@@ -1,0 +1,29 @@
+{
+  "name": "tentaclaw-agent",
+  "version": "0.1.0",
+  "description": "TentaCLAW Agent — Node daemon for AI inference cluster management",
+  "main": "dist/index.js",
+  "bin": {
+    "tentaclaw-agent": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "keywords": [
+    "tentaclaw",
+    "ai",
+    "inference",
+    "cluster",
+    "gpu"
+  ],
+  "author": "TentaCLAW Project",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  }
+}

@@ -1,0 +1,27 @@
+[Unit]
+Description=TentaCLAW Agent — Node daemon for AI inference cluster
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/tentaclaw-agent
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tentaclaw-agent
+
+# Environment
+Environment=NODE_ID=
+Environment=FARM_HASH=
+Environment=GATEWAY_URL=
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/run/tentaclaw /var/log/tentaclaw /etc/tentaclaw
+
+[Install]
+WantedBy=multi-user.target
