@@ -87,6 +87,7 @@ import {
     cacheResponse,
     getCacheStats,
     pruneCache,
+    getClusterPower,
     createApiKey,
     validateApiKey,
     trackApiKeyTokens,
@@ -1913,6 +1914,14 @@ app.post('/api/v1/models/smart-deploy', async (c) => {
 
 app.get('/api/v1/inference/stats', (c) => {
     return c.json(getRequestStats());
+});
+
+// =============================================================================
+// Power & Cost (Wave 11)
+// =============================================================================
+
+app.get('/api/v1/power', (c) => {
+    return c.json(getClusterPower());
 });
 
 // =============================================================================

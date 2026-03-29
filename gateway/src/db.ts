@@ -1302,6 +1302,75 @@ export function getAllTags(): Array<{ tag: string; count: number }> {
 }
 
 // =============================================================================
+// Power & Cost Tracking (Wave 11)
+// =============================================================================
+
+const DEFAULT_ELECTRICITY_RATE = 0.12; // $/kWh — US average
+
+export function getClusterPower(): {
+    total_watts: number;
+    per_node: Array<{ node_id: string; hostname: string; watts: number; gpu_watts: number; gpu_count: number }>;
+    daily_kwh: number;
+    monthly_kwh: number;
+    daily_cost: number;
+    monthly_cost: number;
+    cost_per_request: number;
+    cost_per_1k_tokens: number;
+    electricity_rate: number;
+} {
+    const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
+    const rate = DEFAULT_ELECTRICITY_RATE;
+
+    const perNode = nodes.map(n => {
+        const s = n.latest_stats!;
+        const gpuWatts = s.gpus.reduce((sum, g) => sum + (g.powerDrawW || 0), 0);
+        // Estimate system power: CPU ~65W + RAM ~10W + misc ~25W = ~100W baseline
+        const systemWatts = 100;
+        const totalWatts = gpuWatts + systemWatts;
+        return {
+            node_id: n.id,
+            hostname: n.hostname,
+            watts: totalWatts,
+            gpu_watts: gpuWatts,
+            gpu_count: s.gpu_count,
+        };
+    });
+
+    const totalWatts = perNode.reduce((s, n) => s + n.watts, 0);
+    const dailyKwh = (totalWatts * 24) / 1000;
+    const monthlyKwh = dailyKwh * 30;
+    const dailyCost = dailyKwh * rate;
+    const monthlyCost = monthlyKwh * rate;
+
+    // Cost per request from analytics
+    const d = getDb();
+    const hourlyRequests = (d.prepare(`
+        SELECT COUNT(*) as cnt FROM inference_log WHERE created_at >= datetime('now', '-1 hour')
+    `).get() as { cnt: number }).cnt;
+
+    const requestsPerDay = hourlyRequests * 24;
+    const costPerRequest = requestsPerDay > 0 ? dailyCost / requestsPerDay : 0;
+
+    const hourlyTokens = (d.prepare(`
+        SELECT COALESCE(SUM(tokens_out), 0) as total FROM inference_log WHERE created_at >= datetime('now', '-1 hour')
+    `).get() as { total: number }).total;
+    const tokensPerDay = hourlyTokens * 24;
+    const costPer1kTokens = tokensPerDay > 0 ? (dailyCost / tokensPerDay) * 1000 : 0;
+
+    return {
+        total_watts: totalWatts,
+        per_node: perNode,
+        daily_kwh: Math.round(dailyKwh * 10) / 10,
+        monthly_kwh: Math.round(monthlyKwh),
+        daily_cost: Math.round(dailyCost * 100) / 100,
+        monthly_cost: Math.round(monthlyCost * 100) / 100,
+        cost_per_request: Math.round(costPerRequest * 10000) / 10000,
+        cost_per_1k_tokens: Math.round(costPer1kTokens * 10000) / 10000,
+        electricity_rate: rate,
+    };
+}
+
+// =============================================================================
 // Prompt Cache (Wave 10)
 // =============================================================================
 

@@ -1275,6 +1275,45 @@ async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
     console.log('');
 }
 
+async function cmdPower(gateway: string): Promise<void> {
+    console.log('');
+    const data = await apiGet(gateway, '/api/v1/power') as any;
+
+    console.log('  ' + C.purple(C.bold('Power & Cost')));
+    console.log('');
+    const totalW = data.total_watts || 0;
+    const dailyKwh = data.daily_kwh || data.daily_cost_usd ? ((totalW * 24) / 1000) : 0;
+    const monthlyKwh = dailyKwh * 30;
+    const rate = data.electricity_rate || data.cost_per_kwh || 0.12;
+    const dailyCost = data.daily_cost || data.daily_cost_usd || (dailyKwh * rate);
+    const monthlyCost = data.monthly_cost || data.monthly_cost_usd || (monthlyKwh * rate);
+
+    console.log('  ' + C.cyan(C.bold('Cluster Power')));
+    console.log('  ' + padRight(C.dim('Total Draw'), 22) + C.white(totalW + 'W'));
+    console.log('  ' + padRight(C.dim('Daily Usage'), 22) + C.white(dailyKwh.toFixed(1) + ' kWh'));
+    console.log('  ' + padRight(C.dim('Monthly Usage'), 22) + C.white(Math.round(monthlyKwh) + ' kWh'));
+    console.log('');
+    console.log('  ' + C.cyan(C.bold('Cost')) + C.dim(` ($${rate}/kWh)`));
+    console.log('  ' + padRight(C.dim('Daily'), 22) + C.green('$' + dailyCost.toFixed(2)));
+    console.log('  ' + padRight(C.dim('Monthly'), 22) + C.green('$' + monthlyCost.toFixed(2)));
+    if (data.cost_per_request > 0) {
+        console.log('  ' + padRight(C.dim('Per Request'), 22) + C.green('$' + data.cost_per_request.toFixed(4)));
+    }
+    if (data.cost_per_1k_tokens > 0) {
+        console.log('  ' + padRight(C.dim('Per 1K Tokens'), 22) + C.green('$' + data.cost_per_1k_tokens.toFixed(4)));
+    }
+
+    if (data.per_node.length > 0) {
+        console.log('');
+        console.log('  ' + C.cyan(C.bold('Per Node')));
+        for (const n of data.per_node) {
+            const nodeW = n.watts || (n.gpu_watts + 100) || 0;
+            console.log('  ' + padRight(C.white(n.hostname), 18) + padRight(C.dim(nodeW + 'W total'), 14) + C.dim((n.gpu_watts || 0) + 'W GPU') + C.dim(` (${n.gpu_count} GPUs)`));
+        }
+    }
+    console.log('');
+}
+
 async function cmdAlias(gateway: string, positional: string[], flags: Record<string, string>): Promise<void> {
     const sub = positional[0] || 'list';
 
@@ -2014,6 +2053,11 @@ async function main(): Promise<void> {
 
         case 'notify':
             await cmdNotify(gateway, parsed.positional, parsed.flags);
+            break;
+
+        case 'power':
+        case 'cost':
+            await cmdPower(gateway);
             break;
 
         case 'alias':
