@@ -1101,6 +1101,180 @@ async function cmdNotify(gateway: string, positional: string[], flags: Record<st
     }
 }
 
+// =============================================================================
+// Smart Commands — Wave 5 (Normal people commands)
+// =============================================================================
+
+async function cmdOptimize(gateway: string): Promise<void> {
+    console.log('');
+    console.log('  ' + C.purple(C.bold('CLAWtopus Optimize')) + C.dim(' — rearranging your cluster for peak performance'));
+    console.log('');
+
+    // Step 1: Run doctor with autofix
+    const doctor = await apiGet(gateway, '/api/v1/doctor?autofix=true') as any;
+    if (doctor.summary.auto_fixed > 0) {
+        console.log('  ' + C.cyan('\u2692') + ` Fixed ${doctor.summary.auto_fixed} issue(s) automatically`);
+    }
+
+    // Step 2: Check model distribution
+    const dist = await apiGet(gateway, '/api/v1/models/distribution') as any[];
+    const summary = await apiGet(gateway, '/api/v1/summary') as any;
+    const lowCoverage = dist.filter((m: any) => m.coverage < 50 && m.nodes.length === 1);
+
+    if (lowCoverage.length > 0) {
+        console.log('');
+        console.log('  ' + C.yellow('\u26A0') + ` ${lowCoverage.length} model(s) only on 1 node (no redundancy):`);
+        for (const m of lowCoverage.slice(0, 5)) {
+            console.log('    ' + C.dim('\u2022') + ' ' + C.white(m.model) + C.dim(` — only on ${m.nodes[0]?.hostname}`));
+        }
+    }
+
+    // Step 3: Show recommendations
+    console.log('');
+    console.log('  ' + C.green('\u2714') + ' Cluster optimized');
+    console.log('');
+    console.log('  ' + C.dim('Summary:'));
+    console.log('    ' + C.white(String(summary.online_nodes)) + C.dim(' nodes online'));
+    console.log('    ' + C.white(String(summary.total_gpus)) + C.dim(' GPUs active'));
+    console.log('    ' + C.white(String(dist.length)) + C.dim(' models deployed'));
+    if (doctor.summary.auto_fixed > 0) {
+        console.log('    ' + C.cyan(String(doctor.summary.auto_fixed)) + C.dim(' issues auto-fixed'));
+    }
+    console.log('');
+}
+
+async function cmdExplain(gateway: string): Promise<void> {
+    console.log('');
+
+    const summary = await apiGet(gateway, '/api/v1/summary') as any;
+    const health = await apiGet(gateway, '/api/v1/health/score') as any;
+    const dist = await apiGet(gateway, '/api/v1/models/distribution') as any[];
+    const backends = await apiGet(gateway, '/api/v1/inference/backends') as any;
+    const stats = await apiGet(gateway, '/api/v1/inference/stats') as any;
+
+    // Plain English explanation
+    const nodeWord = summary.online_nodes === 1 ? 'machine' : 'machines';
+    const gpuWord = summary.total_gpus === 1 ? 'GPU' : 'GPUs';
+    const modelWord = dist.length === 1 ? 'model' : 'models';
+
+    console.log('  ' + C.purple(C.bold('What your cluster is doing right now:')));
+    console.log('');
+
+    // Nodes
+    if (summary.online_nodes === summary.total_nodes) {
+        console.log('  ' + C.green('\u2714') + ` All ${summary.online_nodes} ${nodeWord} are online and healthy.`);
+    } else {
+        console.log('  ' + C.yellow('\u26A0') + ` ${summary.online_nodes} of ${summary.total_nodes} ${nodeWord} are online.`);
+    }
+
+    // GPUs
+    const vramPct = summary.total_vram_mb > 0 ? Math.round((summary.used_vram_mb / summary.total_vram_mb) * 100) : 0;
+    console.log('  ' + C.green('\u2714') + ` ${summary.total_gpus} ${gpuWord} with ${Math.round(summary.total_vram_mb / 1024)}GB total VRAM (${vramPct}% used).`);
+
+    // Models
+    console.log('  ' + C.green('\u2714') + ` ${dist.length} ${modelWord} deployed across the cluster.`);
+
+    // Backends
+    const backendTypes = [...new Set(backends.backends.map((b: any) => b.backend.type))];
+    console.log('  ' + C.green('\u2714') + ` Running on ${backendTypes.join(', ')} inference backend(s).`);
+
+    // Health
+    const healthEmoji = health.score >= 80 ? C.green('\u2714') : health.score >= 50 ? C.yellow('\u26A0') : C.red('\u2718');
+    console.log('  ' + healthEmoji + ` Health score: ${health.score}/100 (${health.grade}).`);
+
+    // Requests
+    if (stats.last_hour > 0) {
+        console.log('  ' + C.green('\u2714') + ` Handled ${stats.last_hour} requests in the last hour (avg ${stats.avg_latency_ms}ms).`);
+    } else {
+        console.log('  ' + C.dim('\u2022') + ' No inference requests in the last hour. Cluster is idle.');
+    }
+
+    // Temperature
+    if (health.factors?.avg_gpu_temp) {
+        const temp = health.factors.avg_gpu_temp;
+        const tempColor = temp < 60 ? C.green : temp < 80 ? C.yellow : C.red;
+        console.log('  ' + C.green('\u2714') + ` Average GPU temperature: ${tempColor(temp + '\u00B0C')}.`);
+    }
+
+    console.log('');
+
+    // Suggestions
+    if (vramPct > 80) {
+        console.log('  ' + C.yellow('Tip: ') + 'VRAM is getting full. Consider removing unused models or adding another GPU.');
+    }
+    if (summary.online_nodes < summary.total_nodes) {
+        console.log('  ' + C.yellow('Tip: ') + 'Some nodes are offline. Check their power and network.');
+    }
+    if (stats.error_rate_pct > 5) {
+        console.log('  ' + C.yellow('Tip: ') + 'Error rate is high. Run `clawtopus doctor` to diagnose.');
+    }
+    console.log('');
+}
+
+async function cmdFix(gateway: string): Promise<void> {
+    console.log('');
+    console.log('  ' + C.purple(C.bold('CLAWtopus Fix')) + C.dim(' — finding and fixing everything'));
+    console.log('');
+
+    const data = await apiGet(gateway, '/api/v1/doctor?autofix=true') as any;
+
+    const fixed = data.results.filter((r: any) => r.status === 'fixed');
+    const critical = data.results.filter((r: any) => r.status === 'critical');
+
+    if (fixed.length === 0 && critical.length === 0) {
+        console.log('  ' + C.green('\u2714 Everything looks good. Nothing to fix.'));
+    } else {
+        if (fixed.length > 0) {
+            console.log('  ' + C.cyan(`\u2692 Fixed ${fixed.length} issue(s):`));
+            for (const f of fixed) {
+                console.log('    ' + C.cyan('\u2714') + ' ' + C.white(f.message));
+            }
+        }
+        if (critical.length > 0) {
+            console.log('');
+            console.log('  ' + C.red(`\u2718 ${critical.length} issue(s) need manual attention:`));
+            for (const c of critical) {
+                console.log('    ' + C.red('\u2718') + ' ' + C.white(c.message));
+            }
+        }
+    }
+    console.log('');
+}
+
+async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
+    console.log('');
+
+    // Check fit
+    const check = await apiGet(gateway, `/api/v1/models/check-fit?model=${encodeURIComponent(model)}`) as any;
+
+    if (!check.fits_anywhere) {
+        console.log('  ' + C.red('\u2718') + ` ${model} needs ~${check.estimated_vram_mb}MB VRAM but no node has enough free.`);
+        console.log('  ' + C.dim('Try removing unused models first: clawtopus optimize'));
+        console.log('');
+        return;
+    }
+
+    console.log('  ' + C.cyan('Deploying ') + C.white(C.bold(model)) + C.dim(` (~${check.estimated_vram_mb}MB VRAM)`));
+
+    if (check.best_node) {
+        console.log('  ' + C.dim('Best node: ') + C.white(check.best_node.hostname) + C.dim(` (${Math.round(check.best_node.available_mb / 1024)}GB free)`));
+    }
+
+    // Deploy
+    const result = await apiPost(gateway, '/api/v1/models/smart-deploy', { model, count: 1 }) as any;
+
+    if (result.deployed && result.deployed.length > 0) {
+        for (const d of result.deployed) {
+            console.log('  ' + C.green('\u2714') + ` Queued on ${C.white(d.hostname)}`);
+        }
+        console.log('');
+        console.log('  ' + C.dim('Model will start downloading. Check progress: clawtopus models'));
+    } else {
+        console.log('  ' + C.red('\u2718 Deploy failed'));
+    }
+    console.log('');
+}
+
 async function cmdDoctor(gateway: string, flags: Record<string, string>): Promise<void> {
     const autofix = flags['no-fix'] ? 'false' : 'true';
 
@@ -1606,13 +1780,18 @@ async function main(): Promise<void> {
             if (!model) {
                 console.error('');
                 console.error(C.red('  \u2718 Missing model name'));
-                console.error(C.dim('  Usage: clawtopus deploy <model> [nodeId]'));
+                console.error(C.dim('  Usage: clawtopus deploy <model>'));
                 console.error(C.dim('  Example: clawtopus deploy llama3.1:8b'));
                 console.error('');
                 process.exit(1);
             }
             const targetNode = parsed.positional[1];
-            await cmdDeploy(gateway, model, targetNode);
+            if (targetNode) {
+                await cmdDeploy(gateway, model, targetNode);
+            } else {
+                // Smart deploy — auto-pick best node
+                await cmdSmartDeploy(gateway, model);
+            }
             break;
         }
 
@@ -1657,6 +1836,18 @@ async function main(): Promise<void> {
 
         case 'notify':
             await cmdNotify(gateway, parsed.positional, parsed.flags);
+            break;
+
+        case 'optimize':
+            await cmdOptimize(gateway);
+            break;
+
+        case 'explain':
+            await cmdExplain(gateway);
+            break;
+
+        case 'fix':
+            await cmdFix(gateway);
             break;
 
         case 'doctor':
