@@ -31,7 +31,7 @@ RESET='\x1b[0m'
 ```
 ${CYAN}        ╭──────────────────╮${RESET}
 ${CYAN}    ╭───┤  ${WHITE}TENTACLAW OS  ${CYAN}├───╮${RESET}
-${CYAN}   ╭─┤  ${WHITE}HiveOS for AI${RESET}    ╰─┤${RESET}
+${CYAN}   ╭─┤  ${WHITE}AI inference cluster OS${RESET}    ╰─┤${RESET}
 ${CYAN}   │╭┴────────────────────┴╮│${RESET}
 ${CYAN}   ││${PURPLE}    ___              ${CYAN}    ││${RESET}
 ${CYAN}   ││${PURPLE}   /   \\   ${CYAN}             ││${RESET}
@@ -233,7 +233,7 @@ ${CYAN}         "Just you and me. Cute."${RESET}
 ║    ${TEAL}▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓${RESET}    ║
 ║                                                                  ║
 ║    ${WHITE}Eight arms. One mind. Zero compromises.${RESET}                             ║
-║    ${WHITE}HiveOS for AI Inference Clusters${RESET}                            ║
+║    ${WHITE}AI inference cluster OS Inference Clusters${RESET}                            ║
 ║                                                                  ║
 ║    ${CYAN}[ CLAWtopus ]${RESET} — Loading...                              ║
 ║                                                                  ║

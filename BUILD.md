@@ -10,7 +10,7 @@
 ## 1. Project Overview
 
 ### What is TentaCLAW OS?
-TentaCLAW OS is a purpose-built Linux distribution for AI inference clusters. Like HiveOS revolutionized GPU mining by making 1000-rig farms manageable from one dashboard, TentaCLAW OS makes AI inference clusters accessible to non-technical users via zero-config auto-discovery and one-click model deployment.
+TentaCLAW OS is a purpose-built Linux distribution for AI inference clusters. Like TentaCLAW revolutionized GPU mining by making 1000-rig farms manageable from one dashboard, TentaCLAW OS makes AI inference clusters accessible to non-technical users via zero-config auto-discovery and one-click model deployment.
 
 ### What This Build Covers (v1.0.0 — FULL SCOPE)
 This is a **full release** covering:
@@ -19,7 +19,7 @@ This is a **full release** covering:
 3. HiveMind gateway registration using Farm Hash
 4. Full TentaCLAW Agent daemon (`tentaclaw-agent`)
 5. HiveMind gateway API endpoints (register, stats, commands)
-6. HiveOS-style push model (POST stats, receive commands in response)
+6. TentaCLAW-style push model (POST stats, receive commands in response)
 7. GPU stats collection and watchdog
 
 ### Future Phases
@@ -179,7 +179,7 @@ F:\Daphney-OG\tentaclaw-os\
 
 ### 2.3 Network Communication Model
 
-**HiveOS-style push model** — nodes push stats, receive commands in response:
+**TentaCLAW-style push model** — nodes push stats, receive commands in response:
 
 ```
 EVERY 10 SECONDS:
@@ -1109,9 +1109,9 @@ GET  /api/v1/nodes/{id}/commands # Command queue (long poll)
 ```
 
 ### Key Scripts to Understand
-- `hive/sbin/gpu-detect` (HiveOS) — Reference for GPU detection
-- `hive/sbin/gpu-stats` (HiveOS) — Reference for GPU stats collection
-- `hive/sbin/amd-oc` (HiveOS) — Reference for AMD overclocking
+- `hive/sbin/gpu-detect` (TentaCLAW) — Reference for GPU detection
+- `hive/sbin/gpu-stats` (TentaCLAW) — Reference for GPU stats collection
+- `hive/sbin/amd-oc` (TentaCLAW) — Reference for AMD overclocking
 
 ---
 

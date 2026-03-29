@@ -2,16 +2,16 @@
 
 ## Hacker News Submission
 
-**Title**: TentaCLAW OS: A purpose-built Linux for AI inference clusters (like HiveOS, but for AI)
+**Title**: TentaCLAW OS: A purpose-built Linux for AI inference clusters (like TentaCLAW, but for AI)
 
 **Body**:
 ```
-TentaCLAW OS is a new Linux distribution designed specifically for AI inference clusters. Think HiveOS but for running distributed AI inference workloads instead of GPU mining.
+TentaCLAW OS is a new Linux distribution designed specifically for AI inference clusters. Think TentaCLAW but for running distributed AI inference workloads instead of GPU mining.
 
 ## What it does
 
 - **Zero-config GPU detection**: Automatically detects and configures NVIDIA/AMD GPUs on boot
-- **Push-based HiveMind protocol**: Nodes phone home with stats, receive commands via response headers (like HiveOS farm hash system)
+- **Push-based HiveMind protocol**: Nodes phone home with stats, receive commands via response headers (like TentaCLAW farm hash system)
 - **One-click model deployment**: Deploy models to your cluster with a single command
 - **Distributed inference gateway**: Built-in API gateway with streaming, routing, health checks, and rate limiting
 - **PXE boot support**: Boot entire racks over the network
@@ -43,7 +43,7 @@ TentaCLAW OS is a new Linux distribution designed specifically for AI inference 
 
 ## Why
 
-HiveOS revolutionized GPU mining with its plug-and-play approach. We wanted to bring that same ease-of-use to AI inference clusters. Running a distributed inference setup shouldn't require a PhD in cluster management.
+TentaCLAW revolutionized GPU mining with its plug-and-play approach. We wanted to bring that same ease-of-use to AI inference clusters. Running a distributed inference setup shouldn't require a PhD in cluster management.
 
 ## Links
 
@@ -66,15 +66,15 @@ Would love feedback from the community on the architecture and approach. Pull re
 
 **Body**:
 ```
-TentaCLAW OS is a purpose-built Linux distribution for AI inference clusters. Inspired by HiveOS's success with GPU mining, we wanted to bring that same plug-and-play philosophy to distributed AI inference.
+TentaCLAW OS is a purpose-built Linux distribution for AI inference clusters. Inspired by TentaCLAW's success with GPU mining, we wanted to bring that same plug-and-play philosophy to distributed AI inference.
 
 ## Architecture Highlights
 
-- **Farm Hash System**: SHA256 of hardware signatures creates unique cluster/node identity (same pattern as HiveOS)
+- **Farm Hash System**: SHA256 of hardware signatures creates unique cluster/node identity (same pattern as TentaCLAW)
 - **Push Telemetry**: Nodes POST stats every 10s, commands received in HTTP response headers
 - **Stateless Config**: /etc/tentaclaw/ contains all config; nodes work offline
 - **GPU Detection**: Multi-layer: lspci → GPU_VENDOR → BUSID mapping → driver validation
-- **Flight Sheets**: Model configs stored as swappable files (like HiveOS flight sheets)
+- **Flight Sheets**: Model configs stored as swappable files (like TentaCLAW flight sheets)
 
 ## Technical Stack
 
@@ -104,11 +104,11 @@ Launching v1.0.0 Sunday. Feedback welcome!
 
 ## r/selfhosted Submission
 
-**Title**: TentaCLAW OS – We built a purpose-built Linux for AI inference clusters (like HiveOS for AI inference)
+**Title**: TentaCLAW OS – We built a purpose-built Linux for AI inference clusters (like AI inference cluster OS inference)
 
 **Body**:
 ```
-Hey r/selfhosted! We built TentaCLAW OS – a Linux distribution specifically for AI inference clusters. Like HiveOS revolutionized GPU mining, we wanted to make distributed AI inference accessible to everyone.
+Hey r/selfhosted! We built TentaCLAW OS – a Linux distribution specifically for AI inference clusters. Like TentaCLAW revolutionized GPU mining, we wanted to make distributed AI inference accessible to everyone.
 
 ## The Problem
 
@@ -131,7 +131,7 @@ TentaCLAW OS handles:
 
 ## Architecture
 
-- Farm Hash identity (like HiveOS)
+- Farm Hash identity (like TentaCLAW)
 - Stateless /etc/tentaclaw/ config
 - TypeScript agent daemon
 - Express gateway with SSE streaming
@@ -178,7 +178,7 @@ Been running some AI inference workloads at home and got tired of:
 3. No good way to manage multiple nodes
 4. Reinventing the wheel for each new model
 
-So we built TentaCLAW OS – think HiveOS but for AI inference.
+So we built TentaCLAW OS – think TentaCLAW but for AI inference.
 
 ## Features
 
@@ -192,7 +192,7 @@ So we built TentaCLAW OS – think HiveOS but for AI inference.
 
 ## Architecture
 
-Same principles that made HiveOS successful:
+Same principles that made TentaCLAW successful:
 - Farm Hash identity (SHA256 of hardware sig)
 - Stateless config in /etc/tentaclaw/
 - Push telemetry every 10s

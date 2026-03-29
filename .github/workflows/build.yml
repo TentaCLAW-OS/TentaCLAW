@@ -177,7 +177,7 @@ jobs:
             - HiveMind Gateway with web dashboard
             - Flight sheet model deployment
             - SSE real-time dashboard updates
-            - HiveOS-style push model
+            - TentaCLAW-style push model
             - CLAWtopus ASCII art
 
           files: |

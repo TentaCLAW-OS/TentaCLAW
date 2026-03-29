@@ -10,7 +10,7 @@ A viewer should understand:
 3. why they should care
 
 ## Demo Story
-**TentaCLAW OS is HiveOS for AI inference clusters.**
+**TentaCLAW OS is AI inference cluster OS.**
 
 Show that story visually, not by over-explaining it.
 
@@ -18,7 +18,7 @@ Show that story visually, not by over-explaining it.
 
 ### Shot 1 — Cold open (2-3s)
 **Visual:** Terminal / boot splash / CLAWtopus
-**On-screen text:** `HiveOS for AI inference clusters`
+**On-screen text:** `AI inference cluster OS`
 **Goal:** product definition immediately
 
 ### Shot 2 — Hardware detection (3-4s)
@@ -113,7 +113,7 @@ Show that story visually, not by over-explaining it.
 - tags
 
 ## Suggested Screen Text
-- HiveOS for AI inference clusters
+- AI inference cluster OS
 - Flash. Boot. Deploy.
 - Auto-discovery on LAN
 - One dashboard. One CLI.
@@ -142,7 +142,7 @@ For GitHub / README:
 ## Narration Script (Optional)
 If using voiceover, keep it short:
 
-> TentaCLAW OS is HiveOS for AI inference clusters.
+> TentaCLAW OS is AI inference cluster OS.
 > Boot a node, let it join the tank, deploy a model, and run local inference on hardware you already own.
 > Eight arms. One mind.
 

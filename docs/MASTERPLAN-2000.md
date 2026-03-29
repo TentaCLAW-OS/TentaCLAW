@@ -237,7 +237,7 @@
 ---
 
 # WAVE 7: DASHBOARD — NODE GRID (Phases 121-140)
-*HiveOS-style. Every node is a card. Everything is live.*
+*TentaCLAW-style. Every node is a card. Everything is live.*
 
 ### Phase 121-125: Framework & Architecture
 - [ ] 121. Rewrite dashboard in Svelte (fast, small, reactive)
@@ -287,7 +287,7 @@
 - [ ] 150. One-click "optimize": auto-redistribute models for best coverage
 
 ### Phase 151-155: GPU Heatmap
-- [ ] 151. Grid of all GPUs across all nodes (like HiveOS GPU Hub)
+- [ ] 151. Grid of all GPUs across all nodes (like TentaCLAW GPU Hub)
 - [ ] 152. Color by temperature: green < 60, yellow < 80, red > 80
 - [ ] 153. Click any GPU for detailed stats (temp, VRAM, util, power, clocks)
 - [ ] 154. Historical temp chart per GPU (last 24h)
@@ -369,7 +369,7 @@
 ---
 
 # WAVE 11: PER-GPU CONTROL (Phases 201-220)
-*HiveOS-level GPU management. Every card, individually.*
+*TentaCLAW-level GPU management. Every card, individually.*
 
 ### Phase 201-205: AMD Overclocking
 - [ ] 201. Core clock offset via sysfs pp_od_clk_voltage

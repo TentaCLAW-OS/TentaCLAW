@@ -3,7 +3,7 @@
 ## Positioning
 
 ### Primary line
-**TentaCLAW OS is HiveOS for AI inference clusters.**
+**TentaCLAW OS is AI inference cluster OS.**
 
 ### One-sentence explainer
 TentaCLAW OS turns your pile of GPUs into a self-managing local AI cluster with auto-discovery, node health, model deployment, and one CLI to run the tank.
@@ -18,7 +18,7 @@ TentaCLAW OS turns your pile of GPUs into a self-managing local AI cluster with 
 
 Use this order everywhere:
 
-1. **What it is** — HiveOS for AI inference clusters
+1. **What it is** — AI inference cluster OS
 2. **Why it matters** — turns spare GPUs into one local cluster
 3. **Why it spreads** — CLAWtopus, terminal-native identity, anti-SaaS hook
 
@@ -72,7 +72,7 @@ Prepare these before posting anywhere:
 ### 3. Tight landing copy
 README, release notes, and launch post should all start with the same line:
 
-> TentaCLAW OS is HiveOS for AI inference clusters.
+> TentaCLAW OS is AI inference cluster OS.
 
 ## Distribution Priority
 
@@ -100,7 +100,7 @@ Must include:
 Purpose: credibility + discovery.
 
 Angle:
-- "We built HiveOS for AI inference clusters"
+- "We built AI inference cluster OS"
 - focus on technical usefulness, not mascot first
 - mention local inference management gap
 
@@ -108,7 +108,7 @@ Angle:
 Purpose: adoption + discussion.
 
 Best angles:
-- "I built HiveOS for AI inference"
+- "I built AI inference cluster OS inference"
 - "My homelab has tentacles now"
 - "Flash USB, boot, and your GPU box joins the cluster"
 
@@ -151,7 +151,7 @@ Best formats:
 ## Demo Script (30 seconds)
 
 ### Cut 1 — Boot
-Caption: **HiveOS for AI is real now.**
+Caption: **AI inference cluster OS is real now.**
 
 ### Cut 2 — GPU detection
 Caption: **Auto-detects the hardware.**
@@ -173,14 +173,14 @@ Caption: **Deploy a model. Run inference. Done.**
 ## Ready-to-Post Copy
 
 ### Hacker News title options
-- TentaCLAW OS: HiveOS for AI inference clusters
+- TentaCLAW OS: AI inference cluster OS
 - Show HN: TentaCLAW OS — a bootable cluster OS for local AI
-- Show HN: TentaCLAW OS, a HiveOS-style stack for GPU inference nodes
+- Show HN: TentaCLAW OS, a TentaCLAW-style stack for GPU inference nodes
 
 ### Hacker News post body
 We built TentaCLAW OS because local AI still has a tooling gap: plenty of people own GPUs, but turning multiple boxes into one manageable inference cluster is still way too manual.
 
-The idea is simple: HiveOS, but for AI inference instead of mining.
+The idea is simple: TentaCLAW, but for AI inference instead of mining.
 
 Flash the ISO, boot a node, auto-discover the gateway, register into a farm, deploy models, and manage the cluster from one dashboard or CLI.
 
@@ -191,12 +191,12 @@ It's opinionated, terminal-native, and yes, it has an octopus mascot named CLAWt
 Would love feedback on the architecture, launch flow, and where this would be most useful in real homelabs or small labs.
 
 ### Reddit post title options
-- I built HiveOS for AI inference and it’s actually working
+- I built AI inference cluster OS inference and it’s actually working
 - My homelab has tentacles now and I regret nothing
 - Flash USB, boot a GPU box, and it joins your AI cluster
 
 ### Reddit post body
-I wanted the HiveOS experience for local AI: boot a node, auto-detect the hardware, register it, push models to it, and manage the whole cluster without babysitting every box.
+I wanted the TentaCLAW experience for local AI: boot a node, auto-detect the hardware, register it, push models to it, and manage the whole cluster without babysitting every box.
 
 So I built TentaCLAW OS.
 
@@ -215,7 +215,7 @@ If that sounds useful, I’d love feedback.
 
 ### X / Twitter thread
 **Post 1**  
-We built **HiveOS for AI inference clusters**.
+We built **AI inference cluster OS**.
 
 It’s called **TentaCLAW OS**.
 
@@ -246,7 +246,7 @@ Her name is CLAWtopus.
 ### Discord announcement
 # TentaCLAW OS is live
 
-**HiveOS for AI inference clusters** is here.
+**AI inference cluster OS** is here.
 
 TentaCLAW OS turns your pile of GPUs into a self-managing local AI cluster with:
 - auto-discovery
@@ -261,7 +261,7 @@ Flash it. Boot it. Deploy models. Let CLAWtopus handle the boring stuff.
 ## Brand Rules for Launch Week
 
 ### Always say
-- HiveOS for AI inference clusters
+- AI inference cluster OS
 - local AI cluster
 - flash, boot, deploy
 - own your hardware

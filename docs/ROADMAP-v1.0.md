@@ -1,6 +1,6 @@
 # TentaCLAW OS — Roadmap to v1.0
 
-> Reverse-engineered from HiveOS architecture, adapted for AI inference.
+> Reverse-engineered from TentaCLAW architecture, adapted for AI inference.
 > 1000 phases organized into 20 milestones.
 
 ## Current State (v0.2.0)
@@ -12,10 +12,10 @@
 - Mock agent for development
 - AMD + NVIDIA GPU detection via sysfs/nvidia-smi
 
-## What HiveOS Does That We Don't (Yet)
+## What TentaCLAW Does That We Don't (Yet)
 
 ### Critical Gaps
-1. **Rig.conf auto-generation** — HiveOS generates config on first boot from Farm Hash URL
+1. **Rig.conf auto-generation** — TentaCLAW generates config on first boot from Farm Hash URL
 2. **Watchdog** — GPU hang detection, auto-reboot, hashrate (tok/s) monitoring with thresholds
 3. **Per-GPU overclocking from dashboard** — core clock, mem clock, power limit, fan curve per card
 4. **Auto-fan** — temperature-based fan curve that runs locally on each node
@@ -23,7 +23,7 @@
 6. **Telegram/Discord alerts** — real-time notifications, not just in-dashboard
 7. **Bulk operations** — select 50 rigs, apply flight sheet to all
 8. **Auto-update** — agent self-updates from gateway or GitHub
-9. **VPN/WAN** — rigs behind NAT can still connect (like HiveOS uses WireGuard)
+9. **VPN/WAN** — rigs behind NAT can still connect (like TentaCLAW uses WireGuard)
 10. **Worker screenshots** — see what the rig's screen shows (for debugging)
 11. **Uptime tracking** — historical uptime percentage per rig
 12. **Wallet management** → replaced by **API key management** for inference
@@ -33,7 +33,7 @@
 
 ## Phase 1-50: WATCHDOG & SELF-HEALING (Milestone 1)
 
-The #1 feature that makes HiveOS indispensable. If a GPU hangs or inference stops, the system fixes itself.
+The #1 feature that makes TentaCLAW indispensable. If a GPU hangs or inference stops, the system fixes itself.
 
 ### Phase 1-10: Watchdog Core
 - [ ] 1. Agent-side watchdog thread — monitors GPU responsiveness every 30s
@@ -277,15 +277,15 @@ The #1 feature that makes HiveOS indispensable. If a GPU hangs or inference stop
 
 ## Phase 201-300: DASHBOARD OVERHAUL (Milestone 5)
 
-### Phase 201-230: HiveOS-Style Dashboard
+### Phase 201-230: TentaCLAW-Style Dashboard
 - [ ] 201. React/Svelte rewrite (ditch vanilla JS)
 - [ ] 202. Real-time WebSocket updates (not polling)
-- [ ] 203. Worker list with HiveOS-style row layout
+- [ ] 203. Worker list with TentaCLAW-style row layout
 - [ ] 204. GPU cards inline — temp bar, util ring, VRAM bar per GPU
 - [ ] 205. Expandable worker detail — full GPU info, commands, logs
 - [ ] 206. Sortable/filterable worker table
 - [ ] 207. Farm selector dropdown (multi-farm)
-- [ ] 208. Dark mode (HiveOS green-on-black aesthetic)
+- [ ] 208. Dark mode (TentaCLAW green-on-black aesthetic)
 - [ ] 209. Responsive mobile layout
 - [ ] 210. Keyboard shortcuts (j/k navigate, r refresh, etc.)
 - [ ] 211. GPU temperature heatmap (color grid of all GPUs)
@@ -474,7 +474,7 @@ Connect the AI personality layer.
 1. **Watchdog** (Phase 1-50) — makes it production-usable
 2. **Remote Shell** (Phase 51-60) — killer feature for management
 3. **Notifications** (Phase 61-70) — can't run production without alerts
-4. **Per-GPU Overclock** (Phase 31-40) — HiveOS core feature
+4. **Per-GPU Overclock** (Phase 31-40) — TentaCLAW core feature
 5. **API Keys** (Phase 151-170) — needed to sell inference access
 6. **Dashboard rewrite** (Phase 201-250) — current one is garbage
 7. **ISO builder** (Phase 301-400) — makes it a real OS

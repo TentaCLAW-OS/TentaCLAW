@@ -9,14 +9,14 @@
 **CLAWtopus**
 
 ### Category line
-**HiveOS for AI inference clusters**
+**AI inference cluster OS**
 
 ### Short product shorthand
 **TentaCLAW** only in casual copy, not as the primary formal name.
 
 ## Current Good Patterns
 - README hero uses **TentaCLAW OS**
-- Launch docs consistently use **HiveOS for AI inference clusters**
+- Launch docs consistently use **AI inference cluster OS**
 - CLAWtopus is clearly framed as mascot/personality in new launch docs
 
 ## Current Problems Found
@@ -67,7 +67,7 @@ Source of truth should be:
 ## Launch-Day Naming Rules
 - Always write **TentaCLAW OS** in headlines
 - Use **CLAWtopus** only after explaining the product
-- Prefer **HiveOS for AI inference clusters** as the category line
+- Prefer **AI inference cluster OS** as the category line
 - Use one repo URL everywhere
 - Use one website URL everywhere
 - Do not mix old CLI names into launch copy

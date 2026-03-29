@@ -26,7 +26,7 @@ Copy-paste ready meme formats for social media.
 ```
 ${CYAN}        ╭──────────────────╮${RESET}
 ${CYAN}    ╭───┤  ${WHITE}TENTACLAW OS  ${CYAN}├───╮${RESET}
-${CYAN}   ╭─┤  ${WHITE}HiveOS for AI${RESET}    ╰─┤${RESET}
+${CYAN}   ╭─┤  ${WHITE}AI inference cluster OS${RESET}    ╰─┤${RESET}
 ${CYAN}   │╭┴────────────────────┴╮│${RESET}
 ${CYAN}   ││${PURPLE}    ___              ${CYAN}    ││${RESET}
 ${CYAN}   ││${PURPLE}   /   \\   ${CYAN}             ││${RESET}

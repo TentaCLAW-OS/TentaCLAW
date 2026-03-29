@@ -1,13 +1,13 @@
 # TentaCLAW OS Release Copy
 
 ## Release Title
-**TentaCLAW OS v0.2.0 — HiveOS for AI inference clusters**
+**TentaCLAW OS v0.2.0 — AI inference cluster OS**
 
 ## Short Release Subtitle
 Turn your pile of GPUs into a self-managing local AI cluster.
 
 ## GitHub Release Summary
-TentaCLAW OS is **HiveOS for AI inference clusters**.
+TentaCLAW OS is **AI inference cluster OS**.
 
 It gives local AI builders a missing operating layer: bootable node setup, LAN auto-discovery, cluster registration, dashboard visibility, model deployment, and a CLI to run the whole tank.
 
@@ -60,7 +60,7 @@ See:
 ## Suggested Release Highlights Block
 Use this near the top of the GitHub release page:
 
-- **HiveOS for AI inference clusters**
+- **AI inference cluster OS**
 - **Flash, boot, deploy**
 - **Dashboard + CLI**
 - **Auto-discovery on LAN**
@@ -68,10 +68,10 @@ Use this near the top of the GitHub release page:
 - **CLAWtopus included**
 
 ## One-Paragraph Release Version
-TentaCLAW OS v0.2.0 is a major step toward a real operating layer for local AI clusters: gateway, agent, dashboard, CLI, LAN auto-discovery, node health, tags, alerts, model deployment, and a mock mode for testing the stack without GPUs. If HiveOS made mining rigs manageable, TentaCLAW OS aims to do the same for AI inference nodes.
+TentaCLAW OS v0.2.0 is a major step toward a real operating layer for local AI clusters: gateway, agent, dashboard, CLI, LAN auto-discovery, node health, tags, alerts, model deployment, and a mock mode for testing the stack without GPUs. If TentaCLAW made mining rigs manageable, TentaCLAW OS aims to do the same for AI inference nodes.
 
 ## Social-Friendly Release Pull Quote
-> TentaCLAW OS is HiveOS for AI inference clusters.
+> TentaCLAW OS is AI inference cluster OS.
 
 ## CTA Lines
 - Download it, boot a node, and see if your GPUs behave better with tentacles.

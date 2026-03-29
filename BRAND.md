@@ -45,7 +45,7 @@ BOLD='\x1b[1m'
 ```
 ${CYAN}        ╭──────────────────╮${RESET}
 ${CYAN}    ╭───┤  ${WHITE}TENTACLAW OS  ${CYAN}├───╮${RESET}
-${CYAN}   ╭─┤  ${WHITE}HiveOS for AI${RESET}    ╰─┤${RESET}
+${CYAN}   ╭─┤  ${WHITE}AI inference cluster OS${RESET}    ╰─┤${RESET}
 ${CYAN}   │╭┴────────────────────┴╮│${RESET}
 ${CYAN}   ││${PURPLE}    ___              ${CYAN}    ││${RESET}
 ${CYAN}   ││${PURPLE}   /   \\   ${CYAN}             ││${RESET}
@@ -132,7 +132,7 @@ ${CYAN}  CLAWtopus: "Not bad, human."${RESET}
 ║    ${TEAL}▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓${RESET}    ║
 ║                                                                  ║
 ║    ${WHITE}Eight arms. One mind. Zero compromises.${RESET}                             ║
-║    ${WHITE}HiveOS for AI Inference Clusters${RESET}                            ║
+║    ${WHITE}AI inference cluster OS Inference Clusters${RESET}                            ║
 ║                                                                  ║
 ║    ${CYAN}[ CLAWtopus ]${RESET} — Loading...                              ║
 ║                                                                  ║
@@ -338,7 +338,7 @@ Issue labels:
 > **"Eight arms. One mind."**
 
 ### Long-form Positioning
-> TentaCLAW OS: HiveOS for AI Inference Clusters
+> TentaCLAW OS: AI inference cluster OS Inference Clusters
 > - Zero-config GPU detection
 > - Plug-and-play model deployment
 > - Self-managing cluster with Farm Hash
@@ -355,7 +355,7 @@ Issue labels:
 
 ### Short & Punchy (for ads, stickers)
 - "Eight arms. One mind."
-- "HiveOS for AI"
+- "AI inference cluster OS"
 - "Per-token is a scam."
 - "Your GPUs. Your inference. Your cluster."
 - "CLAWtopus does the boring stuff."
@@ -410,7 +410,7 @@ When's the deadline? This weekend?
 **8. README First Impression**
 First 30 seconds on GitHub matter. What does the README show?
 - ASCII CLAWtopus right at top?
-- One-liner + "HiveOS for AI"
+- One-liner + "AI inference cluster OS"
 - Demo GIF?
 
 ---
@@ -443,7 +443,7 @@ Can be copy-pasted into any terminal.
 - Controversial. Viral.
 - People will screenshot it.
 
-**Design 5: "HiveOS for AI"**
+**Design 5: "AI inference cluster OS"**
 - Clear positioning
 - For the mining crowd
 
@@ -490,7 +490,7 @@ Can be copy-pasted into any terminal.
 </pre>
 <!-- Tagline -->
 <h2>Eight arms. One mind.</h2>
-<h3>HiveOS for AI Inference Clusters</h3>
+<h3>AI inference cluster OS Inference Clusters</h3>
 
 **TentaCLAW OS** turns your pile of GPUs into a unified AI inference 
 cluster — zero config, auto-discovery, one-click model deployment.
@@ -517,9 +517,9 @@ sudo dd if=TentaCLAW-OS-0.1.0-amd64.iso of=/dev/sdX bs=4M status=progress
 
 ## What Even Is This?
 
-> **HiveOS for AI**
+> **AI inference cluster OS**
 
-Like HiveOS, but instead of mining rigs, you manage AI inference nodes.
+Like TentaCLAW, but instead of mining rigs, you manage AI inference nodes.
 Instead of hashrate, you track tokens/second.
 Instead of flight sheets for miners, you have flight sheets for models.
 
@@ -531,7 +531,7 @@ CLAWtopus handles the boring stuff. You do the interesting stuff.
 
 - ${GREEN}✓${RESET} Zero-config GPU detection (NVIDIA, AMD)
 - ${GREEN}✓${RESET} Farm Hash registration — one hash identifies your entire cluster
-- ${GREEN}✓${RESET} HiveOS-style push model — nodes push stats, receive commands
+- ${GREEN}✓${RESET} TentaCLAW-style push model — nodes push stats, receive commands
 - ${GREEN}✓${RESET} One-click model deployment via flight sheets
 - ${GREEN}✓${RESET} Auto-scaling inference across heterogeneous hardware
 - ${GREEN}✓${RESET} CLAWtopus ASCII art (obviously)
@@ -543,7 +543,7 @@ CLAWtopus handles the boring stuff. You do the interesting stuff.
 Every dollar you pay OpenAI is a dollar you could've spent on more VRAM.
 
 TentaCLAW OS runs on YOUR hardware. You already own the GPUs.
-You just need the OS to manage them like HiveOS manages mining rigs.
+You just need the OS to manage them like TentaCLAW manages mining rigs.
 
 Your AI should run on your hardware. Your cluster should manage itself.
 You shouldn't need a PhD to deploy 8 GPUs.
@@ -592,7 +592,7 @@ CLAWtopus does the boring stuff. You do the interesting stuff.
 3. Farm Hash generated and displayed
 4. Agent daemon runs and pushes stats
 5. Gateway API handles register + stats + commands
-6. Full HiveOS-style push model working
+6. Full TentaCLAW-style push model working
 7. README shows the vision
 
 ### Nice to Have for v1 (skip if running late)
@@ -931,7 +931,7 @@ Then I realized: I already own a 3090. It just needed a brain.
 2/ The problem wasn't the GPU.
 The problem was: who manages 8 GPUs like a boss?
 
-Mining had HiveOS.
+Mining had TentaCLAW.
 AI inference had... spreadsheets?
 
 3/ So I built TentaCLAW OS.
@@ -961,7 +961,7 @@ AI inference pricing is a scam built on FOMO.
 Meanwhile my 3090 sits idle because:
 - Setting up a cluster is hard
 - Managing multiple GPUs is pain
-- Nobody made a HiveOS for AI... until now.
+- Nobody made a AI inference cluster OS... until now.
 
 TentaCLAW OS: The OS your GPUs deserve.
 ```
@@ -1009,11 +1009,11 @@ Is this what the future of homelab looks like?
 AMA about TentaCLAW OS. It's free. It's open source. Your GPUs deserve better than spreadsheets.
 ```
 
-**Post 2: "I built the HiveOS for AI inference and it's working"**
+**Post 2: "I built the AI inference cluster OS inference and it's working"**
 ```
-Title: I built "HiveOS for AI inference" and it actually works
+Title: I built "AI inference cluster OS inference" and it actually works
 
-Background: Ran GPU mining rigs for years. Used HiveOS. Loved it.
+Background: Ran GPU mining rigs for years. Used TentaCLAW. Loved it.
 When AI inference became viable on consumer GPUs, I wanted the same UX.
 
 So I built TentaCLAW OS.

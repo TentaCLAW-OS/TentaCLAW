@@ -1,7 +1,7 @@
 # TentaCLAW OS Launch Checklist
 
 ## Positioning
-- [ ] README opens with **HiveOS for AI inference clusters**
+- [ ] README opens with **AI inference cluster OS**
 - [ ] Release page uses the same opening line
 - [ ] Social posts use the same one-line explainer
 - [ ] CLAWtopus appears after product definition, not before it

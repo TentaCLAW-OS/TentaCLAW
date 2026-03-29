@@ -1,82 +1,46 @@
+<h1 align="center">TentaCLAW OS</h1>
+<h3 align="center">Your GPUs. One Brain. Zero Limits.</h3>
+
 <p align="center">
-  <pre>
-
-  <span style="color:#00FFFF">        ╭──────────────────────────────────────────────────────────╮</span>
-  <span style="color:#00FFFF">    ╭───┤  <span style="color:#F0F0F0">TENTACLAW OS — HiveOS for AI Inference Clusters</span>  ├───╮</span>
-  <span style="color:#00FFFF">   ╭─┤                                                         ╰─┤</span>
-  <span style="color:#00FFFF">   │╭┴───────────────────────────────────────────────────────────┴╮│</span>
-  <span style="color:#00FFFF">   ││                                                               ││</span>
-  <span style="color:#8C00C8">   ││           ██████╗ ████████╗ ██████╗ ███╗   ██╗               ││</span>
-  <span style="color:#8C00C8">   ││           ██╔══██╗╚══██╔══╝██╔═══██╗████╗  ██║               ││</span>
-  <span style="color:#8C00C8">   ││           ██████╔╝   ██║   ██║   ██║██╔██╗ ██║               ││</span>
-  <span style="color:#8C00C8">   ││           ██╔══██╗   ██║   ██║   ██║██║╚██╗██║               ││</span>
-  <span style="color:#8C00C8">   ││           ██║  ██║   ██║   ╚██████╔╝██║ ╚████║               ││</span>
-  <span style="color:#8C00C8">   ││           ╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═══╝               ││</span>
-  <span style="color:#008C8C">   ││           ██████╗ ███████╗ █████╗ ██████╗ ██╗   ██╗███████╗   ││</span>
-  <span style="color:#008C8C">   ││           ██╔══██╗██╔════╝██╔══██╗██╔══██╗██║   ██║██╔════╝   ││</span>
-  <span style="color:#008C8C">   ││           ██████╔╝█████╗  ███████║██████╔╝██║   ██║███████╗   ││</span>
-  <span style="color:#008C8C">   ││           ██╔══██╗██╔══╝  ██╔══██║██║  ██║╚██╗ ██╔╝╚════██║   ││</span>
-  <span style="color:#008C8C">   ││           ██║  ██║███████╗██║  ██║██║  ██║ ╚████╔╝ ███████║   ││</span>
-  <span style="color:#008C8C">   ││           ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝   ││</span>
-  <span style="color:#00FFFF">   │╰───────────────────────────────────────────────────────────────╯│</span>
-  <span style="color:#00FFFF">   │  <span style="color:#F0F0F0">Eight arms. One mind.</span>                                            │</span>
-  <span style="color:#00FFFF">   ╰─────────────────────────────────────────────────────────────────╯</span>
-
-  </pre>
-
-  <h2>HiveOS for AI inference clusters</h2>
-  <p><strong>TentaCLAW OS</strong> turns your pile of GPUs into a self-managing local AI cluster — auto-discovery, node health, model deployment, and one CLI to control the whole tank.</p>
-
-  <p align="center">
-    <a href="https://www.TentaCLAW.io"><img src="https://img.shields.io/badge/Web-TentaCLAW.io-00FFFF?style=for-the-badge" alt="Website"></a>
-    <a href="https://github.com/TentaCLAW-OS"><img src="https://img.shields.io/badge/GitHub-TentaCLAW--OS-8C00C8?style=for-the-badge&logo=github" alt="GitHub"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-8C00C8?style=for-the-badge" alt="License"></a>
-  </p>
+  <strong>TentaCLAW OS</strong> turns scattered GPUs into one self-healing AI inference cluster.<br>
+  Auto-discovery. Smart routing. Zero config. The octopus handles everything.
 </p>
 
-> Flash the ISO. Boot the node. Let CLAWtopus do the boring stuff.
+<p align="center">
+  <a href="https://www.TentaCLAW.io"><img src="https://img.shields.io/badge/Web-TentaCLAW.io-00d4aa?style=for-the-badge" alt="Website"></a>
+  <a href="https://github.com/TentaCLAW-OS/TentaCLAW"><img src="https://img.shields.io/badge/GitHub-TentaCLAW-8b5cf6?style=for-the-badge&logo=github" alt="GitHub"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge" alt="License"></a>
+</p>
 
-### Why it exists
-
-- **Turn spare GPUs into one cluster**
-- **Skip manual CUDA-and-dashboard nonsense**
-- **Run local inference on hardware you actually own**
-- **Get HiveOS-style visibility for AI nodes**
-
-### Launch hooks
-
-- **HiveOS for AI**
-- **Eight arms. One mind.**
-- **Per-token is a scam. Run local.**
-
-### Start here
-
-- [Quick Start](docs/QUICKSTART.md)
-- [Build Guide](BUILD.md)
-- [Brand Guide](BRAND.md)
-- [Launch Plan](docs/LAUNCH.md)
-- [Launch Checklist](docs/LAUNCH-CHECKLIST.md)
-- [Release Copy](docs/RELEASE.md)
-- [Social Launch Kit](docs/SOCIAL.md)
-- [Final Launch Posts](docs/POSTS-FINAL.md)
-- [Demo Production Script](docs/DEMO-SCRIPT.md)
-- [Screenshot Shotlist](docs/SCREENSHOT-SHOTLIST.md)
-- [Hacker News Final](docs/HN-FINAL.md)
-- [Naming Audit](docs/NAMING-AUDIT.md)
+<p align="center"><em>Eight arms. One mind. Zero compromises.</em></p>
 
 ---
 
-## What Even Is This?
+## Install in 60 seconds
 
-> **HiveOS for AI**
+```bash
+curl -fsSL tentaclaw.io/install | bash
+```
 
-Like [HiveOS](https://hiveos.farm/) revolutionized GPU mining by making 1000-rig farms manageable from one dashboard, **TentaCLAW OS** makes AI inference clusters accessible to non-technical users.
+Or manually:
+```bash
+git clone https://github.com/TentaCLAW-OS/TentaCLAW.git
+cd TentaCLAW/gateway && npm install && npm run dev
+# Open http://localhost:8080/dashboard/
+```
 
-Instead of mining rigs, you manage AI inference nodes.
-Instead of hashrate, you track tokens/second.
-Instead of flight sheets for miners, you have flight sheets for models.
+---
 
-**CLAWtopus** handles the boring stuff. You do the interesting stuff.
+## What is TentaCLAW?
+
+TentaCLAW OS is an **AI inference cluster operating system**. It manages your GPU hardware — NVIDIA, AMD, Intel — so you can run local AI models across multiple machines with zero configuration.
+
+- **Plug in a machine** — it auto-discovers the gateway and starts serving
+- **Deploy a model** — `clawtopus deploy llama3.1:8b` picks the best node
+- **Everything self-heals** — watchdog restarts crashed services automatically
+- **OpenAI-compatible API** — point any client at your cluster
+
+**CLAWtopus** is the mascot octopus that runs your stack.
 
 ---
 
@@ -98,7 +62,7 @@ Instead of flight sheets for miners, you have flight sheets for models.
 |---|
 | <span style="color:#00FF88">&#10003;</span> **Zero-config GPU detection** — NVIDIA, AMD, Intel (eventually) |
 | <span style="color:#00FF88">&#10003;</span> **Farm Hash registration** — one hash identifies your entire cluster |
-| <span style="color:#00FF88">&#10003;</span> **HiveOS-style push model** — nodes push stats, receive commands |
+| <span style="color:#00FF88">&#10003;</span> **TentaCLAW-style push model** — nodes push stats, receive commands |
 | <span style="color:#00FF88">&#10003;</span> **One-click model deployment** via flight sheets |
 | <span style="color:#00FF88">&#10003;</span> **Auto-scaling inference** across heterogeneous hardware |
 | <span style="color:#00FF88">&#10003;</span> **CLAWtopus ASCII art** — because your terminal deserves better |
@@ -145,7 +109,7 @@ Try the full stack on **any machine** (Windows, Mac, Linux) — no GPUs needed:
 cd gateway && npm install
 cd ../agent && npm install
 
-# Terminal 1 — Start the HiveMind Gateway
+# Terminal 1 — Start the TentaCLAW Gateway
 cd gateway && npm run dev
 # → http://localhost:8080/dashboard
 
@@ -222,7 +186,7 @@ npx clawtopus command TENTACLAW-FARM7K3P-node1 install_model --model hermes3:8b
 
 ```
   ┌──────────────┐      ┌───────────────────────────────────────┐
-  │ CLAWtopus    │      │      HiveMind Gateway (:8080)         │
+  │ CLAWtopus    │      │      TentaCLAW Gateway (:8080)         │
   │ CLI          │─────►│                                       │
   │              │      │  REST API    Web Dashboard    SSE     │
   │  clawtopus   │      │  /api/v1/*   /dashboard       Events  │
@@ -306,7 +270,7 @@ The mascot of TentaCLAW OS. An octopus who lives in your terminal and coordinate
 **CLAWtopus says:**
 - *"Eight arms. One mind."*
 - *"Per-token is a scam."*
-- *"HiveOS for AI. Finally."*
+- *"AI inference cluster OS. Finally."*
 - *"I've got arms for days."*
 
 ---
@@ -345,10 +309,10 @@ tentaclaw-os/
 │   ├── src/index.ts     # Agent with --mock mode, auto-discovery, overclock
 │   ├── src/spawner.ts   # Multi-node mock spawner (16 presets)
 │   └── tests/           # 10 tests
-├── gateway/             # HiveMind Gateway (Hono + SQLite)
+├── gateway/             # TentaCLAW Gateway (Hono + SQLite)
 │   ├── src/index.ts     # 65+ REST API endpoints, SSE, OpenAI proxy, Daphney bridge
 │   ├── src/db.ts        # Database layer (11 tables)
-│   ├── public/          # HiveOS-style web dashboard (HTML/CSS/JS)
+│   ├── public/          # TentaCLAW-style web dashboard (HTML/CSS/JS)
 │   └── tests/           # 42 tests (unit + integration)
 ├── cli/                 # CLAWtopus CLI (inference router + cluster management)
 │   └── src/index.ts     # chat, models, health, tags, deploy, alerts, benchmarks

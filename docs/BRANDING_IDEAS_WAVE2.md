@@ -201,7 +201,7 @@ YouTube/GitHub tutorial:
 "Conference Bingo" cards:
 - "Someone asks about per-token pricing"
 - "CLAWtopus ASCII appears"
-- "Someone mentions HiveOS"
+- "Someone mentions TentaCLAW"
 - "I get mentioned in a PR"
 - Free space: "The dev appears"
 
@@ -383,7 +383,7 @@ Collab with top homelab channels:
 ### 57. Mining Community Outreach
 ```
 Target ex-miners:
-- "HiveOS users: Meet your new OS"
+- "TentaCLAW users: Meet your new OS"
 - Mining rig → AI inference conversion guide
 - "Your hardware deserves better than just hashing"
 - ASCII art: CLAWtopus wearing a miner's helmet

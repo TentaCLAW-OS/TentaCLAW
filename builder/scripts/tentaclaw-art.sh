@@ -234,7 +234,7 @@ art_logo() {
     cat << 'EOF'
 
     ${CYAN}        ╭──────────────────────────────────────────────────────────╮${RESET}
-    ${CYAN}    ╭───┤  ${WHITE}TENTACLAW OS — HiveOS for AI Inference Clusters${CYAN}  ├───╮${RESET}
+    ${CYAN}    ╭───┤  ${WHITE}TENTACLAW OS — AI inference cluster OS Inference Clusters${CYAN}  ├───╮${RESET}
     ${CYAN}   ╭─┤                                                         ╰─┤${CYAN}
     ${CYAN}   │╭┴───────────────────────────────────────────────────────────┴╮│
     ${CYAN}   ││                                                               ││
@@ -303,7 +303,7 @@ list_arts() {
     echo -e "  ${PURPLE}thinking${RESET}       - Deep thought..."
     echo -e "  ${PURPLE}party${RESET}         - Party time!"
     echo -e "  ${PURPLE}coding${RESET}        - Coding octopus"
-    echo -e "  ${PURPLE}mining${RESET}        - HiveOS vibes"
+    echo -e "  ${PURPLE}mining${RESET}        - TentaCLAW vibes"
     echo -e "  ${PURPLE}hacker${RESET}        - Matrix vibes"
     echo -e "  ${PURPLE}love${RESET}          - Love is in the air"
     echo -e "  ${PURPLE}fire${RESET}          - Things are heating up"

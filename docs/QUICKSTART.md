@@ -1,6 +1,6 @@
 # TentaCLAW OS — Quick Start Guide
 
-> **HiveOS for AI inference clusters**
+> **AI inference cluster OS**
 
 ## TL;DR
 

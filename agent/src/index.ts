@@ -1176,7 +1176,7 @@ async function main() {
 // WATCHDOG — Escalating Recovery System
 // =============================================================================
 //
-// Like HiveOS watchdog but smarter:
+// Like TentaCLAW watchdog but smarter:
 // Level 0: Log warning
 // Level 1: Restart Ollama service
 // Level 2: Kill and restart inference process

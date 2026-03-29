@@ -50,21 +50,21 @@
 
 ### Biggest Pain Points We Solve
 1. **Multi-node GPU management is a nightmare** — people use SSH + scripts
-2. **No HiveOS for AI** — mining has HiveOS, inference has nothing
+2. **No AI inference cluster OS** — mining has TentaCLAW, inference has nothing
 3. **Model management sucks** — VRAM math, quantization, compatibility
 4. **No unified dashboard** — Ollama has no web UI, vLLM has no cluster view
 5. **Per-token pricing is a scam** — own your GPUs, run forever
 
 ### Marketing Channels (Priority Order)
 1. **Reddit** — r/LocalLLaMA (750K+), r/selfhosted (500K+), r/homelab
-2. **Hacker News** — "Show HN: TentaCLAW — HiveOS for AI inference"
+2. **Hacker News** — "Show HN: TentaCLAW — AI inference cluster OS inference"
 3. **Twitter/X** — AI community, GPU enthusiasts, indie hackers
 4. **YouTube** — NetworkChuck, Jeff Geerling, Fireship, Tech With Tim
 5. **Product Hunt** — launch day campaign
 6. **Discord** — LocalLLaMA, Ollama, self-hosted communities
 
 ### Questions We Must Answer Before Launch
-1. What's the one-line elevator pitch? → "HiveOS for AI. Plug in GPUs, get inference."
+1. What's the one-line elevator pitch? → "AI inference cluster OS. Plug in GPUs, get inference."
 2. What's the 60-second wow? → Install → dashboard shows all your GPUs → chat with a model
 3. What makes someone share it? → Terminal screenshots + dashboard screenshots
 4. Why us over just running Ollama? → Multi-node, auto-balance, dashboard, watchdog, API keys
@@ -353,7 +353,7 @@
 *www.TentaCLAW.io — where the viral moment starts.*
 
 ### Wave 51-52: Landing Page (Phases 1001-1040)
-- [ ] 1001. Hero: "HiveOS for AI. Plug in GPUs, get inference."
+- [ ] 1001. Hero: "AI inference cluster OS. Plug in GPUs, get inference."
 - [ ] 1002. Sub-hero: animated terminal showing install + dashboard
 - [ ] 1003. 3 value props: Zero Config | Multi-Node | Self-Healing
 - [ ] 1004. Live demo dashboard (read-only, real data from test cluster)
@@ -377,7 +377,7 @@
 - [ ] 1048-1080. Tutorials, examples, video embeds
 
 ### Wave 55-60: Blog + Content (Phases 1081-1200)
-- [ ] 1081. Launch blog post: "We built HiveOS for AI"
+- [ ] 1081. Launch blog post: "We built AI inference cluster OS"
 - [ ] 1082. "Why per-token is a scam" article
 - [ ] 1083. "How to build a 4-node AI cluster for $500" tutorial
 - [ ] 1084. "TentaCLAW vs OpenAI: cost comparison" with math
@@ -410,7 +410,7 @@
 ### Wave 65-70: Social Media Content (Phases 1281-1400)
 - [ ] 1281. Reddit posts for: r/LocalLLaMA, r/selfhosted, r/homelab
 - [ ] 1282. Hacker News "Show HN" post
-- [ ] 1283. Twitter/X thread: "I built HiveOS for AI"
+- [ ] 1283. Twitter/X thread: "I built AI inference cluster OS"
 - [ ] 1284. Product Hunt listing
 - [ ] 1285. Discord announcements
 - [ ] 1286-1400. Content calendar, follow-ups, engagement
@@ -541,7 +541,7 @@ Between every 10 waves:
 | LM Studio | We add multi-node. They're desktop app only |
 | LocalAI | We add dashboard + self-healing. They're API-only |
 | GPUStack | We add personality + simplicity. They target Kubernetes users |
-| HiveOS | We're the AI version. They're mining only |
+| TentaCLAW | We're the AI version. They're mining only |
 
 ## Developer Pain Points (from r/LocalLLaMA)
 1. Multi-GPU scaling is a 1-2 week project manually
@@ -552,7 +552,7 @@ Between every 10 waves:
 
 ## Launch Channels (Priority Order)
 1. r/LocalLLaMA (750K+, direct audience)
-2. Hacker News (Show HN: TentaCLAW — HiveOS for AI inference)
+2. Hacker News (Show HN: TentaCLAW — AI inference cluster OS inference)
 3. Product Hunt (launch day Tuesday-Thursday)
 4. Twitter/X (founder personality + community)
 5. YouTube (NetworkChuck, Jeff Geerling, Fireship)

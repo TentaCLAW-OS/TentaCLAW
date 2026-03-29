@@ -1,7 +1,7 @@
 # TentaCLAW OS Final Paste-Ready Launch Posts
 
 ## Best X Launch Post
-We built **HiveOS for AI inference clusters**.
+We built **AI inference cluster OS**.
 
 It’s called **TentaCLAW OS**.
 
@@ -12,7 +12,7 @@ Flash a USB, boot your GPU box, and let it join a local AI cluster.
 [link]
 
 ## Best X Thread
-**1/** We built **HiveOS for AI inference clusters**.
+**1/** We built **AI inference cluster OS**.
 
 It’s called **TentaCLAW OS**.
 
@@ -26,7 +26,7 @@ It’s called **TentaCLAW OS**.
 - model deployment
 - one CLI for the whole tank
 
-**4/** If HiveOS made mining rigs manageable, TentaCLAW OS is trying to do that for inference nodes.
+**4/** If TentaCLAW made mining rigs manageable, TentaCLAW OS is trying to do that for inference nodes.
 
 **5/** And yes, it has an octopus mascot in the terminal.
 
@@ -38,12 +38,12 @@ Her name is CLAWtopus.
 [link]
 
 ## Best Hacker News Submission
-**Title:** Show HN: TentaCLAW OS — HiveOS for AI inference clusters
+**Title:** Show HN: TentaCLAW OS — AI inference cluster OS
 
 **Body:**
 We built TentaCLAW OS because there’s still a painful gap between “I own GPUs” and “I can run them as one manageable local inference cluster.”
 
-The idea is simple: HiveOS, but for AI inference instead of mining.
+The idea is simple: TentaCLAW, but for AI inference instead of mining.
 
 Flash a node, boot it, let it auto-discover the gateway, register into the cluster, and manage it from one dashboard or CLI.
 
@@ -56,9 +56,9 @@ And yes, there’s an octopus mascot named CLAWtopus.
 Would love feedback on what’s still missing for real-world homelabs, small labs, and mixed GPU setups.
 
 ## Best Reddit Post — r/LocalLLaMA
-**Title:** I built HiveOS for AI inference and it’s actually working
+**Title:** I built AI inference cluster OS inference and it’s actually working
 
-I wanted the HiveOS experience for local AI: boot a node, auto-detect the hardware, register it, deploy models, and manage the whole cluster without hand-holding every machine.
+I wanted the TentaCLAW experience for local AI: boot a node, auto-detect the hardware, register it, deploy models, and manage the whole cluster without hand-holding every machine.
 
 So I built **TentaCLAW OS**.
 
@@ -83,7 +83,7 @@ I’ve wanted a self-hosted answer to the “how do I manage several local infer
 
 That turned into **TentaCLAW OS**.
 
-The pitch is simple: **HiveOS for AI inference clusters**.
+The pitch is simple: **AI inference cluster OS**.
 
 Flash a node, boot it, let it discover the gateway, register into the cluster, and manage it from a dashboard or CLI.
 
@@ -92,7 +92,7 @@ It’s still early, but the shape is real now and I’d love feedback from peopl
 ## Best Discord Launch Post
 # TentaCLAW OS is live
 
-**HiveOS for AI inference clusters** is here.
+**AI inference cluster OS** is here.
 
 TentaCLAW OS turns your pile of GPUs into a self-managing local AI cluster with:
 - auto-discovery

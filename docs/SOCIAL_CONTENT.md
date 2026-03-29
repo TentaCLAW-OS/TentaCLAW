@@ -11,7 +11,7 @@ Then I realized: I already own a 3090. It just needed a brain.
 2/ The problem wasn't the GPU.
 The problem was: who manages 8 GPUs like a boss?
 
-Mining had HiveOS.
+Mining had TentaCLAW.
 AI inference had... spreadsheets?
 
 3/ So I built TentaCLAW OS.
@@ -41,7 +41,7 @@ AI inference pricing is a scam built on FOMO.
 Meanwhile my 3090 sits idle because:
 - Setting up a cluster is hard
 - Managing multiple GPUs is pain
-- Nobody made a HiveOS for AI... until now.
+- Nobody made a AI inference cluster OS... until now.
 
 TentaCLAW OS: The OS your GPUs deserve.
 ```
@@ -121,11 +121,11 @@ Is this what the future of homelab looks like?
 AMA about TentaCLAW OS. It's free. It's open source. Your GPUs deserve better than spreadsheets.
 ```
 
-### r/LocalLLaMA - "I built the HiveOS for AI"
+### r/LocalLLaMA - "I built the AI inference cluster OS"
 ```
-Title: I built "HiveOS for AI inference" and it actually works
+Title: I built "AI inference cluster OS inference" and it actually works
 
-Background: Ran GPU mining rigs for years. Used HiveOS. Loved it.
+Background: Ran GPU mining rigs for years. Used TentaCLAW. Loved it.
 When AI inference became viable on consumer GPUs, I wanted the same UX.
 
 So I built TentaCLAW OS.
@@ -161,7 +161,7 @@ Been running some AI inference workloads at home and got tired of:
 3. No good way to manage multiple nodes
 4. Reinventing the wheel for each new model
 
-So we built TentaCLAW OS – think HiveOS but for AI inference.
+So we built TentaCLAW OS – think TentaCLAW but for AI inference.
 
 ## Features
 
@@ -207,7 +207,7 @@ Local AI. Local control. Local first.
 ```
 Built a purpose-built Linux distribution for AI inference clusters.
 
-Same principles that made HiveOS successful for GPU mining:
+Same principles that made TentaCLAW successful for GPU mining:
 - Farm Hash identity (SHA256 of hardware sig)
 - Stateless config in /etc/tentaclaw/
 - Push telemetry every 10s
@@ -403,7 +403,7 @@ No Kubernetes. No CUDA config. No per-token bills.
 What it does:
 ✓ Zero-config GPU detection (NVIDIA + AMD)
 ✓ Farm Hash registration
-✓ HiveOS-style push model
+✓ TentaCLAW-style push model
 ✓ One-click model deployment
 ✓ PXE boot for racks
 

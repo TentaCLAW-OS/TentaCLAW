@@ -36,7 +36,7 @@ clawtopus_splash() {
     cat << EOF
 
 ${CYAN}        ╭──────────────────────────────────────────────────────────╮
-${CYAN}    ╭───┤  ${WHITE}TENTACLAW OS — HiveOS for AI Inference Clusters${CYAN}  ├───╮
+${CYAN}    ╭───┤  ${WHITE}TENTACLAW OS — AI inference cluster OS Inference Clusters${CYAN}  ├───╮
 ${CYAN}   ╭─┤                                                         ╰─┤${CYAN}
 ${CYAN}   │╭┴───────────────────────────────────────────────────────────┴╮│
 ${CYAN}   ││                                                               ││
@@ -214,7 +214,7 @@ clawtopus_quote() {
     local quotes=(
         "Eight arms. One mind."
         "Per-token is a scam."
-        "HiveOS for AI. Finally."
+        "AI inference cluster OS. Finally."
         "Let's party."
         "Don't make me tap the sign."
         "I've got arms for days."
