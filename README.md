@@ -1,21 +1,5 @@
 <p align="center">
-<pre>
-                                       <span style="color:#00d4aa">████████╗███████╗███╗   ██╗████████╗ █████╗</span>
-                                       <span style="color:#00d4aa">╚══██╔══╝██╔════╝████╗  ██║╚══██╔══╝██╔══██╗</span>
-  <span style="color:#8b5cf6">          .--'''''''--.               </span><span style="color:#00d4aa">   ██║   █████╗  ██╔██╗ ██║   ██║   ███████║</span>
-  <span style="color:#8b5cf6">         /  ◉      ◉   \              </span><span style="color:#00d4aa">   ██║   ██╔══╝  ██║╚██╗██║   ██║   ██╔══██║</span>
-  <span style="color:#8b5cf6">        |    \  __  /    |             </span><span style="color:#00d4aa">   ██║   ███████╗██║ ╚████║   ██║   ██║  ██║</span>
-  <span style="color:#8b5cf6">         \ ___`----'___ /              </span><span style="color:#00d4aa">   ╚═╝   ╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝</span>
-  <span style="color:#8b5cf6">        /  |  |  |  |  \</span>
-  <span style="color:#8b5cf6">       / / |  |  |  | \ \             </span><span style="color:#00d4aa">██████╗██╗      █████╗ ██╗    ██╗</span>
-  <span style="color:#8b5cf6">      / /  |  |  |  |  \ \            </span><span style="color:#00d4aa">██╔════╝██║     ██╔══██╗██║    ██║</span>
-  <span style="color:#8b5cf6">     ~ ~   ~  ~  ~  ~   ~ ~           </span><span style="color:#00d4aa">██║     ██║     ███████║██║ █╗ ██║</span>
-                                       <span style="color:#00d4aa">██║     ██║     ██╔══██║██║███╗██║</span>
-                                       <span style="color:#00d4aa">╚██████╗███████╗██║  ██║╚███╔███╔╝</span>
-                                       <span style="color:#00d4aa"> ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝</span>
-
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-</pre>
+  <img src="assets/tentaclaw-header.svg" alt="TentaCLAW OS" width="900">
 </p>
 
 <h3 align="center">Your GPUs. One Brain. Zero Limits.</h3>
