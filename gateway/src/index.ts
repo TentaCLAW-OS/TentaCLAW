@@ -2997,3 +2997,69 @@ function getLocalIp(): string {
 }
 
 
+
+// =============================================================================
+// Prometheus Metrics (Wave 26)
+// =============================================================================
+
+app.get('/metrics', (c) => {
+    const nodes = getAllNodes();
+    const online = nodes.filter(n => n.status === 'online');
+    const stats = getRequestStats();
+    const cacheStats = getCacheStats();
+
+    let metrics = '';
+    // Cluster metrics
+    metrics += '# HELP tentaclaw_nodes_total Total number of nodes\n';
+    metrics += '# TYPE tentaclaw_nodes_total gauge\n';
+    metrics += 'tentaclaw_nodes_total ' + nodes.length + '\n';
+    metrics += '# HELP tentaclaw_nodes_online Online nodes\n';
+    metrics += '# TYPE tentaclaw_nodes_online gauge\n';
+    metrics += 'tentaclaw_nodes_online ' + online.length + '\n';
+
+    // GPU metrics per node
+    metrics += '# HELP tentaclaw_gpu_temperature_celsius GPU temperature\n';
+    metrics += '# TYPE tentaclaw_gpu_temperature_celsius gauge\n';
+    metrics += '# HELP tentaclaw_gpu_utilization_percent GPU utilization\n';
+    metrics += '# TYPE tentaclaw_gpu_utilization_percent gauge\n';
+    metrics += '# HELP tentaclaw_gpu_vram_used_mb GPU VRAM used\n';
+    metrics += '# TYPE tentaclaw_gpu_vram_used_mb gauge\n';
+    metrics += '# HELP tentaclaw_gpu_vram_total_mb GPU VRAM total\n';
+    metrics += '# TYPE tentaclaw_gpu_vram_total_mb gauge\n';
+    metrics += '# HELP tentaclaw_gpu_power_watts GPU power draw\n';
+    metrics += '# TYPE tentaclaw_gpu_power_watts gauge\n';
+
+    for (const node of online) {
+        if (!node.latest_stats) continue;
+        for (let i = 0; i < node.latest_stats.gpus.length; i++) {
+            const g = node.latest_stats.gpus[i];
+            const labels = '{node="' + node.hostname + '",gpu="' + i + '"}';
+            metrics += 'tentaclaw_gpu_temperature_celsius' + labels + ' ' + g.temperatureC + '\n';
+            metrics += 'tentaclaw_gpu_utilization_percent' + labels + ' ' + g.utilizationPct + '\n';
+            metrics += 'tentaclaw_gpu_vram_used_mb' + labels + ' ' + g.vramUsedMb + '\n';
+            metrics += 'tentaclaw_gpu_vram_total_mb' + labels + ' ' + g.vramTotalMb + '\n';
+            metrics += 'tentaclaw_gpu_power_watts' + labels + ' ' + g.powerDrawW + '\n';
+        }
+    }
+
+    // Request metrics
+    metrics += '# HELP tentaclaw_requests_total Total inference requests\n';
+    metrics += '# TYPE tentaclaw_requests_total counter\n';
+    metrics += 'tentaclaw_requests_total ' + stats.total + '\n';
+    metrics += '# HELP tentaclaw_requests_last_hour Requests in last hour\n';
+    metrics += '# TYPE tentaclaw_requests_last_hour gauge\n';
+    metrics += 'tentaclaw_requests_last_hour ' + stats.last_hour + '\n';
+    metrics += '# HELP tentaclaw_avg_latency_ms Average request latency\n';
+    metrics += '# TYPE tentaclaw_avg_latency_ms gauge\n';
+    metrics += 'tentaclaw_avg_latency_ms ' + stats.avg_latency_ms + '\n';
+
+    // Cache metrics
+    metrics += '# HELP tentaclaw_cache_entries Cached prompt entries\n';
+    metrics += '# TYPE tentaclaw_cache_entries gauge\n';
+    metrics += 'tentaclaw_cache_entries ' + cacheStats.entries + '\n';
+    metrics += '# HELP tentaclaw_cache_hits Total cache hits\n';
+    metrics += '# TYPE tentaclaw_cache_hits counter\n';
+    metrics += 'tentaclaw_cache_hits ' + cacheStats.total_hits + '\n';
+
+    return new Response(metrics, { headers: { 'Content-Type': 'text/plain; version=0.0.4' } });
+});
