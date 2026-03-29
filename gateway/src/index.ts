@@ -3137,3 +3137,44 @@ app.post('/api/v1/deploy/all', async (c) => {
     broadcastSSE('deploy_all', { model: body.model, deployed, skipped });
     return c.json({ model: body.model, vram_estimate_mb: vramNeeded, deployed, skipped, results });
 });
+
+// =============================================================================
+// Cluster Search (Wave 29) — search across everything
+// =============================================================================
+
+app.get('/api/v1/search', (c) => {
+    const q = (c.req.query('q') || '').toLowerCase();
+    if (!q) return c.json({ error: 'q query parameter required' }, 400);
+
+    const results: Array<{ type: string; id: string; name: string; match: string }> = [];
+
+    // Search nodes
+    for (const n of getAllNodes()) {
+        if (n.hostname.toLowerCase().includes(q) || n.id.toLowerCase().includes(q) || (n.ip_address || '').includes(q)) {
+            results.push({ type: 'node', id: n.id, name: n.hostname, match: n.id });
+        }
+    }
+
+    // Search models
+    for (const m of getClusterModels()) {
+        if (m.model.toLowerCase().includes(q)) {
+            results.push({ type: 'model', id: m.model, name: m.model, match: m.node_count + ' nodes' });
+        }
+    }
+
+    // Search aliases
+    for (const a of getAllModelAliases()) {
+        if (a.alias.toLowerCase().includes(q) || a.target.toLowerCase().includes(q)) {
+            results.push({ type: 'alias', id: a.alias, name: a.alias + ' -> ' + a.target, match: a.alias });
+        }
+    }
+
+    // Search tags
+    for (const t of getAllTags()) {
+        if (t.tag.toLowerCase().includes(q)) {
+            results.push({ type: 'tag', id: t.tag, name: t.tag, match: t.count + ' nodes' });
+        }
+    }
+
+    return c.json({ query: q, results, count: results.length });
+});
