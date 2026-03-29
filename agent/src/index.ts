@@ -614,12 +614,63 @@ function getModelRecommendation(totalVramMb: number): string[] {
     return ['llama3.2:1b']; // Tiny VRAM
 }
 
+let cachedSystemInfo: any = null;
+
+function getSystemInfo(): any {
+    if (cachedSystemInfo) return cachedSystemInfo; // Only collect once — doesn't change
+
+    try {
+        const cpuModel = os.cpus()[0]?.model || 'unknown';
+        const cpuCores = os.cpus().length;
+        const cpuThreads = cpuCores; // os.cpus() returns logical CPUs
+        const ramTotalGb = Math.round(os.totalmem() / 1073741824 * 10) / 10;
+        const kernel = os.release();
+        const arch = os.arch();
+
+        let osName = 'Linux';
+        try {
+            osName = fs.readFileSync('/etc/os-release', 'utf-8').match(/PRETTY_NAME="(.*)"/)?.[1] || 'Linux';
+        } catch {}
+
+        let diskType = 'unknown';
+        try {
+            const rotational = fs.readFileSync('/sys/block/sda/queue/rotational', 'utf-8').trim();
+            if (rotational === '0') {
+                // Check if NVMe
+                if (fs.existsSync('/sys/block/nvme0n1')) diskType = 'nvme';
+                else diskType = 'ssd';
+            } else {
+                diskType = 'hdd';
+            }
+        } catch {
+            if (fs.existsSync('/sys/block/nvme0n1')) diskType = 'nvme';
+        }
+
+        cachedSystemInfo = {
+            cpu_model: cpuModel,
+            cpu_cores: cpuCores,
+            cpu_threads: cpuThreads,
+            ram_total_gb: ramTotalGb,
+            kernel,
+            arch,
+            os: osName,
+            disk_type: diskType,
+            agent_version: '0.2.0',
+        };
+    } catch {
+        cachedSystemInfo = { cpu_model: 'unknown', cpu_cores: 0, cpu_threads: 0, ram_total_gb: 0, kernel: '', arch: '', os: '', disk_type: 'unknown', agent_version: '0.2.0' };
+    }
+
+    return cachedSystemInfo;
+}
+
 function collectStats(config: AgentConfig): StatsPayload {
     const gpus = config.mockMode ? getMockGpuStats() : getGpuStats();
     const system = config.mockMode ? getMockSystemStats() : getLinuxSystemStats();
     const inference = getInferenceStats(config.mockMode);
 
     const backend = config.mockMode ? undefined : (detectedBackend || detectInferenceBackends());
+    const systemInfo = config.mockMode ? undefined : getSystemInfo();
     return {
         farm_hash: config.farmHash,
         node_id: config.nodeId,
@@ -633,6 +684,7 @@ function collectStats(config: AgentConfig): StatsPayload {
         network: system.network,
         inference,
         backend: backend ? { type: backend.backend, port: backend.port, version: backend.version } : undefined,
+        system_info: systemInfo,
         toks_per_sec: config.mockMode ? Math.round(50 + Math.random() * 200) : 0,
         requests_completed: 0,
     };

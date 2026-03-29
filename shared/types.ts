@@ -56,9 +56,20 @@ export interface StatsPayload {
         avg_latency_ms: number;
     };
     backend?: {
-        type: string;        // 'ollama' | 'vllm' | 'llamacpp' | 'none'
+        type: string;
         port: number;
         version?: string;
+    };
+    system_info?: {
+        cpu_model: string;
+        cpu_cores: number;
+        cpu_threads: number;
+        ram_total_gb: number;
+        kernel: string;
+        arch: string;
+        os: string;
+        disk_type: string;      // 'nvme' | 'ssd' | 'hdd' | 'unknown'
+        agent_version: string;
     };
     toks_per_sec: number;
     requests_completed: number;

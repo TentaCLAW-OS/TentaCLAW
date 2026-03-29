@@ -1917,6 +1917,47 @@ app.get('/api/v1/inference/stats', (c) => {
 });
 
 // =============================================================================
+// Hardware Inventory (Wave 12)
+// =============================================================================
+
+app.get('/api/v1/inventory', (c) => {
+    const nodes = getAllNodes();
+    const inventory = nodes.map(n => {
+        const s = n.latest_stats || {} as any;
+        return {
+            node_id: n.id,
+            hostname: n.hostname,
+            status: n.status,
+            ip_address: n.ip_address,
+            system: s.system_info || {},
+            backend: s.backend || {},
+            gpus: (s.gpus || []).map((g: any) => ({
+                name: g.name,
+                vram_mb: g.vramTotalMb,
+                bus_id: g.busId,
+            })),
+            models: s.inference?.loaded_models || [],
+            registered_at: n.registered_at,
+            last_seen: n.last_seen_at,
+        };
+    });
+
+    const totalGpus = inventory.reduce((s, n) => s + n.gpus.length, 0);
+    const totalVram = inventory.reduce((s, n) => s + n.gpus.reduce((vs: number, g: any) => vs + (g.vram_mb || 0), 0), 0);
+    const totalRam = inventory.reduce((s, n) => s + (n.system.ram_total_gb || 0), 0);
+    const totalCores = inventory.reduce((s, n) => s + (n.system.cpu_cores || 0), 0);
+
+    return c.json({
+        total_nodes: inventory.length,
+        total_gpus: totalGpus,
+        total_vram_gb: Math.round(totalVram / 1024),
+        total_ram_gb: Math.round(totalRam),
+        total_cpu_cores: totalCores,
+        nodes: inventory,
+    });
+});
+
+// =============================================================================
 // Power & Cost (Wave 11)
 // =============================================================================
 
