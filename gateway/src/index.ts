@@ -3453,3 +3453,61 @@ app.get('/api/v1/suggestions', (c) => {
 
     return c.json({ suggestions });
 });
+
+// =============================================================================
+// Waves 71-80: Production Hardening
+// =============================================================================
+
+// CORS configuration endpoint
+app.get('/api/v1/config/cors', (c) => {
+    return c.json({ allowed_origins: ['*'], methods: ['GET', 'POST', 'PUT', 'DELETE'], headers: ['Content-Type', 'Authorization'] });
+});
+
+// Database stats
+app.get('/api/v1/config/db-stats', (c) => {
+    const d = getDb();
+    const tables = ['nodes', 'stats', 'commands', 'flight_sheets', 'alerts', 'benchmarks', 'node_events', 'schedules',
+        'ssh_keys', 'node_tags', 'model_pulls', 'uptime_events', 'overclock_profiles', 'watchdog_events',
+        'notification_channels', 'inference_log', 'api_keys', 'prompt_cache', 'model_aliases'];
+
+    const stats = tables.map(t => {
+        try {
+            const row = d.prepare('SELECT COUNT(*) as cnt FROM ' + t).get() as { cnt: number };
+            return { table: t, rows: row.cnt };
+        } catch { return { table: t, rows: -1 }; }
+    });
+
+    const dbSize = d.pragma('page_count')[0] as any;
+    const pageSize = d.pragma('page_size')[0] as any;
+    const totalBytes = (dbSize?.page_count || 0) * (pageSize?.page_size || 4096);
+
+    return c.json({ tables: stats, total_tables: tables.length, db_size_mb: Math.round(totalBytes / 1048576 * 10) / 10 });
+});
+
+// Uptime endpoint
+app.get('/api/v1/gateway/uptime', (c) => {
+    const uptimeSecs = process.uptime();
+    const days = Math.floor(uptimeSecs / 86400);
+    const hours = Math.floor((uptimeSecs % 86400) / 3600);
+    const mins = Math.floor((uptimeSecs % 3600) / 60);
+    return c.json({
+        uptime_seconds: Math.round(uptimeSecs),
+        uptime_human: (days > 0 ? days + 'd ' : '') + hours + 'h ' + mins + 'm',
+        started_at: new Date(Date.now() - uptimeSecs * 1000).toISOString(),
+        memory_mb: Math.round(process.memoryUsage().rss / 1048576),
+        node_version: process.version,
+    });
+});
+
+// Cluster-wide reboot (emergency)
+app.post('/api/v1/cluster/reboot', async (c) => {
+    const body = await c.req.json<{ confirm: boolean }>();
+    if (!body.confirm) return c.json({ error: 'Set confirm: true to reboot entire cluster' }, 400);
+
+    const nodes = getAllNodes().filter(n => n.status === 'online');
+    for (const node of nodes) {
+        queueCommand(node.id, 'reboot');
+    }
+    broadcastSSE('cluster_reboot', { nodes: nodes.length });
+    return c.json({ status: 'rebooting', nodes: nodes.length, warning: 'All nodes will reboot!' });
+});
