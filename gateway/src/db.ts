@@ -812,12 +812,57 @@ export interface InferenceTarget {
  * Find the best node to serve inference for a given model.
  * Strategy: among online nodes with the model loaded, pick the one with lowest average GPU utilization.
  */
+// =============================================================================
+// Smart Load Balancer (Wave 3) — Circuit Breaker + VRAM-Aware Routing
+// =============================================================================
+
+const nodeErrorCounts = new Map<string, { errors: number; lastError: number; blocked: boolean }>();
+const requestLog: Array<{ time: number; nodeId: string; model: string; latencyMs: number; success: boolean }> = [];
+
+export function recordRouteResult(nodeId: string, model: string, latencyMs: number, success: boolean): void {
+    requestLog.push({ time: Date.now(), nodeId, model, latencyMs, success });
+    if (requestLog.length > 10000) requestLog.splice(0, 5000);
+
+    if (!success) {
+        const entry = nodeErrorCounts.get(nodeId) || { errors: 0, lastError: 0, blocked: false };
+        entry.errors++;
+        entry.lastError = Date.now();
+        if (entry.errors >= 5) {
+            entry.blocked = true;
+            console.log(`[lb] Circuit breaker OPEN for ${nodeId} — ${entry.errors} errors`);
+        }
+        nodeErrorCounts.set(nodeId, entry);
+    } else {
+        nodeErrorCounts.delete(nodeId);
+    }
+}
+
+function isNodeBlocked(nodeId: string): boolean {
+    const entry = nodeErrorCounts.get(nodeId);
+    if (!entry || !entry.blocked) return false;
+    if (Date.now() - entry.lastError > 60000) {
+        entry.blocked = false;
+        entry.errors = 0;
+        return false;
+    }
+    return true;
+}
+
+export function getRequestStats(): { total: number; last_hour: number; avg_latency_ms: number; error_rate_pct: number } {
+    const now = Date.now();
+    const lastHour = requestLog.filter(r => now - r.time < 3600000);
+    const avgLatency = lastHour.length > 0 ? lastHour.reduce((s, r) => s + r.latencyMs, 0) / lastHour.length : 0;
+    const errorRate = lastHour.length > 0 ? lastHour.filter(r => !r.success).length / lastHour.length * 100 : 0;
+    return { total: requestLog.length, last_hour: lastHour.length, avg_latency_ms: Math.round(avgLatency), error_rate_pct: Math.round(errorRate * 10) / 10 };
+}
+
 export function findBestNode(model: string): InferenceTarget | null {
     const nodes = getAllNodes();
-    const candidates: InferenceTarget[] = [];
+    const candidates: (InferenceTarget & { score: number })[] = [];
 
     for (const node of nodes) {
         if (node.status !== 'online' || !node.latest_stats) continue;
+        if (isNodeBlocked(node.id)) continue;
 
         const hasModel = node.latest_stats.inference.loaded_models.some(
             m => m === model || m.startsWith(model.split(':')[0])
@@ -827,23 +872,27 @@ export function findBestNode(model: string): InferenceTarget | null {
         const gpuUtils = node.latest_stats.gpus.map(g => g.utilizationPct);
         const avgUtil = gpuUtils.length > 0 ? gpuUtils.reduce((a, b) => a + b, 0) / gpuUtils.length : 100;
 
+        const totalVram = node.latest_stats.gpus.reduce((s, g) => s + g.vramTotalMb, 0);
+        const usedVram = node.latest_stats.gpus.reduce((s, g) => s + g.vramUsedMb, 0);
+        const vramHeadroom = totalVram > 0 ? ((totalVram - usedVram) / totalVram) * 100 : 0;
+
+        // Composite score: lower = better
+        const score = (node.latest_stats.inference.in_flight_requests * 40) +
+                      (avgUtil * 0.3) +
+                      ((100 - vramHeadroom) * 0.3);
+
         candidates.push({
             node_id: node.id,
             hostname: node.hostname,
             ip_address: node.ip_address,
             gpu_utilization_avg: avgUtil,
             in_flight_requests: node.latest_stats.inference.in_flight_requests,
+            score: Math.round(score * 10) / 10,
         });
     }
 
     if (candidates.length === 0) return null;
-
-    // Sort by in-flight requests first, then GPU utilization
-    candidates.sort((a, b) => {
-        if (a.in_flight_requests !== b.in_flight_requests) return a.in_flight_requests - b.in_flight_requests;
-        return a.gpu_utilization_avg - b.gpu_utilization_avg;
-    });
-
+    candidates.sort((a, b) => a.score - b.score);
     return candidates[0];
 }
 

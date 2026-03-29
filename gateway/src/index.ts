@@ -68,6 +68,8 @@ import {
     updateModelPull,
     getActiveModelPulls,
     getAllActiveModelPulls,
+    recordRouteResult,
+    getRequestStats,
     recordUptimeEvent,
     getNodeUptime,
     getFleetUptime,
@@ -762,6 +764,7 @@ app.post('/v1/chat/completions', async (c) => {
 
     // Proxy the request to the target node's Ollama instance
     const ollamaUrl = 'http://' + (target.ip_address || target.hostname) + ':11434/v1/chat/completions';
+    const startTime = Date.now();
 
     try {
         const proxyReq = await fetch(ollamaUrl, {
@@ -769,6 +772,9 @@ app.post('/v1/chat/completions', async (c) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
         });
+
+        const latencyMs = Date.now() - startTime;
+        recordRouteResult(target.node_id, model, latencyMs, proxyReq.ok);
 
         // Stream or return the response
         if (body.stream) {
@@ -780,6 +786,7 @@ app.post('/v1/chat/completions', async (c) => {
                     'Connection': 'keep-alive',
                     'X-TentaCLAW-Node': target.node_id,
                     'X-TentaCLAW-Hostname': target.hostname,
+                    'X-TentaCLAW-Latency': String(latencyMs),
                 },
             });
         }
@@ -789,10 +796,37 @@ app.post('/v1/chat/completions', async (c) => {
             routed_to: target.node_id,
             hostname: target.hostname,
             gpu_utilization: target.gpu_utilization_avg,
+            latency_ms: latencyMs,
         };
         return c.json(result, proxyReq.status as any);
 
     } catch (err: any) {
+        recordRouteResult(target.node_id, model, Date.now() - startTime, false);
+
+        // AUTO-RETRY on different node
+        const retry = findBestNode(model);
+        if (retry && retry.node_id !== target.node_id) {
+            try {
+                const retryUrl = 'http://' + (retry.ip_address || retry.hostname) + ':11434/v1/chat/completions';
+                const retryReq = await fetch(retryUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const retryLatency = Date.now() - startTime;
+                recordRouteResult(retry.node_id, model, retryLatency, retryReq.ok);
+
+                const result = await retryReq.json() as Record<string, unknown>;
+                result._tentaclaw = {
+                    routed_to: retry.node_id,
+                    hostname: retry.hostname,
+                    retried_from: target.node_id,
+                    latency_ms: retryLatency,
+                };
+                return c.json(result, retryReq.status as any);
+            } catch {}
+        }
+
         return c.json({
             error: {
                 message: 'Failed to proxy to node ' + target.hostname + ': ' + err.message,
@@ -1748,6 +1782,10 @@ app.get('/api/v1/doctor', async (c) => {
 // =============================================================================
 // Inference Engine Info (Wave 2)
 // =============================================================================
+
+app.get('/api/v1/inference/stats', (c) => {
+    return c.json(getRequestStats());
+});
 
 app.get('/api/v1/inference/backends', (c) => {
     const nodes = getAllNodes();
