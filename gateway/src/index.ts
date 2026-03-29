@@ -3063,3 +3063,36 @@ app.get('/metrics', (c) => {
 
     return new Response(metrics, { headers: { 'Content-Type': 'text/plain; version=0.0.4' } });
 });
+
+// =============================================================================
+// Dashboard Data Bundle (Wave 27) — one call gets everything
+// =============================================================================
+
+app.get('/api/v1/dashboard', (c) => {
+    const summary = getClusterSummary();
+    const health = getHealthScore();
+    const models = getClusterModels();
+    const stats = getRequestStats();
+    const cacheStats = getCacheStats();
+    const power = getClusterPower();
+    const fleet = getFleetReliability();
+    const qStats = getQueueStats();
+
+    return c.json({
+        summary,
+        health,
+        models: models.slice(0, 20),
+        inference: {
+            ...stats,
+            cache: cacheStats,
+            queue: qStats,
+        },
+        power: {
+            total_watts: power.total_watts,
+            daily_cost: power.daily_cost,
+            monthly_cost: power.monthly_cost,
+        },
+        fleet: fleet.slice(0, 20),
+        timestamp: new Date().toISOString(),
+    });
+});
