@@ -55,6 +55,11 @@ export interface StatsPayload {
         tokens_generated: number;
         avg_latency_ms: number;
     };
+    backend?: {
+        type: string;        // 'ollama' | 'vllm' | 'llamacpp' | 'none'
+        port: number;
+        version?: string;
+    };
     toks_per_sec: number;
     requests_completed: number;
 }

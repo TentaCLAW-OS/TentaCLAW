@@ -1745,6 +1745,27 @@ app.get('/api/v1/doctor', async (c) => {
 // Uptime & Reliability API (Phase 21-30)
 // =============================================================================
 
+// =============================================================================
+// Inference Engine Info (Wave 2)
+// =============================================================================
+
+app.get('/api/v1/inference/backends', (c) => {
+    const nodes = getAllNodes();
+    const backends = nodes.filter(n => n.status === 'online' && n.latest_stats).map(n => {
+        const s = n.latest_stats!;
+        const totalVram = s.gpus.reduce((sum, g) => sum + g.vramTotalMb, 0);
+        return {
+            node_id: n.id,
+            hostname: n.hostname,
+            backend: (s as any).backend || { type: 'unknown' },
+            gpu_count: s.gpu_count,
+            total_vram_mb: totalVram,
+            models: s.inference.loaded_models,
+        };
+    });
+    return c.json({ backends });
+});
+
 app.get('/api/v1/nodes/:id/uptime', (c) => {
     const hours = parseInt(c.req.query('hours') || '24');
     return c.json(getNodeUptime(c.req.param('id'), hours));

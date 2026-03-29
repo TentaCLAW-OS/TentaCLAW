@@ -515,16 +515,103 @@ function getInferenceStats(mockMode: boolean) {
             avg_latency_ms: Math.round(20 + Math.random() * 60),
         };
     }
+    // Use detected backend
+    const backend = detectedBackend || detectInferenceBackends();
     try {
-        const output = execFileSync('curl', ['-s', 'http://localhost:11434/api/tags'], { encoding: 'utf-8' });
+        if (backend.backend === 'ollama') {
+            const output = execFileSync('curl', ['-s', '--max-time', '3', 'http://localhost:11434/api/tags'], { encoding: 'utf-8' });
+            const data = JSON.parse(output);
+            return {
+                loaded_models: data.models?.map((m: { name: string }) => m.name) || [],
+                in_flight_requests: 0, tokens_generated: 0, avg_latency_ms: 0,
+            };
+        }
+        if (backend.backend === 'vllm') {
+            const output = execFileSync('curl', ['-s', '--max-time', '3', 'http://localhost:8000/v1/models'], { encoding: 'utf-8' });
+            const data = JSON.parse(output);
+            return {
+                loaded_models: data.data?.map((m: { id: string }) => m.id) || [],
+                in_flight_requests: 0, tokens_generated: 0, avg_latency_ms: 0,
+            };
+        }
+        if (backend.backend === 'llamacpp') {
+            return { loaded_models: ['llama.cpp-model'], in_flight_requests: 0, tokens_generated: 0, avg_latency_ms: 0 };
+        }
+    } catch {}
+    return { loaded_models: [], in_flight_requests: 0, tokens_generated: 0, avg_latency_ms: 0 };
+}
+
+// =============================================================================
+// Smart Inference Engine — Auto-Backend Detection (Wave 2)
+// =============================================================================
+
+type InferenceBackend = 'ollama' | 'llamacpp' | 'vllm' | 'none';
+
+interface BackendInfo {
+    backend: InferenceBackend;
+    port: number;
+    version?: string;
+    models: string[];
+    healthy: boolean;
+}
+
+let detectedBackend: BackendInfo | null = null;
+
+function detectInferenceBackends(): BackendInfo {
+    // Priority: Ollama > vLLM > llama.cpp > none
+    // Check Ollama (port 11434)
+    try {
+        const output = execFileSync('curl', ['-s', '--max-time', '2', 'http://localhost:11434/api/tags'], { encoding: 'utf-8' });
         const data = JSON.parse(output);
-        return {
-            loaded_models: data.models?.map((m: { name: string }) => m.name) || [],
-            in_flight_requests: 0, tokens_generated: 0, avg_latency_ms: 0,
-        };
-    } catch {
-        return { loaded_models: [], in_flight_requests: 0, tokens_generated: 0, avg_latency_ms: 0 };
-    }
+        const models = data.models?.map((m: { name: string }) => m.name) || [];
+        let version = '';
+        try {
+            version = execFileSync('ollama', ['--version'], { encoding: 'utf-8', timeout: 3000 }).trim().replace('ollama version is ', '');
+        } catch {}
+        detectedBackend = { backend: 'ollama', port: 11434, version, models, healthy: true };
+        return detectedBackend;
+    } catch {}
+
+    // Check vLLM (port 8000)
+    try {
+        const output = execFileSync('curl', ['-s', '--max-time', '2', 'http://localhost:8000/v1/models'], { encoding: 'utf-8' });
+        const data = JSON.parse(output);
+        const models = data.data?.map((m: { id: string }) => m.id) || [];
+        detectedBackend = { backend: 'vllm', port: 8000, models, healthy: true };
+        return detectedBackend;
+    } catch {}
+
+    // Check llama.cpp server (port 8080 — but we use 8080 for gateway, check 8081)
+    try {
+        const output = execFileSync('curl', ['-s', '--max-time', '2', 'http://localhost:8081/health'], { encoding: 'utf-8' });
+        if (output.includes('ok')) {
+            detectedBackend = { backend: 'llamacpp', port: 8081, models: ['loaded'], healthy: true };
+            return detectedBackend;
+        }
+    } catch {}
+
+    detectedBackend = { backend: 'none', port: 0, models: [], healthy: false };
+    return detectedBackend;
+}
+
+function getBackendRecommendation(gpus: GpuStats[]): string {
+    const totalVram = gpus.reduce((sum, g) => sum + g.vramTotalMb, 0);
+    const gpuCount = gpus.length;
+
+    if (gpuCount === 0) return 'llama.cpp (CPU-only, no GPU detected)';
+    if (totalVram >= 48000) return 'vLLM (high VRAM, batching benefits)';
+    if (totalVram >= 8000) return 'Ollama (good VRAM, easy management)';
+    return 'llama.cpp (low VRAM, quantized models)';
+}
+
+function getModelRecommendation(totalVramMb: number): string[] {
+    // Auto-recommend models based on available VRAM
+    if (totalVramMb >= 80000) return ['llama3.1:70b', 'llama3.1:8b', 'nomic-embed-text'];
+    if (totalVramMb >= 40000) return ['llama3.1:70b-q4', 'codellama:34b', 'llama3.1:8b'];
+    if (totalVramMb >= 16000) return ['llama3.1:8b', 'codellama:7b', 'nomic-embed-text'];
+    if (totalVramMb >= 8000) return ['llama3.2:3b', 'codellama:7b', 'nomic-embed-text'];
+    if (totalVramMb >= 4000) return ['llama3.2:1b', 'phi3:3.8b'];
+    return ['llama3.2:1b']; // Tiny VRAM
 }
 
 function collectStats(config: AgentConfig): StatsPayload {
@@ -532,6 +619,7 @@ function collectStats(config: AgentConfig): StatsPayload {
     const system = config.mockMode ? getMockSystemStats() : getLinuxSystemStats();
     const inference = getInferenceStats(config.mockMode);
 
+    const backend = config.mockMode ? undefined : (detectedBackend || detectInferenceBackends());
     return {
         farm_hash: config.farmHash,
         node_id: config.nodeId,
@@ -544,6 +632,7 @@ function collectStats(config: AgentConfig): StatsPayload {
         disk: system.disk,
         network: system.network,
         inference,
+        backend: backend ? { type: backend.backend, port: backend.port, version: backend.version } : undefined,
         toks_per_sec: config.mockMode ? Math.round(50 + Math.random() * 200) : 0,
         requests_completed: 0,
     };
@@ -997,6 +1086,15 @@ async function main() {
     }
     console.log('[agent] CPU: ' + stats.cpu.usage_pct + '% | RAM: ' + stats.ram.used_mb + '/' + stats.ram.total_mb + 'MB');
     console.log('[agent] Models: ' + (stats.inference.loaded_models.join(', ') || 'none'));
+
+    // Detect and log inference backend
+    if (!config.mockMode) {
+        const backend = detectInferenceBackends();
+        const totalVram = stats.gpus.reduce((s, g) => s + g.vramTotalMb, 0);
+        console.log('[agent] Backend: ' + backend.backend + (backend.version ? ' v' + backend.version : '') + ' (port ' + backend.port + ')');
+        console.log('[agent] Recommendation: ' + getBackendRecommendation(stats.gpus));
+        console.log('[agent] Suggested models: ' + getModelRecommendation(totalVram).join(', '));
+    }
     console.log('');
 
     let pushCount = 0;
