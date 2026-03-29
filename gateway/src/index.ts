@@ -74,6 +74,8 @@ import {
     checkModelFits,
     findBestNodeForModel,
     getModelDistribution,
+    logInferenceRequest,
+    getInferenceAnalytics,
     recordUptimeEvent,
     getNodeUptime,
     getFleetUptime,
@@ -779,6 +781,7 @@ app.post('/v1/chat/completions', async (c) => {
 
         const latencyMs = Date.now() - startTime;
         recordRouteResult(target.node_id, model, latencyMs, proxyReq.ok);
+        logInferenceRequest(target.node_id, model, latencyMs, proxyReq.ok);
 
         // Stream or return the response
         if (body.stream) {
@@ -806,6 +809,7 @@ app.post('/v1/chat/completions', async (c) => {
 
     } catch (err: any) {
         recordRouteResult(target.node_id, model, Date.now() - startTime, false);
+        logInferenceRequest(target.node_id, model, Date.now() - startTime, false, 0, 0, err.message);
 
         // AUTO-RETRY on different node
         const retry = findBestNode(model);
@@ -1845,6 +1849,11 @@ app.post('/api/v1/models/smart-deploy', async (c) => {
 
 app.get('/api/v1/inference/stats', (c) => {
     return c.json(getRequestStats());
+});
+
+app.get('/api/v1/inference/analytics', (c) => {
+    const hours = parseInt(c.req.query('hours') || '24');
+    return c.json(getInferenceAnalytics(hours));
 });
 
 app.get('/api/v1/inference/backends', (c) => {

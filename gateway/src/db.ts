@@ -180,6 +180,21 @@ function initSchema(db: Database.Database): void {
 
         CREATE INDEX IF NOT EXISTS idx_oc_node ON overclock_profiles(node_id);
 
+        CREATE TABLE IF NOT EXISTS inference_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            node_id TEXT NOT NULL,
+            model TEXT NOT NULL,
+            latency_ms INTEGER NOT NULL,
+            tokens_in INTEGER DEFAULT 0,
+            tokens_out INTEGER DEFAULT 0,
+            success INTEGER DEFAULT 1,
+            error TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_inference_log_time ON inference_log(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_inference_log_model ON inference_log(model, created_at DESC);
+
         CREATE TABLE IF NOT EXISTS watchdog_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             node_id TEXT NOT NULL,
@@ -1246,6 +1261,89 @@ export function getAllTags(): Array<{ tag: string; count: number }> {
     return d.prepare(
         'SELECT tag, COUNT(*) as count FROM node_tags GROUP BY tag ORDER BY count DESC'
     ).all() as Array<{ tag: string; count: number }>;
+}
+
+// =============================================================================
+// Inference Analytics (Wave 6)
+// =============================================================================
+
+export function logInferenceRequest(nodeId: string, model: string, latencyMs: number, success: boolean, tokensIn?: number, tokensOut?: number, error?: string): void {
+    const d = getDb();
+    d.prepare(`INSERT INTO inference_log (node_id, model, latency_ms, tokens_in, tokens_out, success, error) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+        nodeId, model, latencyMs, tokensIn || 0, tokensOut || 0, success ? 1 : 0, error || null
+    );
+}
+
+export function getInferenceAnalytics(hours: number = 24): {
+    total_requests: number;
+    successful: number;
+    failed: number;
+    avg_latency_ms: number;
+    p50_latency_ms: number;
+    p95_latency_ms: number;
+    p99_latency_ms: number;
+    total_tokens_in: number;
+    total_tokens_out: number;
+    requests_per_minute: number;
+    by_model: Array<{ model: string; count: number; avg_latency_ms: number; error_rate_pct: number }>;
+    by_node: Array<{ node_id: string; count: number; avg_latency_ms: number; error_rate_pct: number }>;
+} {
+    const d = getDb();
+    const since = new Date(Date.now() - hours * 3600_000).toISOString().replace('T', ' ').slice(0, 19);
+
+    const rows = d.prepare('SELECT * FROM inference_log WHERE created_at >= ? ORDER BY latency_ms').all(since) as any[];
+
+    const successful = rows.filter(r => r.success);
+    const latencies = successful.map(r => r.latency_ms).sort((a, b) => a - b);
+
+    const p = (pct: number) => latencies.length > 0 ? latencies[Math.floor(latencies.length * pct / 100)] || 0 : 0;
+
+    // By model
+    const modelMap = new Map<string, { count: number; totalLatency: number; errors: number }>();
+    for (const r of rows) {
+        const entry = modelMap.get(r.model) || { count: 0, totalLatency: 0, errors: 0 };
+        entry.count++;
+        entry.totalLatency += r.latency_ms;
+        if (!r.success) entry.errors++;
+        modelMap.set(r.model, entry);
+    }
+
+    // By node
+    const nodeMap = new Map<string, { count: number; totalLatency: number; errors: number }>();
+    for (const r of rows) {
+        const entry = nodeMap.get(r.node_id) || { count: 0, totalLatency: 0, errors: 0 };
+        entry.count++;
+        entry.totalLatency += r.latency_ms;
+        if (!r.success) entry.errors++;
+        nodeMap.set(r.node_id, entry);
+    }
+
+    const elapsedMin = Math.max(1, hours * 60);
+
+    return {
+        total_requests: rows.length,
+        successful: successful.length,
+        failed: rows.length - successful.length,
+        avg_latency_ms: latencies.length > 0 ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length) : 0,
+        p50_latency_ms: p(50),
+        p95_latency_ms: p(95),
+        p99_latency_ms: p(99),
+        total_tokens_in: rows.reduce((s, r) => s + (r.tokens_in || 0), 0),
+        total_tokens_out: rows.reduce((s, r) => s + (r.tokens_out || 0), 0),
+        requests_per_minute: Math.round((rows.length / elapsedMin) * 10) / 10,
+        by_model: [...modelMap.entries()].map(([model, v]) => ({
+            model,
+            count: v.count,
+            avg_latency_ms: Math.round(v.totalLatency / v.count),
+            error_rate_pct: Math.round((v.errors / v.count) * 1000) / 10,
+        })).sort((a, b) => b.count - a.count),
+        by_node: [...nodeMap.entries()].map(([node_id, v]) => ({
+            node_id,
+            count: v.count,
+            avg_latency_ms: Math.round(v.totalLatency / v.count),
+            error_rate_pct: Math.round((v.errors / v.count) * 1000) / 10,
+        })).sort((a, b) => b.count - a.count),
+    };
 }
 
 // =============================================================================

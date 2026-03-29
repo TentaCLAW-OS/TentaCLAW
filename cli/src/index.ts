@@ -1275,6 +1275,61 @@ async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
     console.log('');
 }
 
+async function cmdAnalytics(gateway: string, flags: Record<string, string>): Promise<void> {
+    const hours = parseInt(flags['hours'] || '24');
+
+    console.log('');
+    console.log('  ' + C.purple(C.bold('Inference Analytics')) + C.dim(` — last ${hours}h`));
+    console.log('');
+
+    const data = await apiGet(gateway, `/api/v1/inference/analytics?hours=${hours}`) as any;
+
+    // Overview
+    console.log('  ' + C.cyan(C.bold('Overview')));
+    console.log('  ' + padRight(C.dim('Total Requests'), 22) + C.white(String(data.total_requests)));
+    console.log('  ' + padRight(C.dim('Successful'), 22) + C.green(String(data.successful)));
+    console.log('  ' + padRight(C.dim('Failed'), 22) + (data.failed > 0 ? C.red(String(data.failed)) : C.dim('0')));
+    console.log('  ' + padRight(C.dim('Req/min'), 22) + C.white(String(data.requests_per_minute)));
+    console.log('  ' + padRight(C.dim('Tokens In'), 22) + C.white(formatNumber(data.total_tokens_in)));
+    console.log('  ' + padRight(C.dim('Tokens Out'), 22) + C.white(formatNumber(data.total_tokens_out)));
+    console.log('');
+
+    // Latency
+    console.log('  ' + C.cyan(C.bold('Latency')));
+    console.log('  ' + padRight(C.dim('Average'), 22) + C.white(data.avg_latency_ms + 'ms'));
+    console.log('  ' + padRight(C.dim('p50'), 22) + C.white(data.p50_latency_ms + 'ms'));
+    console.log('  ' + padRight(C.dim('p95'), 22) + (data.p95_latency_ms > 5000 ? C.yellow : C.white)(data.p95_latency_ms + 'ms'));
+    console.log('  ' + padRight(C.dim('p99'), 22) + (data.p99_latency_ms > 10000 ? C.red : C.white)(data.p99_latency_ms + 'ms'));
+    console.log('');
+
+    // By model
+    if (data.by_model.length > 0) {
+        console.log('  ' + C.cyan(C.bold('By Model')));
+        console.log('  ' + padRight(C.dim('MODEL'), 35) + padRight(C.dim('REQS'), 10) + padRight(C.dim('AVG'), 10) + C.dim('ERRORS'));
+        for (const m of data.by_model.slice(0, 10)) {
+            const errColor = m.error_rate_pct > 5 ? C.red : m.error_rate_pct > 0 ? C.yellow : C.dim;
+            console.log('  ' + padRight(C.white(m.model), 35) + padRight(C.cyan(String(m.count)), 10) + padRight(C.dim(m.avg_latency_ms + 'ms'), 10) + errColor(m.error_rate_pct + '%'));
+        }
+        console.log('');
+    }
+
+    // By node
+    if (data.by_node.length > 0) {
+        console.log('  ' + C.cyan(C.bold('By Node')));
+        for (const n of data.by_node) {
+            const nodeShort = n.node_id.split('-').pop() || n.node_id;
+            console.log('  ' + padRight(C.white(nodeShort), 20) + C.cyan(String(n.count)) + C.dim(' reqs, ') + C.dim(n.avg_latency_ms + 'ms avg'));
+        }
+        console.log('');
+    }
+
+    if (data.total_requests === 0) {
+        console.log('  ' + C.dim('No inference requests yet. Try:'));
+        console.log('  ' + C.cyan('  clawtopus chat --model dolphin-mistral:latest'));
+        console.log('');
+    }
+}
+
 async function cmdDoctor(gateway: string, flags: Record<string, string>): Promise<void> {
     const autofix = flags['no-fix'] ? 'false' : 'true';
 
@@ -1848,6 +1903,10 @@ async function main(): Promise<void> {
 
         case 'fix':
             await cmdFix(gateway);
+            break;
+
+        case 'analytics':
+            await cmdAnalytics(gateway, parsed.flags);
             break;
 
         case 'doctor':
