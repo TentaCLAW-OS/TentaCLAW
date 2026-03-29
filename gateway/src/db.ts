@@ -156,6 +156,30 @@ function initSchema(db: Database.Database): void {
 
         CREATE INDEX IF NOT EXISTS idx_ssh_keys_node ON ssh_keys(node_id);
 
+        CREATE TABLE IF NOT EXISTS uptime_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            node_id TEXT NOT NULL,
+            event TEXT NOT NULL,
+            from_status TEXT,
+            to_status TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_uptime_node ON uptime_events(node_id, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS overclock_profiles (
+            id TEXT PRIMARY KEY,
+            node_id TEXT NOT NULL,
+            gpu_index INTEGER NOT NULL,
+            core_offset_mhz INTEGER DEFAULT 0,
+            mem_offset_mhz INTEGER DEFAULT 0,
+            power_limit_w INTEGER DEFAULT 0,
+            fan_speed_pct INTEGER DEFAULT 0,
+            applied_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_oc_node ON overclock_profiles(node_id);
+
         CREATE TABLE IF NOT EXISTS watchdog_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             node_id TEXT NOT NULL,
@@ -324,6 +348,7 @@ export function markStaleNodes(thresholdSecs: number = 60): string[] {
         const stmt = d.prepare("UPDATE nodes SET status = 'offline' WHERE id = ?");
         for (const node of stale) {
             stmt.run(node.id);
+            recordUptimeEvent(node.id, 'stale_offline', 'online', 'offline');
         }
         return stale.map(n => n.id);
     }
@@ -351,7 +376,11 @@ export function insertStats(nodeId: string, payload: StatsPayload): void {
         payload.toks_per_sec
     );
 
-    // Update node last_seen and status
+    // Update node last_seen and status — track state transition for uptime
+    const current = d.prepare('SELECT status FROM nodes WHERE id = ?').get(nodeId) as { status: string } | undefined;
+    if (current && current.status !== 'online') {
+        recordUptimeEvent(nodeId, 'stats_online', current.status, 'online');
+    }
     d.prepare(`
         UPDATE nodes SET last_seen_at = datetime('now'), status = 'online', gpu_count = ?
         WHERE id = ?
@@ -1153,6 +1182,103 @@ function computeNextRun(cron: string): string {
     }
 
     return next.toISOString().replace('T', ' ').slice(0, 19);
+}
+
+// =============================================================================
+// Uptime Tracking
+// =============================================================================
+
+export function recordUptimeEvent(nodeId: string, event: string, fromStatus?: string, toStatus?: string): void {
+    const d = getDb();
+    d.prepare('INSERT INTO uptime_events (node_id, event, from_status, to_status) VALUES (?, ?, ?, ?)').run(nodeId, event, fromStatus || null, toStatus || null);
+}
+
+export function getNodeUptime(nodeId: string, hours: number = 24): { uptime_pct: number; total_online_s: number; total_offline_s: number; events: number } {
+    const d = getDb();
+    const since = new Date(Date.now() - hours * 3600_000).toISOString().replace('T', ' ').slice(0, 19);
+
+    const events = d.prepare(
+        'SELECT * FROM uptime_events WHERE node_id = ? AND created_at >= ? ORDER BY created_at'
+    ).all(nodeId, since) as any[];
+
+    // Simple calculation: count time in each state
+    let onlineMs = 0;
+    let offlineMs = 0;
+    let lastTime = Date.now() - hours * 3600_000;
+    let lastStatus = 'offline';
+
+    // Check if node was online before the window
+    const node = d.prepare('SELECT status FROM nodes WHERE id = ?').get(nodeId) as any;
+    if (node) lastStatus = node.status === 'online' ? 'online' : 'offline';
+
+    for (const evt of events) {
+        const evtTime = new Date(evt.created_at + 'Z').getTime();
+        const elapsed = evtTime - lastTime;
+        if (lastStatus === 'online') onlineMs += elapsed;
+        else offlineMs += elapsed;
+
+        if (evt.to_status) lastStatus = evt.to_status;
+        lastTime = evtTime;
+    }
+
+    // Account for time since last event
+    const remaining = Date.now() - lastTime;
+    if (lastStatus === 'online') onlineMs += remaining;
+    else offlineMs += remaining;
+
+    const total = onlineMs + offlineMs;
+    return {
+        uptime_pct: total > 0 ? Math.round((onlineMs / total) * 1000) / 10 : 0,
+        total_online_s: Math.round(onlineMs / 1000),
+        total_offline_s: Math.round(offlineMs / 1000),
+        events: events.length,
+    };
+}
+
+export function getFleetUptime(hours: number = 24): Array<{ node_id: string; hostname: string; uptime_pct: number }> {
+    const d = getDb();
+    const nodes = d.prepare('SELECT id, hostname FROM nodes').all() as any[];
+    return nodes.map(n => {
+        const uptime = getNodeUptime(n.id, hours);
+        return { node_id: n.id, hostname: n.hostname, uptime_pct: uptime.uptime_pct };
+    });
+}
+
+// =============================================================================
+// Overclock Profiles
+// =============================================================================
+
+export function setOverclockProfile(nodeId: string, gpuIndex: number, profile: {
+    core_offset_mhz?: number;
+    mem_offset_mhz?: number;
+    power_limit_w?: number;
+    fan_speed_pct?: number;
+}): void {
+    const d = getDb();
+    const id = `${nodeId}:${gpuIndex}`;
+    const existing = d.prepare('SELECT id FROM overclock_profiles WHERE id = ?').get(id);
+
+    if (existing) {
+        const sets: string[] = ["applied_at = datetime('now')"];
+        const vals: unknown[] = [];
+        if (profile.core_offset_mhz !== undefined) { sets.push('core_offset_mhz = ?'); vals.push(profile.core_offset_mhz); }
+        if (profile.mem_offset_mhz !== undefined) { sets.push('mem_offset_mhz = ?'); vals.push(profile.mem_offset_mhz); }
+        if (profile.power_limit_w !== undefined) { sets.push('power_limit_w = ?'); vals.push(profile.power_limit_w); }
+        if (profile.fan_speed_pct !== undefined) { sets.push('fan_speed_pct = ?'); vals.push(profile.fan_speed_pct); }
+        vals.push(id);
+        d.prepare(`UPDATE overclock_profiles SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    } else {
+        d.prepare(`INSERT INTO overclock_profiles (id, node_id, gpu_index, core_offset_mhz, mem_offset_mhz, power_limit_w, fan_speed_pct) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+            id, nodeId, gpuIndex,
+            profile.core_offset_mhz || 0, profile.mem_offset_mhz || 0,
+            profile.power_limit_w || 0, profile.fan_speed_pct || 0,
+        );
+    }
+}
+
+export function getOverclockProfiles(nodeId: string): any[] {
+    const d = getDb();
+    return d.prepare('SELECT * FROM overclock_profiles WHERE node_id = ? ORDER BY gpu_index').all(nodeId) as any[];
 }
 
 // =============================================================================

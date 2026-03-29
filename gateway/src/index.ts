@@ -68,6 +68,11 @@ import {
     updateModelPull,
     getActiveModelPulls,
     getAllActiveModelPulls,
+    recordUptimeEvent,
+    getNodeUptime,
+    getFleetUptime,
+    setOverclockProfile,
+    getOverclockProfiles,
     recordWatchdogEvent,
     getWatchdogEvents,
     getAllWatchdogEvents,
@@ -1734,6 +1739,155 @@ app.get('/api/v1/doctor', async (c) => {
         },
         results,
     });
+});
+
+// =============================================================================
+// Uptime & Reliability API (Phase 21-30)
+// =============================================================================
+
+app.get('/api/v1/nodes/:id/uptime', (c) => {
+    const hours = parseInt(c.req.query('hours') || '24');
+    return c.json(getNodeUptime(c.req.param('id'), hours));
+});
+
+app.get('/api/v1/uptime', (c) => {
+    const hours = parseInt(c.req.query('hours') || '24');
+    return c.json(getFleetUptime(hours));
+});
+
+// =============================================================================
+// Per-GPU Overclocking API (Phase 31-40)
+// =============================================================================
+
+app.get('/api/v1/nodes/:id/overclock', (c) => {
+    return c.json(getOverclockProfiles(c.req.param('id')));
+});
+
+app.post('/api/v1/nodes/:id/overclock', async (c) => {
+    const nodeId = c.req.param('id');
+    const node = getNode(nodeId);
+    if (!node) return c.json({ error: 'Node not found' }, 404);
+
+    const body = await c.req.json<{
+        gpu_index: number;
+        core_offset_mhz?: number;
+        mem_offset_mhz?: number;
+        power_limit_w?: number;
+        fan_speed_pct?: number;
+    }>();
+
+    if (body.gpu_index === undefined) return c.json({ error: 'gpu_index required' }, 400);
+
+    // Save profile
+    setOverclockProfile(nodeId, body.gpu_index, body);
+
+    // Send overclock command to agent
+    queueCommand(nodeId, 'overclock', {
+        gpu: body.gpu_index,
+        core_offset: body.core_offset_mhz,
+        mem_offset: body.mem_offset_mhz,
+        power_limit: body.power_limit_w,
+        fan_speed: body.fan_speed_pct,
+    });
+
+    broadcastSSE('overclock_applied', { node_id: nodeId, gpu_index: body.gpu_index });
+    return c.json({ status: 'queued', profile: body });
+});
+
+// =============================================================================
+// Bulk Operations API (Phase 71-80)
+// =============================================================================
+
+app.post('/api/v1/bulk/command', async (c) => {
+    const body = await c.req.json<{
+        node_ids?: string[];
+        tag?: string;
+        action: string;
+        payload?: Record<string, unknown>;
+    }>();
+
+    if (!body.action) return c.json({ error: 'action required' }, 400);
+
+    // Resolve target nodes
+    let targetNodes: string[];
+    if (body.tag) {
+        const tagged = getNodesByTag(body.tag);
+        targetNodes = tagged.map(n => n.id);
+    } else if (body.node_ids) {
+        targetNodes = body.node_ids;
+    } else {
+        // All online nodes
+        targetNodes = getAllNodes().filter(n => n.status === 'online').map(n => n.id);
+    }
+
+    const results: Array<{ node_id: string; status: string }> = [];
+    for (const nodeId of targetNodes) {
+        try {
+            queueCommand(nodeId, body.action as any, body.payload);
+            results.push({ node_id: nodeId, status: 'queued' });
+        } catch {
+            results.push({ node_id: nodeId, status: 'error' });
+        }
+    }
+
+    broadcastSSE('bulk_command', { action: body.action, count: results.length });
+    return c.json({ action: body.action, total: results.length, results });
+});
+
+app.post('/api/v1/bulk/tags', async (c) => {
+    const body = await c.req.json<{ node_ids: string[]; tags: string[]; action: 'add' | 'remove' }>();
+    if (!body.node_ids || !body.tags) return c.json({ error: 'node_ids and tags required' }, 400);
+
+    let count = 0;
+    for (const nodeId of body.node_ids) {
+        for (const tag of body.tags) {
+            if (body.action === 'remove') {
+                removeNodeTag(nodeId, tag);
+            } else {
+                addNodeTag(nodeId, tag);
+            }
+            count++;
+        }
+    }
+    return c.json({ status: 'done', operations: count });
+});
+
+app.post('/api/v1/bulk/reboot', async (c) => {
+    const body = await c.req.json<{ node_ids?: string[]; tag?: string }>();
+    let targets: string[];
+    if (body.tag) {
+        targets = getNodesByTag(body.tag).map(n => n.id);
+    } else if (body.node_ids) {
+        targets = body.node_ids;
+    } else {
+        return c.json({ error: 'node_ids or tag required' }, 400);
+    }
+
+    for (const nodeId of targets) {
+        queueCommand(nodeId, 'reboot');
+    }
+    broadcastSSE('bulk_reboot', { count: targets.length });
+    return c.json({ status: 'queued', count: targets.length });
+});
+
+app.post('/api/v1/bulk/deploy', async (c) => {
+    const body = await c.req.json<{ model: string; node_ids?: string[]; tag?: string }>();
+    if (!body.model) return c.json({ error: 'model required' }, 400);
+
+    let targets: string[];
+    if (body.tag) {
+        targets = getNodesByTag(body.tag).map(n => n.id);
+    } else if (body.node_ids) {
+        targets = body.node_ids;
+    } else {
+        targets = getAllNodes().filter(n => n.status === 'online').map(n => n.id);
+    }
+
+    for (const nodeId of targets) {
+        queueCommand(nodeId, 'install_model', { model: body.model });
+    }
+    broadcastSSE('bulk_deploy', { model: body.model, count: targets.length });
+    return c.json({ status: 'queued', model: body.model, count: targets.length });
 });
 
 // =============================================================================
