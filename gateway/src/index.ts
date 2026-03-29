@@ -70,6 +70,10 @@ import {
     getAllActiveModelPulls,
     recordRouteResult,
     getRequestStats,
+    estimateModelVram,
+    checkModelFits,
+    findBestNodeForModel,
+    getModelDistribution,
     recordUptimeEvent,
     getNodeUptime,
     getFleetUptime,
@@ -1782,6 +1786,62 @@ app.get('/api/v1/doctor', async (c) => {
 // =============================================================================
 // Inference Engine Info (Wave 2)
 // =============================================================================
+
+// =============================================================================
+// Model Management API (Wave 4)
+// =============================================================================
+
+app.get('/api/v1/models/distribution', (c) => {
+    return c.json(getModelDistribution());
+});
+
+app.get('/api/v1/models/check-fit', (c) => {
+    const model = c.req.query('model');
+    const nodeId = c.req.query('node');
+    if (!model) return c.json({ error: 'model query param required' }, 400);
+
+    if (nodeId) {
+        return c.json(checkModelFits(model, nodeId));
+    }
+
+    // Find best node for this model
+    const best = findBestNodeForModel(model);
+    return c.json({
+        model,
+        estimated_vram_mb: estimateModelVram(model),
+        best_node: best,
+        fits_anywhere: best !== null,
+    });
+});
+
+app.post('/api/v1/models/smart-deploy', async (c) => {
+    const body = await c.req.json<{ model: string; count?: number }>();
+    if (!body.model) return c.json({ error: 'model required' }, 400);
+
+    const targetCount = body.count || 1;
+    const deployed: Array<{ node_id: string; hostname: string; status: string }> = [];
+
+    for (let i = 0; i < targetCount; i++) {
+        const best = findBestNodeForModel(body.model);
+        if (!best) break;
+
+        const fit = checkModelFits(body.model, best.node_id);
+        if (!fit.fits) break;
+
+        queueCommand(best.node_id, 'install_model', { model: body.model });
+        deployed.push({ node_id: best.node_id, hostname: best.hostname, status: 'queued' });
+    }
+
+    if (deployed.length === 0) {
+        return c.json({
+            error: 'No node has enough VRAM for ' + body.model,
+            estimated_vram_mb: estimateModelVram(body.model),
+        }, 409);
+    }
+
+    broadcastSSE('smart_deploy', { model: body.model, nodes: deployed });
+    return c.json({ model: body.model, deployed });
+});
 
 app.get('/api/v1/inference/stats', (c) => {
     return c.json(getRequestStats());

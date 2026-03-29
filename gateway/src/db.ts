@@ -920,6 +920,97 @@ export function getClusterModels(): { model: string; node_count: number; nodes: 
 }
 
 // =============================================================================
+// Smart Model Management (Wave 4)
+// =============================================================================
+
+// Known model VRAM requirements (approximate, in MB)
+const MODEL_VRAM_MAP: Record<string, number> = {
+    'llama3.1:8b': 5120, 'llama3.1:70b': 41000, 'llama3.2:3b': 2048, 'llama3.2:1b': 1024,
+    'codellama:7b': 4608, 'codellama:13b': 8192, 'codellama:34b': 20480,
+    'mistral:7b': 4608, 'mixtral:8x7b': 28672,
+    'qwen2.5:7b': 4608, 'qwen2.5:3b': 2048, 'qwen3:14b': 9216,
+    'gemma2:9b': 5632, 'phi3:3.8b': 2560,
+    'deepseek-coder-v2:16b': 10240, 'hermes3:8b': 5120,
+    'nomic-embed-text': 512, 'dolphin-mistral': 4096,
+};
+
+export function estimateModelVram(model: string): number {
+    // Exact match
+    if (MODEL_VRAM_MAP[model]) return MODEL_VRAM_MAP[model];
+    // Partial match (without quantization suffix)
+    const base = model.split(':')[0];
+    for (const [key, vram] of Object.entries(MODEL_VRAM_MAP)) {
+        if (key.startsWith(base)) return vram;
+    }
+    // Heuristic: parse parameter count from name
+    const paramMatch = model.match(/(\d+)b/i);
+    if (paramMatch) {
+        const params = parseInt(paramMatch[1]);
+        return params * 600; // ~600MB per billion params (Q4 quantized)
+    }
+    return 4096; // Default 4GB estimate
+}
+
+export function checkModelFits(model: string, nodeId: string): { fits: boolean; required_mb: number; available_mb: number; node: string } {
+    const node = getNode(nodeId);
+    if (!node || !node.latest_stats) return { fits: false, required_mb: 0, available_mb: 0, node: nodeId };
+
+    const required = estimateModelVram(model);
+    const totalVram = node.latest_stats.gpus.reduce((s, g) => s + g.vramTotalMb, 0);
+    const usedVram = node.latest_stats.gpus.reduce((s, g) => s + g.vramUsedMb, 0);
+    const available = totalVram - usedVram;
+
+    return { fits: available >= required, required_mb: required, available_mb: available, node: nodeId };
+}
+
+export function findBestNodeForModel(model: string): { node_id: string; hostname: string; available_mb: number } | null {
+    const nodes = getAllNodes();
+    const required = estimateModelVram(model);
+
+    const candidates: Array<{ node_id: string; hostname: string; available_mb: number }> = [];
+
+    for (const node of nodes) {
+        if (node.status !== 'online' || !node.latest_stats) continue;
+
+        // Skip nodes that already have this model
+        if (node.latest_stats.inference.loaded_models.includes(model)) continue;
+
+        const totalVram = node.latest_stats.gpus.reduce((s, g) => s + g.vramTotalMb, 0);
+        const usedVram = node.latest_stats.gpus.reduce((s, g) => s + g.vramUsedMb, 0);
+        const available = totalVram - usedVram;
+
+        if (available >= required) {
+            candidates.push({ node_id: node.id, hostname: node.hostname, available_mb: available });
+        }
+    }
+
+    if (candidates.length === 0) return null;
+    // Pick node with most available VRAM
+    candidates.sort((a, b) => b.available_mb - a.available_mb);
+    return candidates[0];
+}
+
+export function getModelDistribution(): Array<{
+    model: string;
+    estimated_vram_mb: number;
+    nodes: Array<{ node_id: string; hostname: string }>;
+    coverage: number; // % of online nodes that have this model
+}> {
+    const models = getClusterModels();
+    const onlineCount = getAllNodes().filter(n => n.status === 'online').length;
+
+    return models.map(m => ({
+        model: m.model,
+        estimated_vram_mb: estimateModelVram(m.model),
+        nodes: m.nodes.map(nid => {
+            const n = getAllNodes().find(x => x.id === nid);
+            return { node_id: nid, hostname: n?.hostname || '?' };
+        }),
+        coverage: onlineCount > 0 ? Math.round((m.node_count / onlineCount) * 100) : 0,
+    }));
+}
+
+// =============================================================================
 // Cluster Health Score (0-100)
 // =============================================================================
 
