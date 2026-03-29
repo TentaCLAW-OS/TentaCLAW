@@ -18,7 +18,7 @@ If you already own GPUs, this is the software layer that helps them behave like 
 ## What’s in v0.2.0
 
 ### Core platform
-- HiveMind Gateway with dashboard, REST API, SSE, and OpenAI-compatible endpoints
+- TentaCLAW Gateway with dashboard, REST API, SSE, and OpenAI-compatible endpoints
 - Agent daemon with auto-discovery, stats push, command execution, and mock mode
 - CLAWtopus CLI for routing, deployment, cluster health, models, alerts, tags, and benchmarks
 - Shared type contract across gateway, agent, and CLI

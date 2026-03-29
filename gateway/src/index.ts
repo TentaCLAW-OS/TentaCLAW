@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * TentaCLAW TentaCLAW Gateway
+ * TentaCLAW Gateway
  *
  * The central coordinator for your AI inference cluster.
  * Receives stats from agents, dispatches commands, serves the dashboard.
@@ -244,7 +244,7 @@ app.get('/health', (c) => {
 
 app.get('/', (c) => {
     return c.json({
-        name: 'TentaCLAW TentaCLAW Gateway',
+        name: 'TentaCLAW Gateway',
         version: '0.1.0',
         tagline: 'Eight arms. One mind. Zero compromises.',
         endpoints: {
@@ -2787,7 +2787,7 @@ ensureDefaultAliases();
 
 console.log(`
 \x1b[38;2;0;255;255m        ╭──────────────────────────────────────╮\x1b[0m
-\x1b[38;2;0;255;255m   ╭───┤\x1b[0m  \x1b[38;2;140;0;200mTentaCLAW TentaCLAW Gateway\x1b[0m  \x1b[38;2;0;255;255m├───╮\x1b[0m
+\x1b[38;2;0;255;255m   ╭───┤\x1b[0m  \x1b[38;2;140;0;200mTentaCLAW Gateway\x1b[0m  \x1b[38;2;0;255;255m├───╮\x1b[0m
 \x1b[38;2;0;255;255m   │\x1b[0m  \x1b[38;2;0;140;140mOne mind to rule them all.\x1b[0m       \x1b[38;2;0;255;255m│\x1b[0m
 \x1b[38;2;0;255;255m   ╰──────────────────────────────────────╯\x1b[0m
 `);

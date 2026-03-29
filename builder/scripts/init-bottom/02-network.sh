@@ -3,7 +3,7 @@
 # TentaCLAW OS — Network Bring-Up Script (init-bottom)
 # =============================================================================
 # Runs inside initrd during early boot, BEFORE switchroot.
-# Brings up networking via DHCP and discovers the HiveMind gateway.
+# Brings up networking via DHCP and discovers the TentaCLAW gateway.
 #
 # CLAWtopus says: "I need to reach out to my other arms."
 # =============================================================================
@@ -160,7 +160,7 @@ discover_gateway() {
         return 0
     fi
 
-    log "Discovering HiveMind gateway..."
+    log "Discovering TentaCLAW gateway..."
 
     # Try DNS resolution for common gateway names
     local discovered=""
@@ -300,7 +300,7 @@ echo ""
 if [ -s "$GATEWAY_URL_FILE" ] && [ -n "$(cat "$GATEWAY_URL_FILE")" ]; then
     gw=$(cat "$GATEWAY_URL_FILE")
     log_success "Network ready. Gateway: ${gw}"
-    echo -e "  ${GREEN}✓ Connected to HiveMind${RESET}"
+    echo -e "  ${GREEN}✓ Connected to TentaCLAW${RESET}"
 else
     log_warn "Network ready but no gateway found."
     echo -e "  ${YELLOW}⚠ Operating in standalone mode${RESET}"

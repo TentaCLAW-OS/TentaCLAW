@@ -16,9 +16,9 @@ TentaCLAW OS is a purpose-built Linux distribution for AI inference clusters. Li
 This is a **full release** covering:
 1. Bootable ISO (USB/CD) and PXE network boot
 2. Auto-detect GPU hardware on first boot (NVIDIA + AMD)
-3. HiveMind gateway registration using Farm Hash
+3. TentaCLAW gateway registration using Farm Hash
 4. Full TentaCLAW Agent daemon (`tentaclaw-agent`)
-5. HiveMind gateway API endpoints (register, stats, commands)
+5. TentaCLAW gateway API endpoints (register, stats, commands)
 6. TentaCLAW-style push model (POST stats, receive commands in response)
 7. GPU stats collection and watchdog
 
@@ -113,7 +113,7 @@ F:\Daphney-OG\tentaclaw-os\
 └── docs/
     ├── NETWORK-BOOT.md               # PXE server setup guide
     ├── USB-BOOT.md                   # USB creation guide
-    └── GATEWAY-SETUP.md              # HiveMind gateway setup
+    └── GATEWAY-SETUP.md              # TentaCLAW gateway setup
 ```
 
 ### 2.2 Boot Flow
@@ -494,7 +494,7 @@ log "Detection complete: $NVIDIA_COUNT NVIDIA, $AMD_COUNT AMD"
 
 ### 3.4 Network Boot Script (`builder/scripts/init-bottom/02-network.sh`)
 
-**Purpose**: Bring up networking and discover the HiveMind gateway.
+**Purpose**: Bring up networking and discover the TentaCLAW gateway.
 
 ```bash
 #!/bin/bash
@@ -551,7 +551,7 @@ fi
 
 ### 3.5 Hive Registration Script (`builder/scripts/init-bottom/03-hive-registration.sh`)
 
-**Purpose**: Register node with HiveMind gateway using Farm Hash.
+**Purpose**: Register node with TentaCLAW gateway using Farm Hash.
 
 ```bash
 #!/bin/bash
@@ -651,7 +651,7 @@ These are passed by PXE/iPXE or ISO bootloader:
 
 | Parameter | Example | Description |
 |-----------|---------|-------------|
-| `tentaclaw.gateway` | `192.168.1.100` | HiveMind gateway IP:port |
+| `tentaclaw.gateway` | `192.168.1.100` | TentaCLAW gateway IP:port |
 | `tentaclaw.farmhash` | `FARM3K7P9` | Farm Hash (user enters in dashboard) |
 | `tentaclaw.nodename` | `node-a1b2c3` | Optional explicit node name |
 | `tentaclaw.initrd` | `*` | Signals that initrd is loaded |
@@ -744,7 +744,7 @@ build-iso.sh
 After building PXE artifacts, the user sets up a server:
 
 ```bash
-# On the gateway/HiveMind machine (Ubuntu 24.04)
+# On the gateway/TentaCLAW machine (Ubuntu 24.04)
 
 # Install dnsmasq for DHCP+TFTP
 sudo apt-get install -y dnsmasq

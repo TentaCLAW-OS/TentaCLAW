@@ -13,7 +13,7 @@ xeyes                 # GUI eyes that follow your mouse
 oneko                 # Neko Desktop Pet (cat follows cursor)
 starwars              # Telnet to watch Star Wars ASCII movie
 rigOfTheDay           # Random rig display (if multiple exist)
-hiveinfo              # Full HiveMind network overview
+hiveinfo              # Full TentaCLAW network overview
 clawtopusMode         # Enable maximum verbosity + CLAWtopus quotes
 sudo rm -rf /         # DON'T DO THIS - just a joke
 ```

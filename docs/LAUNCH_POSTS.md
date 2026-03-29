@@ -11,7 +11,7 @@ TentaCLAW OS is a new Linux distribution designed specifically for AI inference 
 ## What it does
 
 - **Zero-config GPU detection**: Automatically detects and configures NVIDIA/AMD GPUs on boot
-- **Push-based HiveMind protocol**: Nodes phone home with stats, receive commands via response headers (like TentaCLAW farm hash system)
+- **Push-based TentaCLAW protocol**: Nodes phone home with stats, receive commands via response headers (like TentaCLAW farm hash system)
 - **One-click model deployment**: Deploy models to your cluster with a single command
 - **Distributed inference gateway**: Built-in API gateway with streaming, routing, health checks, and rate limiting
 - **PXE boot support**: Boot entire racks over the network

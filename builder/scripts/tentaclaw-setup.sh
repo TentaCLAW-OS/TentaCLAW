@@ -298,14 +298,14 @@ step_network() {
 
 step_gateway() {
     echo ""
-    echo -e "${BOLD}  ═══ Step 3: HiveMind Gateway ═══${RESET}"
+    echo -e "${BOLD}  ═══ Step 3: TentaCLAW Gateway ═══${RESET}"
     echo ""
     
-    echo -e "  ${DIM}The HiveMind gateway is the brain of your cluster.${RESET}"
+    echo -e "  ${DIM}The TentaCLAW gateway is the brain of your cluster.${RESET}"
     echo -e "  ${DIM}Nodes push stats here and receive commands.${RESET}"
     echo ""
     
-    local gateway_ip=$(ask "HiveMind Gateway IP" "192.168.1.100")
+    local gateway_ip=$(ask "TentaCLAW Gateway IP" "192.168.1.100")
     local gateway_port=$(ask "Gateway Port" "7860")
     
     echo ""

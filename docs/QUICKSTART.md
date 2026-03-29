@@ -76,9 +76,9 @@ Registration:
 
 ---
 
-## 5. Add Node to HiveMind Gateway
+## 5. Add Node to TentaCLAW Gateway
 
-On your HiveMind gateway server:
+On your TentaCLAW gateway server:
 
 ```bash
 # Check gateway logs for new node registrations
@@ -111,7 +111,7 @@ curl -X POST http://localhost:8080/api/v1/deploy \
 For network boot, set up a PXE server:
 
 ```bash
-# On your gateway/HiveMind server
+# On your gateway/TentaCLAW server
 cd /path/to/pxe-artifacts
 sudo ./setup-pxe.sh
 ```
@@ -132,7 +132,7 @@ See [SETUP.md](./SETUP.md) for detailed PXE setup.
 - Try static IP: `tentaclaw.gateway=192.168.1.100 ip=192.168.1.50::192.168.1.1:255.255.255.0`
 
 ### "Gateway unreachable"
-- Ensure HiveMind gateway is running
+- Ensure TentaCLAW gateway is running
 - Check firewall: `sudo ufw allow 7860/tcp`
 
 ### "Registration failed"

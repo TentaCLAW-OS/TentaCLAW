@@ -374,7 +374,7 @@ pxe/
 
 ## Quick Setup with Dnsmasq
 
-On your HiveMind gateway server (Ubuntu/Debian):
+On your TentaCLAW gateway server (Ubuntu/Debian):
 
 ```bash
 # 1. Install dnsmasq
@@ -432,7 +432,7 @@ sudo systemctl restart nginx
 3. iPXE loads and executes boot.ipxe from TFTP/HTTP
 4. Kernel and initrd are downloaded (HTTP recommended)
 5. TentaCLAW OS boots and runs init scripts
-6. CLAWtopus registers with HiveMind gateway
+6. CLAWtopus registers with TentaCLAW gateway
 
 ## Troubleshooting
 
@@ -445,7 +445,7 @@ sudo systemctl restart nginx
 - Check firewall: `sudo ufw allow 69/udp`
 
 ### "Gateway unreachable"
-- Ensure the HiveMind gateway is running
+- Ensure the TentaCLAW gateway is running
 - Check firewall on gateway: `sudo ufw allow 7860/tcp`
 
 ## Notes

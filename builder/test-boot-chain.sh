@@ -136,7 +136,7 @@ for arg in "\$@"; do
 done
 
 if echo "\$@" | grep -q "health"; then
-    echo '{"status":"ok","service":"tentaclaw-hivemind","version":"0.1.0"}'
+    echo '{"status":"ok","service":"tentaclaw-tentaclaw","version":"0.1.0"}'
 elif echo "\$@" | grep -q "register"; then
     echo '{"status":"registered","node":{"id":"TENTACLAW-SIMTEST-mock","status":"online"}}'
 elif echo "\$@" | grep -q "11434"; then

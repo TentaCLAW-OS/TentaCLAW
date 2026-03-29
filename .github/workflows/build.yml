@@ -159,7 +159,7 @@ jobs:
 
             ### Downloads
             - TentaCLAW-OS-${{ env.VERSION }}-amd64.iso — Bootable ISO
-            - tentaclaw-gateway-${{ env.VERSION }} — HiveMind Gateway
+            - tentaclaw-gateway-${{ env.VERSION }} — TentaCLAW Gateway
             - tentaclaw-agent-${{ env.VERSION }} — Node Agent
 
             ### Quick Start
@@ -174,7 +174,7 @@ jobs:
             ### What's New
             - Zero-config GPU detection (NVIDIA)
             - Farm Hash registration
-            - HiveMind Gateway with web dashboard
+            - TentaCLAW Gateway with web dashboard
             - Flight sheet model deployment
             - SSE real-time dashboard updates
             - TentaCLAW-style push model

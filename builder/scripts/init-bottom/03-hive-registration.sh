@@ -1,9 +1,9 @@
 #!/bin/bash
 # =============================================================================
-# TentaCLAW OS — HiveMind Registration Script (init-bottom)
+# TentaCLAW OS — TentaCLAW Registration Script (init-bottom)
 # =============================================================================
 # Runs inside initrd during early boot, AFTER network is up.
-# Generates Farm Hash from hardware, registers with HiveMind gateway.
+# Generates Farm Hash from hardware, registers with TentaCLAW gateway.
 #
 # CLAWtopus says: "Let me wrap an arm around this node."
 # =============================================================================
@@ -193,7 +193,7 @@ register_with_gateway() {
         gw_port="7860"
     fi
 
-    log "Registering with HiveMind gateway at ${gw_host}:${gw_port}..."
+    log "Registering with TentaCLAW gateway at ${gw_host}:${gw_port}..."
 
     # Determine OS version
     local os_version
@@ -303,7 +303,7 @@ EOF
 
 echo ""
 echo -e "${BOLD}${CYAN}  ═══════════════════════════════════════════════════════${RESET}"
-echo -e "${BOLD}${CYAN}  ║        ${PURPLE}CLAWtopus HiveMind Registration${CYAN}         ${RESET}"
+echo -e "${BOLD}${CYAN}  ║        ${PURPLE}CLAWtopus TentaCLAW Registration${CYAN}         ${RESET}"
 echo -e "${BOLD}${CYAN}  ═══════════════════════════════════════════════════════${RESET}"
 echo ""
 
@@ -350,7 +350,7 @@ echo -e "  ${BOLD}${PURPLE}╰────────────────�
 echo ""
 
 if [ -n "$GATEWAY_URL" ]; then
-    log_success "Node registered with HiveMind"
+    log_success "Node registered with TentaCLAW"
     echo -e "  ${GREEN}✓ All arms accounted for.${RESET}"
 else
     log_warn "No gateway found. Node will operate in standalone mode."

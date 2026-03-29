@@ -1,7 +1,7 @@
 {
   "name": "tentaclaw-gateway",
   "version": "0.1.0",
-  "description": "TentaCLAW HiveMind Gateway — Central coordinator for AI inference clusters",
+  "description": "TentaCLAW Gateway — Central coordinator for AI inference clusters",
   "main": "dist/index.js",
   "bin": {
     "tentaclaw-gateway": "./dist/index.js"
@@ -15,7 +15,7 @@
   },
   "keywords": [
     "tentaclaw",
-    "hivemind",
+    "tentaclaw",
     "gateway",
     "ai",
     "inference",

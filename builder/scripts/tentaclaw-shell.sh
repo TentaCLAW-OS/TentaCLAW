@@ -289,7 +289,7 @@ cmd_nodes() {
         echo -e "    ${PURPLE}Gateway:${RESET} $gateway"
         echo ""
         
-        echo -e "  ${YELLOW}⚠${RESET} ${DIM}To see other nodes, open the HiveMind dashboard${RESET}"
+        echo -e "  ${YELLOW}⚠${RESET} ${DIM}To see other nodes, open the TentaCLAW dashboard${RESET}"
     else
         warn "Not registered. Run 'init' to register this node."
     fi
