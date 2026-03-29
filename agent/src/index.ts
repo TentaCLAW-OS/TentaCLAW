@@ -296,6 +296,45 @@ function collectStats(config: AgentConfig): StatsPayload {
 }
 
 // =============================================================================
+// System Info (collected once on startup for registration)
+// =============================================================================
+
+function getSystemInfo(mockMode: boolean): Record<string, string> {
+    if (mockMode) {
+        return {
+            cpu_model: 'AMD Ryzen 9 7950X 16-Core Processor',
+            cpu_cores: String(os.cpus().length),
+            total_ram_mb: String(Math.round(os.totalmem() / 1024 / 1024)),
+            os_platform: os.platform(),
+            os_release: os.release(),
+            arch: os.arch(),
+            node_version: process.version,
+            agent_version: '0.1.0',
+        };
+    }
+
+    const info: Record<string, string> = {
+        cpu_cores: String(os.cpus().length),
+        total_ram_mb: String(Math.round(os.totalmem() / 1024 / 1024)),
+        os_platform: os.platform(),
+        os_release: os.release(),
+        arch: os.arch(),
+        node_version: process.version,
+        agent_version: '0.1.0',
+    };
+
+    try {
+        info.cpu_model = os.cpus()[0]?.model || 'unknown';
+    } catch { info.cpu_model = 'unknown'; }
+
+    try {
+        info.kernel = execFileSync('uname', ['-r'], { encoding: 'utf-8' }).trim();
+    } catch { /* not linux */ }
+
+    return info;
+}
+
+// =============================================================================
 // Stats Pusher
 // =============================================================================
 
@@ -444,6 +483,11 @@ async function executeCommand(command: GatewayCommand, mockMode: boolean): Promi
         return;
     }
 
+    if (command.action === 'overclock') {
+        await applyOverclockProfile(command, mockMode);
+        return;
+    }
+
     if (mockMode) {
         console.log('[agent] [mock] Simulated: ' + label);
         return;
@@ -489,6 +533,81 @@ async function executeCommand(command: GatewayCommand, mockMode: boolean): Promi
 
         default:
             console.log('[agent] Unknown command: ' + command.action);
+    }
+}
+
+// =============================================================================
+// GPU Overclock Profiles
+// =============================================================================
+
+const OC_PROFILES: Record<string, { power_limit_pct: number; core_offset_mhz: number; mem_offset_mhz: number; fan_speed_pct: number }> = {
+    stock:     { power_limit_pct: 100, core_offset_mhz: 0,    mem_offset_mhz: 0,    fan_speed_pct: 0 },
+    gaming:    { power_limit_pct: 110, core_offset_mhz: 100,  mem_offset_mhz: 500,  fan_speed_pct: 70 },
+    mining:    { power_limit_pct: 70,  core_offset_mhz: -200, mem_offset_mhz: 1000, fan_speed_pct: 80 },
+    inference: { power_limit_pct: 90,  core_offset_mhz: 50,   mem_offset_mhz: 200,  fan_speed_pct: 60 },
+};
+
+async function applyOverclockProfile(command: GatewayCommand, mockMode: boolean): Promise<void> {
+    const profile = command.profile || 'stock';
+    const gpuIdx = command.gpu !== undefined ? command.gpu : -1; // -1 = all GPUs
+    const settings = OC_PROFILES[profile] || OC_PROFILES['stock'];
+
+    console.log('[agent] Applying overclock profile: ' + profile + (gpuIdx >= 0 ? ' (GPU ' + gpuIdx + ')' : ' (all GPUs)'));
+
+    if (mockMode) {
+        console.log('[agent] [mock] OC profile: power=' + settings.power_limit_pct + '%, core=' +
+            (settings.core_offset_mhz >= 0 ? '+' : '') + settings.core_offset_mhz + 'MHz, mem=' +
+            (settings.mem_offset_mhz >= 0 ? '+' : '') + settings.mem_offset_mhz + 'MHz, fan=' +
+            (settings.fan_speed_pct > 0 ? settings.fan_speed_pct + '%' : 'auto'));
+        return;
+    }
+
+    try {
+        const gpuTarget = gpuIdx >= 0 ? String(gpuIdx) : '0'; // TODO: iterate all GPUs
+
+        // Set power limit (nvidia-smi takes absolute watts, we need to calculate)
+        // First get the default power limit
+        const defaultPower = execFileSync('nvidia-smi', [
+            '--query-gpu=power.default_limit', '--format=csv,noheader,nounits', '-i', gpuTarget
+        ], { encoding: 'utf-8' }).trim();
+        const targetPower = Math.round(parseFloat(defaultPower) * settings.power_limit_pct / 100);
+
+        execFileSync('nvidia-smi', ['-i', gpuTarget, '-pl', String(targetPower)], { stdio: 'ignore' });
+        console.log('[agent] Power limit set to ' + targetPower + 'W (' + settings.power_limit_pct + '%)');
+
+        // Set clock offsets
+        if (settings.core_offset_mhz !== 0) {
+            execFileSync('nvidia-settings', [
+                '-a', '[gpu:' + gpuTarget + ']/GPUGraphicsClockOffsetAllPerformanceLevels=' + settings.core_offset_mhz
+            ], { stdio: 'ignore' });
+            console.log('[agent] Core offset: ' + (settings.core_offset_mhz >= 0 ? '+' : '') + settings.core_offset_mhz + 'MHz');
+        }
+
+        if (settings.mem_offset_mhz !== 0) {
+            execFileSync('nvidia-settings', [
+                '-a', '[gpu:' + gpuTarget + ']/GPUMemoryTransferRateOffsetAllPerformanceLevels=' + settings.mem_offset_mhz
+            ], { stdio: 'ignore' });
+            console.log('[agent] Memory offset: +' + settings.mem_offset_mhz + 'MHz');
+        }
+
+        // Set fan speed
+        if (settings.fan_speed_pct > 0) {
+            execFileSync('nvidia-settings', [
+                '-a', '[gpu:' + gpuTarget + ']/GPUFanControlState=1',
+                '-a', '[fan:' + gpuTarget + ']/GPUTargetFanSpeed=' + settings.fan_speed_pct
+            ], { stdio: 'ignore' });
+            console.log('[agent] Fan speed: ' + settings.fan_speed_pct + '%');
+        } else {
+            execFileSync('nvidia-settings', [
+                '-a', '[gpu:' + gpuTarget + ']/GPUFanControlState=0'
+            ], { stdio: 'ignore' });
+            console.log('[agent] Fan speed: auto');
+        }
+
+        console.log('[agent] Overclock profile "' + profile + '" applied successfully');
+    } catch (e) {
+        console.error('[agent] Overclock failed: ' + e);
+        console.error('[agent] Note: overclocking requires nvidia-settings and root access');
     }
 }
 

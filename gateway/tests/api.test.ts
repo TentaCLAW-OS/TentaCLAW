@@ -71,10 +71,9 @@ function makeStats(nodeId: string): StatsPayload {
 describe('Node Registration', () => {
     beforeEach(() => {
         const db = getDb();
-        db.prepare('DELETE FROM stats').run();
-        db.prepare('DELETE FROM commands').run();
-        db.prepare('DELETE FROM flight_sheets').run();
-        db.prepare('DELETE FROM nodes').run();
+        for (const t of ['stats', 'commands', 'flight_sheets', 'alerts', 'benchmarks', 'node_events', 'schedules', 'nodes']) {
+            db.prepare('DELETE FROM ' + t).run();
+        }
     });
 
     it('registers a new node', () => {
@@ -130,10 +129,9 @@ describe('Node Registration', () => {
 describe('Stats', () => {
     beforeEach(() => {
         const db = getDb();
-        db.prepare('DELETE FROM stats').run();
-        db.prepare('DELETE FROM commands').run();
-        db.prepare('DELETE FROM flight_sheets').run();
-        db.prepare('DELETE FROM nodes').run();
+        for (const t of ['stats', 'commands', 'flight_sheets', 'alerts', 'benchmarks', 'node_events', 'schedules', 'nodes']) {
+            db.prepare('DELETE FROM ' + t).run();
+        }
     });
 
     it('inserts and retrieves stats', () => {
@@ -167,10 +165,9 @@ describe('Stats', () => {
 describe('Commands', () => {
     beforeEach(() => {
         const db = getDb();
-        db.prepare('DELETE FROM stats').run();
-        db.prepare('DELETE FROM commands').run();
-        db.prepare('DELETE FROM flight_sheets').run();
-        db.prepare('DELETE FROM nodes').run();
+        for (const t of ['stats', 'commands', 'flight_sheets', 'alerts', 'benchmarks', 'node_events', 'schedules', 'nodes']) {
+            db.prepare('DELETE FROM ' + t).run();
+        }
     });
 
     it('queues and retrieves commands', () => {
@@ -204,10 +201,9 @@ describe('Commands', () => {
 describe('Flight Sheets', () => {
     beforeEach(() => {
         const db = getDb();
-        db.prepare('DELETE FROM stats').run();
-        db.prepare('DELETE FROM commands').run();
-        db.prepare('DELETE FROM flight_sheets').run();
-        db.prepare('DELETE FROM nodes').run();
+        for (const t of ['stats', 'commands', 'flight_sheets', 'alerts', 'benchmarks', 'node_events', 'schedules', 'nodes']) {
+            db.prepare('DELETE FROM ' + t).run();
+        }
     });
 
     it('creates and retrieves flight sheets', () => {
@@ -254,10 +250,9 @@ describe('Flight Sheets', () => {
 describe('Cluster Summary', () => {
     beforeEach(() => {
         const db = getDb();
-        db.prepare('DELETE FROM stats').run();
-        db.prepare('DELETE FROM commands').run();
-        db.prepare('DELETE FROM flight_sheets').run();
-        db.prepare('DELETE FROM nodes').run();
+        for (const t of ['stats', 'commands', 'flight_sheets', 'alerts', 'benchmarks', 'node_events', 'schedules', 'nodes']) {
+            db.prepare('DELETE FROM ' + t).run();
+        }
     });
 
     it('returns correct summary', () => {
@@ -286,10 +281,9 @@ describe('Cluster Summary', () => {
 describe('Stale Node Detection', () => {
     beforeEach(() => {
         const db = getDb();
-        db.prepare('DELETE FROM stats').run();
-        db.prepare('DELETE FROM commands').run();
-        db.prepare('DELETE FROM flight_sheets').run();
-        db.prepare('DELETE FROM nodes').run();
+        for (const t of ['stats', 'commands', 'flight_sheets', 'alerts', 'benchmarks', 'node_events', 'schedules', 'nodes']) {
+            db.prepare('DELETE FROM ' + t).run();
+        }
     });
 
     it('marks nodes offline when stale', () => {
