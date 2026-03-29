@@ -2042,6 +2042,55 @@ app.get('/api/v1/inference/stats', (c) => {
 });
 
 // =============================================================================
+// Node Comparison + Benchmark Ranking (Wave 24)
+// =============================================================================
+
+app.get('/api/v1/compare', (c) => {
+    const nodeIds = (c.req.query('nodes') || '').split(',').filter(Boolean);
+    const nodes = getAllNodes().filter(n => nodeIds.length === 0 || nodeIds.includes(n.id));
+
+    const comparison = nodes.map(n => {
+        const s = n.latest_stats || {} as any;
+        const health = getNodeHealthScore(n.id);
+        const uptime = getNodeUptime(n.id, 24);
+        return {
+            node_id: n.id,
+            hostname: n.hostname,
+            status: n.status,
+            health: health.score,
+            grade: health.grade,
+            uptime_pct: uptime.uptime_pct,
+            gpu_count: n.gpu_count,
+            total_vram_mb: s.gpus?.reduce((sum: number, g: any) => sum + (g.vramTotalMb || 0), 0) || 0,
+            used_vram_mb: s.gpus?.reduce((sum: number, g: any) => sum + (g.vramUsedMb || 0), 0) || 0,
+            avg_temp: s.gpus?.length > 0 ? Math.round(s.gpus.reduce((sum: number, g: any) => sum + (g.temperatureC || 0), 0) / s.gpus.length) : 0,
+            models: s.inference?.loaded_models?.length || 0,
+            backend: s.backend?.type || 'unknown',
+            cpu: s.system_info?.cpu_model || 'unknown',
+            ram_gb: s.system_info?.ram_total_gb || 0,
+        };
+    }).sort((a, b) => b.health - a.health);
+
+    return c.json({ nodes: comparison });
+});
+
+app.get('/api/v1/leaderboard/models', (c) => {
+    const d = getDb();
+    const rows = d.prepare(`
+        SELECT model, node_id,
+            COUNT(*) as requests,
+            AVG(latency_ms) as avg_latency,
+            MIN(latency_ms) as best_latency
+        FROM inference_log
+        WHERE success = 1
+        GROUP BY model, node_id
+        ORDER BY avg_latency ASC
+    `).all() as any[];
+
+    return c.json({ rankings: rows });
+});
+
+// =============================================================================
 // Version & Capabilities (Wave 19)
 // =============================================================================
 
