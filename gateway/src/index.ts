@@ -938,6 +938,96 @@ app.get('/api/v1/config', (c) => {
 });
 
 // =============================================================================
+// Power Monitoring & Cost Estimation
+// =============================================================================
+
+const POWER_COST_KWH = parseFloat(process.env.TENTACLAW_POWER_COST || '0.12');
+
+app.get('/api/v1/power', (c) => {
+    const nodes = getAllNodes();
+    let totalWatts = 0;
+    let gpuWatts = 0;
+    const perNode: { node_id: string; hostname: string; gpu_watts: number; gpu_count: number }[] = [];
+
+    for (const node of nodes) {
+        if (!node.latest_stats || node.status !== 'online') continue;
+        let nodeGpuWatts = 0;
+        for (const gpu of node.latest_stats.gpus) {
+            nodeGpuWatts += gpu.powerDrawW;
+        }
+        gpuWatts += nodeGpuWatts;
+        // Estimate system power: ~100W base + GPU power
+        const systemWatts = 100 + nodeGpuWatts;
+        totalWatts += systemWatts;
+        perNode.push({
+            node_id: node.id,
+            hostname: node.hostname,
+            gpu_watts: Math.round(nodeGpuWatts),
+            gpu_count: node.latest_stats.gpus.length,
+        });
+    }
+
+    const totalKw = totalWatts / 1000;
+    const dailyCost = totalKw * 24 * POWER_COST_KWH;
+    const monthlyCost = dailyCost * 30;
+    const summary = getClusterSummary();
+    const tokensPerDollar = monthlyCost > 0 && summary.total_toks_per_sec > 0
+        ? Math.round((summary.total_toks_per_sec * 86400 * 30) / monthlyCost)
+        : 0;
+
+    return c.json({
+        total_watts: Math.round(totalWatts),
+        gpu_watts: Math.round(gpuWatts),
+        system_overhead_watts: Math.round(totalWatts - gpuWatts),
+        cost_per_kwh: POWER_COST_KWH,
+        daily_cost_usd: Math.round(dailyCost * 100) / 100,
+        monthly_cost_usd: Math.round(monthlyCost * 100) / 100,
+        tokens_per_dollar: tokensPerDollar,
+        per_node: perNode,
+    });
+});
+
+// =============================================================================
+// Model Leaderboard
+// =============================================================================
+
+app.get('/api/v1/leaderboard', (c) => {
+    const nodes = getAllNodes();
+    const modelStats = new Map<string, { total_toks: number; node_count: number; best_toks: number; best_node: string; nodes: string[] }>();
+
+    for (const node of nodes) {
+        if (!node.latest_stats || node.status !== 'online') continue;
+        const nodeToks = node.latest_stats.toks_per_sec;
+
+        for (const model of node.latest_stats.inference.loaded_models) {
+            const existing = modelStats.get(model) || { total_toks: 0, node_count: 0, best_toks: 0, best_node: '', nodes: [] };
+            existing.total_toks += nodeToks;
+            existing.node_count++;
+            existing.nodes.push(node.hostname);
+            if (nodeToks > existing.best_toks) {
+                existing.best_toks = nodeToks;
+                existing.best_node = node.hostname;
+            }
+            modelStats.set(model, existing);
+        }
+    }
+
+    const leaderboard = [...modelStats.entries()]
+        .map(([model, stats]) => ({
+            model,
+            total_toks_per_sec: stats.total_toks,
+            avg_toks_per_sec: Math.round(stats.total_toks / stats.node_count),
+            node_count: stats.node_count,
+            best_node: stats.best_node,
+            best_toks_per_sec: stats.best_toks,
+            nodes: stats.nodes,
+        }))
+        .sort((a, b) => b.total_toks_per_sec - a.total_toks_per_sec);
+
+    return c.json({ leaderboard });
+});
+
+// =============================================================================
 // Discovery (for agents to find the gateway)
 // =============================================================================
 

@@ -63,7 +63,16 @@ export interface StatsPayload {
 // Commands (Gateway → Agent)
 // =============================================================================
 
-export type CommandAction = 'reload_model' | 'install_model' | 'remove_model' | 'overclock' | 'restart_agent' | 'reboot';
+export type CommandAction = 'reload_model' | 'install_model' | 'remove_model' | 'overclock' | 'benchmark' | 'restart_agent' | 'reboot';
+
+export type OverclockProfile = 'stock' | 'gaming' | 'mining' | 'inference';
+
+export const OVERCLOCK_PROFILES: Record<OverclockProfile, { power_limit_pct: number; core_offset_mhz: number; mem_offset_mhz: number; fan_speed_pct: number }> = {
+    stock:     { power_limit_pct: 100, core_offset_mhz: 0,    mem_offset_mhz: 0,    fan_speed_pct: 0 },   // 0 = auto
+    gaming:    { power_limit_pct: 110, core_offset_mhz: 100,  mem_offset_mhz: 500,  fan_speed_pct: 70 },
+    mining:    { power_limit_pct: 70,  core_offset_mhz: -200, mem_offset_mhz: 1000, fan_speed_pct: 80 },
+    inference: { power_limit_pct: 90,  core_offset_mhz: 50,   mem_offset_mhz: 200,  fan_speed_pct: 60 },
+};
 
 export interface GatewayCommand {
     id: string;
