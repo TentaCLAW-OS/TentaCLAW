@@ -55,6 +55,9 @@
 - [Build Guide](BUILD.md)
 - [Brand Guide](BRAND.md)
 - [Launch Plan](docs/LAUNCH.md)
+- [Release Copy](docs/RELEASE.md)
+- [Social Launch Kit](docs/SOCIAL.md)
+- [Demo Production Script](docs/DEMO-SCRIPT.md)
 
 ---
 
