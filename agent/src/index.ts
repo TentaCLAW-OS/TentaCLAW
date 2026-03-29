@@ -73,7 +73,84 @@ function parseRigConf(content: string): Record<string, string> {
     return config;
 }
 
-function loadConfig(): AgentConfig {
+async function discoverGateway(): Promise<string | null> {
+    // Method 1: Listen for gateway UDP broadcast on port 41338
+    return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+            sock.close();
+            resolve(scanForGateway()); // Fallback to port scan
+        }, 5000);
+
+        const sock = dgram.createSocket('udp4');
+        sock.on('message', (msg) => {
+            try {
+                const data = JSON.parse(msg.toString());
+                if (data.magic === 'TENTACLAW-GATEWAY' && data.url) {
+                    clearTimeout(timeout);
+                    sock.close();
+                    resolve(data.url);
+                }
+            } catch {}
+        });
+        sock.on('error', () => {
+            clearTimeout(timeout);
+            resolve(scanForGateway());
+        });
+        try {
+            sock.bind(41338);
+        } catch {
+            clearTimeout(timeout);
+            resolve(scanForGateway());
+        }
+    });
+}
+
+function scanForGateway(): Promise<string | null> {
+    // Method 2: Scan common local IPs for gateway on port 8080
+    return new Promise((resolve) => {
+        const localIp = getLocalIpPrefix();
+        let found = false;
+        let pending = 0;
+
+        for (let i = 1; i <= 254; i++) {
+            const ip = localIp + i;
+            pending++;
+            const req = http.get(`http://${ip}:8080/health`, { timeout: 1000 }, (res) => {
+                let data = '';
+                res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+                res.on('end', () => {
+                    if (!found && data.includes('tentaclaw-hivemind')) {
+                        found = true;
+                        console.log(`[discovery] Found gateway at ${ip}:8080`);
+                        resolve(`http://${ip}:8080`);
+                    }
+                    pending--;
+                    if (pending === 0 && !found) resolve(null);
+                });
+            });
+            req.on('error', () => { pending--; if (pending === 0 && !found) resolve(null); });
+            req.on('timeout', () => { req.destroy(); pending--; if (pending === 0 && !found) resolve(null); });
+        }
+
+        // Overall timeout
+        setTimeout(() => { if (!found) resolve(null); }, 10000);
+    });
+}
+
+function getLocalIpPrefix(): string {
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+        for (const iface of ifaces[name] || []) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                const parts = iface.address.split('.');
+                return parts.slice(0, 3).join('.') + '.';
+            }
+        }
+    }
+    return '192.168.1.';
+}
+
+async function loadConfig(): Promise<AgentConfig> {
     if (MOCK_MODE) {
         const hostname = NODE_NAME_OVERRIDE || ('mock-' + os.hostname());
         const farmHash = 'FARMM0CK';
@@ -105,8 +182,29 @@ function loadConfig(): AgentConfig {
             };
         }
 
-        console.error('[agent] No config found at /etc/tentaclaw/rig.conf');
-        console.error('[agent] Use --mock for development, or set NODE_ID + GATEWAY_URL env vars');
+        // No config file and no env vars — try auto-discovery
+        console.log('[agent] No config found — auto-discovering gateway on LAN...');
+        const discovered = await discoverGateway();
+        if (discovered) {
+            console.log('[agent] Found gateway at ' + discovered);
+            const hostname = NODE_NAME_OVERRIDE || os.hostname();
+            const farmHash = 'AUTO';
+            const nodeId = 'TENTACLAW-AUTO-' + hostname;
+            // Auto-create rig.conf for next boot
+            try {
+                fs.mkdirSync('/etc/tentaclaw', { recursive: true });
+                fs.writeFileSync(configPath, `NODE_ID=${nodeId}\nFARM_HASH=${farmHash}\nGATEWAY_URL=${discovered}\nHOSTNAME=${hostname}\nAGENT_INTERVAL=10\n`);
+                console.log('[agent] Auto-created /etc/tentaclaw/rig.conf');
+            } catch {}
+            return {
+                nodeId, farmHash, hostname, gatewayUrl: discovered,
+                agentInterval: 10,
+                statsUrl: discovered + '/api/v1/nodes/' + nodeId + '/stats',
+                mockMode: false,
+            };
+        }
+        console.error('[agent] No gateway found on LAN. Set GATEWAY_URL in /etc/tentaclaw/rig.conf');
+        console.error('[agent] Or use --mock for development');
         process.exit(1);
     }
 
@@ -594,7 +692,8 @@ async function postBenchmarkResult(model: string, result: {
     eval_rate: number;
     total_duration_ms: number;
 }): Promise<void> {
-    const config = loadConfig();
+    const config = cachedConfig;
+    if (!config) return;
     if (!config.gatewayUrl) return;
 
     const url = config.gatewayUrl + '/api/v1/nodes/' + config.nodeId + '/benchmark';
@@ -773,6 +872,7 @@ async function applyOverclockProfile(command: GatewayCommand, mockMode: boolean)
 
 let totalTokens = 0;
 let totalRequests = 0;
+let cachedConfig: AgentConfig | null = null;
 
 // =============================================================================
 // Remote Shell Tunnel — Connects to gateway WebSocket
@@ -833,13 +933,13 @@ function startShellTunnel(config: ReturnType<typeof loadConfig>): void {
             ws.on('close', () => {
                 shellProcess?.kill();
                 shellProcess = null;
-                console.log('[shell] Disconnected from gateway — reconnecting in 10s');
-                setTimeout(connect, 10000);
+                // Exponential backoff: 30s, 60s, 120s, max 5min
+                const delay = Math.min(30000 * Math.pow(2, Math.floor(Math.random() * 3)), 300000);
+                setTimeout(connect, delay);
             });
 
             ws.on('error', () => {
-                // Silently reconnect
-                setTimeout(connect, 10000);
+                setTimeout(connect, 60000); // Retry quietly every 60s
             });
         } catch {
             setTimeout(connect, 10000);
@@ -850,7 +950,8 @@ function startShellTunnel(config: ReturnType<typeof loadConfig>): void {
 }
 
 async function main() {
-    const config = loadConfig();
+    const config = await loadConfig();
+    cachedConfig = config;
 
     console.log(
         '\n\x1b[38;2;0;255;255m        \u256D\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256E\x1b[0m\n' +
