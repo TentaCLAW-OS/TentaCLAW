@@ -2071,8 +2071,8 @@ app.use('/dashboard/*', serveStatic({
 
 app.get('/dashboard', (c) => c.redirect('/dashboard/'));
 
-// Also serve at root so /style.css and /app.js work
-app.use('/*', serveStatic({ root: 'public' }));
+// Root redirect to dashboard
+app.get('/', (c) => c.redirect('/dashboard/'));
 
 // =============================================================================
 // Background Tasks
