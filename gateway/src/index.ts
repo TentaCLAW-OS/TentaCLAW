@@ -76,6 +76,7 @@ import {
     getModelDistribution,
     logInferenceRequest,
     getInferenceAnalytics,
+    runAutoMode,
     createApiKey,
     validateApiKey,
     trackApiKeyTokens,
@@ -1855,6 +1856,24 @@ app.post('/api/v1/models/smart-deploy', async (c) => {
 
 app.get('/api/v1/inference/stats', (c) => {
     return c.json(getRequestStats());
+});
+
+// =============================================================================
+// Auto Mode (Wave 8)
+// =============================================================================
+
+app.post('/api/v1/auto', (c) => {
+    const decisions = runAutoMode();
+    broadcastSSE('auto_mode', { decisions: decisions.length, executed: decisions.filter(d => d.executed).length });
+    return c.json({
+        decisions,
+        executed: decisions.filter(d => d.executed).length,
+        suggested: decisions.filter(d => !d.executed).length,
+    });
+});
+
+app.get('/api/v1/auto/status', (c) => {
+    return c.json({ enabled: true, last_run: null, interval_minutes: 30 });
 });
 
 // =============================================================================

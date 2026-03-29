@@ -1282,6 +1282,110 @@ export function getAllTags(): Array<{ tag: string; count: number }> {
 }
 
 // =============================================================================
+// Auto Mode (Wave 8) — System decides everything
+// =============================================================================
+
+export interface AutoModeDecision {
+    action: string;
+    reason: string;
+    target?: string;
+    model?: string;
+    executed: boolean;
+}
+
+export function runAutoMode(): AutoModeDecision[] {
+    const decisions: AutoModeDecision[] = [];
+    const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
+    const models = getClusterModels();
+
+    if (nodes.length === 0) return decisions;
+
+    // Decision 1: Empty nodes should get the most popular model
+    for (const node of nodes) {
+        if (!node.latest_stats) continue;
+        const loadedCount = node.latest_stats.inference.loaded_models.length;
+        if (loadedCount === 0) {
+            // Find most popular model (most nodes have it)
+            const popular = models.sort((a, b) => b.node_count - a.node_count)[0];
+            const fallbackModel = popular?.model || 'llama3.2:3b';
+
+            const totalVram = node.latest_stats.gpus.reduce((s, g) => s + g.vramTotalMb, 0);
+            const recommended = getAutoModelForVram(totalVram);
+
+            const model = recommended || fallbackModel;
+            const fit = checkModelFits(model, node.id);
+            if (fit.fits) {
+                queueCommand(node.id, 'install_model', { model });
+                decisions.push({
+                    action: 'deploy_model',
+                    reason: `Node ${node.hostname} has no models — deploying ${model} (${fit.required_mb}MB, ${fit.available_mb}MB free)`,
+                    target: node.id,
+                    model,
+                    executed: true,
+                });
+            }
+        }
+    }
+
+    // Decision 2: High-demand models should have redundancy
+    const d = getDb();
+    const recentRequests = d.prepare(`
+        SELECT model, COUNT(*) as cnt FROM inference_log
+        WHERE created_at >= datetime('now', '-1 hour')
+        GROUP BY model ORDER BY cnt DESC LIMIT 5
+    `).all() as Array<{ model: string; cnt: number }>;
+
+    for (const req of recentRequests) {
+        const modelInfo = models.find(m => m.model === req.model);
+        if (modelInfo && modelInfo.node_count < 2 && req.cnt >= 10) {
+            // Popular model on only 1 node — add redundancy
+            const best = findBestNodeForModel(req.model);
+            if (best) {
+                queueCommand(best.node_id, 'install_model', { model: req.model });
+                decisions.push({
+                    action: 'add_redundancy',
+                    reason: `${req.model} got ${req.cnt} requests/hr but only on 1 node — deploying to ${best.hostname}`,
+                    target: best.node_id,
+                    model: req.model,
+                    executed: true,
+                });
+            }
+        }
+    }
+
+    // Decision 3: Remove models unused for 7+ days
+    // (We'd need per-model last-used tracking — simplified version using inference_log)
+    for (const model of models) {
+        const lastUsed = d.prepare(`
+            SELECT MAX(created_at) as last_used FROM inference_log WHERE model = ?
+        `).get(model.model) as { last_used: string | null } | undefined;
+
+        if (lastUsed?.last_used) {
+            const daysSinceUse = (Date.now() - new Date(lastUsed.last_used + 'Z').getTime()) / 86400000;
+            if (daysSinceUse > 7 && model.node_count > 0) {
+                decisions.push({
+                    action: 'suggest_remove',
+                    reason: `${model.model} hasn't been used in ${Math.round(daysSinceUse)} days`,
+                    model: model.model,
+                    executed: false, // Don't auto-remove, just suggest
+                });
+            }
+        }
+    }
+
+    return decisions;
+}
+
+function getAutoModelForVram(totalVramMb: number): string | null {
+    if (totalVramMb >= 40000) return 'llama3.1:70b';
+    if (totalVramMb >= 16000) return 'llama3.1:8b';
+    if (totalVramMb >= 8000) return 'llama3.2:3b';
+    if (totalVramMb >= 4000) return 'llama3.2:1b';
+    if (totalVramMb >= 2000) return 'phi3:3.8b';
+    return null;
+}
+
+// =============================================================================
 // API Key Management (Wave 7)
 // =============================================================================
 

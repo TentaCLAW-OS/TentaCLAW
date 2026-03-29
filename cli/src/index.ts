@@ -1275,6 +1275,35 @@ async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
     console.log('');
 }
 
+async function cmdAuto(gateway: string): Promise<void> {
+    console.log('');
+    console.log('  ' + C.purple(C.bold('CLAWtopus Auto Mode')) + C.dim(' — letting the system decide'));
+    console.log('');
+
+    const result = await apiPost(gateway, '/api/v1/auto', {}) as any;
+
+    if (result.decisions.length === 0) {
+        console.log('  ' + C.green('\u2714') + ' Cluster is already optimized. No changes needed.');
+        console.log('');
+        return;
+    }
+
+    for (const d of result.decisions) {
+        const icon = d.executed ? C.cyan('\u2692') : C.yellow('\u26A0');
+        const label = d.executed ? C.cyan('[AUTO]') : C.yellow('[SUGGEST]');
+        console.log('  ' + icon + ' ' + label + ' ' + C.white(d.reason));
+    }
+
+    console.log('');
+    if (result.executed > 0) {
+        console.log('  ' + C.cyan(C.bold(`\u2692 ${result.executed} action(s) executed automatically`)));
+    }
+    if (result.suggested > 0) {
+        console.log('  ' + C.yellow(`\u26A0 ${result.suggested} suggestion(s) — review and act manually`));
+    }
+    console.log('');
+}
+
 async function cmdApiKey(gateway: string, positional: string[], flags: Record<string, string>): Promise<void> {
     const sub = positional[0] || 'list';
 
@@ -1950,6 +1979,10 @@ async function main(): Promise<void> {
 
         case 'notify':
             await cmdNotify(gateway, parsed.positional, parsed.flags);
+            break;
+
+        case 'auto':
+            await cmdAuto(gateway);
             break;
 
         case 'optimize':
