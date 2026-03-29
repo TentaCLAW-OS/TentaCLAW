@@ -1029,6 +1029,318 @@ async function cmdDoctor(gateway: string, flags: Record<string, string>): Promis
     console.log('');
 }
 
+// =============================================================================
+// Model Package Manager — Search HuggingFace & Ollama
+// =============================================================================
+
+// Built-in Ollama model catalog (Ollama API only returns trending, not searchable)
+const OLLAMA_CATALOG = [
+    { name: 'llama3.1:8b', params: '8B', vram: '5GB', tags: ['chat', 'general', 'meta'], desc: 'Meta Llama 3.1 8B — great all-rounder' },
+    { name: 'llama3.1:70b', params: '70B', vram: '41GB', tags: ['chat', 'general', 'meta'], desc: 'Meta Llama 3.1 70B — production quality' },
+    { name: 'llama3.1:405b', params: '405B', vram: '230GB', tags: ['chat', 'general', 'meta'], desc: 'Meta Llama 3.1 405B — frontier class' },
+    { name: 'llama3.2:3b', params: '3B', vram: '2GB', tags: ['chat', 'small', 'meta'], desc: 'Meta Llama 3.2 3B — lightweight chat' },
+    { name: 'llama3.2:1b', params: '1B', vram: '1GB', tags: ['chat', 'tiny', 'meta'], desc: 'Meta Llama 3.2 1B — edge devices' },
+    { name: 'llama3.2-vision:11b', params: '11B', vram: '7GB', tags: ['vision', 'multimodal', 'meta'], desc: 'Llama 3.2 Vision — image understanding' },
+    { name: 'codellama:7b', params: '7B', vram: '4.5GB', tags: ['code', 'meta'], desc: 'Code Llama 7B — code generation' },
+    { name: 'codellama:34b', params: '34B', vram: '20GB', tags: ['code', 'meta'], desc: 'Code Llama 34B — advanced coding' },
+    { name: 'codellama:70b', params: '70B', vram: '41GB', tags: ['code', 'meta'], desc: 'Code Llama 70B — best code model' },
+    { name: 'mistral:7b', params: '7B', vram: '4.5GB', tags: ['chat', 'general', 'mistral'], desc: 'Mistral 7B — fast and efficient' },
+    { name: 'mixtral:8x7b', params: '47B', vram: '28GB', tags: ['chat', 'moe', 'mistral'], desc: 'Mixtral 8x7B — mixture of experts' },
+    { name: 'mixtral:8x22b', params: '141B', vram: '84GB', tags: ['chat', 'moe', 'mistral'], desc: 'Mixtral 8x22B — large MoE' },
+    { name: 'qwen2.5:7b', params: '7B', vram: '4.5GB', tags: ['chat', 'multilingual', 'alibaba'], desc: 'Qwen 2.5 7B — strong multilingual' },
+    { name: 'qwen2.5:32b', params: '32B', vram: '19GB', tags: ['chat', 'multilingual', 'alibaba'], desc: 'Qwen 2.5 32B — balanced quality/speed' },
+    { name: 'qwen2.5:72b', params: '72B', vram: '43GB', tags: ['chat', 'multilingual', 'alibaba'], desc: 'Qwen 2.5 72B — frontier multilingual' },
+    { name: 'qwen2.5-coder:7b', params: '7B', vram: '4.5GB', tags: ['code', 'alibaba'], desc: 'Qwen 2.5 Coder — code focused' },
+    { name: 'qwen2.5-coder:32b', params: '32B', vram: '19GB', tags: ['code', 'alibaba'], desc: 'Qwen 2.5 Coder 32B — advanced code' },
+    { name: 'deepseek-r1:8b', params: '8B', vram: '5GB', tags: ['reasoning', 'deepseek'], desc: 'DeepSeek R1 8B — reasoning model' },
+    { name: 'deepseek-r1:70b', params: '70B', vram: '41GB', tags: ['reasoning', 'deepseek'], desc: 'DeepSeek R1 70B — deep reasoning' },
+    { name: 'deepseek-coder-v2:16b', params: '16B', vram: '10GB', tags: ['code', 'deepseek'], desc: 'DeepSeek Coder V2 — code gen' },
+    { name: 'phi3:3.8b', params: '3.8B', vram: '2.5GB', tags: ['chat', 'small', 'microsoft'], desc: 'Phi-3 3.8B — Microsoft compact' },
+    { name: 'phi3:14b', params: '14B', vram: '8GB', tags: ['chat', 'microsoft'], desc: 'Phi-3 Medium — balanced' },
+    { name: 'gemma2:9b', params: '9B', vram: '5.5GB', tags: ['chat', 'general', 'google'], desc: 'Gemma 2 9B — Google open model' },
+    { name: 'gemma2:27b', params: '27B', vram: '16GB', tags: ['chat', 'general', 'google'], desc: 'Gemma 2 27B — Google large' },
+    { name: 'command-r:35b', params: '35B', vram: '21GB', tags: ['chat', 'rag', 'cohere'], desc: 'Command R — RAG optimized' },
+    { name: 'command-r-plus:104b', params: '104B', vram: '62GB', tags: ['chat', 'rag', 'cohere'], desc: 'Command R+ — enterprise RAG' },
+    { name: 'starcoder2:7b', params: '7B', vram: '4.5GB', tags: ['code', 'bigcode'], desc: 'StarCoder2 — multi-language code' },
+    { name: 'starcoder2:15b', params: '15B', vram: '9GB', tags: ['code', 'bigcode'], desc: 'StarCoder2 15B — advanced code' },
+    { name: 'nomic-embed-text', params: '137M', vram: '512MB', tags: ['embedding', 'nomic'], desc: 'Nomic Embed — text embeddings' },
+    { name: 'mxbai-embed-large', params: '335M', vram: '1GB', tags: ['embedding', 'mixedbread'], desc: 'mxbai Embed Large — embeddings' },
+    { name: 'all-minilm:33m', params: '33M', vram: '256MB', tags: ['embedding', 'tiny'], desc: 'all-MiniLM — tiny embeddings' },
+    { name: 'llava:7b', params: '7B', vram: '4.5GB', tags: ['vision', 'multimodal'], desc: 'LLaVA — vision language model' },
+    { name: 'llava:13b', params: '13B', vram: '8GB', tags: ['vision', 'multimodal'], desc: 'LLaVA 13B — better vision' },
+    { name: 'bakllava:7b', params: '7B', vram: '4.5GB', tags: ['vision', 'multimodal'], desc: 'BakLLaVA — vision chat' },
+    { name: 'hermes3:8b', params: '8B', vram: '5GB', tags: ['chat', 'function-calling', 'nous'], desc: 'Hermes 3 — function calling' },
+    { name: 'hermes3:70b', params: '70B', vram: '41GB', tags: ['chat', 'function-calling', 'nous'], desc: 'Hermes 3 70B — tool use' },
+    { name: 'yi:34b', params: '34B', vram: '20GB', tags: ['chat', 'multilingual', '01ai'], desc: 'Yi 34B — bilingual EN/CN' },
+    { name: 'solar:10.7b', params: '10.7B', vram: '6.5GB', tags: ['chat', 'upstage'], desc: 'Solar 10.7B — upscaled' },
+    { name: 'whisper:base', params: '74M', vram: '512MB', tags: ['speech', 'audio', 'openai'], desc: 'Whisper — speech recognition' },
+];
+
+async function rawHttpsGet(url: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const parsed = new URL(url);
+        https.get({
+            hostname: parsed.hostname,
+            path: parsed.pathname + parsed.search,
+            headers: { 'User-Agent': 'CLAWtopus-CLI/0.2.0', 'Accept': 'application/json' },
+            timeout: 15000,
+        }, (res) => {
+            let data = '';
+            res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+            res.on('end', () => resolve(data));
+        }).on('error', reject).on('timeout', () => { reject(new Error('timeout')); });
+    });
+}
+
+function formatDownloads(n: number): string {
+    if (n >= 1_000_000) return C.green((n / 1_000_000).toFixed(1) + 'M');
+    if (n >= 1_000) return C.green((n / 1_000).toFixed(1) + 'K');
+    return C.dim(String(n));
+}
+
+function formatSize(bytes: number): string {
+    if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(1) + ' GB';
+    if (bytes >= 1048576) return (bytes / 1048576).toFixed(0) + ' MB';
+    return String(bytes) + ' B';
+}
+
+async function cmdSearch(positional: string[], flags: Record<string, string>): Promise<void> {
+    const query = positional.join(' ').trim();
+    if (!query) {
+        console.error(C.red('  Usage: clawtopus search <query> [--source ollama|hf|all] [--limit N]'));
+        console.error(C.dim('  Example: clawtopus search llama'));
+        console.error(C.dim('  Example: clawtopus search codellama --source hf'));
+        process.exit(1);
+    }
+
+    const source = flags['source'] || flags['s'] || 'all';
+    const limit = parseInt(flags['limit'] || flags['n'] || '10');
+
+    console.log('');
+    console.log('  ' + C.purple(C.bold('Model Search')) + C.dim(` — "${query}"`));
+    console.log('');
+
+    // Search Ollama (local catalog + live trending API)
+    if (source === 'all' || source === 'ollama') {
+        console.log('  ' + C.cyan(C.bold('Ollama Library')));
+        console.log('  ' + C.dim('─'.repeat(70)));
+
+        const q = query.toLowerCase();
+        const matches = OLLAMA_CATALOG.filter(m =>
+            m.name.toLowerCase().includes(q) ||
+            m.tags.some(t => t.includes(q)) ||
+            m.desc.toLowerCase().includes(q)
+        ).slice(0, limit);
+
+        if (matches.length === 0) {
+            console.log('  ' + C.dim('No matches in catalog'));
+        } else {
+            console.log('  ' + padRight(C.dim('MODEL'), 32) + padRight(C.dim('PARAMS'), 10) + padRight(C.dim('VRAM'), 10) + C.dim('DESCRIPTION'));
+            console.log('  ' + C.dim('─'.repeat(85)));
+            for (const m of matches) {
+                console.log(
+                    '  ' +
+                    padRight(C.white(C.bold(m.name)), 32) +
+                    padRight(C.cyan(m.params), 10) +
+                    padRight(C.yellow(m.vram), 10) +
+                    C.dim(m.desc)
+                );
+            }
+            console.log('');
+            console.log('  ' + C.dim('Deploy: ') + C.cyan('clawtopus deploy <model>'));
+        }
+        console.log('');
+    }
+
+    // Search HuggingFace
+    if (source === 'all' || source === 'hf' || source === 'huggingface') {
+        console.log('  ' + C.cyan(C.bold('HuggingFace Hub')));
+        console.log('  ' + C.dim('─'.repeat(70)));
+        try {
+            const url = `https://huggingface.co/api/models?search=${encodeURIComponent(query)}&filter=text-generation&sort=downloads&direction=-1&limit=${limit}`;
+            const raw = await rawHttpsGet(url);
+            const models = JSON.parse(raw);
+
+            if (models.length === 0) {
+                console.log('  ' + C.dim('No matches'));
+            } else {
+                console.log('  ' + padRight(C.dim('MODEL'), 48) + padRight(C.dim('DOWNLOADS'), 14) + padRight(C.dim('LIKES'), 10) + C.dim('TAGS'));
+                console.log('  ' + C.dim('─'.repeat(90)));
+                for (const m of models) {
+                    const tags = (m.tags || []).filter((t: string) =>
+                        !['transformers', 'safetensors', 'pytorch', 'region:us', 'text-generation'].includes(t)
+                    ).slice(0, 3);
+                    const tagStr = tags.map((t: string) => C.dim(t)).join(C.dim(', '));
+                    console.log(
+                        '  ' +
+                        padRight(C.white(m.modelId), 48) +
+                        padRight(formatDownloads(m.downloads || 0), 14) +
+                        padRight(C.yellow('♥ ' + (m.likes || 0)), 10) +
+                        tagStr
+                    );
+                }
+            }
+        } catch (err) {
+            console.log('  ' + C.red('Error fetching HuggingFace: ' + (err instanceof Error ? err.message : String(err))));
+        }
+        console.log('');
+    }
+}
+
+async function cmdBrowseTags(): Promise<void> {
+    console.log('');
+    console.log('  ' + C.purple(C.bold('Model Categories')) + C.dim(' — Browse by type'));
+    console.log('');
+
+    // HuggingFace pipeline tags
+    const categories = [
+        { tag: 'text-generation',     icon: '▸', label: 'Text Generation',       desc: 'LLMs, chat models, code generation' },
+        { tag: 'text2text-generation', icon: '▸', label: 'Text-to-Text',          desc: 'Translation, summarization, paraphrase' },
+        { tag: 'text-classification',  icon: '▸', label: 'Text Classification',   desc: 'Sentiment, topic, intent detection' },
+        { tag: 'token-classification', icon: '▸', label: 'Token Classification',  desc: 'NER, POS tagging' },
+        { tag: 'question-answering',   icon: '▸', label: 'Question Answering',    desc: 'Extractive QA, reading comprehension' },
+        { tag: 'feature-extraction',   icon: '▸', label: 'Embeddings',            desc: 'Vector embeddings for RAG, search' },
+        { tag: 'image-text-to-text',   icon: '▸', label: 'Vision LLMs',           desc: 'Multimodal models (image + text)' },
+        { tag: 'automatic-speech-recognition', icon: '▸', label: 'Speech-to-Text', desc: 'Whisper, transcription' },
+        { tag: 'text-to-image',        icon: '▸', label: 'Image Generation',      desc: 'Stable Diffusion, DALL-E style' },
+        { tag: 'text-to-audio',        icon: '▸', label: 'Audio Generation',      desc: 'TTS, music generation' },
+    ];
+
+    for (const cat of categories) {
+        console.log('  ' + C.cyan(cat.icon) + ' ' + padRight(C.white(C.bold(cat.label)), 28) + C.dim(cat.desc));
+        console.log('    ' + C.dim('Browse: ') + C.cyan('clawtopus keywords ' + cat.tag));
+    }
+
+    console.log('');
+    console.log('  ' + C.dim('Or search directly:'));
+    console.log('    ' + C.cyan('clawtopus search llama'));
+    console.log('    ' + C.cyan('clawtopus search mistral --source ollama'));
+    console.log('    ' + C.cyan('clawtopus keywords text-generation --limit 20'));
+    console.log('');
+}
+
+async function cmdKeywords(positional: string[], flags: Record<string, string>): Promise<void> {
+    const keyword = positional.join(' ').trim();
+    if (!keyword) {
+        console.error(C.red('  Usage: clawtopus keywords <tag/pipeline> [--limit N] [--sort downloads|likes|trending]'));
+        console.error(C.dim('  Example: clawtopus keywords text-generation'));
+        console.error(C.dim('  Example: clawtopus keywords gguf --limit 20'));
+        console.error(C.dim('  Run "clawtopus tags" to see available categories'));
+        process.exit(1);
+    }
+
+    const limit = parseInt(flags['limit'] || flags['n'] || '15');
+    const sort = flags['sort'] || 'downloads';
+
+    console.log('');
+    console.log('  ' + C.purple(C.bold('Models')) + C.dim(` — filter: ${keyword} | sort: ${sort} | limit: ${limit}`));
+    console.log('');
+
+    try {
+        // Try as pipeline_tag first, fall back to general tag filter
+        const url = `https://huggingface.co/api/models?filter=${encodeURIComponent(keyword)}&sort=${sort}&direction=-1&limit=${limit}`;
+        const raw = await rawHttpsGet(url);
+        const models = JSON.parse(raw);
+
+        if (models.length === 0) {
+            console.log('  ' + C.dim('No models found for tag: ' + keyword));
+            console.log('  ' + C.dim('Try: clawtopus tags'));
+            console.log('');
+            return;
+        }
+
+        console.log('  ' + padRight(C.dim('MODEL'), 48) + padRight(C.dim('DOWNLOADS'), 14) + padRight(C.dim('LIKES'), 10) + C.dim('PIPELINE'));
+        console.log('  ' + C.dim('─'.repeat(90)));
+
+        for (const m of models) {
+            const pipeline = m.pipeline_tag || '?';
+            const pipeColor = pipeline === 'text-generation' ? C.green : pipeline.includes('image') ? C.purple : C.dim;
+            console.log(
+                '  ' +
+                padRight(C.white(m.modelId), 48) +
+                padRight(formatDownloads(m.downloads || 0), 14) +
+                padRight(C.yellow('♥ ' + (m.likes || 0)), 10) +
+                pipeColor(pipeline)
+            );
+        }
+
+        console.log('');
+        console.log('  ' + C.dim(`Showing ${models.length} of many. Use --limit N for more.`));
+    } catch (err) {
+        console.log('  ' + C.red('Error: ' + (err instanceof Error ? err.message : String(err))));
+    }
+    console.log('');
+}
+
+async function cmdModelInfo(positional: string[]): Promise<void> {
+    const modelId = positional.join('/').trim();
+    if (!modelId || !modelId.includes('/')) {
+        console.error(C.red('  Usage: clawtopus info <org/model>'));
+        console.error(C.dim('  Example: clawtopus info meta-llama/Llama-3.1-8B-Instruct'));
+        process.exit(1);
+    }
+
+    console.log('');
+
+    try {
+        const raw = await rawHttpsGet(`https://huggingface.co/api/models/${modelId}`);
+        const m = JSON.parse(raw);
+
+        if (m.error) {
+            console.log('  ' + C.red('Model not found: ' + modelId));
+            console.log('');
+            return;
+        }
+
+        console.log('  ' + C.purple(C.bold(m.modelId || modelId)));
+        console.log('');
+
+        // Basic info
+        console.log('  ' + C.cyan('│') + padRight(' Pipeline', 18) + C.white(m.pipeline_tag || 'unknown'));
+        console.log('  ' + C.cyan('│') + padRight(' Downloads', 18) + formatDownloads(m.downloads || 0));
+        console.log('  ' + C.cyan('│') + padRight(' Likes', 18) + C.yellow('♥ ' + (m.likes || 0)));
+        console.log('  ' + C.cyan('│') + padRight(' Last Modified', 18) + C.dim(m.lastModified ? m.lastModified.slice(0, 10) : '?'));
+        console.log('  ' + C.cyan('│') + padRight(' Author', 18) + C.white(m.author || '?'));
+
+        if (m.library_name) {
+            console.log('  ' + C.cyan('│') + padRight(' Library', 18) + C.white(m.library_name));
+        }
+
+        if (m.license) {
+            console.log('  ' + C.cyan('│') + padRight(' License', 18) + C.white(m.license));
+        }
+
+        // Tags
+        const tags = (m.tags || []).filter((t: string) =>
+            !['transformers', 'safetensors', 'pytorch', 'jax', 'region:us', 'endpoints_compatible', 'text-generation-inference'].includes(t)
+        ).slice(0, 8);
+        if (tags.length > 0) {
+            console.log('');
+            console.log('  ' + C.cyan('│') + ' Tags: ' + tags.map((t: string) => C.dim('[') + C.white(t) + C.dim(']')).join(' '));
+        }
+
+        // Siblings (files) — show GGUF files if any
+        const siblings = m.siblings || [];
+        const ggufFiles = siblings.filter((s: any) => s.rfilename?.endsWith('.gguf'));
+        if (ggufFiles.length > 0) {
+            console.log('');
+            console.log('  ' + C.cyan(C.bold('  GGUF Quantizations')));
+            for (const f of ggufFiles.slice(0, 8)) {
+                const name = f.rfilename;
+                const size = f.size ? formatSize(f.size) : '?';
+                console.log('    ' + C.green('●') + ' ' + padRight(C.white(name), 50) + C.dim(size));
+            }
+            if (ggufFiles.length > 8) {
+                console.log('    ' + C.dim(`... and ${ggufFiles.length - 8} more`));
+            }
+        }
+
+    } catch (err) {
+        console.log('  ' + C.red('Error: ' + (err instanceof Error ? err.message : String(err))));
+    }
+    console.log('');
+}
+
 function cmdHelp(): void {
     console.log('');
     for (const line of CLAWTOPUS_FACE) {
@@ -1054,6 +1366,15 @@ function cmdHelp(): void {
     console.log('    ' + padRight(C.green('tags') + ' [list|add|nodes]', 42) + 'Manage node tags');
     console.log('    ' + padRight(C.green('doctor'), 42) + 'Run diagnostics + auto-fix issues');
     console.log('    ' + padRight(C.green('doctor') + ' --no-fix', 42) + 'Dry run (diagnose only, no fixes)');
+    console.log('');
+    console.log('  ' + C.cyan(C.bold('MODEL PACKAGE MANAGER')));
+    console.log('');
+    console.log('    ' + padRight(C.green('search') + ' <query>', 42) + 'Search Ollama + HuggingFace for models');
+    console.log('    ' + padRight(C.green('search') + ' <q> --source ollama', 42) + 'Search Ollama only');
+    console.log('    ' + padRight(C.green('search') + ' <q> --source hf', 42) + 'Search HuggingFace only');
+    console.log('    ' + padRight(C.green('tags'), 42) + 'Browse model categories (text-gen, code, etc)');
+    console.log('    ' + padRight(C.green('keywords') + ' <tag>', 42) + 'List models by HuggingFace tag/pipeline');
+    console.log('    ' + padRight(C.green('info') + ' <org/model>', 42) + 'Detailed model info from HuggingFace');
     console.log('');
     console.log('  ' + C.cyan(C.bold('INFERENCE & MODELS')));
     console.log('');
@@ -1196,16 +1517,36 @@ async function main(): Promise<void> {
             await cmdBenchmarks(gateway);
             break;
 
-        case 'tags':
-            await cmdTags(gateway, parsed.positional, parsed.flags);
-            break;
-
         case 'chat':
             await cmdChat(gateway, parsed.flags);
             break;
 
         case 'doctor':
             await cmdDoctor(gateway, parsed.flags);
+            break;
+
+        case 'search':
+            await cmdSearch(parsed.positional, parsed.flags);
+            break;
+
+        case 'tags': {
+            const sub = parsed.positional[0];
+            if (sub === 'list' || sub === 'add' || sub === 'nodes') {
+                // Node tagging (requires gateway)
+                await cmdTags(gateway, parsed.positional, parsed.flags);
+            } else {
+                // Model category browser (no gateway needed)
+                await cmdBrowseTags();
+            }
+            break;
+        }
+
+        case 'keywords':
+            await cmdKeywords(parsed.positional, parsed.flags);
+            break;
+
+        case 'info':
+            await cmdModelInfo(parsed.positional);
             break;
 
         case 'flight-sheets':
