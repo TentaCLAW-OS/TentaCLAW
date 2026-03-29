@@ -1872,27 +1872,74 @@
         body: JSON.stringify({
           model: model,
           messages: playgroundHistory,
-          stream: false,
+          stream: true,
         }),
       });
 
-      const elapsed = Date.now() - startTime;
-      const data = await resp.json();
-
-      if (data.error) {
-        const errMsg = typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error));
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        const errMsg = errData.error?.message || errData.error || 'HTTP ' + resp.status;
         addPlaygroundMessage('assistant', 'Error: ' + errMsg);
         if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Error';
-      } else {
-        const choice = data.choices?.[0];
-        const content = choice?.message?.content || '(empty response)';
-        const tc = data._tentaclaw || {};
-        const nodeId = tc.hostname || tc.routed_to || 'cluster';
-        const latency = tc.latency_ms || elapsed;
-        addPlaygroundMessage('assistant', content, nodeId + ' | ' + Math.round(latency / 1000) + 's');
-        playgroundHistory.push({ role: 'assistant', content: content });
-        if (dom.playgroundStatus) dom.playgroundStatus.textContent = nodeId + ' responded in ' + Math.round(latency / 1000) + 's';
+        if (dom.btnPlaygroundSend) dom.btnPlaygroundSend.disabled = false;
+        return;
       }
+
+      // Stream tokens in real-time
+      const container = dom.playgroundMessages;
+      const empty = container.querySelector('.playground-empty');
+      if (empty) empty.remove();
+
+      const msgDiv = document.createElement('div');
+      msgDiv.className = 'playground-msg playground-msg-assistant';
+      container.appendChild(msgDiv);
+
+      const nodeId = resp.headers.get('X-TentaCLAW-Hostname') || resp.headers.get('X-TentaCLAW-Node') || 'cluster';
+      let fullContent = '';
+      let tokenCount = 0;
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6);
+          if (data === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(data);
+            const delta = parsed.choices?.[0]?.delta?.content || '';
+            if (delta) {
+              fullContent += delta;
+              tokenCount++;
+              msgDiv.textContent = fullContent;
+              container.scrollTop = container.scrollHeight;
+
+              const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+              if (dom.playgroundStatus) dom.playgroundStatus.textContent = nodeId + ' | ' + tokenCount + ' tokens | ' + elapsed + 's';
+            }
+          } catch {}
+        }
+      }
+
+      const elapsed = Date.now() - startTime;
+      const metaDiv = document.createElement('div');
+      metaDiv.className = 'playground-msg-meta';
+      metaDiv.textContent = nodeId + ' | ' + tokenCount + ' tokens | ' + (elapsed / 1000).toFixed(1) + 's';
+      msgDiv.appendChild(metaDiv);
+
+      playgroundHistory.push({ role: 'assistant', content: fullContent });
+      if (dom.playgroundStatus) dom.playgroundStatus.textContent = nodeId + ' | ' + tokenCount + ' tokens in ' + (elapsed / 1000).toFixed(1) + 's';
+
     } catch (err) {
       addPlaygroundMessage('assistant', 'Connection error: ' + err.message);
       if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Connection error — is the cluster running?';
