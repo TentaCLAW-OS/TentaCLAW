@@ -17,9 +17,10 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as dgram from 'dgram';
-import { execSync, execFileSync } from 'child_process';
+import { execSync, execFileSync, spawn } from 'child_process';
 import * as https from 'https';
 import * as http from 'http';
+import WebSocket from 'ws';
 
 // =============================================================================
 // CLI Args
@@ -773,6 +774,81 @@ async function applyOverclockProfile(command: GatewayCommand, mockMode: boolean)
 let totalTokens = 0;
 let totalRequests = 0;
 
+// =============================================================================
+// Remote Shell Tunnel — Connects to gateway WebSocket
+// =============================================================================
+
+let shellProcess: ReturnType<typeof spawn> | null = null;
+
+function startShellTunnel(config: ReturnType<typeof loadConfig>): void {
+    if (!config.gatewayUrl) return;
+
+    const wsUrl = config.gatewayUrl.replace('http://', 'ws://').replace('https://', 'wss://') +
+        '/ws/agent-shell/' + encodeURIComponent(config.nodeId);
+
+    function connect() {
+        try {
+            const ws = new WebSocket(wsUrl);
+
+            ws.on('open', () => {
+                console.log('[shell] Connected to gateway shell tunnel');
+            });
+
+            ws.on('message', (data: Buffer) => {
+                try {
+                    const msg = JSON.parse(data.toString());
+                    if (msg.type === 'shell_start' && !shellProcess) {
+                        // Spawn a bash shell
+                        console.log('[shell] Starting shell session');
+                        shellProcess = spawn('/bin/bash', ['-l'], {
+                            env: { ...process.env, TERM: 'xterm-256color' },
+                            stdio: ['pipe', 'pipe', 'pipe'],
+                        });
+
+                        shellProcess.stdout?.on('data', (chunk: Buffer) => {
+                            if (ws.readyState === WebSocket.OPEN) ws.send(chunk);
+                        });
+                        shellProcess.stderr?.on('data', (chunk: Buffer) => {
+                            if (ws.readyState === WebSocket.OPEN) ws.send(chunk);
+                        });
+                        shellProcess.on('close', () => {
+                            console.log('[shell] Shell session ended');
+                            shellProcess = null;
+                        });
+                        return;
+                    }
+                    if (msg.type === 'shell_stop') {
+                        shellProcess?.kill();
+                        shellProcess = null;
+                        return;
+                    }
+                } catch {}
+
+                // Raw input data — send to shell stdin
+                if (shellProcess?.stdin?.writable) {
+                    shellProcess.stdin.write(data);
+                }
+            });
+
+            ws.on('close', () => {
+                shellProcess?.kill();
+                shellProcess = null;
+                console.log('[shell] Disconnected from gateway — reconnecting in 10s');
+                setTimeout(connect, 10000);
+            });
+
+            ws.on('error', () => {
+                // Silently reconnect
+                setTimeout(connect, 10000);
+            });
+        } catch {
+            setTimeout(connect, 10000);
+        }
+    }
+
+    connect();
+}
+
 async function main() {
     const config = loadConfig();
 
@@ -793,6 +869,9 @@ async function main() {
     console.log('[agent] Gateway:   ' + (config.gatewayUrl || 'none (standalone)'));
     console.log('[agent] Interval:  ' + config.agentInterval + 's');
     console.log('');
+
+    // Start remote shell tunnel
+    startShellTunnel(config);
 
     // Start watchdog (escalating recovery)
     startWatchdog(config);

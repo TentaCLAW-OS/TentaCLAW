@@ -15,6 +15,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import path from 'path';
 import dgram from 'dgram';
 import os from 'os';
+import { WebSocketServer, WebSocket as WsWebSocket } from 'ws';
 import type { StatsPayload, GatewayResponse, CommandAction } from '../../shared/types';
 import {
     getDb,
@@ -2005,7 +2006,7 @@ console.log(`
 \x1b[38;2;0;255;255m   ╰──────────────────────────────────────╯\x1b[0m
 `);
 
-serve({
+const server = serve({
     fetch: app.fetch,
     port: PORT,
     hostname: HOST,
@@ -2015,6 +2016,9 @@ serve({
     console.log(`[hivemind] API: http://${HOST}:${info.port}/api/v1`);
     console.log(`[hivemind] Health: http://${HOST}:${info.port}/health`);
     console.log('');
+
+    // Remote shell WebSocket server
+    setupShellServer(server);
 
     // Auto-discovery: listen for agent broadcasts and respond
     startDiscoveryService(info.port);
@@ -2076,6 +2080,123 @@ function startDiscoveryService(gatewayPort: number): void {
         console.log('[hivemind] Auto-discovery unavailable (non-fatal)');
     }
 }
+
+// =============================================================================
+// Remote Shell — WebSocket Terminal Proxy
+// =============================================================================
+//
+// Architecture:
+// 1. Agent connects: ws://gateway:8080/ws/agent-shell/:nodeId (keeps alive)
+// 2. Dashboard connects: ws://gateway:8080/ws/shell/:nodeId
+// 3. Gateway pipes dashboard ↔ agent WebSocket data
+// 4. Agent spawns /bin/bash and pipes stdin/stdout
+
+const agentShells = new Map<string, WsWebSocket>(); // nodeId → agent WebSocket
+const dashboardShells = new Map<string, Set<WsWebSocket>>(); // nodeId → dashboard WebSockets
+
+function setupShellServer(httpServer: any): void {
+    const wss = new WebSocketServer({ noServer: true });
+
+    httpServer.on('upgrade', (req: any, socket: any, head: any) => {
+        const url = new URL(req.url, 'http://localhost');
+        const path = url.pathname;
+
+        // Agent registers its shell tunnel
+        const agentMatch = path.match(/^\/ws\/agent-shell\/(.+)$/);
+        if (agentMatch) {
+            const nodeId = decodeURIComponent(agentMatch[1]);
+            wss.handleUpgrade(req, socket, head, (ws) => {
+                agentShells.set(nodeId, ws);
+                console.log(`[shell] Agent shell connected: ${nodeId}`);
+                broadcastSSE('shell_available', { node_id: nodeId });
+
+                ws.on('message', (data: Buffer) => {
+                    // Forward agent output to all dashboard clients
+                    const clients = dashboardShells.get(nodeId);
+                    if (clients) {
+                        for (const client of clients) {
+                            if (client.readyState === WsWebSocket.OPEN) {
+                                client.send(data);
+                            }
+                        }
+                    }
+                });
+
+                ws.on('close', () => {
+                    agentShells.delete(nodeId);
+                    console.log(`[shell] Agent shell disconnected: ${nodeId}`);
+                    // Notify dashboard clients
+                    const clients = dashboardShells.get(nodeId);
+                    if (clients) {
+                        for (const client of clients) {
+                            client.send(JSON.stringify({ type: 'shell_closed', nodeId }));
+                            client.close();
+                        }
+                        dashboardShells.delete(nodeId);
+                    }
+                });
+            });
+            return;
+        }
+
+        // Dashboard requests a shell
+        const dashMatch = path.match(/^\/ws\/shell\/(.+)$/);
+        if (dashMatch) {
+            const nodeId = decodeURIComponent(dashMatch[1]);
+            const agentWs = agentShells.get(nodeId);
+
+            if (!agentWs || agentWs.readyState !== WsWebSocket.OPEN) {
+                socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+                socket.destroy();
+                return;
+            }
+
+            wss.handleUpgrade(req, socket, head, (ws) => {
+                if (!dashboardShells.has(nodeId)) {
+                    dashboardShells.set(nodeId, new Set());
+                }
+                dashboardShells.get(nodeId)!.add(ws);
+                console.log(`[shell] Dashboard connected to ${nodeId}`);
+
+                // Tell agent to start shell
+                agentWs.send(JSON.stringify({ type: 'shell_start' }));
+
+                ws.on('message', (data: Buffer) => {
+                    // Forward dashboard input to agent
+                    if (agentWs.readyState === WsWebSocket.OPEN) {
+                        agentWs.send(data);
+                    }
+                });
+
+                ws.on('close', () => {
+                    dashboardShells.get(nodeId)?.delete(ws);
+                    if (dashboardShells.get(nodeId)?.size === 0) {
+                        dashboardShells.delete(nodeId);
+                        // Tell agent to close shell
+                        if (agentWs.readyState === WsWebSocket.OPEN) {
+                            agentWs.send(JSON.stringify({ type: 'shell_stop' }));
+                        }
+                    }
+                    console.log(`[shell] Dashboard disconnected from ${nodeId}`);
+                });
+            });
+            return;
+        }
+
+        // Not a shell WebSocket
+        socket.destroy();
+    });
+
+    console.log('[shell] Remote shell server active');
+}
+
+// API endpoint to check which nodes have shells available
+app.get('/api/v1/shells', (c) => {
+    const available = [...agentShells.entries()]
+        .filter(([_, ws]) => ws.readyState === WsWebSocket.OPEN)
+        .map(([nodeId]) => nodeId);
+    return c.json({ available, active: [...dashboardShells.keys()] });
+});
 
 function getLocalIp(): string {
     const ifaces = os.networkInterfaces();
