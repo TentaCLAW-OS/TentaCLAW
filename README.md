@@ -55,9 +55,14 @@
 - [Build Guide](BUILD.md)
 - [Brand Guide](BRAND.md)
 - [Launch Plan](docs/LAUNCH.md)
+- [Launch Checklist](docs/LAUNCH-CHECKLIST.md)
 - [Release Copy](docs/RELEASE.md)
 - [Social Launch Kit](docs/SOCIAL.md)
+- [Final Launch Posts](docs/POSTS-FINAL.md)
 - [Demo Production Script](docs/DEMO-SCRIPT.md)
+- [Screenshot Shotlist](docs/SCREENSHOT-SHOTLIST.md)
+- [Hacker News Final](docs/HN-FINAL.md)
+- [Naming Audit](docs/NAMING-AUDIT.md)
 
 ---
 
@@ -121,7 +126,7 @@ Own the hardware. Own the inference. Own the failure modes too.
 
 ```bash
 # 1. Download the ISO
-wget https://github.com/TentaCLAW-OS/TentaCLAW/releases/latest/download/TentaCLAW-OS-0.1.0-amd64.iso
+wget https://github.com/TentaCLAW-OS/TentaCLAW-OS/releases/latest/download/TentaCLAW-OS-0.1.0-amd64.iso
 
 # 2. Flash to USB
 sudo dd if=TentaCLAW-OS-0.1.0-amd64.iso of=/dev/sdX bs=4M status=progress
