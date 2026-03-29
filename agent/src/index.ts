@@ -640,6 +640,9 @@ async function main() {
     console.log('[agent] Interval:  ' + config.agentInterval + 's');
     console.log('');
 
+    // Start self-heal loop (doctor mode)
+    startSelfHealLoop(config);
+
     // Start auto-discovery
     startDiscoveryBroadcast(config);
     if (!config.gatewayUrl) {
@@ -688,6 +691,164 @@ async function main() {
 
         await new Promise(resolve => setTimeout(resolve, config.agentInterval * 1000));
     }
+}
+
+// =============================================================================
+// Doctor Mode — Agent Self-Heal Loop
+// =============================================================================
+
+interface SelfHealResult {
+    check: string;
+    status: 'ok' | 'warning' | 'fixed' | 'failed';
+    message: string;
+}
+
+async function runSelfHeal(config: ReturnType<typeof loadConfig>): Promise<SelfHealResult[]> {
+    const results: SelfHealResult[] = [];
+
+    // 1. Check gateway connectivity
+    if (config.gatewayUrl) {
+        try {
+            const resp = await httpGet(config.gatewayUrl + '/health');
+            if (resp.includes('"ok"')) {
+                results.push({ check: 'gateway_connectivity', status: 'ok', message: 'Gateway reachable' });
+            } else {
+                results.push({ check: 'gateway_connectivity', status: 'warning', message: 'Gateway returned unexpected response' });
+            }
+        } catch {
+            results.push({ check: 'gateway_connectivity', status: 'warning', message: 'Cannot reach gateway — will retry on next push' });
+        }
+    }
+
+    // 2. Check disk space (Linux only)
+    if (process.platform === 'linux') {
+        try {
+            const dfOut = execSync('df -h / | tail -1', { encoding: 'utf-8', timeout: 5000 });
+            const parts = dfOut.trim().split(/\s+/);
+            const usePct = parseInt(parts[4]);
+            if (usePct > 95) {
+                // Auto-fix: clear old logs and temp files
+                try {
+                    execSync('find /tmp -type f -mtime +1 -delete 2>/dev/null; journalctl --vacuum-time=1d 2>/dev/null', { timeout: 10000 });
+                    results.push({ check: 'disk_space', status: 'fixed', message: `Disk ${usePct}% full — cleared temp files and old logs` });
+                } catch {
+                    results.push({ check: 'disk_space', status: 'failed', message: `Disk ${usePct}% full — cleanup failed` });
+                }
+            } else if (usePct > 90) {
+                results.push({ check: 'disk_space', status: 'warning', message: `Disk ${usePct}% full` });
+            } else {
+                results.push({ check: 'disk_space', status: 'ok', message: `Disk ${usePct}% used` });
+            }
+        } catch {
+            results.push({ check: 'disk_space', status: 'ok', message: 'Disk check skipped (non-Linux)' });
+        }
+    }
+
+    // 3. Check Ollama process (Linux only, skip in mock mode)
+    if (process.platform === 'linux' && !config.mockMode) {
+        try {
+            execSync('pgrep -x ollama', { timeout: 5000 });
+            results.push({ check: 'ollama_process', status: 'ok', message: 'Ollama is running' });
+        } catch {
+            // Auto-fix: restart Ollama
+            try {
+                execSync('systemctl restart ollama 2>/dev/null || ollama serve &', { timeout: 10000 });
+                results.push({ check: 'ollama_process', status: 'fixed', message: 'Ollama was down — restarted' });
+            } catch {
+                results.push({ check: 'ollama_process', status: 'failed', message: 'Ollama is down and restart failed' });
+            }
+        }
+    }
+
+    // 4. Check GPU driver (Linux + NVIDIA only, skip in mock mode)
+    if (process.platform === 'linux' && !config.mockMode) {
+        try {
+            execSync('nvidia-smi --query-gpu=name --format=csv,noheader', { timeout: 5000 });
+            results.push({ check: 'gpu_driver', status: 'ok', message: 'NVIDIA driver responding' });
+        } catch {
+            results.push({ check: 'gpu_driver', status: 'failed', message: 'nvidia-smi failed — GPU driver may be crashed. Needs manual reboot.' });
+        }
+    }
+
+    // 5. Check memory pressure
+    const memUsage = process.memoryUsage();
+    const heapPct = Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100);
+    if (heapPct > 90) {
+        // Force GC if available
+        if (global.gc) {
+            global.gc();
+            results.push({ check: 'memory_pressure', status: 'fixed', message: `Heap ${heapPct}% — forced GC` });
+        } else {
+            results.push({ check: 'memory_pressure', status: 'warning', message: `Heap ${heapPct}% — high memory pressure` });
+        }
+    } else {
+        results.push({ check: 'memory_pressure', status: 'ok', message: `Heap ${heapPct}% used (${Math.round(memUsage.heapUsed / 1048576)}MB)` });
+    }
+
+    return results;
+}
+
+function httpGet(url: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const transport = url.startsWith('https') ? https : http;
+        const req = transport.get(url, { timeout: 5000 }, (res) => {
+            let data = '';
+            res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+            res.on('end', () => resolve(data));
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    });
+}
+
+// Run self-heal every 60 seconds
+function startSelfHealLoop(config: ReturnType<typeof loadConfig>): void {
+    const HEAL_INTERVAL = 60_000;
+    let healCount = 0;
+
+    setInterval(async () => {
+        try {
+            const results = await runSelfHeal(config);
+            healCount++;
+            const fixed = results.filter(r => r.status === 'fixed').length;
+            const failed = results.filter(r => r.status === 'failed').length;
+
+            if (fixed > 0 || failed > 0) {
+                console.log(`[doctor] Self-heal #${healCount}: ${fixed} fixed, ${failed} failed`);
+                for (const r of results.filter(r => r.status !== 'ok')) {
+                    console.log(`[doctor]   ${r.status === 'fixed' ? '\u2714' : '\u2718'} ${r.check}: ${r.message}`);
+                }
+            }
+
+            // Report to gateway
+            if (config.gatewayUrl) {
+                try {
+                    const body = JSON.stringify({
+                        node_id: config.nodeId,
+                        heal_count: healCount,
+                        results,
+                    });
+                    const parsed = new URL(config.gatewayUrl + '/api/v1/nodes/' + encodeURIComponent(config.nodeId) + '/doctor');
+                    const transport = parsed.protocol === 'https:' ? https : http;
+                    const req = transport.request({
+                        hostname: parsed.hostname,
+                        port: parsed.port,
+                        path: parsed.pathname,
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        timeout: 5000,
+                    });
+                    req.write(body);
+                    req.end();
+                    req.on('error', () => {});
+                } catch {}
+            }
+        } catch (err) {
+            console.error('[doctor] Self-heal error: ' + err);
+        }
+    }, HEAL_INTERVAL);
+
+    console.log('[doctor] Self-heal loop active (every 60s)');
 }
 
 // =============================================================================

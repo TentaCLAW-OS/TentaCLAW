@@ -1421,6 +1421,329 @@ function broadcastDaphney(eventType: string, data: unknown): void {
 }
 
 // =============================================================================
+// Doctor Mode — Self-Healing Diagnostics & Auto-Fix
+// =============================================================================
+
+interface DiagnosticResult {
+    check: string;
+    status: 'ok' | 'warning' | 'critical' | 'fixed';
+    message: string;
+    auto_fixed?: boolean;
+    detail?: unknown;
+}
+
+app.get('/api/v1/doctor', async (c) => {
+    const autofix = c.req.query('autofix') !== 'false'; // autofix by default
+    const results: DiagnosticResult[] = [];
+    const d = getDb();
+
+    // 1. Check for stale nodes and auto-recover
+    const allNodes = getAllNodes();
+    const staleThreshold = 90; // seconds
+    const now = Date.now();
+    let staleFixed = 0;
+    for (const node of allNodes) {
+        if (node.status === 'online' && node.last_seen_at) {
+            const lastSeen = new Date(node.last_seen_at + 'Z').getTime();
+            const ageSecs = (now - lastSeen) / 1000;
+            if (ageSecs > staleThreshold) {
+                if (autofix) {
+                    markStaleNodes(staleThreshold);
+                    staleFixed++;
+                }
+            }
+        }
+    }
+    if (staleFixed > 0) {
+        results.push({ check: 'stale_nodes', status: 'fixed', message: `Marked ${staleFixed} stale node(s) offline`, auto_fixed: true });
+    } else {
+        const staleCount = allNodes.filter(n => {
+            if (n.status !== 'online' || !n.last_seen_at) return false;
+            return (now - new Date(n.last_seen_at + 'Z').getTime()) / 1000 > staleThreshold;
+        }).length;
+        results.push({
+            check: 'stale_nodes',
+            status: staleCount > 0 ? 'warning' : 'ok',
+            message: staleCount > 0 ? `${staleCount} node(s) appear stale` : 'All online nodes are reporting',
+        });
+    }
+
+    // 2. Check for orphaned stats (stats for deleted nodes)
+    const orphanedStats = (d.prepare(`
+        SELECT COUNT(*) as cnt FROM stats WHERE node_id NOT IN (SELECT id FROM nodes)
+    `).get() as { cnt: number }).cnt;
+    if (orphanedStats > 0 && autofix) {
+        d.prepare('DELETE FROM stats WHERE node_id NOT IN (SELECT id FROM nodes)').run();
+        results.push({ check: 'orphaned_stats', status: 'fixed', message: `Cleaned ${orphanedStats} orphaned stat rows`, auto_fixed: true });
+    } else {
+        results.push({
+            check: 'orphaned_stats',
+            status: orphanedStats > 0 ? 'warning' : 'ok',
+            message: orphanedStats > 0 ? `${orphanedStats} orphaned stat rows found` : 'No orphaned data',
+        });
+    }
+
+    // 3. Check for orphaned commands
+    const orphanedCmds = (d.prepare(`
+        SELECT COUNT(*) as cnt FROM commands WHERE node_id NOT IN (SELECT id FROM nodes)
+    `).get() as { cnt: number }).cnt;
+    if (orphanedCmds > 0 && autofix) {
+        d.prepare('DELETE FROM commands WHERE node_id NOT IN (SELECT id FROM nodes)').run();
+        results.push({ check: 'orphaned_commands', status: 'fixed', message: `Cleaned ${orphanedCmds} orphaned commands`, auto_fixed: true });
+    } else {
+        results.push({
+            check: 'orphaned_commands',
+            status: orphanedCmds > 0 ? 'warning' : 'ok',
+            message: orphanedCmds > 0 ? `${orphanedCmds} orphaned commands` : 'No orphaned commands',
+        });
+    }
+
+    // 4. Check for stuck commands (pending > 5 min)
+    const stuckCmds = d.prepare(`
+        SELECT COUNT(*) as cnt FROM commands
+        WHERE status = 'pending' AND created_at < datetime('now', '-5 minutes')
+    `).get() as { cnt: number };
+    if (stuckCmds.cnt > 0 && autofix) {
+        d.prepare(`
+            UPDATE commands SET status = 'failed'
+            WHERE status = 'pending' AND created_at < datetime('now', '-5 minutes')
+        `).run();
+        results.push({ check: 'stuck_commands', status: 'fixed', message: `Failed ${stuckCmds.cnt} stuck command(s)`, auto_fixed: true });
+    } else {
+        results.push({
+            check: 'stuck_commands',
+            status: stuckCmds.cnt > 0 ? 'warning' : 'ok',
+            message: stuckCmds.cnt > 0 ? `${stuckCmds.cnt} stuck commands` : 'No stuck commands',
+        });
+    }
+
+    // 5. Check for stale model pulls
+    const stalePulls = d.prepare(`
+        SELECT COUNT(*) as cnt FROM model_pulls
+        WHERE status = 'downloading' AND updated_at < datetime('now', '-10 minutes')
+    `).get() as { cnt: number };
+    if (stalePulls.cnt > 0 && autofix) {
+        d.prepare(`
+            UPDATE model_pulls SET status = 'error'
+            WHERE status = 'downloading' AND updated_at < datetime('now', '-10 minutes')
+        `).run();
+        results.push({ check: 'stale_pulls', status: 'fixed', message: `Marked ${stalePulls.cnt} stale pull(s) as error`, auto_fixed: true });
+    } else {
+        results.push({
+            check: 'stale_pulls',
+            status: stalePulls.cnt > 0 ? 'warning' : 'ok',
+            message: stalePulls.cnt > 0 ? `${stalePulls.cnt} stale model pulls` : 'No stale pulls',
+        });
+    }
+
+    // 6. Check unacknowledged critical alerts
+    const unackedCritical = (d.prepare(`
+        SELECT COUNT(*) as cnt FROM alerts WHERE severity = 'critical' AND acknowledged = 0
+    `).get() as { cnt: number }).cnt;
+    results.push({
+        check: 'unacked_critical_alerts',
+        status: unackedCritical > 0 ? 'critical' : 'ok',
+        message: unackedCritical > 0
+            ? `${unackedCritical} unacknowledged critical alert(s) — needs human attention`
+            : 'No unacknowledged critical alerts',
+    });
+
+    // 7. Check stats table bloat (auto-prune if > 100k rows)
+    const statsCount = (d.prepare('SELECT COUNT(*) as cnt FROM stats').get() as { cnt: number }).cnt;
+    if (statsCount > 100000 && autofix) {
+        pruneStats(48); // keep 48 hours
+        const after = (d.prepare('SELECT COUNT(*) as cnt FROM stats').get() as { cnt: number }).cnt;
+        results.push({ check: 'stats_bloat', status: 'fixed', message: `Pruned stats from ${statsCount} to ${after} rows`, auto_fixed: true });
+    } else {
+        results.push({
+            check: 'stats_bloat',
+            status: statsCount > 50000 ? 'warning' : 'ok',
+            message: `Stats table: ${statsCount} rows`,
+        });
+    }
+
+    // 8. Check DB integrity
+    const integrity = d.pragma('integrity_check') as Array<{ integrity_check: string }>;
+    const integrityOk = integrity.length === 1 && integrity[0].integrity_check === 'ok';
+    results.push({
+        check: 'db_integrity',
+        status: integrityOk ? 'ok' : 'critical',
+        message: integrityOk ? 'Database integrity OK' : 'Database integrity check FAILED',
+        detail: integrityOk ? undefined : integrity,
+    });
+
+    // 9. Check WAL size
+    const walMode = d.pragma('journal_mode') as Array<{ journal_mode: string }>;
+    results.push({
+        check: 'wal_mode',
+        status: walMode[0]?.journal_mode === 'wal' ? 'ok' : 'warning',
+        message: `Journal mode: ${walMode[0]?.journal_mode || 'unknown'}`,
+    });
+
+    // 10. Check node model coverage (any node with 0 loaded models?)
+    const nodesNoModels = allNodes.filter(n =>
+        n.status === 'online' && n.latest_stats && n.latest_stats.inference.loaded_models.length === 0
+    );
+    if (nodesNoModels.length > 0 && autofix) {
+        // Auto-deploy the most common model to empty nodes
+        const models = getClusterModels();
+        if (models.length > 0) {
+            const bestModel = models[0].model;
+            for (const node of nodesNoModels) {
+                queueCommand(node.id, 'install_model', { model: bestModel });
+            }
+            results.push({
+                check: 'empty_nodes',
+                status: 'fixed',
+                message: `Queued ${bestModel} deploy to ${nodesNoModels.length} empty node(s)`,
+                auto_fixed: true,
+            });
+        }
+    } else {
+        results.push({
+            check: 'empty_nodes',
+            status: nodesNoModels.length > 0 ? 'warning' : 'ok',
+            message: nodesNoModels.length > 0
+                ? `${nodesNoModels.length} online node(s) have no models loaded`
+                : 'All online nodes have models loaded',
+        });
+    }
+
+    // 11. Check for GPU thermal throttling risk
+    const hotGpus: Array<{ node: string; gpu: string; temp: number }> = [];
+    for (const node of allNodes) {
+        if (node.latest_stats) {
+            for (const gpu of node.latest_stats.gpus) {
+                if (gpu.temperatureC >= 80) {
+                    hotGpus.push({ node: node.id, gpu: gpu.name, temp: gpu.temperatureC });
+                }
+            }
+        }
+    }
+    if (hotGpus.length > 0 && autofix) {
+        // Auto-apply conservative overclock profile to hot nodes
+        const hotNodeIds = [...new Set(hotGpus.map(g => g.node))];
+        for (const nodeId of hotNodeIds) {
+            queueCommand(nodeId, 'overclock', { profile: 'stock' });
+        }
+        results.push({
+            check: 'gpu_thermal',
+            status: 'fixed',
+            message: `Applied stock overclock to ${hotNodeIds.length} node(s) with hot GPUs`,
+            auto_fixed: true,
+            detail: hotGpus,
+        });
+    } else {
+        results.push({
+            check: 'gpu_thermal',
+            status: hotGpus.length > 0 ? 'warning' : 'ok',
+            message: hotGpus.length > 0
+                ? `${hotGpus.length} GPU(s) running hot (≥80°C)`
+                : 'All GPUs within safe temperature range',
+            detail: hotGpus.length > 0 ? hotGpus : undefined,
+        });
+    }
+
+    // Summary
+    const fixedCount = results.filter(r => r.status === 'fixed').length;
+    const criticalCount = results.filter(r => r.status === 'critical').length;
+    const warningCount = results.filter(r => r.status === 'warning').length;
+    const okCount = results.filter(r => r.status === 'ok').length;
+
+    const overallStatus = criticalCount > 0 ? 'critical' : warningCount > 0 ? 'warning' : 'healthy';
+
+    broadcastSSE('doctor_ran', {
+        timestamp: new Date().toISOString(),
+        status: overallStatus,
+        fixed: fixedCount,
+        checks: results.length,
+    });
+
+    return c.json({
+        status: overallStatus,
+        timestamp: new Date().toISOString(),
+        autofix_enabled: autofix,
+        summary: {
+            total_checks: results.length,
+            ok: okCount,
+            warnings: warningCount,
+            critical: criticalCount,
+            auto_fixed: fixedCount,
+        },
+        results,
+    });
+});
+
+// Doctor: receive agent self-heal reports
+app.post('/api/v1/nodes/:id/doctor', async (c) => {
+    const nodeId = c.req.param('id');
+    const body = await c.req.json<{
+        node_id: string;
+        heal_count: number;
+        results: Array<{ check: string; status: string; message: string }>;
+    }>();
+
+    const fixed = body.results.filter(r => r.status === 'fixed');
+    const failed = body.results.filter(r => r.status === 'failed');
+
+    if (fixed.length > 0 || failed.length > 0) {
+        for (const r of [...fixed, ...failed]) {
+            recordNodeEvent(nodeId, `doctor_${r.status}`, `${r.check}: ${r.message}`);
+        }
+        broadcastSSE('doctor_node_report', {
+            node_id: nodeId,
+            heal_count: body.heal_count,
+            fixed: fixed.length,
+            failed: failed.length,
+            timestamp: new Date().toISOString(),
+        });
+    }
+
+    return c.json({ status: 'received' });
+});
+
+// Doctor: auto-fix a specific issue by name
+app.post('/api/v1/doctor/fix', async (c) => {
+    const body = await c.req.json<{ check: string; params?: Record<string, unknown> }>();
+
+    switch (body.check) {
+        case 'reboot_node': {
+            const nodeId = body.params?.node_id as string;
+            if (!nodeId) return c.json({ error: 'node_id required' }, 400);
+            queueCommand(nodeId, 'reboot');
+            return c.json({ status: 'queued', action: 'reboot', node_id: nodeId });
+        }
+        case 'restart_agent': {
+            const nodeId = body.params?.node_id as string;
+            if (!nodeId) return c.json({ error: 'node_id required' }, 400);
+            queueCommand(nodeId, 'restart_agent');
+            return c.json({ status: 'queued', action: 'restart_agent', node_id: nodeId });
+        }
+        case 'prune_stats': {
+            const hours = (body.params?.hours as number) || 24;
+            pruneStats(hours);
+            return c.json({ status: 'done', action: 'prune_stats', hours });
+        }
+        case 'clear_alerts': {
+            const d = getDb();
+            d.prepare('UPDATE alerts SET acknowledged = 1 WHERE acknowledged = 0').run();
+            return c.json({ status: 'done', action: 'acknowledge_all_alerts' });
+        }
+        case 'deploy_model': {
+            const model = body.params?.model as string;
+            if (!model) return c.json({ error: 'model required' }, 400);
+            const nodes = getAllNodes().filter(n => n.status === 'online');
+            for (const node of nodes) {
+                queueCommand(node.id, 'install_model', { model });
+            }
+            return c.json({ status: 'queued', action: 'deploy_model', model, nodes: nodes.length });
+        }
+        default:
+            return c.json({ error: `Unknown fix: ${body.check}` }, 400);
+    }
+});
+
+// =============================================================================
 // SSE Endpoint
 // =============================================================================
 

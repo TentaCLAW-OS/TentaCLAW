@@ -968,6 +968,67 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
     });
 }
 
+async function cmdDoctor(gateway: string, flags: Record<string, string>): Promise<void> {
+    const autofix = flags['no-fix'] ? 'false' : 'true';
+
+    console.log('');
+    console.log('  ' + C.purple(C.bold('CLAWtopus Doctor')) + C.dim(' — Self-healing diagnostics'));
+    console.log('  ' + C.dim(autofix === 'true' ? 'Auto-fix: ENABLED' : 'Auto-fix: DISABLED (dry run)'));
+    console.log('');
+
+    const data = await apiGet(gateway, `/api/v1/doctor?autofix=${autofix}`) as {
+        status: string;
+        timestamp: string;
+        autofix_enabled: boolean;
+        summary: { total_checks: number; ok: number; warnings: number; critical: number; auto_fixed: number };
+        results: Array<{ check: string; status: string; message: string; auto_fixed?: boolean; detail?: unknown }>;
+    };
+
+    // Status icon and color for overall
+    const statusIcon = data.status === 'healthy' ? C.green('\u2714') : data.status === 'warning' ? C.yellow('\u26A0') : C.red('\u2718');
+    const statusColor = data.status === 'healthy' ? C.green : data.status === 'warning' ? C.yellow : C.red;
+    console.log('  ' + statusIcon + ' Cluster status: ' + statusColor(data.status.toUpperCase()));
+    console.log('');
+
+    // Results
+    for (const r of data.results) {
+        let icon: string;
+        let color: (s: string) => string;
+        switch (r.status) {
+            case 'ok': icon = C.green('\u2714'); color = C.green; break;
+            case 'fixed': icon = C.cyan('\u2692'); color = C.cyan; break;
+            case 'warning': icon = C.yellow('\u26A0'); color = C.yellow; break;
+            case 'critical': icon = C.red('\u2718'); color = C.red; break;
+            default: icon = C.dim('\u25CB'); color = C.dim;
+        }
+
+        const fixLabel = r.auto_fixed ? C.cyan(' [AUTO-FIXED]') : '';
+        console.log('  ' + icon + ' ' + padRight(color(r.check), 30) + C.white(r.message) + fixLabel);
+    }
+
+    // Summary
+    console.log('');
+    const s = data.summary;
+    const parts: string[] = [];
+    parts.push(C.green(`${s.ok} ok`));
+    if (s.auto_fixed > 0) parts.push(C.cyan(`${s.auto_fixed} fixed`));
+    if (s.warnings > 0) parts.push(C.yellow(`${s.warnings} warning${s.warnings > 1 ? 's' : ''}`));
+    if (s.critical > 0) parts.push(C.red(`${s.critical} critical`));
+    console.log('  ' + C.dim(`${s.total_checks} checks: `) + parts.join(C.dim(' | ')));
+
+    if (s.auto_fixed > 0) {
+        console.log('');
+        console.log('  ' + C.cyan(C.bold(`\u2692 ${s.auto_fixed} issue(s) auto-fixed by CLAWtopus Doctor`)));
+    }
+
+    if (s.critical > 0) {
+        console.log('');
+        console.log('  ' + C.red(C.bold('\u26A0 Critical issues require manual intervention')));
+    }
+
+    console.log('');
+}
+
 function cmdHelp(): void {
     console.log('');
     for (const line of CLAWTOPUS_FACE) {
@@ -991,6 +1052,8 @@ function cmdHelp(): void {
     console.log('    ' + padRight(C.green('alerts'), 42) + 'View cluster alerts');
     console.log('    ' + padRight(C.green('benchmarks'), 42) + 'View benchmark results');
     console.log('    ' + padRight(C.green('tags') + ' [list|add|nodes]', 42) + 'Manage node tags');
+    console.log('    ' + padRight(C.green('doctor'), 42) + 'Run diagnostics + auto-fix issues');
+    console.log('    ' + padRight(C.green('doctor') + ' --no-fix', 42) + 'Dry run (diagnose only, no fixes)');
     console.log('');
     console.log('  ' + C.cyan(C.bold('INFERENCE & MODELS')));
     console.log('');
@@ -1139,6 +1202,10 @@ async function main(): Promise<void> {
 
         case 'chat':
             await cmdChat(gateway, parsed.flags);
+            break;
+
+        case 'doctor':
+            await cmdDoctor(gateway, parsed.flags);
             break;
 
         case 'flight-sheets':
