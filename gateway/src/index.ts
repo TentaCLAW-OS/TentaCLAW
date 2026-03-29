@@ -3511,3 +3511,52 @@ app.post('/api/v1/cluster/reboot', async (c) => {
     broadcastSSE('cluster_reboot', { nodes: nodes.length });
     return c.json({ status: 'rebooting', nodes: nodes.length, warning: 'All nodes will reboot!' });
 });
+
+// =============================================================================
+// Waves 91-100: Final v1 Polish
+// =============================================================================
+
+// Cluster summary for display (combines everything needed for a status page)
+app.get('/api/v1/status-page', (c) => {
+    const summary = getClusterSummary();
+    const health = getHealthScore();
+    const models = getClusterModels();
+    const power = getClusterPower();
+    const analytics = getInferenceAnalytics(24);
+
+    return c.json({
+        name: 'TentaCLAW OS',
+        tagline: 'Eight arms. One mind. Zero compromises.',
+        status: health.score >= 80 ? 'operational' : health.score >= 50 ? 'degraded' : 'outage',
+        health_score: health.score,
+        health_grade: health.grade,
+        nodes: { online: summary.online_nodes, total: summary.total_nodes },
+        gpus: summary.total_gpus,
+        vram_gb: Math.round(summary.total_vram_mb / 1024),
+        models: models.length,
+        inference: {
+            requests_24h: analytics.total_requests,
+            avg_latency_ms: analytics.avg_latency_ms,
+            error_rate_pct: analytics.failed > 0 ? Math.round((analytics.failed / Math.max(analytics.total_requests, 1)) * 1000) / 10 : 0,
+        },
+        power_watts: power.total_watts,
+        monthly_cost: power.monthly_cost,
+        updated_at: new Date().toISOString(),
+    });
+});
+
+// Final endpoint — the "about" page
+app.get('/api/v1/about', (c) => {
+    return c.json({
+        product: 'TentaCLAW OS',
+        mascot: 'CLAWtopus',
+        tagline: 'Eight arms. One mind. Zero compromises.',
+        description: 'The operating system for personal AI infrastructure. Plug it in. It just works.',
+        version: '0.2.0',
+        website: 'https://www.tentaclaw.io',
+        github: 'https://github.com/TentaCLAW-OS/TentaCLAW',
+        license: 'MIT',
+        waves_completed: 100,
+        api_endpoints: 200,
+    });
+});
