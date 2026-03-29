@@ -294,7 +294,24 @@
   async function fetchNodes() {
     try {
       const data = await api('GET', '/api/v1/nodes');
-      state.nodes = Array.isArray(data) ? data : (data.nodes || data.data || []);
+      const raw = Array.isArray(data) ? data : (data.nodes || data.data || []);
+      // Flatten latest_stats into node object for easier access in render functions
+      state.nodes = raw.map(n => {
+        const s = n.latest_stats || {};
+        return {
+          ...n,
+          gpus: s.gpus || n.gpus || [],
+          cpu: s.cpu || n.cpu || {},
+          ram: s.ram || n.ram || {},
+          disk: s.disk || n.disk || {},
+          network: s.network || n.network || {},
+          inference: s.inference || n.inference || {},
+          toks_per_sec: s.toks_per_sec != null ? s.toks_per_sec : (n.toks_per_sec || 0),
+          uptime_secs: s.uptime_secs != null ? s.uptime_secs : (n.uptime_secs || 0),
+          requests_completed: s.requests_completed || n.requests_completed || 0,
+          gpu_count: n.gpu_count || s.gpu_count || (s.gpus ? s.gpus.length : 0),
+        };
+      });
       state.initialLoad = false;
       renderNodes();
       computeSummary();
