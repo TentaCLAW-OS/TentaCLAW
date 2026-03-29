@@ -772,6 +772,35 @@ app.get('/v1/models', (c) => {
     });
 });
 
+// =============================================================================
+// Request Queue (Wave 23)
+// =============================================================================
+
+interface QueuedRequest {
+    id: string;
+    priority: number; // 0=high, 1=normal, 2=low
+    model: string;
+    addedAt: number;
+}
+
+const requestQueue: QueuedRequest[] = [];
+const activeRequests = new Map<string, number>(); // nodeId → count
+const MAX_QUEUE_DEPTH = 100;
+const MAX_CONCURRENT_PER_NODE = 4;
+
+function getQueueStats() {
+    return {
+        queued: requestQueue.length,
+        active: [...activeRequests.values()].reduce((s, n) => s + n, 0),
+        max_queue: MAX_QUEUE_DEPTH,
+        max_concurrent_per_node: MAX_CONCURRENT_PER_NODE,
+    };
+}
+
+app.get('/api/v1/queue', (c) => {
+    return c.json(getQueueStats());
+});
+
 // Chat completions proxy — OpenAI-compatible with function calling + JSON mode
 app.post('/v1/chat/completions', async (c) => {
     const body = await c.req.json();
@@ -782,6 +811,12 @@ app.post('/v1/chat/completions', async (c) => {
     }
     if (!body.messages || !Array.isArray(body.messages)) {
         return c.json({ error: { message: 'messages array is required', type: 'invalid_request_error' } }, 400);
+    }
+
+    // Load shedding — reject if queue is full
+    const qStats = getQueueStats();
+    if (qStats.active >= MAX_QUEUE_DEPTH) {
+        return c.json({ error: { message: 'Cluster is at capacity. Try again shortly.', type: 'rate_limit', queue_depth: qStats.queued } }, 429);
     }
 
     // Log function calling usage for analytics
