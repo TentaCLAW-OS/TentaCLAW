@@ -833,17 +833,39 @@ async function main() {
             // Feed tok/s to watchdog
             watchdogState.lastToksPerSec = currentStats.toks_per_sec;
 
-            const response = await pushStats(config, currentStats);
-            if (response?.commands && response.commands.length > 0) {
-                console.log('[agent] Received ' + response.commands.length + ' command(s)');
-                for (const cmd of response.commands) {
-                    await executeCommand(cmd, config.mockMode);
+            // Smart recovery checks
+            checkMemoryLeak();
+            checkDiskSpace();
+
+            // Try to push stats — queue offline if gateway unreachable
+            try {
+                const response = await pushStats(config, currentStats);
+                if (!recovery.gatewayReachable) {
+                    console.log('[recovery] Gateway reconnected! Flushing offline queue...');
+                    recovery.gatewayReachable = true;
+                    recovery.consecutiveGatewayFailures = 0;
+                    await flushOfflineQueue(config);
                 }
+
+                if (response?.commands && response.commands.length > 0) {
+                    console.log('[agent] Received ' + response.commands.length + ' command(s)');
+                    for (const cmd of response.commands) {
+                        await executeCommand(cmd, config.mockMode);
+                    }
+                }
+            } catch (pushErr) {
+                recovery.consecutiveGatewayFailures++;
+                if (recovery.consecutiveGatewayFailures === 1) {
+                    console.log('[recovery] Gateway unreachable — entering offline mode, queueing stats');
+                }
+                recovery.gatewayReachable = false;
+                queueOfflineStats(currentStats);
             }
 
             pushCount++;
             if (pushCount % 10 === 0) {
-                console.log('[agent] Pushed ' + pushCount + 'x | tok/s: ' + currentStats.toks_per_sec + ' | tokens: ' + totalTokens + ' | reqs: ' + totalRequests);
+                const offlineMsg = recovery.offlineQueue.length > 0 ? ` | offline queue: ${recovery.offlineQueue.length}` : '';
+                console.log('[agent] Pushed ' + pushCount + 'x | tok/s: ' + currentStats.toks_per_sec + ' | tokens: ' + totalTokens + offlineMsg);
             }
         } catch (error) {
             console.error('[agent] Error: ' + error);
@@ -1142,6 +1164,132 @@ function startWatchdog(config: ReturnType<typeof loadConfig>): void {
             console.error('[watchdog] Check error: ' + err);
         });
     }, wdConf.checkIntervalMs);
+}
+
+// =============================================================================
+// SMART RECOVERY — Phase 11-20
+// =============================================================================
+
+interface RecoveryState {
+    offlineQueue: Array<{ stats: any; timestamp: number }>;  // Queue stats when gateway is down
+    modelFailures: Map<string, number>;                       // Track model load failures
+    rssHistory: number[];                                     // RSS memory samples for leak detection
+    lastDiskCheck: number;
+    gatewayReachable: boolean;
+    consecutiveGatewayFailures: number;
+}
+
+const recovery: RecoveryState = {
+    offlineQueue: [],
+    modelFailures: new Map(),
+    rssHistory: [],
+    lastDiskCheck: 0,
+    gatewayReachable: true,
+    consecutiveGatewayFailures: 0,
+};
+
+const MAX_OFFLINE_QUEUE = 360; // 1 hour at 10s intervals
+
+function queueOfflineStats(stats: any): void {
+    recovery.offlineQueue.push({ stats, timestamp: Date.now() });
+    if (recovery.offlineQueue.length > MAX_OFFLINE_QUEUE) {
+        recovery.offlineQueue.shift(); // Drop oldest
+    }
+    if (recovery.offlineQueue.length % 10 === 0) {
+        console.log(`[recovery] Offline queue: ${recovery.offlineQueue.length} stats buffered`);
+    }
+}
+
+async function flushOfflineQueue(config: ReturnType<typeof loadConfig>): Promise<void> {
+    if (recovery.offlineQueue.length === 0) return;
+    const count = recovery.offlineQueue.length;
+    console.log(`[recovery] Flushing ${count} buffered stats to gateway...`);
+
+    // Send in batches of 10
+    while (recovery.offlineQueue.length > 0) {
+        const batch = recovery.offlineQueue.splice(0, 10);
+        for (const item of batch) {
+            try {
+                await pushStats(config, item.stats);
+            } catch {
+                // Re-queue failed items
+                recovery.offlineQueue.unshift(...batch.filter(b => b !== item));
+                return;
+            }
+        }
+    }
+    console.log(`[recovery] Flushed ${count} buffered stats`);
+}
+
+function trackModelFailure(model: string): void {
+    const count = (recovery.modelFailures.get(model) || 0) + 1;
+    recovery.modelFailures.set(model, count);
+
+    if (count >= 3) {
+        console.log(`[recovery] Model "${model}" failed ${count} times — marking as corrupt`);
+        // Auto-re-pull the model
+        try {
+            console.log(`[recovery] Auto-re-pulling ${model}...`);
+            execSync(`ollama pull ${model.replace(/[^a-zA-Z0-9.:_-]/g, '')} 2>&1 | tail -1`, { timeout: 300_000, encoding: 'utf-8' });
+            recovery.modelFailures.delete(model);
+            console.log(`[recovery] Re-pull of ${model} complete`);
+        } catch (err) {
+            console.error(`[recovery] Re-pull failed: ${err}`);
+        }
+    }
+}
+
+function checkMemoryLeak(): void {
+    const rss = process.memoryUsage().rss;
+    recovery.rssHistory.push(rss);
+
+    // Keep last 60 samples (10 min at 10s intervals)
+    if (recovery.rssHistory.length > 60) recovery.rssHistory.shift();
+
+    // Check for consistent growth over last 60 samples
+    if (recovery.rssHistory.length >= 60) {
+        const first10 = recovery.rssHistory.slice(0, 10).reduce((a, b) => a + b, 0) / 10;
+        const last10 = recovery.rssHistory.slice(-10).reduce((a, b) => a + b, 0) / 10;
+        const growthPct = ((last10 - first10) / first10) * 100;
+
+        if (growthPct > 50) {
+            console.log(`[recovery] Memory leak suspected: RSS grew ${growthPct.toFixed(0)}% over 10 min (${Math.round(first10 / 1048576)}MB → ${Math.round(last10 / 1048576)}MB)`);
+            // Force GC if available
+            if (global.gc) {
+                global.gc();
+                console.log('[recovery] Forced garbage collection');
+            }
+        }
+    }
+}
+
+function checkDiskSpace(): void {
+    if (Date.now() - recovery.lastDiskCheck < 300_000) return; // Every 5 min
+    recovery.lastDiskCheck = Date.now();
+
+    if (process.platform !== 'linux') return;
+
+    try {
+        const dfOutput = execSync("df -k / | tail -1 | awk '{print $4}'", { encoding: 'utf-8', timeout: 5000 });
+        const freeKb = parseInt(dfOutput.trim());
+        const freeGb = freeKb / 1048576;
+
+        if (freeGb < 2) {
+            console.log(`[recovery] CRITICAL: Only ${freeGb.toFixed(1)}GB free. Cleaning up...`);
+            // Clean Ollama cache
+            try {
+                execSync('ollama rm $(ollama list | tail -1 | cut -f1) 2>/dev/null', { timeout: 30000 });
+                console.log('[recovery] Removed least-recently-used model to free space');
+            } catch {}
+            // Clean temp files
+            try {
+                execSync('find /tmp -type f -mtime +1 -delete 2>/dev/null', { timeout: 10000 });
+                console.log('[recovery] Cleaned old temp files');
+            } catch {}
+        } else if (freeGb < 5) {
+            console.log(`[recovery] WARNING: ${freeGb.toFixed(1)}GB free — consider cleaning up old models`);
+        }
+    } catch {}
 }
 
 // =============================================================================
