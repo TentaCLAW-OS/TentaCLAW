@@ -3096,3 +3096,44 @@ app.get('/api/v1/dashboard', (c) => {
         timestamp: new Date().toISOString(),
     });
 });
+
+// =============================================================================
+// Enhanced Deploy (Wave 28) — deploy to all with progress
+// =============================================================================
+
+app.post('/api/v1/deploy/all', async (c) => {
+    const body = await c.req.json<{ model: string; min_vram_mb?: number }>();
+    if (!body.model) return c.json({ error: 'model required' }, 400);
+
+    const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
+    const vramNeeded = estimateModelVram(body.model);
+    const results: Array<{ node_id: string; hostname: string; action: string; reason: string }> = [];
+
+    for (const node of nodes) {
+        const s = node.latest_stats!;
+        const hasModel = s.inference.loaded_models.includes(body.model);
+        
+        if (hasModel) {
+            results.push({ node_id: node.id, hostname: node.hostname, action: 'skip', reason: 'already loaded' });
+            continue;
+        }
+
+        const totalVram = s.gpus.reduce((sum, g) => sum + g.vramTotalMb, 0);
+        const usedVram = s.gpus.reduce((sum, g) => sum + g.vramUsedMb, 0);
+        const available = totalVram - usedVram;
+
+        if (available < vramNeeded) {
+            results.push({ node_id: node.id, hostname: node.hostname, action: 'skip', reason: 'not enough VRAM (' + Math.round(available/1024) + 'GB free, needs ' + Math.round(vramNeeded/1024) + 'GB)' });
+            continue;
+        }
+
+        queueCommand(node.id, 'install_model', { model: body.model });
+        results.push({ node_id: node.id, hostname: node.hostname, action: 'deploying', reason: 'queued for install' });
+    }
+
+    const deployed = results.filter(r => r.action === 'deploying').length;
+    const skipped = results.filter(r => r.action === 'skip').length;
+
+    broadcastSSE('deploy_all', { model: body.model, deployed, skipped });
+    return c.json({ model: body.model, vram_estimate_mb: vramNeeded, deployed, skipped, results });
+});
