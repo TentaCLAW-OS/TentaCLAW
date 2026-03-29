@@ -1275,6 +1275,41 @@ async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
     console.log('');
 }
 
+async function cmdAlias(gateway: string, positional: string[], flags: Record<string, string>): Promise<void> {
+    const sub = positional[0] || 'list';
+
+    if (sub === 'list') {
+        const aliases = await apiGet(gateway, '/api/v1/aliases') as any[];
+        console.log('');
+        console.log('  ' + C.purple(C.bold('Model Aliases')) + C.dim(` (${aliases.length})`));
+        console.log('  ' + C.dim('Point any OpenAI client at your cluster using familiar model names.'));
+        console.log('');
+        console.log('  ' + padRight(C.dim('ALIAS'), 25) + padRight(C.dim('TARGET'), 30) + C.dim('FALLBACKS'));
+        console.log('  ' + C.dim('\u2500'.repeat(75)));
+        for (const a of aliases) {
+            const fb = a.fallbacks.length > 0 ? C.dim(a.fallbacks.join(' \u2192 ')) : C.dim('none');
+            console.log('  ' + padRight(C.white(C.bold(a.alias)), 25) + padRight(C.cyan(a.target), 30) + fb);
+        }
+        console.log('');
+        console.log('  ' + C.dim('Usage: curl -X POST http://gateway/v1/chat/completions -d \'{"model":"gpt-4",...}\''));
+        console.log('');
+        return;
+    }
+
+    if (sub === 'set') {
+        const alias = positional[1];
+        const target = positional[2];
+        if (!alias || !target) {
+            console.error(C.red('  Usage: clawtopus alias set <alias> <target> [--fallback model1,model2]'));
+            process.exit(1);
+        }
+        const fallbacks = (flags['fallback'] || '').split(',').filter(Boolean);
+        await apiPost(gateway, '/api/v1/aliases', { alias, target, fallbacks });
+        console.log('  ' + C.green('\u2714') + ` ${C.white(alias)} \u2192 ${C.cyan(target)}` + (fallbacks.length > 0 ? C.dim(' (fallbacks: ' + fallbacks.join(', ') + ')') : ''));
+        return;
+    }
+}
+
 async function cmdAuto(gateway: string): Promise<void> {
     console.log('');
     console.log('  ' + C.purple(C.bold('CLAWtopus Auto Mode')) + C.dim(' — letting the system decide'));
@@ -1979,6 +2014,11 @@ async function main(): Promise<void> {
 
         case 'notify':
             await cmdNotify(gateway, parsed.positional, parsed.flags);
+            break;
+
+        case 'alias':
+        case 'aliases':
+            await cmdAlias(gateway, parsed.positional, parsed.flags);
             break;
 
         case 'auto':

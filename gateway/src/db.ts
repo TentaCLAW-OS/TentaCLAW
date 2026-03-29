@@ -180,6 +180,13 @@ function initSchema(db: Database.Database): void {
 
         CREATE INDEX IF NOT EXISTS idx_oc_node ON overclock_profiles(node_id);
 
+        CREATE TABLE IF NOT EXISTS model_aliases (
+            alias TEXT PRIMARY KEY,
+            target TEXT NOT NULL,
+            fallbacks TEXT DEFAULT '[]',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
         CREATE TABLE IF NOT EXISTS api_keys (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
@@ -1279,6 +1286,60 @@ export function getAllTags(): Array<{ tag: string; count: number }> {
     return d.prepare(
         'SELECT tag, COUNT(*) as count FROM node_tags GROUP BY tag ORDER BY count DESC'
     ).all() as Array<{ tag: string; count: number }>;
+}
+
+// =============================================================================
+// Model Aliases & Fallback Chains (Wave 9)
+// =============================================================================
+
+export function setModelAlias(alias: string, target: string, fallbacks: string[] = []): void {
+    const d = getDb();
+    d.prepare('INSERT OR REPLACE INTO model_aliases (alias, target, fallbacks) VALUES (?, ?, ?)').run(
+        alias, target, JSON.stringify(fallbacks)
+    );
+}
+
+export function resolveModelAlias(model: string): { target: string; fallbacks: string[] } {
+    const d = getDb();
+    const row = d.prepare('SELECT target, fallbacks FROM model_aliases WHERE alias = ?').get(model) as any;
+    if (row) {
+        return { target: row.target, fallbacks: JSON.parse(row.fallbacks || '[]') };
+    }
+    return { target: model, fallbacks: [] };
+}
+
+export function getAllModelAliases(): Array<{ alias: string; target: string; fallbacks: string[]; created_at: string }> {
+    const d = getDb();
+    const rows = d.prepare('SELECT * FROM model_aliases ORDER BY alias').all() as any[];
+    return rows.map(r => ({ ...r, fallbacks: JSON.parse(r.fallbacks || '[]') }));
+}
+
+export function deleteModelAlias(alias: string): boolean {
+    const d = getDb();
+    return d.prepare('DELETE FROM model_aliases WHERE alias = ?').run(alias).changes > 0;
+}
+
+// Default aliases — set on first use
+export function ensureDefaultAliases(): void {
+    const d = getDb();
+    const count = (d.prepare('SELECT COUNT(*) as cnt FROM model_aliases').get() as { cnt: number }).cnt;
+    if (count > 0) return;
+
+    const defaults: Array<[string, string, string[]]> = [
+        ['gpt-4', 'llama3.1:70b', ['llama3.1:8b', 'mistral:7b']],
+        ['gpt-4o', 'llama3.1:70b', ['qwen3:14b', 'llama3.1:8b']],
+        ['gpt-3.5-turbo', 'llama3.1:8b', ['mistral:7b', 'llama3.2:3b']],
+        ['gpt-4o-mini', 'llama3.2:3b', ['llama3.2:1b', 'phi3:3.8b']],
+        ['claude-3-opus', 'llama3.1:70b', ['qwen3:14b', 'llama3.1:8b']],
+        ['claude-3-sonnet', 'llama3.1:8b', ['mistral:7b', 'qwen2.5:7b']],
+        ['claude-3-haiku', 'llama3.2:3b', ['llama3.2:1b']],
+        ['codex', 'codellama:13b', ['codellama:7b', 'qwen2.5-coder:7b']],
+        ['text-embedding-ada-002', 'nomic-embed-text', []],
+    ];
+
+    for (const [alias, target, fallbacks] of defaults) {
+        setModelAlias(alias, target, fallbacks);
+    }
 }
 
 // =============================================================================

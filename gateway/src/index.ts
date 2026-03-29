@@ -77,6 +77,11 @@ import {
     logInferenceRequest,
     getInferenceAnalytics,
     runAutoMode,
+    setModelAlias,
+    resolveModelAlias,
+    getAllModelAliases,
+    deleteModelAlias,
+    ensureDefaultAliases,
     createApiKey,
     validateApiKey,
     trackApiKeyTokens,
@@ -763,19 +768,38 @@ app.post('/v1/chat/completions', async (c) => {
         return c.json({ error: { message: 'model is required', type: 'invalid_request_error' } }, 400);
     }
 
-    // Find best node for this model
-    const target = findBestNode(model);
+    // Resolve model aliases (gpt-4 → llama3.1:70b)
+    const resolved = resolveModelAlias(model);
+    let resolvedModel = resolved.target;
+
+    // Find best node — try target first, then fallbacks
+    let target = findBestNode(resolvedModel);
+    let usedFallback = false;
+
+    if (!target && resolved.fallbacks.length > 0) {
+        for (const fallback of resolved.fallbacks) {
+            target = findBestNode(fallback);
+            if (target) {
+                resolvedModel = fallback;
+                usedFallback = true;
+                break;
+            }
+        }
+    }
+
     if (!target) {
         return c.json({
             error: {
-                message: 'No online node has model "' + model + '" loaded. Deploy it first with POST /api/v1/deploy',
+                message: 'No online node has model "' + model + '"' + (model !== resolvedModel ? ' (resolved to "' + resolvedModel + '")' : '') + '. Deploy it first.',
                 type: 'model_not_found',
                 available_models: getClusterModels().map(m => m.model),
+                aliases: model !== resolvedModel ? { requested: model, resolved: resolvedModel, fallbacks: resolved.fallbacks } : undefined,
             },
         }, 503);
     }
 
-    // Proxy the request to the target node's Ollama instance
+    // Proxy the request to the target node — use resolved model name
+    const proxyBody = { ...body, model: resolvedModel };
     const ollamaUrl = 'http://' + (target.ip_address || target.hostname) + ':11434/v1/chat/completions';
     const startTime = Date.now();
 
@@ -783,12 +807,12 @@ app.post('/v1/chat/completions', async (c) => {
         const proxyReq = await fetch(ollamaUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            body: JSON.stringify(proxyBody),
         });
 
         const latencyMs = Date.now() - startTime;
-        recordRouteResult(target.node_id, model, latencyMs, proxyReq.ok);
-        logInferenceRequest(target.node_id, model, latencyMs, proxyReq.ok);
+        recordRouteResult(target.node_id, resolvedModel, latencyMs, proxyReq.ok);
+        logInferenceRequest(target.node_id, resolvedModel, latencyMs, proxyReq.ok);
 
         // Stream or return the response
         if (body.stream) {
@@ -811,6 +835,9 @@ app.post('/v1/chat/completions', async (c) => {
             hostname: target.hostname,
             gpu_utilization: target.gpu_utilization_avg,
             latency_ms: latencyMs,
+            resolved_model: resolvedModel,
+            alias_used: model !== resolvedModel ? model : undefined,
+            fallback_used: usedFallback ? resolvedModel : undefined,
         };
         return c.json(result, proxyReq.status as any);
 
@@ -1859,6 +1886,27 @@ app.get('/api/v1/inference/stats', (c) => {
 });
 
 // =============================================================================
+// Model Aliases (Wave 9)
+// =============================================================================
+
+app.get('/api/v1/aliases', (c) => {
+    ensureDefaultAliases();
+    return c.json(getAllModelAliases());
+});
+
+app.post('/api/v1/aliases', async (c) => {
+    const body = await c.req.json<{ alias: string; target: string; fallbacks?: string[] }>();
+    if (!body.alias || !body.target) return c.json({ error: 'alias and target required' }, 400);
+    setModelAlias(body.alias, body.target, body.fallbacks || []);
+    return c.json({ status: 'created', alias: body.alias, target: body.target });
+});
+
+app.delete('/api/v1/aliases/:alias', (c) => {
+    if (!deleteModelAlias(c.req.param('alias'))) return c.json({ error: 'Alias not found' }, 404);
+    return c.json({ status: 'deleted' });
+});
+
+// =============================================================================
 // Auto Mode (Wave 8)
 // =============================================================================
 
@@ -2331,6 +2379,7 @@ const HOST = process.env.TENTACLAW_HOST || '0.0.0.0';
 
 // Initialize DB on startup
 getDb();
+ensureDefaultAliases();
 
 console.log(`
 \x1b[38;2;0;255;255m        ╭──────────────────────────────────────╮\x1b[0m
