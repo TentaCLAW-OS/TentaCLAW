@@ -156,6 +156,26 @@ function initSchema(db: Database.Database): void {
 
         CREATE INDEX IF NOT EXISTS idx_ssh_keys_node ON ssh_keys(node_id);
 
+        CREATE TABLE IF NOT EXISTS watchdog_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            node_id TEXT NOT NULL,
+            level INTEGER NOT NULL,
+            action TEXT NOT NULL,
+            detail TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_watchdog_node ON watchdog_events(node_id, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS notification_channels (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            name TEXT NOT NULL,
+            config TEXT NOT NULL,
+            enabled INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
         CREATE TABLE IF NOT EXISTS node_tags (
             node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
             tag TEXT NOT NULL,
@@ -361,7 +381,7 @@ export function pruneStats(days: number = 7): number {
 // Command Operations
 // =============================================================================
 
-export function queueCommand(nodeId: string, action: CommandAction, params?: {
+export function queueCommand(nodeId: string, action: CommandAction, params?: Record<string, unknown> & {
     model?: string;
     gpu?: number;
     profile?: string;
@@ -1134,3 +1154,91 @@ function computeNextRun(cron: string): string {
 
     return next.toISOString().replace('T', ' ').slice(0, 19);
 }
+
+// =============================================================================
+// Watchdog Events
+// =============================================================================
+
+export function recordWatchdogEvent(nodeId: string, level: number, action: string, detail: string): void {
+    const d = getDb();
+    d.prepare('INSERT INTO watchdog_events (node_id, level, action, detail) VALUES (?, ?, ?, ?)').run(nodeId, level, action, detail);
+}
+
+export function getWatchdogEvents(nodeId: string, limit: number = 50): Array<{ id: number; node_id: string; level: number; action: string; detail: string; created_at: string }> {
+    const d = getDb();
+    return d.prepare('SELECT * FROM watchdog_events WHERE node_id = ? ORDER BY created_at DESC LIMIT ?').all(nodeId, limit) as any[];
+}
+
+export function getAllWatchdogEvents(limit: number = 100): Array<{ id: number; node_id: string; level: number; action: string; detail: string; created_at: string }> {
+    const d = getDb();
+    return d.prepare('SELECT * FROM watchdog_events ORDER BY created_at DESC LIMIT ?').all(limit) as any[];
+}
+
+// =============================================================================
+// Notification Channels
+// =============================================================================
+
+export function createNotificationChannel(type: string, name: string, config: Record<string, unknown>): any {
+    const d = getDb();
+    const id = generateId();
+    d.prepare('INSERT INTO notification_channels (id, type, name, config) VALUES (?, ?, ?, ?)').run(id, type, name, JSON.stringify(config));
+    return d.prepare('SELECT * FROM notification_channels WHERE id = ?').get(id);
+}
+
+export function getAllNotificationChannels(): any[] {
+    const d = getDb();
+    const rows = d.prepare('SELECT * FROM notification_channels ORDER BY created_at').all() as any[];
+    return rows.map(r => ({ ...r, config: JSON.parse(r.config), enabled: !!r.enabled }));
+}
+
+export function deleteNotificationChannel(id: string): boolean {
+    const d = getDb();
+    return d.prepare('DELETE FROM notification_channels WHERE id = ?').run(id).changes > 0;
+}
+
+export async function sendNotification(channelId: string, message: string): Promise<boolean> {
+    const d = getDb();
+    const channel = d.prepare('SELECT * FROM notification_channels WHERE id = ? AND enabled = 1').get(channelId) as any;
+    if (!channel) return false;
+
+    const config = JSON.parse(channel.config);
+
+    try {
+        switch (channel.type) {
+            case 'telegram': {
+                const url = `https://api.telegram.org/bot${config.bot_token}/sendMessage`;
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: config.chat_id, text: message, parse_mode: 'HTML' }),
+                });
+                d.prepare('INSERT INTO notification_log (channel_id, message, status) VALUES (?, ?, ?)').run(channelId, message, resp.ok ? 'sent' : 'failed');
+                return resp.ok;
+            }
+            case 'discord': {
+                const resp = await fetch(config.webhook_url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: message }),
+                });
+                d.prepare('INSERT INTO notification_log (channel_id, message, status) VALUES (?, ?, ?)').run(channelId, message, resp.ok ? 'sent' : 'failed');
+                return resp.ok;
+            }
+            case 'webhook': {
+                const resp = await fetch(config.url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message, timestamp: new Date().toISOString() }),
+                });
+                d.prepare('INSERT INTO notification_log (channel_id, message, status) VALUES (?, ?, ?)').run(channelId, message, resp.ok ? 'sent' : 'failed');
+                return resp.ok;
+            }
+            default:
+                return false;
+        }
+    } catch {
+        d.prepare('INSERT INTO notification_log (channel_id, message, status) VALUES (?, ?, ?)').run(channelId, message, 'error');
+        return false;
+    }
+}
+

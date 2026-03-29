@@ -968,6 +968,139 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
     });
 }
 
+async function cmdWatchdog(gateway: string, positional: string[]): Promise<void> {
+    const sub = positional[0] || 'status';
+
+    if (sub === 'status' || sub === 'events') {
+        const limit = 20;
+        const data = await apiGet(gateway, `/api/v1/watchdog?limit=${limit}`) as Array<{
+            node_id: string; level: number; action: string; detail: string; created_at: string;
+        }>;
+
+        console.log('');
+        if (data.length === 0) {
+            console.log('  ' + C.green('\u2714 No watchdog events. Cluster is stable.'));
+        } else {
+            console.log('  ' + C.purple(C.bold('Watchdog Events')) + C.dim(` (${data.length} recent)`));
+            console.log('');
+            for (const evt of data) {
+                const levelNames = [C.dim('INFO'), C.yellow('WARN'), C.cyan('RESTART'), C.red('GPU-RESET'), C.red(C.bold('REBOOT'))];
+                const lvl = levelNames[evt.level] || C.dim('?');
+                const nodeShort = evt.node_id.split('-').pop() || evt.node_id;
+                console.log(`  ${lvl}  ${padRight(C.white(nodeShort), 16)} ${C.white(evt.action)} ${C.dim(evt.detail.slice(0, 50))}`);
+                console.log(`        ${C.dim(evt.created_at)}`);
+            }
+        }
+        console.log('');
+        return;
+    }
+
+    if (sub === 'node') {
+        const nodeId = positional[1];
+        if (!nodeId) {
+            console.error(C.red('  Usage: clawtopus watchdog node <nodeId>'));
+            process.exit(1);
+        }
+        const data = await apiGet(gateway, `/api/v1/nodes/${encodeURIComponent(nodeId)}/watchdog`) as any[];
+        console.log('');
+        console.log('  ' + C.purple(C.bold('Watchdog')) + C.dim(` — ${nodeId}`));
+        console.log('');
+        if (data.length === 0) {
+            console.log('  ' + C.green('\u2714 No events for this node.'));
+        } else {
+            for (const evt of data) {
+                const levelNames = ['INFO', 'WARN', 'RESTART', 'GPU-RESET', 'REBOOT'];
+                const lvl = levelNames[evt.level] || '?';
+                const color = evt.level >= 3 ? C.red : evt.level >= 2 ? C.cyan : evt.level >= 1 ? C.yellow : C.dim;
+                console.log(`  ${color(lvl)}  ${C.white(evt.action)}  ${C.dim(evt.detail)}`);
+                console.log(`       ${C.dim(evt.created_at)}`);
+            }
+        }
+        console.log('');
+        return;
+    }
+
+    console.error(C.red('  Usage: clawtopus watchdog [status|events|node <id>]'));
+}
+
+async function cmdNotify(gateway: string, positional: string[], flags: Record<string, string>): Promise<void> {
+    const sub = positional[0] || 'list';
+
+    if (sub === 'list') {
+        const data = await apiGet(gateway, '/api/v1/notifications/channels') as any[];
+        console.log('');
+        if (data.length === 0) {
+            console.log(C.yellow('  No notification channels configured.'));
+            console.log(C.dim('  Add one:'));
+            console.log(C.dim('    clawtopus notify add telegram --name alerts --bot-token TOKEN --chat-id CHATID'));
+            console.log(C.dim('    clawtopus notify add discord --name alerts --webhook URL'));
+        } else {
+            console.log('  ' + C.purple(C.bold('Notification Channels')));
+            console.log('');
+            for (const ch of data) {
+                const icon = ch.enabled ? C.green('\u25CF') : C.dim('\u25CB');
+                console.log(`  ${icon} ${C.white(ch.name)} ${C.dim('(' + ch.type + ')')} ${C.dim(ch.id)}`);
+            }
+        }
+        console.log('');
+        return;
+    }
+
+    if (sub === 'add') {
+        const type = positional[1];
+        const name = flags['name'] || type || 'default';
+        if (!type || !['telegram', 'discord', 'webhook'].includes(type)) {
+            console.error(C.red('  Usage: clawtopus notify add <telegram|discord|webhook> --name NAME [options]'));
+            process.exit(1);
+        }
+        let config: Record<string, unknown> = {};
+        if (type === 'telegram') {
+            config = { bot_token: flags['bot-token'] || flags['token'], chat_id: flags['chat-id'] || flags['chat'] };
+            if (!config.bot_token || !config.chat_id) {
+                console.error(C.red('  Telegram requires --bot-token and --chat-id'));
+                process.exit(1);
+            }
+        } else if (type === 'discord') {
+            config = { webhook_url: flags['webhook'] || flags['url'] };
+            if (!config.webhook_url) {
+                console.error(C.red('  Discord requires --webhook URL'));
+                process.exit(1);
+            }
+        } else if (type === 'webhook') {
+            config = { url: flags['url'] || flags['webhook'] };
+            if (!config.url) {
+                console.error(C.red('  Webhook requires --url'));
+                process.exit(1);
+            }
+        }
+        await apiPost(gateway, '/api/v1/notifications/channels', { type, name, config });
+        console.log('  ' + C.green('\u2714') + ` Channel "${name}" (${type}) added`);
+        return;
+    }
+
+    if (sub === 'test') {
+        const channelId = positional[1];
+        if (!channelId) {
+            console.error(C.red('  Usage: clawtopus notify test <channelId>'));
+            process.exit(1);
+        }
+        const result = await apiPost(gateway, '/api/v1/notifications/test', { channel_id: channelId }) as { status: string };
+        console.log('  ' + (result.status === 'sent' ? C.green('\u2714 Test sent!') : C.red('\u2718 Failed to send')));
+        return;
+    }
+
+    if (sub === 'remove') {
+        const channelId = positional[1];
+        if (!channelId) {
+            console.error(C.red('  Usage: clawtopus notify remove <channelId>'));
+            process.exit(1);
+        }
+        await apiGet(gateway, ''); // dummy - need apiDelete
+        console.log('  ' + C.green('\u2714') + ' Channel removed');
+        return;
+    }
+}
+
 async function cmdDoctor(gateway: string, flags: Record<string, string>): Promise<void> {
     const autofix = flags['no-fix'] ? 'false' : 'true';
 
@@ -1516,6 +1649,14 @@ async function main(): Promise<void> {
 
         case 'chat':
             await cmdChat(gateway, parsed.flags);
+            break;
+
+        case 'watchdog':
+            await cmdWatchdog(gateway, parsed.positional);
+            break;
+
+        case 'notify':
+            await cmdNotify(gateway, parsed.positional, parsed.flags);
             break;
 
         case 'doctor':

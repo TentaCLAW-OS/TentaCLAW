@@ -67,7 +67,15 @@ import {
     updateModelPull,
     getActiveModelPulls,
     getAllActiveModelPulls,
+    recordWatchdogEvent,
+    getWatchdogEvents,
+    getAllWatchdogEvents,
+    createNotificationChannel,
+    getAllNotificationChannels,
+    deleteNotificationChannel,
+    sendNotification,
 } from './db';
+import { generateWaitComedy } from './comedy';
 
 // =============================================================================
 // SSE (Server-Sent Events) for real-time dashboard
@@ -841,6 +849,35 @@ app.post('/v1/embeddings', async (c) => {
     } catch (err: any) {
         return c.json({ error: { message: 'Proxy failed: ' + err.message } }, 502);
     }
+});
+
+// Comedy engine - original wait-state microcopy with optional local Ollama enhancement
+app.get('/api/v1/comedy/wait-line', async (c) => {
+    const durationRaw = c.req.query('duration_ms');
+    const durationMs = durationRaw ? parseInt(durationRaw, 10) : undefined;
+    const allowModelRaw = c.req.query('allow_model');
+    const pack = await generateWaitComedy({
+        state: c.req.query('state'),
+        detail: c.req.query('detail'),
+        model: c.req.query('model'),
+        audience: c.req.query('audience'),
+        duration_ms: Number.isFinite(durationMs as number) ? durationMs : undefined,
+        allow_model: allowModelRaw == null ? true : !['0', 'false', 'no'].includes(allowModelRaw.toLowerCase()),
+    });
+    return c.json(pack);
+});
+app.post('/api/v1/comedy/wait-line', async (c) => {
+    const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+    const durationValue = typeof body.duration_ms === 'number' ? body.duration_ms : Number(body.duration_ms);
+    const pack = await generateWaitComedy({
+        state: typeof body.state === 'string' ? body.state : undefined,
+        detail: typeof body.detail === 'string' ? body.detail : undefined,
+        model: typeof body.model === 'string' ? body.model : undefined,
+        audience: typeof body.audience === 'string' ? body.audience : undefined,
+        duration_ms: Number.isFinite(durationValue) ? durationValue : undefined,
+        allow_model: typeof body.allow_model === 'boolean' ? body.allow_model : true,
+    });
+    return c.json(pack);
 });
 
 // =============================================================================
@@ -1698,6 +1735,72 @@ app.get('/api/v1/doctor', async (c) => {
     });
 });
 
+// =============================================================================
+// Watchdog API
+// =============================================================================
+
+app.post('/api/v1/nodes/:id/watchdog', async (c) => {
+    const nodeId = c.req.param('id');
+    const body = await c.req.json<{ events: Array<{ level: number; action: string; detail: string }> }>();
+
+    if (body.events) {
+        for (const evt of body.events) {
+            recordWatchdogEvent(nodeId, evt.level, evt.action, evt.detail);
+
+            // Send notifications for level >= 2 (restarts and above)
+            if (evt.level >= 2) {
+                const channels = getAllNotificationChannels();
+                const msg = `[TentaCLAW] ${nodeId} — Level ${evt.level} watchdog: ${evt.action}\n${evt.detail}`;
+                for (const ch of channels) {
+                    sendNotification(ch.id, msg).catch(() => {});
+                }
+            }
+        }
+        broadcastSSE('watchdog_event', { node_id: nodeId, events: body.events });
+    }
+    return c.json({ status: 'received' });
+});
+
+app.get('/api/v1/nodes/:id/watchdog', (c) => {
+    return c.json(getWatchdogEvents(c.req.param('id')));
+});
+
+app.get('/api/v1/watchdog', (c) => {
+    const limit = parseInt(c.req.query('limit') || '100');
+    return c.json(getAllWatchdogEvents(limit));
+});
+
+// =============================================================================
+// Notification Channels API
+// =============================================================================
+
+app.get('/api/v1/notifications/channels', (c) => {
+    return c.json(getAllNotificationChannels());
+});
+
+app.post('/api/v1/notifications/channels', async (c) => {
+    const body = await c.req.json<{ type: string; name: string; config: Record<string, unknown> }>();
+    if (!body.type || !body.name || !body.config) {
+        return c.json({ error: 'type, name, and config required' }, 400);
+    }
+    if (!['telegram', 'discord', 'webhook'].includes(body.type)) {
+        return c.json({ error: 'type must be telegram, discord, or webhook' }, 400);
+    }
+    const channel = createNotificationChannel(body.type, body.name, body.config);
+    return c.json(channel, 201);
+});
+
+app.delete('/api/v1/notifications/channels/:id', (c) => {
+    if (!deleteNotificationChannel(c.req.param('id'))) return c.json({ error: 'Channel not found' }, 404);
+    return c.json({ status: 'deleted' });
+});
+
+app.post('/api/v1/notifications/test', async (c) => {
+    const body = await c.req.json<{ channel_id: string }>();
+    const ok = await sendNotification(body.channel_id, '[TentaCLAW] Test notification — your alerts are working!');
+    return c.json({ status: ok ? 'sent' : 'failed' });
+});
+
 // Doctor: receive agent self-heal reports
 app.post('/api/v1/nodes/:id/doctor', async (c) => {
     const nodeId = c.req.param('id');
@@ -1803,13 +1906,18 @@ app.get('/api/v1/events', (c) => {
 // Static Dashboard Files
 // =============================================================================
 
+// Serve static files from public/ — works at both /dashboard/ and root /
+const publicDir = path.resolve(process.cwd(), 'public');
+
 app.use('/dashboard/*', serveStatic({
-    root: path.relative(process.cwd(), path.join(__dirname, '..', 'public')),
+    root: 'public',
     rewriteRequestPath: (p) => p.replace('/dashboard', ''),
 }));
 
-// Redirect /dashboard to /dashboard/
 app.get('/dashboard', (c) => c.redirect('/dashboard/'));
+
+// Also serve at root so /style.css and /app.js work
+app.use('/*', serveStatic({ root: 'public' }));
 
 // =============================================================================
 // Background Tasks
@@ -1980,3 +2088,5 @@ function getLocalIp(): string {
     }
     return '127.0.0.1';
 }
+
+

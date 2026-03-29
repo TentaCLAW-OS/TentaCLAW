@@ -23,6 +23,7 @@
     expandedNodes: new Set(),
     sparklineCache: {},
     initialLoad: true,
+    lastEmptyComedyAt: 0,
   };
 
   const MAX_TERMINAL_LINES = 300;
@@ -205,7 +206,91 @@
     return res.json();
   }
 
-  // ===================== DATA FETCHING =====================
+  const COMEDY_TTL_MS = 15000;
+  const EMPTY_COMEDY_TTL_MS = 30000;
+  const comedyCache = {};
+  let playgroundComedyToken = 0;
+  let playgroundComedyTimer = null;
+  function comedyCacheKey(params) {
+    return JSON.stringify(params || {});
+  }
+  function formatComedyStatus(pack, fallback) {
+    if (!pack) return fallback;
+    if (pack.secondary) return pack.primary + ' ' + pack.secondary;
+    return pack.primary || fallback;
+  }
+  async function fetchComedyWait(params, fallback) {
+    const key = comedyCacheKey(params);
+    const now = Date.now();
+    const cached = comedyCache[key];
+    if (cached && (now - cached.at) < COMEDY_TTL_MS) return cached.value;
+    try {
+      const query = new URLSearchParams();
+      Object.keys(params || {}).forEach((k) => {
+        const value = params[k];
+        if (value != null && value !== '') query.set(k, String(value));
+      });
+      const pack = await api('GET', '/api/v1/comedy/wait-line?' + query.toString());
+      comedyCache[key] = { at: now, value: pack };
+      return pack;
+    } catch (e) {
+      return {
+        primary: fallback,
+        secondary: '',
+        fact: '',
+        mechanic: 'fallback',
+        source: 'template',
+        safe: true,
+      };
+    }
+  }
+  async function refreshEmptyStateComedy(force) {
+    const emptySub = dom.emptyState ? dom.emptyState.querySelector('.empty-sub') : null;
+    if (!emptySub || !dom.emptyState || !dom.emptyState.classList.contains('visible')) return;
+    const now = Date.now();
+    if (!force && (now - state.lastEmptyComedyAt) < EMPTY_COMEDY_TTL_MS) return;
+    state.lastEmptyComedyAt = now;
+    const pack = await fetchComedyWait({
+      state: 'empty',
+      detail: 'workers to register with the gateway',
+      audience: 'dashboard',
+      allow_model: '1',
+    }, 'Waiting for agents to register with the gateway.');
+    emptySub.textContent = formatComedyStatus(pack, 'Waiting for agents to register with the gateway.');
+  }
+  async function updatePlaygroundComedyStatus(model, token, elapsedMs) {
+    const pack = await fetchComedyWait({
+      state: elapsedMs > 5000 ? 'processing' : 'thinking',
+      detail: 'response generation',
+      model: model,
+      audience: 'playground',
+      duration_ms: elapsedMs,
+      allow_model: '1',
+    }, 'Sending to ' + model + '...');
+    if (token !== playgroundComedyToken || !dom.playgroundStatus) return;
+    dom.playgroundStatus.textContent = formatComedyStatus(pack, 'Sending to ' + model + '...');
+  }
+  function startPlaygroundComedy(model) {
+    playgroundComedyToken += 1;
+    const token = playgroundComedyToken;
+    const startedAt = Date.now();
+    if (playgroundComedyTimer) {
+      clearInterval(playgroundComedyTimer);
+      playgroundComedyTimer = null;
+    }
+    updatePlaygroundComedyStatus(model, token, 0);
+    playgroundComedyTimer = setInterval(() => {
+      updatePlaygroundComedyStatus(model, token, Date.now() - startedAt);
+    }, 3500);
+    return token;
+  }
+  function stopPlaygroundComedy(token) {
+    if (token !== playgroundComedyToken) return;
+    if (playgroundComedyTimer) {
+      clearInterval(playgroundComedyTimer);
+      playgroundComedyTimer = null;
+    }
+  }  // ===================== DATA FETCHING =====================
   async function fetchNodes() {
     try {
       const data = await api('GET', '/api/v1/nodes');
@@ -589,6 +674,7 @@
 
     if (filtered.length === 0) {
       dom.emptyState.classList.add('visible');
+      if (!searchTerm) refreshEmptyStateComedy(false);
       return;
     }
     dom.emptyState.classList.remove('visible');
@@ -1732,6 +1818,7 @@
 
     addPlaygroundMessage('user', text);
     input.value = '';
+    const waitToken = startPlaygroundComedy(model);
     if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Sending to ' + model + '...';
 
     playgroundHistory.push({ role: 'user', content: text });
@@ -1751,6 +1838,7 @@
       const elapsed = Date.now() - startTime;
       const data = await resp.json();
 
+      stopPlaygroundComedy(waitToken);
       if (data.error) {
         addPlaygroundMessage('assistant', 'Error: ' + data.error);
         if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Error';
@@ -1763,6 +1851,7 @@
         if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Served by ' + nodeId + ' in ' + elapsed + 'ms';
       }
     } catch (err) {
+      stopPlaygroundComedy(waitToken);
       addPlaygroundMessage('assistant', 'Error: ' + err.message);
       if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Connection error';
     }
@@ -1820,3 +1909,6 @@
     init();
   }
 })();
+
+
+

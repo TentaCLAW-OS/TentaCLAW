@@ -794,6 +794,9 @@ async function main() {
     console.log('[agent] Interval:  ' + config.agentInterval + 's');
     console.log('');
 
+    // Start watchdog (escalating recovery)
+    startWatchdog(config);
+
     // Start self-heal loop (doctor mode)
     startSelfHealLoop(config);
 
@@ -827,6 +830,9 @@ async function main() {
             currentStats.inference.tokens_generated = totalTokens;
             currentStats.requests_completed = totalRequests;
 
+            // Feed tok/s to watchdog
+            watchdogState.lastToksPerSec = currentStats.toks_per_sec;
+
             const response = await pushStats(config, currentStats);
             if (response?.commands && response.commands.length > 0) {
                 console.log('[agent] Received ' + response.commands.length + ' command(s)');
@@ -845,6 +851,297 @@ async function main() {
 
         await new Promise(resolve => setTimeout(resolve, config.agentInterval * 1000));
     }
+}
+
+// =============================================================================
+// WATCHDOG — Escalating Recovery System
+// =============================================================================
+//
+// Like HiveOS watchdog but smarter:
+// Level 0: Log warning
+// Level 1: Restart Ollama service
+// Level 2: Kill and restart inference process
+// Level 3: Reset GPU (AMD: echo 1 > /sys/class/drm/card0/device/reset)
+// Level 4: Full node reboot (last resort)
+//
+// Cooldowns prevent reboot loops. Max 3 escalations per hour.
+
+interface WatchdogConfig {
+    enabled: boolean;
+    checkIntervalMs: number;       // How often to check (default: 30s)
+    toksThreshold: number;         // Min tok/s before alert (0 = disabled)
+    tempThreshold: number;         // Max GPU temp before action (default: 90)
+    maxEscalationsPerHour: number; // Reboot loop protection (default: 3)
+    healthProbeEnabled: boolean;   // Send test prompt to verify inference
+    healthProbeModel: string;      // Model to probe
+}
+
+interface WatchdogState {
+    lastCheck: number;
+    escalationLevel: number;
+    escalationsThisHour: number;
+    hourStart: number;
+    lastToksPerSec: number;
+    consecutiveFailures: number;
+    lastOllamaRestart: number;
+    lastGpuReset: number;
+    lastReboot: number;
+    events: Array<{ time: number; level: number; action: string; detail: string }>;
+}
+
+const watchdogState: WatchdogState = {
+    lastCheck: 0,
+    escalationLevel: 0,
+    escalationsThisHour: 0,
+    hourStart: Date.now(),
+    lastToksPerSec: 0,
+    consecutiveFailures: 0,
+    lastOllamaRestart: 0,
+    lastGpuReset: 0,
+    lastReboot: 0,
+    events: [],
+};
+
+function getWatchdogConfig(config: ReturnType<typeof loadConfig>): WatchdogConfig {
+    // Read from rig.conf or defaults
+    const confPath = '/etc/tentaclaw/rig.conf';
+    let conf: Record<string, string> = {};
+    try {
+        if (fs.existsSync(confPath)) {
+            conf = parseRigConf(fs.readFileSync(confPath, 'utf-8'));
+        }
+    } catch {}
+
+    return {
+        enabled: conf['WATCHDOG_ENABLED'] !== '0',
+        checkIntervalMs: parseInt(conf['WATCHDOG_INTERVAL'] || '30000'),
+        toksThreshold: parseInt(conf['WATCHDOG_TOKS_MIN'] || '0'),
+        tempThreshold: parseInt(conf['WATCHDOG_TEMP_MAX'] || '90'),
+        maxEscalationsPerHour: parseInt(conf['WATCHDOG_MAX_ESCALATIONS'] || '3'),
+        healthProbeEnabled: conf['WATCHDOG_HEALTH_PROBE'] === '1',
+        healthProbeModel: conf['WATCHDOG_PROBE_MODEL'] || 'dolphin-mistral:latest',
+    };
+}
+
+function watchdogLog(level: number, action: string, detail: string): void {
+    const entry = { time: Date.now(), level, action, detail };
+    watchdogState.events.push(entry);
+    // Keep last 100 events
+    if (watchdogState.events.length > 100) watchdogState.events.shift();
+
+    const levelName = ['INFO', 'WARN', 'RESTART', 'GPU-RESET', 'REBOOT'][level] || 'UNKNOWN';
+    console.log(`[watchdog] [${levelName}] ${action}: ${detail}`);
+}
+
+async function watchdogCheck(config: ReturnType<typeof loadConfig>): Promise<void> {
+    const wdConf = getWatchdogConfig(config);
+    if (!wdConf.enabled) return;
+
+    const now = Date.now();
+    watchdogState.lastCheck = now;
+
+    // Reset hourly escalation counter
+    if (now - watchdogState.hourStart > 3600_000) {
+        watchdogState.hourStart = now;
+        watchdogState.escalationsThisHour = 0;
+    }
+
+    // Check if we've hit the escalation limit
+    if (watchdogState.escalationsThisHour >= wdConf.maxEscalationsPerHour) {
+        watchdogLog(0, 'cooldown', `Hit ${wdConf.maxEscalationsPerHour} escalations this hour — backing off`);
+        return;
+    }
+
+    let needsAction = false;
+    let reason = '';
+
+    // 1. Check GPU temperatures
+    if (!config.mockMode) {
+        try {
+            const gpus = getGpuStats();
+            for (const gpu of gpus) {
+                if (gpu.temperatureC > wdConf.tempThreshold) {
+                    needsAction = true;
+                    reason = `GPU ${gpu.name} at ${gpu.temperatureC}°C (threshold: ${wdConf.tempThreshold}°C)`;
+                    break;
+                }
+            }
+        } catch (err) {
+            watchdogState.consecutiveFailures++;
+            if (watchdogState.consecutiveFailures >= 3) {
+                needsAction = true;
+                reason = `GPU stats failed ${watchdogState.consecutiveFailures} times consecutively`;
+            }
+        }
+    }
+
+    // 2. Check Ollama process
+    if (!config.mockMode && process.platform === 'linux') {
+        try {
+            execSync('pgrep -x ollama', { timeout: 5000 });
+        } catch {
+            needsAction = true;
+            reason = 'Ollama process not running';
+        }
+    }
+
+    // 3. Check tok/s threshold
+    if (wdConf.toksThreshold > 0 && watchdogState.lastToksPerSec > 0) {
+        if (watchdogState.lastToksPerSec < wdConf.toksThreshold) {
+            watchdogLog(0, 'low_toks', `tok/s: ${watchdogState.lastToksPerSec} (min: ${wdConf.toksThreshold})`);
+            // Don't escalate immediately for low tok/s — just warn
+        }
+    }
+
+    // 4. Health probe — actually send a test prompt
+    if (wdConf.healthProbeEnabled && !config.mockMode) {
+        try {
+            const probeResult = await healthProbe(wdConf.healthProbeModel);
+            if (!probeResult.ok) {
+                needsAction = true;
+                reason = `Health probe failed: ${probeResult.error}`;
+            }
+        } catch {
+            // Probe failure isn't critical if Ollama is running
+        }
+    }
+
+    if (!needsAction) {
+        watchdogState.consecutiveFailures = 0;
+        if (watchdogState.escalationLevel > 0) {
+            watchdogLog(0, 'recovered', 'All checks passing — resetting escalation level');
+            watchdogState.escalationLevel = 0;
+        }
+        return;
+    }
+
+    // ESCALATE
+    watchdogState.escalationsThisHour++;
+    watchdogState.escalationLevel = Math.min(watchdogState.escalationLevel + 1, 4);
+    const level = watchdogState.escalationLevel;
+
+    watchdogLog(level, 'escalation', `Level ${level}: ${reason}`);
+
+    if (config.mockMode) {
+        watchdogLog(level, 'mock', `Would execute level ${level} recovery (mock mode)`);
+        return;
+    }
+
+    switch (level) {
+        case 1: // Restart Ollama
+            if (now - watchdogState.lastOllamaRestart > 60_000) {
+                try {
+                    execSync('systemctl restart ollama 2>/dev/null || (killall ollama; sleep 1; ollama serve &)', { timeout: 15000 });
+                    watchdogState.lastOllamaRestart = now;
+                    watchdogLog(1, 'ollama_restart', 'Ollama service restarted');
+                } catch (err) {
+                    watchdogLog(1, 'ollama_restart_failed', String(err));
+                }
+            }
+            break;
+
+        case 2: // Kill inference processes
+            try {
+                execSync('pkill -9 -f "ollama run" 2>/dev/null; sleep 2; systemctl restart ollama', { timeout: 15000 });
+                watchdogLog(2, 'inference_kill', 'Killed inference processes and restarted Ollama');
+            } catch {}
+            break;
+
+        case 3: // GPU reset (AMD only)
+            try {
+                const cards = fs.readdirSync('/sys/class/drm').filter(d => /^card\d+$/.test(d));
+                for (const card of cards) {
+                    const resetPath = `/sys/class/drm/${card}/device/reset`;
+                    if (fs.existsSync(resetPath)) {
+                        fs.writeFileSync(resetPath, '1');
+                        watchdogLog(3, 'gpu_reset', `Reset ${card}`);
+                    }
+                }
+                watchdogState.lastGpuReset = now;
+                // Also restart Ollama after GPU reset
+                execSync('systemctl restart ollama', { timeout: 15000 });
+            } catch (err) {
+                watchdogLog(3, 'gpu_reset_failed', String(err));
+            }
+            break;
+
+        case 4: // Full reboot (last resort)
+            if (now - watchdogState.lastReboot > 300_000) { // Min 5min between reboots
+                watchdogLog(4, 'reboot', 'REBOOTING NODE — all recovery attempts failed');
+                // Report to gateway before rebooting
+                try {
+                    const body = JSON.stringify({ event: 'watchdog_reboot', reason, level });
+                    const parsed = new URL(config.gatewayUrl + '/api/v1/nodes/' + encodeURIComponent(config.nodeId) + '/events');
+                    const transport = parsed.protocol === 'https:' ? https : http;
+                    const req = transport.request({
+                        hostname: parsed.hostname,
+                        port: parsed.port,
+                        path: parsed.pathname,
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        timeout: 5000,
+                    });
+                    req.write(body);
+                    req.end();
+                } catch {}
+
+                setTimeout(() => {
+                    try { execSync('reboot', { timeout: 5000 }); } catch {}
+                }, 3000);
+                watchdogState.lastReboot = now;
+            } else {
+                watchdogLog(4, 'reboot_blocked', 'Reboot blocked — too soon since last reboot');
+            }
+            break;
+    }
+}
+
+async function healthProbe(model: string): Promise<{ ok: boolean; error?: string; latencyMs?: number }> {
+    const start = Date.now();
+    return new Promise((resolve) => {
+        const req = http.request({
+            hostname: '127.0.0.1',
+            port: 11434,
+            path: '/api/generate',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 30000,
+        }, (res) => {
+            let data = '';
+            res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+            res.on('end', () => {
+                const latencyMs = Date.now() - start;
+                if (res.statusCode === 200 && data.length > 0) {
+                    resolve({ ok: true, latencyMs });
+                } else {
+                    resolve({ ok: false, error: `HTTP ${res.statusCode}`, latencyMs });
+                }
+            });
+        });
+        req.on('error', (err) => resolve({ ok: false, error: err.message }));
+        req.on('timeout', () => { req.destroy(); resolve({ ok: false, error: 'timeout' }); });
+        req.write(JSON.stringify({ model, prompt: 'ping', stream: false }));
+        req.end();
+    });
+}
+
+function startWatchdog(config: ReturnType<typeof loadConfig>): void {
+    const wdConf = getWatchdogConfig(config);
+    if (!wdConf.enabled) {
+        console.log('[watchdog] Disabled (set WATCHDOG_ENABLED=1 in rig.conf to enable)');
+        return;
+    }
+
+    console.log(`[watchdog] Active — check every ${wdConf.checkIntervalMs / 1000}s, temp max ${wdConf.tempThreshold}°C, max ${wdConf.maxEscalationsPerHour} escalations/hr`);
+    if (wdConf.healthProbeEnabled) {
+        console.log(`[watchdog] Health probe: ${wdConf.healthProbeModel}`);
+    }
+
+    setInterval(() => {
+        watchdogCheck(config).catch(err => {
+            console.error('[watchdog] Check error: ' + err);
+        });
+    }, wdConf.checkIntervalMs);
 }
 
 // =============================================================================
