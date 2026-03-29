@@ -1302,6 +1302,30 @@ export function getAllTags(): Array<{ tag: string; count: number }> {
 }
 
 // =============================================================================
+// Maintenance Mode (Wave 13)
+// =============================================================================
+
+export function setMaintenanceMode(nodeId: string, enabled: boolean): void {
+    const d = getDb();
+    if (enabled) {
+        // Mark node as "maintenance" — stop routing requests to it
+        d.prepare("UPDATE nodes SET status = 'maintenance' WHERE id = ?").run(nodeId);
+        recordNodeEvent(nodeId, 'maintenance_start', 'Node entering maintenance mode');
+        recordUptimeEvent(nodeId, 'maintenance_start', 'online', 'maintenance');
+    } else {
+        d.prepare("UPDATE nodes SET status = 'online' WHERE id = ?").run(nodeId);
+        recordNodeEvent(nodeId, 'maintenance_end', 'Node exiting maintenance mode');
+        recordUptimeEvent(nodeId, 'maintenance_end', 'maintenance', 'online');
+    }
+}
+
+export function isInMaintenance(nodeId: string): boolean {
+    const d = getDb();
+    const row = d.prepare('SELECT status FROM nodes WHERE id = ?').get(nodeId) as any;
+    return row?.status === 'maintenance';
+}
+
+// =============================================================================
 // Power & Cost Tracking (Wave 11)
 // =============================================================================
 

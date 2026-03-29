@@ -1275,6 +1275,28 @@ async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
     console.log('');
 }
 
+async function cmdMaintenance(gateway: string, positional: string[]): Promise<void> {
+    const nodeId = positional[0];
+    const action = positional[1] || 'on';
+
+    if (!nodeId) {
+        console.error(C.red('  Usage: clawtopus maintenance <nodeId> [on|off]'));
+        process.exit(1);
+    }
+
+    const enabled = action !== 'off';
+    const result = await apiPost(gateway, `/api/v1/nodes/${encodeURIComponent(nodeId)}/maintenance`, { enabled }) as any;
+
+    console.log('');
+    if (enabled) {
+        console.log('  ' + C.yellow('\u26A0') + ' ' + C.white(nodeId) + ' is now in ' + C.yellow('MAINTENANCE') + ' mode');
+        console.log('  ' + C.dim('No new requests will be routed to this node.'));
+    } else {
+        console.log('  ' + C.green('\u2714') + ' ' + C.white(nodeId) + ' is back ' + C.green('ONLINE'));
+    }
+    console.log('');
+}
+
 async function cmdPower(gateway: string): Promise<void> {
     console.log('');
     const data = await apiGet(gateway, '/api/v1/power') as any;
@@ -2053,6 +2075,10 @@ async function main(): Promise<void> {
 
         case 'notify':
             await cmdNotify(gateway, parsed.positional, parsed.flags);
+            break;
+
+        case 'maintenance':
+            await cmdMaintenance(gateway, parsed.positional);
             break;
 
         case 'power':

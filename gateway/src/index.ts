@@ -88,6 +88,8 @@ import {
     getCacheStats,
     pruneCache,
     getClusterPower,
+    setMaintenanceMode,
+    isInMaintenance,
     createApiKey,
     validateApiKey,
     trackApiKeyTokens,
@@ -1914,6 +1916,21 @@ app.post('/api/v1/models/smart-deploy', async (c) => {
 
 app.get('/api/v1/inference/stats', (c) => {
     return c.json(getRequestStats());
+});
+
+// =============================================================================
+// Maintenance Mode (Wave 13)
+// =============================================================================
+
+app.post('/api/v1/nodes/:id/maintenance', async (c) => {
+    const nodeId = c.req.param('id');
+    const node = getNode(nodeId);
+    if (!node) return c.json({ error: 'Node not found' }, 404);
+
+    const body = await c.req.json<{ enabled: boolean }>();
+    setMaintenanceMode(nodeId, body.enabled);
+    broadcastSSE('maintenance', { node_id: nodeId, enabled: body.enabled });
+    return c.json({ status: body.enabled ? 'maintenance' : 'online', node_id: nodeId });
 });
 
 // =============================================================================
