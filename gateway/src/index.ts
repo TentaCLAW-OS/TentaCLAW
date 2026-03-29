@@ -3178,3 +3178,41 @@ app.get('/api/v1/search', (c) => {
 
     return c.json({ query: q, results, count: results.length });
 });
+
+// =============================================================================
+// Daily Digest (Wave 30) — human-readable summary for notifications
+// =============================================================================
+
+app.get('/api/v1/digest', (c) => {
+    const summary = getClusterSummary();
+    const health = getHealthScore();
+    const analytics = getInferenceAnalytics(24);
+    const power = getClusterPower();
+    const fleet = getFleetReliability();
+    const timeline = getClusterTimeline(10);
+
+    const onlineNodes = fleet.filter(n => n.status === 'online');
+    const offlineNodes = fleet.filter(n => n.status !== 'online' && n.status !== 'maintenance');
+
+    // Generate human-readable digest
+    let text = '🐙 TentaCLAW Daily Digest\n\n';
+    text += '📊 Cluster: ' + summary.online_nodes + '/' + summary.total_nodes + ' nodes online, ' + summary.total_gpus + ' GPUs\n';
+    text += '💚 Health: ' + health.score + '/100 (' + health.grade + ')\n';
+    text += '⚡ Inference: ' + analytics.total_requests + ' requests (p50: ' + analytics.p50_latency_ms + 'ms, p95: ' + analytics.p95_latency_ms + 'ms)\n';
+    text += '💰 Power: ' + power.total_watts + 'W ($' + (power.daily_cost || 0).toFixed(2) + '/day)\n';
+
+    if (offlineNodes.length > 0) {
+        text += '\n⚠️ Offline: ' + offlineNodes.map(n => n.hostname).join(', ') + '\n';
+    }
+
+    if (timeline.length > 0) {
+        text += '\n📋 Recent events:\n';
+        for (const evt of timeline.slice(0, 5)) {
+            text += '  • ' + evt.message.slice(0, 60) + '\n';
+        }
+    }
+
+    text += '\n🔗 Dashboard: ' + c.req.url.replace('/api/v1/digest', '/dashboard/');
+
+    return c.json({ text, summary, health: health.score, requests_24h: analytics.total_requests });
+});
