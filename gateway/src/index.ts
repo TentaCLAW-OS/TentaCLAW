@@ -772,7 +772,7 @@ app.get('/v1/models', (c) => {
     });
 });
 
-// Chat completions proxy — routes to the best available node
+// Chat completions proxy — OpenAI-compatible with function calling + JSON mode
 app.post('/v1/chat/completions', async (c) => {
     const body = await c.req.json();
     const model = body.model;
@@ -780,6 +780,14 @@ app.post('/v1/chat/completions', async (c) => {
     if (!model) {
         return c.json({ error: { message: 'model is required', type: 'invalid_request_error' } }, 400);
     }
+    if (!body.messages || !Array.isArray(body.messages)) {
+        return c.json({ error: { message: 'messages array is required', type: 'invalid_request_error' } }, 400);
+    }
+
+    // Log function calling usage for analytics
+    const hasTools = body.tools && Array.isArray(body.tools) && body.tools.length > 0;
+    const hasJsonMode = body.response_format?.type === 'json_object';
+    const hasFunctions = body.functions && Array.isArray(body.functions); // Legacy format
 
     // Resolve model aliases (gpt-4 → llama3.1:70b)
     const resolved = resolveModelAlias(model);
@@ -826,8 +834,31 @@ app.post('/v1/chat/completions', async (c) => {
         }
     }
 
-    // Proxy the request to the target node — use resolved model name
-    const proxyBody = { ...body, model: resolvedModel };
+    // Proxy the request to the target node — pass ALL OpenAI params through
+    const proxyBody: Record<string, unknown> = {
+        model: resolvedModel,
+        messages: body.messages,
+        stream: body.stream || false,
+    };
+    // Pass through all supported OpenAI parameters
+    if (body.temperature !== undefined) proxyBody.temperature = body.temperature;
+    if (body.top_p !== undefined) proxyBody.top_p = body.top_p;
+    if (body.max_tokens !== undefined) proxyBody.max_tokens = body.max_tokens;
+    if (body.stop) proxyBody.stop = body.stop;
+    if (body.seed !== undefined) proxyBody.seed = body.seed;
+    if (body.frequency_penalty !== undefined) proxyBody.frequency_penalty = body.frequency_penalty;
+    if (body.presence_penalty !== undefined) proxyBody.presence_penalty = body.presence_penalty;
+    if (body.n !== undefined) proxyBody.n = body.n;
+    // Function calling / tools
+    if (hasTools) proxyBody.tools = body.tools;
+    if (body.tool_choice) proxyBody.tool_choice = body.tool_choice;
+    if (hasFunctions) proxyBody.functions = body.functions; // Legacy
+    if (body.function_call) proxyBody.function_call = body.function_call; // Legacy
+    // JSON mode
+    if (hasJsonMode) proxyBody.response_format = body.response_format;
+    // Logprobs
+    if (body.logprobs !== undefined) proxyBody.logprobs = body.logprobs;
+    if (body.top_logprobs !== undefined) proxyBody.top_logprobs = body.top_logprobs;
     const ollamaUrl = 'http://' + (target.ip_address || target.hostname) + ':11434/v1/chat/completions';
     const startTime = Date.now();
 
@@ -867,6 +898,8 @@ app.post('/v1/chat/completions', async (c) => {
             alias_used: model !== resolvedModel ? model : undefined,
             fallback_used: usedFallback ? resolvedModel : undefined,
             cached: false,
+            tools_used: hasTools || undefined,
+            json_mode: hasJsonMode || undefined,
         };
 
         // Cache the response (non-streaming only)
