@@ -1551,11 +1551,13 @@
         const list = Array.isArray(data) ? data : (data.nodes || data.data || []);
         if (list.length === 0) { addTermLine('warning', 'No nodes found.'); return; }
         list.forEach(n => {
+          const s = n.latest_stats || {};
           const on = isOnline(n);
-          const gpuCount = n.gpu_count || (n.gpus ? n.gpus.length : 0);
+          const gpuCount = n.gpu_count || s.gpu_count || (s.gpus ? s.gpus.length : 0);
+          const toks = s.toks_per_sec != null ? s.toks_per_sec : (n.toks_per_sec || 0);
+          const models = s.inference ? s.inference.loaded_models.length : 0;
           addTermLine(on ? 'success' : 'error',
-            '  ' + (n.hostname || n.node_id) + ' [' + (on ? 'ONLINE' : 'OFFLINE') + '] GPUs: ' + gpuCount +
-            ' tok/s: ' + (n.toks_per_sec != null ? n.toks_per_sec.toFixed(1) : '--'));
+            '  ' + (n.hostname || n.node_id) + ' [' + (on ? 'ONLINE' : 'OFFLINE') + '] ' + gpuCount + ' GPUs, ' + models + ' models' + (toks > 0 ? ', ' + toks.toFixed(1) + ' tok/s' : ''));
         });
       } else if (cmd === 'alert' && parts[1] && parts[1].toLowerCase() === 'ack') {
         const alertId = parts[2];
@@ -1564,8 +1566,30 @@
         await api('POST', '/api/v1/alerts/' + alertId + '/acknowledge');
         addTermLine('success', 'Alert ' + alertId + ' acknowledged.');
         fetchAlerts();
+      } else if (cmd === 'doctor' || cmd === 'fix') {
+        addTermLine('info', 'Running diagnostics...');
+        const doc = await api('GET', '/api/v1/doctor?autofix=true');
+        addTermLine(doc.status === 'healthy' ? 'success' : 'warning',
+          doc.status.toUpperCase() + ' -- ' + doc.summary.ok + '/' + doc.summary.total_checks + ' ok' +
+          (doc.summary.auto_fixed > 0 ? ', ' + doc.summary.auto_fixed + ' fixed' : ''));
+        doc.results.filter(r => r.status !== 'ok').forEach(r => {
+          addTermLine(r.status === 'fixed' ? 'success' : 'warning', '  ' + r.check + ': ' + r.message);
+        });
+      } else if (cmd === 'health') {
+        const h = await api('GET', '/api/v1/health/score');
+        addTermLine(h.score >= 80 ? 'success' : 'warning', 'Health: ' + h.score + '/100 (' + h.grade + ')');
+      } else if (cmd === 'power' || cmd === 'cost') {
+        const p = await api('GET', '/api/v1/power');
+        addTermLine('info', 'Power: ' + p.total_watts + 'W | Daily: $' + (p.daily_cost || p.daily_cost_usd || 0).toFixed(2) + ' | Monthly: $' + (p.monthly_cost || p.monthly_cost_usd || 0).toFixed(2));
+      } else if (cmd === 'models') {
+        const m = await api('GET', '/api/v1/models');
+        const models = m.models || [];
+        if (models.length === 0) { addTermLine('warning', 'No models loaded.'); return; }
+        models.forEach(mod => {
+          addTermLine('info', '  ' + mod.model + ' (' + mod.node_count + ' node' + (mod.node_count !== 1 ? 's' : '') + ')');
+        });
       } else if (cmd === 'help') {
-        addTermLine('info', 'Commands: deploy <model>, status, nodes, alert ack <id>, help');
+        addTermLine('info', 'Commands: status, nodes, models, deploy <model>, health, doctor, power, alert ack <id>, help');
       } else {
         addTermLine('warning', 'Unknown command: ' + cmd + '. Type "help" for available commands.');
       }
