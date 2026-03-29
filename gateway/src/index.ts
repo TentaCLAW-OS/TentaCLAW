@@ -2042,6 +2042,47 @@ app.get('/api/v1/inference/stats', (c) => {
 });
 
 // =============================================================================
+// Cluster Topology (Wave 25)
+// =============================================================================
+
+app.get('/api/v1/topology', (c) => {
+    const nodes = getAllNodes();
+    const models = getClusterModels();
+
+    // Build a topology map
+    const farms = new Map<string, any[]>();
+    for (const n of nodes) {
+        const farm = n.farm_hash || 'default';
+        if (!farms.has(farm)) farms.set(farm, []);
+        const s = n.latest_stats || {} as any;
+        farms.get(farm)!.push({
+            node_id: n.id,
+            hostname: n.hostname,
+            ip: n.ip_address,
+            status: n.status,
+            gpus: (s.gpus || []).map((g: any) => ({
+                name: g.name?.split('[')[1]?.split(']')[0] || g.name?.split('] ')[1] || g.name || '?',
+                vram_mb: g.vramTotalMb,
+                temp: g.temperatureC,
+                util: g.utilizationPct,
+            })),
+            models: s.inference?.loaded_models || [],
+            backend: s.backend?.type,
+        });
+    }
+
+    return c.json({
+        farms: [...farms.entries()].map(([hash, nodeList]) => ({
+            farm_hash: hash,
+            nodes: nodeList,
+            total_gpus: nodeList.reduce((s: number, n: any) => s + n.gpus.length, 0),
+        })),
+        total_models: models.length,
+        model_distribution: models.map(m => ({ model: m.model, nodes: m.node_count })),
+    });
+});
+
+// =============================================================================
 // Node Comparison + Benchmark Ranking (Wave 24)
 // =============================================================================
 
