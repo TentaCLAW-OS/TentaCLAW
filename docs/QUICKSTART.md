@@ -75,14 +75,14 @@ Registration:
 
 ## 5. Add Node to HiveMind Gateway
 
-On your HiveMind gateway server (where Clawdia/TentaCLAW gateway is running):
+On your HiveMind gateway server:
 
 ```bash
 # Check gateway logs for new node registrations
-tail -f /var/log/clawdia/gateway.log
+tail -f /var/log/tentaclaw/gateway.log
 
 # Or use the CLI
-clawdia nodes
+tentaclaw nodes
 ```
 
 Enter the Farm Hash in your dashboard to claim the node.
@@ -92,11 +92,12 @@ Enter the Farm Hash in your dashboard to claim the node.
 ## 6. Deploy Your First Model
 
 ```bash
-# Via gateway CLI
-clawdia model push hermes3:latest
+# Via CLI
+tentaclaw deploy hermes3:latest
 
 # Or via API
-curl -X POST http://localhost:7860/api/v1/models \
+curl -X POST http://localhost:8080/api/v1/deploy \
+  -H "Content-Type: application/json" \
   -d '{"model": "hermes3:latest"}'
 ```
 

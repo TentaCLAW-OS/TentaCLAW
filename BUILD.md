@@ -1017,19 +1017,12 @@ F:/Daphney-OG/tentaclaw-os/
     └── GATEWAY-SETUP.md
 ```
 
-### Files to Modify (Existing Clawdia)
+### TentaCLAW Gateway Files
 
 ```
-D:/DaphneyBrain/Source/clawdia/src/gateway.ts
-  → Add /api/v1/nodes/register endpoint
-  → Add /api/v1/nodes/{id}/stats endpoint
-  → Add command queue in HTTP response
-
-D:/DaphneyBrain/Source/clawdia/src/types.ts
-  → Add NodeRegistration, StatsPayload, GatewayCommand types
-
-D:/DaphneyBrain/Source/clawdia/tentaclaw.yaml
-  → Add farm_hash, gateway_api_port, node_api_base settings
+gateway/src/index.ts     → All API routes (46 endpoints)
+gateway/src/db.ts        → SQLite database layer
+shared/types.ts          → Shared TypeScript types
 ```
 
 ---

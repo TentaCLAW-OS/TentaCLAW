@@ -566,7 +566,7 @@ Categories:
 Name CLAWtopus:
 - Community names their CLAW
 - Best name wins
-- Some names: "Octavia", "Clawdia", "Tentacool"
+- Some names: "Octavia", "TentaCool", "CLAWtopus Jr."
 - "What's YOUR CLAW called?"
 
 "She has a name. What did YOU call her?"

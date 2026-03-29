@@ -322,7 +322,7 @@ cd builder && bash build-pxe.sh --version 0.1.0
 
 ## GATEWAY API (To Be Built)
 
-The existing Clawdia gateway (D:\DaphneyBrain\Source\clawdia) needs expansion:
+The TentaCLAW HiveMind gateway needs the following endpoints:
 
 ### Endpoints to Add
 ```
@@ -428,7 +428,7 @@ Event banner with CLAWtopus ASCII art
 
 ## OPEN QUESTIONS
 
-1. **Gateway Integration**: Add endpoints to existing Clawdia gateway or create separate TentaCLAW gateway project?
+1. **Gateway Integration**: TentaCLAW gateway is now its own standalone project.
 
 2. **Color Feedback**: Love the cyan + purple. Any tweaks? Want more purple? Less?
 

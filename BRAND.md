@@ -8,7 +8,7 @@
 
 ---
 
-## 1. Color Palette (Exact — Matched to Original Clawdia)
+## 1. Color Palette (TentaCLAW Brand)
 
 ```
 Primary:     #00FFFF  (Cyan — main brand, prompts, highlights)
