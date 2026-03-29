@@ -1,105 +1,117 @@
 /* ============================================================
    TentaCLAW HiveMind Dashboard — app.js
-   Vanilla JS, no frameworks, no SaaS, no mercy.
+   HiveOS-style GPU cluster management UI.
+   Pure vanilla JS, no frameworks, no dependencies.
    ============================================================ */
 
 (function () {
   'use strict';
 
-  // ---- State ----
+  // ===================== STATE =====================
   const state = {
     nodes: [],
     summary: {},
+    healthScore: null,
     flightSheets: [],
-    events: [],
+    alerts: [],
+    benchmarks: [],
+    leaderboard: [],
+    power: {},
     sseConnected: false,
-    commandTarget: null, // { nodeId, hostname }
+    commandTarget: null,
+    activeView: 'nodes',
+    expandedNodes: new Set(),
   };
 
-  const MAX_LOG_ENTRIES = 50;
-  const MAX_TERMINAL_LINES = 200;
+  const MAX_TERMINAL_LINES = 300;
   const POLL_INTERVAL = 5000;
 
-  // ---- Terminal state ----
-  var terminalLines = [];
-  var terminalPaused = false;
-  var terminalFilter = 'all';
-  var terminalCommandHistory = [];
-  var terminalHistoryIdx = -1;
+  // Terminal state
+  let terminalLines = [];
+  let terminalPaused = false;
+  let terminalFilter = 'all';
+  let terminalHistory = [];
+  let terminalHistIdx = -1;
 
-  // ---- CLAWtopus quotes ----
-  const QUOTES = [
-    '"I have eight arms and zero patience for your YAML."',
-    '"SaaS? I barely know her. And I don\'t want to."',
-    '"My tentacles reach every GPU in this cluster."',
-    '"Latency is just distance measured in disappointment."',
-    '"One does not simply \'scale horizontally\' without me."',
-    '"I eat tokens for breakfast. Thousands per second."',
-    '"Your models are safe with me. All eight arms on deck."',
-    '"Cloud? I am the cloud. A local, self-hosted cloud."',
-    '"I run inference like I run my life: parallel and fast."',
-    '"404 SaaS not found. You\'re welcome."',
-    '"Uptime is a lifestyle, not a metric."',
-    '"Tentacles > microservices. Fight me."',
-    '"I don\'t phone home. Home phones me."',
-    '"Open source or open the door. Your choice."',
-    '"Every GPU deserves a good squeeze."',
-    '"My inference pipeline is longer than my tentacles."',
-    '"Keep calm and run local."',
-  ];
-
-  let quoteIndex = 0;
-
-  // ---- DOM refs ----
-  const $ = function (sel) { return document.querySelector(sel); };
+  // ===================== DOM REFS =====================
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
 
   const dom = {
-    healthBadge:    $('#health-badge'),
-    quote:          $('#claw-quote'),
-    sumNodes:       $('#sum-nodes'),
-    sumOnline:      $('#sum-online'),
-    sumGpus:        $('#sum-gpus'),
-    sumVram:        $('#sum-vram'),
-    sumToks:        $('#sum-toks'),
-    sumRequests:    $('#sum-requests'),
-    nodeGrid:       $('#node-grid'),
-    emptyState:     $('#empty-state'),
-    flightPanel:    $('#flight-panel'),
-    btnToggleFlight:$('#btn-toggle-flight'),
-    btnCloseFlight: $('#btn-close-flight'),
-    fsName:         $('#fs-name'),
-    fsDesc:         $('#fs-desc'),
-    fsTargets:      $('#fs-targets'),
-    btnAddTarget:   $('#btn-add-target'),
-    btnCreateFs:    $('#btn-create-fs'),
-    fsList:         $('#fs-list'),
-    cmdModal:       $('#cmd-modal'),
-    cmdNodeName:    $('#cmd-node-name'),
-    cmdAction:      $('#cmd-action'),
-    cmdModel:       $('#cmd-model'),
-    cmdGpu:         $('#cmd-gpu'),
-    btnCloseCmd:    $('#btn-close-cmd'),
-    btnCancelCmd:   $('#btn-cancel-cmd'),
-    btnSendCmd:     $('#btn-send-cmd'),
-    logEntries:     $('#log-entries'),
-    btnClearLog:    $('#btn-clear-log'),
+    sidebar:        $('#sidebar'),
+    sidebarToggle:  $('#sidebar-toggle'),
+    mainWrapper:    $('.main-wrapper'),
+    farmHash:       $('#farm-hash'),
+    // Top bar stats
+    statNodesOnline: $('#stat-nodes-online'),
+    statNodesTotal:  $('#stat-nodes-total'),
+    statGpus:        $('#stat-gpus'),
+    statVramBar:     $('#stat-vram-bar'),
+    statVramText:    $('#stat-vram-text'),
+    statToks:        $('#stat-toks'),
+    statPower:       $('#stat-power'),
+    statHealth:      $('#stat-health'),
+    statCost:        $('#stat-cost'),
+    // Nav badges
+    navBadgeNodes:   $('#nav-badge-nodes'),
+    navBadgeAlerts:  $('#nav-badge-alerts'),
+    // Nodes
+    nodesTbody:      $('#nodes-tbody'),
+    emptyState:      $('#empty-state'),
+    nodeSearch:      $('#node-search'),
+    btnRefreshNodes: $('#btn-refresh-nodes'),
+    // Flight sheets
+    btnNewFs:        $('#btn-new-fs'),
+    fsCreateForm:    $('#fs-create-form'),
+    fsName:          $('#fs-name'),
+    fsDesc:          $('#fs-desc'),
+    fsTargets:       $('#fs-targets'),
+    btnAddTarget:    $('#btn-add-target'),
+    btnCreateFs:     $('#btn-create-fs'),
+    btnCancelFs:     $('#btn-cancel-fs'),
+    fsList:          $('#fs-list'),
+    // Models
+    modelsTbody:     $('#models-tbody'),
+    // Alerts
+    alertsList:      $('#alerts-list'),
+    alertFilter:     $('#alert-filter'),
+    // Benchmarks
+    benchmarksTbody: $('#benchmarks-tbody'),
+    // Power
+    powerGrid:       $('#power-grid'),
+    // Settings
+    settingsFarmHash:  $('#settings-farm-hash'),
+    settingsSseStatus: $('#settings-sse-status'),
     // Terminal
-    terminalOutput:     $('#terminal-output'),
-    terminalInput:      $('#terminal-input'),
-    terminalFilter:     $('#terminal-filter'),
-    btnTerminalPause:   $('#btn-terminal-pause'),
-    btnTerminalClear:   $('#btn-terminal-clear'),
-    terminalHealthScore:$('#terminal-health-score'),
+    terminalPanel:   $('#terminal-panel'),
+    terminalOutput:  $('#terminal-output'),
+    terminalInput:   $('#terminal-input'),
+    terminalFilter:  $('#terminal-filter'),
+    btnTermPause:    $('#btn-terminal-pause'),
+    btnTermClear:    $('#btn-terminal-clear'),
+    btnTermToggle:   $('#btn-terminal-toggle'),
+    termSseDot:      $('#terminal-sse-dot'),
+    // Modal
+    cmdModal:        $('#cmd-modal'),
+    cmdNodeName:     $('#cmd-node-name'),
+    cmdAction:       $('#cmd-action'),
+    cmdModel:        $('#cmd-model'),
+    cmdGpu:          $('#cmd-gpu'),
+    btnCloseCmd:     $('#btn-close-cmd'),
+    btnCancelCmd:    $('#btn-cancel-cmd'),
+    btnSendCmd:      $('#btn-send-cmd'),
+    // Action dropdown
+    actionDropdown:  $('#action-dropdown'),
   };
 
-  // ---- Helpers ----
+  // ===================== HELPERS =====================
   function formatBytes(mb) {
     if (mb == null) return '--';
     if (mb >= 1024) return (mb / 1024).toFixed(1) + ' GB';
     return Math.round(mb) + ' MB';
   }
 
-  function formatBytesNetwork(bytes) {
+  function formatBytesNet(bytes) {
     if (bytes == null) return '--';
     if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
     if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
@@ -109,10 +121,10 @@
 
   function formatUptime(secs) {
     if (secs == null) return '--';
-    var d = Math.floor(secs / 86400);
-    var h = Math.floor((secs % 86400) / 3600);
-    var m = Math.floor((secs % 3600) / 60);
-    if (d > 0) return d + 'd ' + h + 'h ' + m + 'm';
+    const d = Math.floor(secs / 86400);
+    const h = Math.floor((secs % 86400) / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    if (d > 0) return d + 'd ' + h + 'h';
     if (h > 0) return h + 'h ' + m + 'm';
     return m + 'm';
   }
@@ -122,553 +134,706 @@
     return Math.min(100, Math.max(0, (used / total) * 100));
   }
 
-  function tempClass(c) {
-    if (c >= 80) return 'temp-hot';
+  function tempColorClass(c) {
+    if (c == null) return 'temp-cool';
+    if (c >= 85) return 'temp-crit';
+    if (c >= 75) return 'temp-hot';
     if (c >= 60) return 'temp-warm';
     return 'temp-cool';
   }
 
-  function barColorClass(p) {
+  function barColor(p) {
     if (p >= 90) return 'red';
-    if (p >= 75) return 'yellow';
-    if (p >= 50) return 'teal';
+    if (p >= 75) return 'orange';
+    if (p >= 50) return 'yellow';
     return 'cyan';
   }
 
-  function timestamp() {
+  function ts() {
     return new Date().toLocaleTimeString('en-US', { hour12: false });
   }
 
-  /** Create a text span with given class and content */
-  function mkSpan(cls, text) {
-    var s = document.createElement('span');
-    if (cls) s.className = cls;
-    s.textContent = text;
-    return s;
+  function isOnline(node) {
+    return node.status === 'online' || node.is_online === true || node.online !== false;
   }
 
-  /** Create a labeled stat like: "Label: <val>value</val>" */
-  function mkStatSpan(label, value, valClass) {
-    var s = document.createElement('span');
-    s.appendChild(document.createTextNode(label + ': '));
-    s.appendChild(mkSpan(valClass || 'val', value));
-    return s;
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
   }
 
-  // ---- API ----
+  function totalNodePower(node) {
+    let w = 0;
+    if (node.gpus) node.gpus.forEach(g => { w += (g.powerDrawW || 0); });
+    return w;
+  }
+
+  function totalNodeVram(node) {
+    let used = 0, total = 0;
+    if (node.gpus) node.gpus.forEach(g => {
+      used += (g.vramUsedMb || 0);
+      total += (g.vramTotalMb || 0);
+    });
+    return { used, total };
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.textContent;
+  }
+
+  // ===================== API =====================
   async function api(method, path, body) {
-    var opts = {
-      method: method,
-      headers: { 'Content-Type': 'application/json' },
-    };
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
     if (body) opts.body = JSON.stringify(body);
-    var res = await fetch(path, opts);
+    const res = await fetch(path, opts);
     if (!res.ok) {
-      var text = await res.text().catch(function () { return ''; });
-      throw new Error('API ' + method + ' ' + path + ' failed: ' + res.status + ' ' + text);
+      const text = await res.text().catch(() => '');
+      throw new Error(res.status + ' ' + text);
     }
     return res.json();
   }
 
-  // ---- Health check ----
-  async function checkHealth() {
-    try {
-      await fetch('/health');
-      dom.healthBadge.textContent = 'ONLINE';
-      dom.healthBadge.className = 'health-badge ok';
-    } catch (e) {
-      dom.healthBadge.textContent = 'OFFLINE';
-      dom.healthBadge.className = 'health-badge err';
-    }
-  }
-
-  // ---- Fetch data ----
+  // ===================== DATA FETCHING =====================
   async function fetchNodes() {
     try {
-      var data = await api('GET', '/api/v1/nodes');
+      const data = await api('GET', '/api/v1/nodes');
       state.nodes = Array.isArray(data) ? data : (data.nodes || data.data || []);
       renderNodes();
-      updateNodeSelectors();
+      computeSummary();
     } catch (e) {
-      logEvent('system', 'Failed to fetch nodes: ' + e.message);
+      addTermLine('error', 'Failed to fetch nodes: ' + e.message);
     }
   }
 
   async function fetchSummary() {
     try {
-      var data = await api('GET', '/api/v1/summary');
+      const data = await api('GET', '/api/v1/summary');
       state.summary = data;
-      renderSummary();
+      renderTopBar();
     } catch (e) {
-      computeSummaryFromNodes();
+      computeSummary();
     }
   }
 
-  function computeSummaryFromNodes() {
-    var nodes = state.nodes;
-    var totalGpus = 0, totalVramMb = 0, usedVramMb = 0, totalToks = 0, totalRequests = 0;
-    var onlineCount = 0;
-
-    nodes.forEach(function (n) {
-      var isOnline = n.status === 'online' || n.is_online || n.online;
-      if (isOnline) onlineCount++;
+  function computeSummary() {
+    let totalGpus = 0, totalVram = 0, usedVram = 0, totalToks = 0, totalPwr = 0, online = 0;
+    state.nodes.forEach(n => {
+      if (isOnline(n)) online++;
       totalGpus += n.gpu_count || (n.gpus ? n.gpus.length : 0);
-      if (n.gpus) {
-        n.gpus.forEach(function (g) {
-          totalVramMb += g.vramTotalMb || 0;
-          usedVramMb += g.vramUsedMb || 0;
-        });
-      }
-      totalToks += n.toks_per_sec || 0;
-      totalRequests += n.requests_completed || 0;
+      if (n.gpus) n.gpus.forEach(g => {
+        totalVram += (g.vramTotalMb || 0);
+        usedVram += (g.vramUsedMb || 0);
+        totalPwr += (g.powerDrawW || 0);
+      });
+      totalToks += (n.toks_per_sec || 0);
     });
-
     state.summary = {
-      total_nodes: nodes.length,
-      online_nodes: onlineCount,
+      total_nodes: state.nodes.length,
+      online_nodes: online,
       total_gpus: totalGpus,
-      total_vram_mb: totalVramMb,
-      used_vram_mb: usedVramMb,
+      total_vram_mb: totalVram,
+      used_vram_mb: usedVram,
       total_toks_per_sec: totalToks,
-      total_requests: totalRequests,
+      total_power_w: totalPwr,
     };
-    renderSummary();
+    renderTopBar();
+  }
+
+  async function fetchHealthScore() {
+    try {
+      const data = await api('GET', '/api/v1/health/score');
+      state.healthScore = data.score != null ? data.score : data.health_score;
+      renderHealthScore();
+    } catch (e) {
+      state.healthScore = null;
+      renderHealthScore();
+    }
+  }
+
+  async function fetchPower() {
+    try {
+      state.power = await api('GET', '/api/v1/power');
+      renderPower();
+    } catch (e) { /* silent */ }
   }
 
   async function fetchFlightSheets() {
     try {
-      var data = await api('GET', '/api/v1/flight-sheets');
+      const data = await api('GET', '/api/v1/flight-sheets');
       state.flightSheets = Array.isArray(data) ? data : (data.flight_sheets || data.data || []);
       renderFlightSheets();
     } catch (e) {
-      logEvent('system', 'Failed to fetch flight sheets: ' + e.message);
+      addTermLine('error', 'Flight sheets: ' + e.message);
     }
   }
 
-  // ---- SSE ----
+  async function fetchAlerts() {
+    try {
+      const data = await api('GET', '/api/v1/alerts');
+      state.alerts = Array.isArray(data) ? data : (data.alerts || data.data || []);
+      renderAlerts();
+      updateAlertBadge();
+    } catch (e) { /* silent */ }
+  }
+
+  async function fetchBenchmarks() {
+    try {
+      const data = await api('GET', '/api/v1/benchmarks');
+      state.benchmarks = Array.isArray(data) ? data : (data.benchmarks || data.data || []);
+      renderBenchmarks();
+    } catch (e) { /* silent */ }
+  }
+
+  async function fetchLeaderboard() {
+    try {
+      const data = await api('GET', '/api/v1/leaderboard');
+      state.leaderboard = Array.isArray(data) ? data : (data.leaderboard || data.models || data.data || []);
+      renderModels();
+    } catch (e) { /* silent */ }
+  }
+
+  // ===================== SSE =====================
   function connectSSE() {
-    var evtSource = new EventSource('/api/v1/events');
+    const evtSource = new EventSource('/api/v1/events');
 
-    evtSource.onopen = function () {
+    evtSource.onopen = () => {
       state.sseConnected = true;
-      logEvent('system', 'SSE connected. Real-time updates active.');
+      dom.termSseDot.classList.add('connected');
+      if (dom.settingsSseStatus) dom.settingsSseStatus.textContent = 'Connected';
+      addTermLine('system', 'SSE connected \u2014 real-time updates active.');
     };
 
-    evtSource.onmessage = function (event) {
-      handleSSEMessage(event);
+    evtSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        handleSSE(data.type || data.event || 'info', data);
+      } catch (e) {
+        addTermLine('info', event.data);
+      }
     };
 
-    ['stats_update', 'node_online', 'node_offline', 'command_sent', 'alert', 'benchmark_complete'].forEach(function (evtType) {
-      evtSource.addEventListener(evtType, function (event) {
-        handleSSEEvent(evtType, event);
+    ['stats_update', 'node_online', 'node_offline', 'command_sent', 'alert', 'benchmark_complete']
+      .forEach(t => {
+        evtSource.addEventListener(t, (event) => {
+          try { handleSSE(t, JSON.parse(event.data)); }
+          catch (e) { handleSSE(t, { raw: event.data }); }
+        });
       });
-    });
 
-    evtSource.onerror = function () {
+    evtSource.onerror = () => {
       state.sseConnected = false;
-      logEvent('system', 'SSE disconnected. Reconnecting...');
+      dom.termSseDot.classList.remove('connected');
+      if (dom.settingsSseStatus) dom.settingsSseStatus.textContent = 'Reconnecting...';
+      addTermLine('warning', 'SSE disconnected. Reconnecting...');
     };
   }
 
-  function handleSSEMessage(event) {
-    try {
-      var data = JSON.parse(event.data);
-      var type = data.type || data.event || 'unknown';
-      handleSSEEvent(type, { data: event.data });
-    } catch (e) {
-      logEvent('info', event.data);
-    }
-  }
-
-  function handleSSEEvent(type, event) {
-    var data;
-    try {
-      data = JSON.parse(event.data);
-    } catch (e) {
-      data = { raw: event.data };
-    }
-
+  function handleSSE(type, data) {
     switch (type) {
       case 'stats_update':
-        if (data.node_id) {
-          updateNodeInState(data);
-        }
-        var statsMsg = 'Stats update from ' + (data.hostname || data.node_id || 'unknown');
-        logEvent(type, statsMsg);
-        addTerminalLine('stats_update', statsMsg);
+        if (data.node_id) updateNodeInState(data);
+        addTermLine('stats_update', 'Stats: ' + (data.hostname || data.node_id || 'unknown'));
         break;
       case 'node_online':
-        var onMsg = 'Node online: ' + (data.hostname || data.node_id || 'unknown');
-        logEvent(type, onMsg);
-        addTerminalLine('node_online', onMsg);
-        fetchNodes();
-        fetchSummary();
+        addTermLine('node_online', 'Node online: ' + (data.hostname || data.node_id));
+        fetchNodes(); fetchSummary();
         break;
       case 'node_offline':
-        var offMsg = 'Node offline: ' + (data.hostname || data.node_id || 'unknown');
-        logEvent(type, offMsg);
-        addTerminalLine('node_offline', offMsg);
-        fetchNodes();
-        fetchSummary();
+        addTermLine('node_offline', 'Node offline: ' + (data.hostname || data.node_id));
+        fetchNodes(); fetchSummary();
         break;
       case 'command_sent':
-        var cmdMsg = 'Command sent: ' + (data.action || 'unknown') + ' -> ' + (data.hostname || data.node_id || 'unknown');
-        logEvent(type, cmdMsg);
-        addTerminalLine('command_sent', cmdMsg);
+        addTermLine('command_sent', 'Command: ' + (data.action || '?') + ' -> ' + (data.hostname || data.node_id));
         break;
       case 'alert':
-        var alertMsg = 'ALERT: ' + (data.message || data.alert || data.description || JSON.stringify(data).substring(0, 100));
-        logEvent(type, alertMsg);
-        addTerminalLine('alert', alertMsg);
+        addTermLine('alert', 'ALERT: ' + (data.message || data.description || JSON.stringify(data).substring(0, 100)));
+        fetchAlerts();
         break;
       case 'benchmark_complete':
-        var benchMsg = 'Benchmark complete: ' + (data.model || 'unknown') + ' — ' + (data.result || data.toks_per_sec || JSON.stringify(data).substring(0, 80));
-        logEvent(type, benchMsg);
-        addTerminalLine('benchmark_complete', benchMsg);
+        addTermLine('benchmark_complete', 'Benchmark: ' + (data.model || '?') + ' \u2014 ' + (data.toks_per_sec || JSON.stringify(data).substring(0, 80)));
+        fetchBenchmarks();
         break;
       default:
-        var defaultMsg = type + ': ' + JSON.stringify(data).substring(0, 120);
-        logEvent('info', defaultMsg);
-        addTerminalLine('info', defaultMsg);
+        addTermLine('info', type + ': ' + JSON.stringify(data).substring(0, 120));
     }
   }
 
   function updateNodeInState(payload) {
-    var idx = state.nodes.findIndex(function (n) { return n.node_id === payload.node_id; });
-    if (idx >= 0) {
-      Object.assign(state.nodes[idx], payload);
-    } else {
-      state.nodes.push(payload);
-    }
+    const idx = state.nodes.findIndex(n => n.node_id === payload.node_id);
+    if (idx >= 0) Object.assign(state.nodes[idx], payload);
+    else state.nodes.push(payload);
     renderNodes();
-    computeSummaryFromNodes();
+    computeSummary();
   }
 
-  // ---- Render: Summary ----
-  function renderSummary() {
-    var s = state.summary;
-    dom.sumNodes.textContent = s.total_nodes != null ? s.total_nodes : state.nodes.length;
-    dom.sumOnline.textContent = s.online_nodes != null ? s.online_nodes : '--';
-    dom.sumGpus.textContent = s.total_gpus != null ? s.total_gpus : '--';
+  // ===================== RENDER: TOP BAR =====================
+  function renderTopBar() {
+    const s = state.summary;
+    dom.statNodesOnline.textContent = s.online_nodes != null ? s.online_nodes : '--';
+    dom.statNodesTotal.textContent = s.total_nodes != null ? s.total_nodes : state.nodes.length;
+    dom.statGpus.textContent = s.total_gpus != null ? s.total_gpus : '--';
 
-    if (s.total_vram_mb != null) {
-      var used = s.used_vram_mb || 0;
-      dom.sumVram.textContent = formatBytes(used) + ' / ' + formatBytes(s.total_vram_mb);
+    if (s.total_vram_mb) {
+      const p = pct(s.used_vram_mb || 0, s.total_vram_mb);
+      dom.statVramBar.style.width = p.toFixed(1) + '%';
+      dom.statVramText.textContent = formatBytes(s.used_vram_mb) + '/' + formatBytes(s.total_vram_mb);
     } else {
-      dom.sumVram.textContent = '--';
+      dom.statVramBar.style.width = '0%';
+      dom.statVramText.textContent = '--';
     }
 
-    dom.sumToks.textContent = s.total_toks_per_sec != null ? s.total_toks_per_sec.toFixed(1) : '--';
-    dom.sumRequests.textContent = s.total_requests != null ? s.total_requests.toLocaleString() : '--';
+    dom.statToks.textContent = s.total_toks_per_sec != null ? s.total_toks_per_sec.toFixed(1) : '--';
+    dom.statPower.textContent = s.total_power_w != null ? Math.round(s.total_power_w) : '--';
+
+    // Farm hash
+    if (s.farm_hash) {
+      dom.farmHash.textContent = s.farm_hash;
+      dom.farmHash.title = s.farm_hash;
+      if (dom.settingsFarmHash) dom.settingsFarmHash.textContent = s.farm_hash;
+    }
+
+    // Nav badge
+    dom.navBadgeNodes.textContent = (s.online_nodes != null ? s.online_nodes : '--') + '/' + (s.total_nodes != null ? s.total_nodes : state.nodes.length);
+
+    // Cost estimate: assume $0.10/kWh
+    if (s.total_power_w) {
+      const daily = ((s.total_power_w / 1000) * 24 * 0.10).toFixed(2);
+      dom.statCost.textContent = daily;
+    }
   }
 
-  // ---- Render: Nodes ----
-  function renderNodes() {
-    dom.nodeGrid.querySelectorAll('.node-card').forEach(function (el) { el.remove(); });
-
-    if (state.nodes.length === 0) {
-      if (dom.emptyState) dom.emptyState.style.display = '';
+  function renderHealthScore() {
+    const score = state.healthScore;
+    if (score == null) {
+      dom.statHealth.textContent = '--';
+      dom.statHealth.className = 'stat-pill-value health-score';
       return;
     }
-
-    if (dom.emptyState) dom.emptyState.style.display = 'none';
-
-    state.nodes.forEach(function (node) {
-      var card = buildNodeCard(node);
-      dom.nodeGrid.appendChild(card);
-    });
+    dom.statHealth.textContent = score + '%';
+    dom.statHealth.className = 'stat-pill-value health-score ' +
+      (score >= 80 ? 'health-good' : score >= 50 ? 'health-warn' : 'health-bad');
   }
 
-  function buildNodeCard(node) {
-    var isOnline = node.status === 'online' || node.is_online || node.online !== false;
-    var card = document.createElement('div');
-    card.className = 'node-card' + (isOnline ? '' : ' offline');
-    card.dataset.nodeId = node.node_id || '';
+  // ===================== RENDER: NODES TABLE =====================
+  function renderNodes() {
+    const tbody = dom.nodesTbody;
+    const searchTerm = (dom.nodeSearch.value || '').toLowerCase();
 
-    // Header
-    var header = document.createElement('div');
-    header.className = 'node-header';
+    // Preserve scroll position
+    const wrapper = tbody.parentElement ? tbody.parentElement.parentElement : null;
+    const scrollTop = wrapper ? wrapper.scrollTop : 0;
 
-    var left = document.createElement('div');
-    var hostname = document.createElement('span');
-    hostname.className = 'node-hostname';
-    hostname.textContent = node.hostname || node.node_id || 'Unknown';
-    left.appendChild(hostname);
+    tbody.textContent = '';
 
-    var badge = document.createElement('span');
-    badge.className = 'status-badge ' + (isOnline ? 'online' : 'offline');
-    var dot = document.createElement('span');
-    dot.className = 'status-dot';
-    badge.appendChild(dot);
-    badge.appendChild(document.createTextNode(isOnline ? 'online' : 'offline'));
+    let filtered = state.nodes;
+    if (searchTerm) {
+      filtered = state.nodes.filter(n =>
+        (n.hostname || '').toLowerCase().includes(searchTerm) ||
+        (n.node_id || '').toLowerCase().includes(searchTerm)
+      );
+    }
 
-    var actions = document.createElement('div');
-    actions.className = 'node-actions';
+    if (filtered.length === 0) {
+      dom.emptyState.classList.add('visible');
+      return;
+    }
+    dom.emptyState.classList.remove('visible');
 
-    var cmdBtn = document.createElement('button');
-    cmdBtn.className = 'btn btn-small';
-    cmdBtn.textContent = 'CMD';
-    cmdBtn.title = 'Send command';
-    cmdBtn.addEventListener('click', function () {
-      openCommandModal(node.node_id, node.hostname || node.node_id);
-    });
-    actions.appendChild(cmdBtn);
+    filtered.forEach(node => {
+      const online = isOnline(node);
+      const nodeId = node.node_id || '';
+      const expanded = state.expandedNodes.has(nodeId);
 
-    left.appendChild(badge);
-    header.appendChild(left);
-    header.appendChild(actions);
-    card.appendChild(header);
+      // Main row
+      const row = el('tr', 'node-row' + (online ? '' : ' offline'));
+      row.dataset.nodeId = nodeId;
 
-    // Node ID + uptime
-    var meta = document.createElement('div');
-    meta.style.display = 'flex';
-    meta.style.justifyContent = 'space-between';
-    meta.style.alignItems = 'center';
+      // 1. Status dot
+      const tdStatus = el('td');
+      const dot = el('span', 'status-dot ' + (online ? 'online' : 'offline'));
+      tdStatus.appendChild(dot);
+      row.appendChild(tdStatus);
 
-    var nodeIdEl = document.createElement('span');
-    nodeIdEl.className = 'node-id';
-    nodeIdEl.textContent = node.node_id ? 'ID: ' + node.node_id.substring(0, 12) + '...' : '';
-    meta.appendChild(nodeIdEl);
+      // 2. Hostname
+      const tdHost = el('td');
+      const hostSpan = el('div', 'node-hostname', node.hostname || node.node_id || 'Unknown');
+      tdHost.appendChild(hostSpan);
+      const idSub = el('div', 'node-id-sub', nodeId ? nodeId.substring(0, 12) : '');
+      tdHost.appendChild(idSub);
+      row.appendChild(tdHost);
 
-    var uptimeEl = document.createElement('span');
-    uptimeEl.className = 'node-uptime';
-    uptimeEl.textContent = 'up ' + formatUptime(node.uptime_secs);
-    meta.appendChild(uptimeEl);
+      // 3. GPU strip
+      const tdGpus = el('td');
+      const strip = el('div', 'gpu-strip');
+      if (node.gpus && node.gpus.length > 0) {
+        node.gpus.forEach((gpu, i) => {
+          const chip = el('div', 'gpu-chip');
+          const bar = el('div', 'gpu-chip-bar ' + tempColorClass(gpu.temperatureC));
+          bar.textContent = gpu.temperatureC != null ? Math.round(gpu.temperatureC) : '?';
+          chip.appendChild(bar);
 
-    card.appendChild(meta);
+          const util = el('div', 'gpu-chip-util', (gpu.utilizationPct != null ? Math.round(gpu.utilizationPct) + '%' : ''));
+          chip.appendChild(util);
 
-    // GPUs
-    if (node.gpus && node.gpus.length > 0) {
-      var gpuList = document.createElement('div');
-      gpuList.className = 'gpu-list';
+          // Tooltip (built safely with DOM methods)
+          const tip = el('div', 'gpu-chip-tooltip');
+          const tipTitle = el('b', null, '#' + i + ' ' + (gpu.name || 'GPU'));
+          tip.appendChild(tipTitle);
+          tip.appendChild(document.createElement('br'));
+          tip.appendChild(document.createTextNode('Temp: ' + (gpu.temperatureC != null ? gpu.temperatureC + '\u00B0C' : '--')));
+          tip.appendChild(document.createElement('br'));
+          tip.appendChild(document.createTextNode('Util: ' + (gpu.utilizationPct != null ? gpu.utilizationPct + '%' : '--')));
+          tip.appendChild(document.createElement('br'));
+          tip.appendChild(document.createTextNode('Power: ' + (gpu.powerDrawW != null ? Math.round(gpu.powerDrawW) + 'W' : '--')));
+          tip.appendChild(document.createElement('br'));
+          tip.appendChild(document.createTextNode('VRAM: ' + formatBytes(gpu.vramUsedMb) + '/' + formatBytes(gpu.vramTotalMb)));
+          chip.appendChild(tip);
 
-      node.gpus.forEach(function (gpu, i) {
-        var gc = document.createElement('div');
-        gc.className = 'gpu-card';
+          strip.appendChild(chip);
+        });
+      } else {
+        const count = node.gpu_count || 0;
+        if (count > 0) {
+          for (let i = 0; i < count; i++) {
+            const chip = el('div', 'gpu-chip');
+            const bar = el('div', 'gpu-chip-bar temp-cool', '?');
+            chip.appendChild(bar);
+            strip.appendChild(chip);
+          }
+        } else {
+          tdGpus.textContent = '--';
+        }
+      }
+      tdGpus.appendChild(strip);
+      row.appendChild(tdGpus);
 
-        var gcHeader = document.createElement('div');
-        gcHeader.className = 'gpu-card-header';
+      // 4. VRAM bar
+      const tdVram = el('td');
+      const vram = totalNodeVram(node);
+      const vramDiv = el('div', 'vram-bar-cell');
+      const vramOuter = el('div', 'vram-bar-outer');
+      const vramInner = el('div', 'vram-bar-inner');
+      vramInner.style.width = pct(vram.used, vram.total).toFixed(1) + '%';
+      vramOuter.appendChild(vramInner);
+      vramDiv.appendChild(vramOuter);
+      const vramText = el('div', 'vram-bar-text', formatBytes(vram.used) + '/' + formatBytes(vram.total));
+      vramDiv.appendChild(vramText);
+      tdVram.appendChild(vramDiv);
+      row.appendChild(tdVram);
 
-        var gpuName = document.createElement('span');
-        gpuName.className = 'gpu-name';
-        gpuName.textContent = '#' + i + ' ' + (gpu.name || 'GPU ' + i);
-        gpuName.title = gpu.name || '';
-        gcHeader.appendChild(gpuName);
+      // 5. Models
+      const tdModels = el('td');
+      const tagsDiv = el('div', 'model-tags');
+      if (node.inference && node.inference.loaded_models && node.inference.loaded_models.length > 0) {
+        node.inference.loaded_models.forEach(m => {
+          tagsDiv.appendChild(el('span', 'model-tag', m));
+        });
+      } else {
+        tdModels.classList.add('text-muted');
+        tdModels.textContent = 'none';
+      }
+      tdModels.appendChild(tagsDiv);
+      row.appendChild(tdModels);
 
-        var gpuStats = document.createElement('div');
-        gpuStats.className = 'gpu-stats';
+      // 6. tok/s
+      const tdToks = el('td');
+      tdToks.style.textAlign = 'right';
+      const toksVal = el('span', 'toks-value', node.toks_per_sec != null ? node.toks_per_sec.toFixed(1) : '--');
+      tdToks.appendChild(toksVal);
+      row.appendChild(tdToks);
 
-        // Temperature
-        var tempC = gpu.temperatureC != null ? gpu.temperatureC : '--';
-        var tempStat = document.createElement('span');
-        tempStat.className = 'gpu-stat';
-        tempStat.appendChild(mkSpan('val ' + tempClass(tempC), String(tempC)));
-        tempStat.appendChild(mkSpan('unit', '\u00B0C'));
-        gpuStats.appendChild(tempStat);
+      // 7. Uptime
+      const tdUp = el('td');
+      tdUp.appendChild(el('span', 'uptime-text', formatUptime(node.uptime_secs)));
+      row.appendChild(tdUp);
 
-        // Power
-        var pwrStat = document.createElement('span');
-        pwrStat.className = 'gpu-stat';
-        pwrStat.appendChild(mkSpan('val', gpu.powerDrawW != null ? Math.round(gpu.powerDrawW) + '' : '--'));
-        pwrStat.appendChild(mkSpan('unit', 'W'));
-        gpuStats.appendChild(pwrStat);
+      // 8. Power
+      const tdPwr = el('td');
+      tdPwr.style.textAlign = 'right';
+      const pwr = totalNodePower(node);
+      const pwrSpan = el('span', 'power-value');
+      pwrSpan.textContent = pwr > 0 ? Math.round(pwr) : '--';
+      tdPwr.appendChild(pwrSpan);
+      if (pwr > 0) tdPwr.appendChild(el('span', 'power-unit', 'W'));
+      row.appendChild(tdPwr);
 
-        // Fan
-        var fanStat = document.createElement('span');
-        fanStat.className = 'gpu-stat';
-        fanStat.appendChild(mkSpan('val', gpu.fanSpeedPct != null ? Math.round(gpu.fanSpeedPct) + '' : '--'));
-        fanStat.appendChild(mkSpan('unit', '%fan'));
-        gpuStats.appendChild(fanStat);
+      // 9. Actions
+      const tdAct = el('td');
+      const actBtn = el('button', 'actions-btn', '\u22EE');
+      actBtn.title = 'Actions';
+      actBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showActionDropdown(e, nodeId, node.hostname || node.node_id);
+      });
+      tdAct.appendChild(actBtn);
+      row.appendChild(tdAct);
 
-        gcHeader.appendChild(gpuStats);
-        gc.appendChild(gcHeader);
-
-        // VRAM bar
-        var vramPct = pct(gpu.vramUsedMb, gpu.vramTotalMb);
-        gc.appendChild(buildProgressRow(
-          'VRAM',
-          vramPct,
-          formatBytes(gpu.vramUsedMb) + ' / ' + formatBytes(gpu.vramTotalMb),
-          'purple'
-        ));
-
-        // Utilization bar
-        var utilPct = gpu.utilizationPct != null ? gpu.utilizationPct : 0;
-        gc.appendChild(buildProgressRow(
-          'UTIL',
-          utilPct,
-          utilPct.toFixed(0) + '%',
-          'cyan'
-        ));
-
-        gpuList.appendChild(gc);
+      // Click to expand
+      row.addEventListener('click', () => {
+        toggleNodeExpand(nodeId);
       });
 
-      card.appendChild(gpuList);
+      tbody.appendChild(row);
+
+      // Detail row (always present, hidden by default)
+      const detailRow = el('tr', 'node-detail-row');
+      detailRow.dataset.nodeId = nodeId + '-detail';
+      const detailTd = document.createElement('td');
+      detailTd.colSpan = 9;
+      const detailInner = el('div', 'node-detail-inner' + (expanded ? ' expanded' : ''));
+      buildNodeDetailDOM(detailInner, node);
+      detailTd.appendChild(detailInner);
+      detailRow.appendChild(detailTd);
+      tbody.appendChild(detailRow);
+    });
+
+    // Restore scroll
+    if (wrapper) wrapper.scrollTop = scrollTop;
+  }
+
+  function toggleNodeExpand(nodeId) {
+    if (state.expandedNodes.has(nodeId)) {
+      state.expandedNodes.delete(nodeId);
+    } else {
+      state.expandedNodes.add(nodeId);
+    }
+    // Toggle the detail panel for this node
+    const detailRow = dom.nodesTbody.querySelector('tr[data-node-id="' + nodeId + '-detail"]');
+    if (detailRow) {
+      const inner = detailRow.querySelector('.node-detail-inner');
+      if (inner) inner.classList.toggle('expanded');
+    }
+  }
+
+  /** Build the expanded detail for a node using safe DOM methods */
+  function buildNodeDetailDOM(container, node) {
+    const nid = node.node_id || '';
+
+    // GPUs detail
+    if (node.gpus && node.gpus.length > 0) {
+      container.appendChild(el('div', 'detail-section-title', 'GPU Details'));
+      const gpuGrid = el('div', 'detail-gpu-grid');
+
+      node.gpus.forEach((gpu, i) => {
+        const vp = pct(gpu.vramUsedMb, gpu.vramTotalMb);
+        const up = gpu.utilizationPct != null ? gpu.utilizationPct : 0;
+
+        const card = el('div', 'detail-gpu-card');
+
+        // Header
+        const header = el('div', 'detail-gpu-header');
+        header.appendChild(el('span', 'detail-gpu-name', '#' + i + ' ' + (gpu.name || 'GPU ' + i)));
+        header.appendChild(el('span', 'detail-gpu-bus', gpu.busId || ''));
+        card.appendChild(header);
+
+        // Stats grid
+        const statsGrid = el('div', 'detail-gpu-stats');
+
+        const tempStat = el('div', 'detail-stat');
+        tempStat.appendChild(el('span', 'detail-stat-label', 'Temp'));
+        const tempCls = gpu.temperatureC >= 80 ? 'detail-stat-value text-red' :
+                        gpu.temperatureC >= 60 ? 'detail-stat-value text-yellow' :
+                        'detail-stat-value text-green';
+        tempStat.appendChild(el('span', tempCls, gpu.temperatureC != null ? gpu.temperatureC + '\u00B0C' : '--'));
+        statsGrid.appendChild(tempStat);
+
+        const pwrStat = el('div', 'detail-stat');
+        pwrStat.appendChild(el('span', 'detail-stat-label', 'Power'));
+        pwrStat.appendChild(el('span', 'detail-stat-value', gpu.powerDrawW != null ? Math.round(gpu.powerDrawW) + 'W' : '--'));
+        statsGrid.appendChild(pwrStat);
+
+        const fanStat = el('div', 'detail-stat');
+        fanStat.appendChild(el('span', 'detail-stat-label', 'Fan'));
+        fanStat.appendChild(el('span', 'detail-stat-value', gpu.fanSpeedPct != null ? Math.round(gpu.fanSpeedPct) + '%' : '--'));
+        statsGrid.appendChild(fanStat);
+
+        const clkStat = el('div', 'detail-stat');
+        clkStat.appendChild(el('span', 'detail-stat-label', 'Clock'));
+        clkStat.appendChild(el('span', 'detail-stat-value', gpu.clockSmMhz != null ? gpu.clockSmMhz + ' MHz' : '--'));
+        statsGrid.appendChild(clkStat);
+
+        card.appendChild(statsGrid);
+
+        // VRAM bar
+        card.appendChild(buildDetailBar('VRAM', vp, formatBytes(gpu.vramUsedMb) + '/' + formatBytes(gpu.vramTotalMb), 'purple'));
+
+        // Util bar
+        card.appendChild(buildDetailBar('Util', up, up.toFixed(0) + '%', 'cyan'));
+
+        gpuGrid.appendChild(card);
+      });
+
+      container.appendChild(gpuGrid);
     }
 
-    // CPU bar
+    // System info
+    container.appendChild(el('div', 'detail-section-title', 'System'));
+    const sysGrid = el('div', 'detail-system-grid');
+
     if (node.cpu) {
-      var cpuPct = node.cpu.usage_pct != null ? node.cpu.usage_pct : 0;
-      var cpuLabel = cpuPct.toFixed(1) + '%' + (node.cpu.temp_c != null ? ' / ' + node.cpu.temp_c + '\u00B0C' : '');
-      card.appendChild(buildProgressRow('CPU', cpuPct, cpuLabel, barColorClass(cpuPct)));
+      const cp = node.cpu.usage_pct || 0;
+      const cpuDiv = el('div');
+      cpuDiv.appendChild(buildDetailBar('CPU', cp, cp.toFixed(1) + '%' + (node.cpu.temp_c != null ? ' ' + node.cpu.temp_c + '\u00B0C' : ''), barColor(cp)));
+      sysGrid.appendChild(cpuDiv);
     }
 
-    // RAM bar
     if (node.ram) {
-      var ramPct = pct(node.ram.used_mb, node.ram.total_mb);
-      card.appendChild(buildProgressRow(
-        'RAM',
-        ramPct,
-        formatBytes(node.ram.used_mb) + ' / ' + formatBytes(node.ram.total_mb),
-        barColorClass(ramPct)
-      ));
+      const rp = pct(node.ram.used_mb, node.ram.total_mb);
+      const ramDiv = el('div');
+      ramDiv.appendChild(buildDetailBar('RAM', rp, formatBytes(node.ram.used_mb) + '/' + formatBytes(node.ram.total_mb), barColor(rp)));
+      sysGrid.appendChild(ramDiv);
     }
 
-    // Disk bar
     if (node.disk) {
-      var diskPct = pct(node.disk.used_gb, node.disk.total_gb);
-      card.appendChild(buildProgressRow(
-        'DISK',
-        diskPct,
-        node.disk.used_gb + ' / ' + node.disk.total_gb + ' GB',
-        barColorClass(diskPct)
-      ));
+      const dp = pct(node.disk.used_gb, node.disk.total_gb);
+      const diskDiv = el('div');
+      diskDiv.appendChild(buildDetailBar('Disk', dp, (node.disk.used_gb || 0) + '/' + (node.disk.total_gb || 0) + ' GB', barColor(dp)));
+      sysGrid.appendChild(diskDiv);
     }
-
-    // Models
-    if (node.inference) {
-      var modelsSection = document.createElement('div');
-      modelsSection.className = 'models-section';
-
-      if (node.inference.loaded_models && node.inference.loaded_models.length > 0) {
-        var label = document.createElement('div');
-        label.className = 'models-label';
-        label.textContent = 'Loaded Models';
-        modelsSection.appendChild(label);
-
-        var tagsDiv = document.createElement('div');
-        node.inference.loaded_models.forEach(function (m) {
-          var tag = document.createElement('span');
-          tag.className = 'model-tag';
-          tag.textContent = m;
-          tagsDiv.appendChild(tag);
-        });
-        modelsSection.appendChild(tagsDiv);
-      }
-
-      // Inference stats
-      var infStats = document.createElement('div');
-      infStats.className = 'inference-stats';
-      infStats.appendChild(mkStatSpan('In-flight', node.inference.in_flight_requests != null ? String(node.inference.in_flight_requests) : '--'));
-      infStats.appendChild(mkStatSpan('Tokens', node.inference.tokens_generated != null ? node.inference.tokens_generated.toLocaleString() : '--'));
-      infStats.appendChild(mkStatSpan('Latency', node.inference.avg_latency_ms != null ? node.inference.avg_latency_ms.toFixed(1) + 'ms' : '--'));
-      modelsSection.appendChild(infStats);
-
-      card.appendChild(modelsSection);
-    }
-
-    // tok/s and network at bottom
-    var footer = document.createElement('div');
-    footer.className = 'inference-stats';
-    footer.style.borderTop = '1px solid var(--border)';
-    footer.style.paddingTop = '6px';
-    footer.style.marginTop = '2px';
-
-    footer.appendChild(mkStatSpan('tok/s', node.toks_per_sec != null ? node.toks_per_sec.toFixed(1) : '--'));
-    footer.appendChild(mkStatSpan('reqs', node.requests_completed != null ? node.requests_completed.toLocaleString() : '--'));
 
     if (node.network) {
-      footer.appendChild(mkStatSpan('net in', formatBytesNetwork(node.network.bytes_in)));
-      footer.appendChild(mkStatSpan('out', formatBytesNetwork(node.network.bytes_out)));
+      const netDiv = el('div');
+      netDiv.style.padding = '4px 0';
+      netDiv.style.fontSize = '0.75rem';
+      netDiv.style.color = 'var(--text-secondary)';
+      const netIn = el('span', 'text-cyan', formatBytesNet(node.network.bytes_in));
+      const netOut = el('span', 'text-cyan', formatBytesNet(node.network.bytes_out));
+      netDiv.appendChild(document.createTextNode('Net In: '));
+      netDiv.appendChild(netIn);
+      netDiv.appendChild(document.createTextNode(' | Out: '));
+      netDiv.appendChild(netOut);
+      sysGrid.appendChild(netDiv);
     }
 
-    card.appendChild(footer);
+    container.appendChild(sysGrid);
 
-    return card;
+    // Loaded models with remove buttons
+    if (node.inference && node.inference.loaded_models && node.inference.loaded_models.length > 0) {
+      container.appendChild(el('div', 'detail-section-title', 'Loaded Models'));
+      const modelsDiv = el('div', 'detail-models');
+
+      node.inference.loaded_models.forEach(m => {
+        const tag = el('span', 'detail-model-tag', m + ' ');
+        const removeBtn = el('button', 'detail-model-remove', '\u00D7');
+        removeBtn.title = 'Unload';
+        removeBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          api('POST', '/api/v1/nodes/' + nid + '/commands', { action: 'unload_model', model: m })
+            .then(() => addTermLine('success', 'Unloading ' + m + ' from ' + nid))
+            .catch(err => addTermLine('error', 'Unload failed: ' + err.message));
+        });
+        tag.appendChild(removeBtn);
+        modelsDiv.appendChild(tag);
+      });
+
+      container.appendChild(modelsDiv);
+    }
+
+    // Quick deploy
+    container.appendChild(el('div', 'detail-section-title', 'Quick Deploy'));
+    const deployDiv = el('div', 'detail-deploy');
+    const deployInput = document.createElement('input');
+    deployInput.type = 'text';
+    deployInput.placeholder = 'e.g. llama3:70b';
+    deployDiv.appendChild(deployInput);
+    const deployBtn = el('button', 'btn btn-primary btn-sm', 'Deploy');
+    deployBtn.addEventListener('click', () => {
+      const model = deployInput.value.trim();
+      if (model) {
+        deployToNode(nid, model);
+        deployInput.value = '';
+      }
+    });
+    deployInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.stopPropagation();
+        deployBtn.click();
+      }
+    });
+    deployDiv.appendChild(deployBtn);
+    container.appendChild(deployDiv);
   }
 
-  function buildProgressRow(label, percent, text, colorClass) {
-    var row = document.createElement('div');
-    row.className = 'progress-row';
-
-    var lbl = document.createElement('span');
-    lbl.className = 'progress-label';
-    lbl.textContent = label;
-    row.appendChild(lbl);
-
-    var bar = document.createElement('div');
-    bar.className = 'progress-bar';
-
-    var fill = document.createElement('div');
-    fill.className = 'progress-fill ' + (colorClass || 'cyan');
+  function buildDetailBar(label, percent, text, colorClass) {
+    const bar = el('div', 'detail-bar');
+    bar.appendChild(el('span', 'detail-bar-label', label));
+    const track = el('div', 'detail-bar-track');
+    const fill = el('div', 'detail-bar-fill ' + (colorClass || 'cyan'));
     fill.style.width = Math.min(100, Math.max(0, percent)).toFixed(1) + '%';
-    bar.appendChild(fill);
-    row.appendChild(bar);
-
-    var txt = document.createElement('span');
-    txt.className = 'progress-text';
-    txt.textContent = text;
-    row.appendChild(txt);
-
-    return row;
+    track.appendChild(fill);
+    bar.appendChild(track);
+    bar.appendChild(el('span', 'detail-bar-text', text));
+    return bar;
   }
 
-  // ---- Render: Flight Sheets ----
+  async function deployToNode(nodeId, model) {
+    try {
+      addTermLine('info', 'Deploying ' + model + ' to ' + nodeId + '...');
+      await api('POST', '/api/v1/nodes/' + nodeId + '/commands', { action: 'install_model', model });
+      addTermLine('success', 'Deploy command sent: ' + model + ' -> ' + nodeId);
+    } catch (e) {
+      addTermLine('error', 'Deploy failed: ' + e.message);
+    }
+  }
+
+  // ===================== ACTION DROPDOWN =====================
+  let dropdownTarget = null;
+
+  function showActionDropdown(e, nodeId, hostname) {
+    dropdownTarget = { nodeId, hostname };
+    const dd = dom.actionDropdown;
+    dd.classList.remove('hidden');
+
+    const rect = e.target.getBoundingClientRect();
+    dd.style.top = (rect.bottom + 4) + 'px';
+    dd.style.left = Math.min(rect.left, window.innerWidth - 180) + 'px';
+  }
+
+  function hideActionDropdown() {
+    dom.actionDropdown.classList.add('hidden');
+    dropdownTarget = null;
+  }
+
+  // ===================== RENDER: FLIGHT SHEETS =====================
   function renderFlightSheets() {
-    var container = dom.fsList;
+    const container = dom.fsList;
     container.textContent = '';
 
     if (state.flightSheets.length === 0) {
-      var p = document.createElement('p');
-      p.className = 'dim';
-      p.textContent = 'No flight sheets yet.';
-      container.appendChild(p);
+      container.appendChild(el('div', 'text-muted', 'No flight sheets created yet.'));
       return;
     }
 
-    state.flightSheets.forEach(function (fs) {
-      var card = document.createElement('div');
-      card.className = 'fs-card';
+    state.flightSheets.forEach(fs => {
+      const card = el('div', 'fs-card');
 
-      var header = document.createElement('div');
-      header.className = 'fs-card-header';
+      const info = el('div', 'fs-card-info');
+      info.appendChild(el('div', 'fs-card-name', fs.name));
+      if (fs.description) info.appendChild(el('div', 'fs-card-desc', fs.description));
+      const meta = el('div', 'fs-card-meta');
+      const targets = fs.targets || [];
+      const models = [...new Set(targets.map(t => t.model).filter(Boolean))].join(', ');
+      meta.appendChild(document.createTextNode('Targets: '));
+      meta.appendChild(el('span', null, String(targets.length)));
+      meta.appendChild(document.createTextNode(' | Models: '));
+      meta.appendChild(el('span', null, models || 'none'));
+      info.appendChild(meta);
+      card.appendChild(info);
 
-      var name = document.createElement('span');
-      name.className = 'fs-card-name';
-      name.textContent = fs.name;
-      header.appendChild(name);
+      const actions = el('div', 'fs-card-actions');
+      const applyBtn = el('button', 'btn btn-primary btn-sm', 'Apply');
+      applyBtn.addEventListener('click', () => applyFlightSheet(fs.id || fs._id));
+      actions.appendChild(applyBtn);
 
-      var applyBtn = document.createElement('button');
-      applyBtn.className = 'btn btn-small btn-primary';
-      applyBtn.textContent = 'Apply';
-      applyBtn.addEventListener('click', function () {
-        applyFlightSheet(fs.id || fs._id);
-      });
-      header.appendChild(applyBtn);
+      const delBtn = el('button', 'btn btn-danger btn-sm', 'Delete');
+      delBtn.addEventListener('click', () => deleteFlightSheet(fs.id || fs._id));
+      actions.appendChild(delBtn);
 
-      card.appendChild(header);
-
-      if (fs.description) {
-        var desc = document.createElement('div');
-        desc.className = 'fs-card-desc';
-        desc.textContent = fs.description;
-        card.appendChild(desc);
-      }
-
-      if (fs.targets && fs.targets.length > 0) {
-        var targets = document.createElement('div');
-        targets.className = 'fs-card-targets';
-        fs.targets.forEach(function (t, ti) {
-          if (ti > 0) targets.appendChild(document.createTextNode(', '));
-          var modelSpan = document.createElement('span');
-          modelSpan.textContent = t.model || '?';
-          targets.appendChild(modelSpan);
-          targets.appendChild(document.createTextNode(' -> ' + (t.node_id ? t.node_id.substring(0, 8) : '?')));
-        });
-        card.appendChild(targets);
-      }
-
+      card.appendChild(actions);
       container.appendChild(card);
     });
   }
@@ -676,126 +841,315 @@
   async function applyFlightSheet(id) {
     try {
       await api('POST', '/api/v1/flight-sheets/' + id + '/apply');
-      logEvent('command_sent', 'Flight sheet ' + id + ' applied.');
+      addTermLine('success', 'Flight sheet ' + id + ' applied.');
       fetchNodes();
     } catch (e) {
-      logEvent('system', 'Failed to apply flight sheet: ' + e.message);
+      addTermLine('error', 'Apply failed: ' + e.message);
+    }
+  }
+
+  async function deleteFlightSheet(id) {
+    try {
+      await api('DELETE', '/api/v1/flight-sheets/' + id);
+      addTermLine('success', 'Flight sheet ' + id + ' deleted.');
+      fetchFlightSheets();
+    } catch (e) {
+      addTermLine('error', 'Delete failed: ' + e.message);
     }
   }
 
   async function createFlightSheet() {
-    var name = dom.fsName.value.trim();
-    var description = dom.fsDesc.value.trim();
-
+    const name = dom.fsName.value.trim();
+    const description = dom.fsDesc.value.trim();
     if (!name) {
       dom.fsName.style.borderColor = 'var(--red)';
-      setTimeout(function () { dom.fsName.style.borderColor = ''; }, 1500);
+      setTimeout(() => dom.fsName.style.borderColor = '', 1500);
       return;
     }
 
-    var targets = [];
-    dom.fsTargets.querySelectorAll('.fs-target-row').forEach(function (row) {
-      var nodeSelect = row.querySelector('[data-field="node_id"]');
-      var modelInput = row.querySelector('[data-field="model"]');
-      var gpuInput = row.querySelector('[data-field="gpu"]');
-
-      var nodeId = nodeSelect ? nodeSelect.value : '';
-      var model = modelInput ? modelInput.value.trim() : '';
-
+    const targets = [];
+    dom.fsTargets.querySelectorAll('.fs-target-row').forEach(row => {
+      const nodeSelect = row.querySelector('[data-field="node_id"]');
+      const modelInput = row.querySelector('[data-field="model"]');
+      const gpuInput = row.querySelector('[data-field="gpu"]');
+      const nodeId = nodeSelect ? nodeSelect.value : '';
+      const model = modelInput ? modelInput.value.trim() : '';
       if (nodeId && model) {
-        var target = { node_id: nodeId, model: model };
-        var gpuVal = gpuInput ? gpuInput.value.trim() : '';
-        if (gpuVal !== '') target.gpu = parseInt(gpuVal, 10);
-        targets.push(target);
+        const t = { node_id: nodeId, model: model };
+        const gpuVal = gpuInput ? gpuInput.value.trim() : '';
+        if (gpuVal !== '') t.gpu = parseInt(gpuVal, 10);
+        targets.push(t);
       }
     });
 
     try {
-      await api('POST', '/api/v1/flight-sheets', { name: name, description: description, targets: targets });
-      logEvent('command_sent', 'Flight sheet "' + name + '" created.');
+      await api('POST', '/api/v1/flight-sheets', { name, description, targets });
+      addTermLine('success', 'Flight sheet "' + name + '" created.');
       dom.fsName.value = '';
       dom.fsDesc.value = '';
-      resetFsTargets();
+      dom.fsTargets.textContent = '';
+      addFsTargetRow();
+      dom.fsCreateForm.classList.add('hidden');
       fetchFlightSheets();
     } catch (e) {
-      logEvent('system', 'Failed to create flight sheet: ' + e.message);
+      addTermLine('error', 'Create flight sheet failed: ' + e.message);
     }
   }
 
-  function resetFsTargets() {
-    dom.fsTargets.textContent = '';
-    addFsTargetRow();
-  }
-
   function addFsTargetRow() {
-    var idx = dom.fsTargets.querySelectorAll('.fs-target-row').length;
-    var row = document.createElement('div');
-    row.className = 'fs-target-row';
-    row.dataset.idx = idx;
+    const row = el('div', 'fs-target-row');
 
-    var nodeSelect = document.createElement('select');
-    nodeSelect.className = 'input fs-node-select';
-    nodeSelect.dataset.field = 'node_id';
-    var defaultOpt = document.createElement('option');
+    const sel = document.createElement('select');
+    sel.className = 'form-select';
+    sel.dataset.field = 'node_id';
+    const defaultOpt = document.createElement('option');
     defaultOpt.value = '';
     defaultOpt.textContent = '-- node --';
-    nodeSelect.appendChild(defaultOpt);
-    state.nodes.forEach(function (n) {
-      var opt = document.createElement('option');
+    sel.appendChild(defaultOpt);
+    state.nodes.forEach(n => {
+      const opt = document.createElement('option');
       opt.value = n.node_id;
       opt.textContent = n.hostname || n.node_id;
-      nodeSelect.appendChild(opt);
+      sel.appendChild(opt);
     });
-    row.appendChild(nodeSelect);
+    row.appendChild(sel);
 
-    var modelInput = document.createElement('input');
-    modelInput.type = 'text';
-    modelInput.className = 'input';
-    modelInput.dataset.field = 'model';
-    modelInput.placeholder = 'Model';
-    row.appendChild(modelInput);
+    const modelIn = document.createElement('input');
+    modelIn.type = 'text';
+    modelIn.className = 'form-input';
+    modelIn.dataset.field = 'model';
+    modelIn.placeholder = 'Model name';
+    row.appendChild(modelIn);
 
-    var gpuInput = document.createElement('input');
-    gpuInput.type = 'number';
-    gpuInput.className = 'input input-sm';
-    gpuInput.dataset.field = 'gpu';
-    gpuInput.placeholder = 'GPU#';
-    gpuInput.min = '0';
-    row.appendChild(gpuInput);
+    const gpuIn = document.createElement('input');
+    gpuIn.type = 'number';
+    gpuIn.className = 'form-input';
+    gpuIn.dataset.field = 'gpu';
+    gpuIn.placeholder = 'GPU#';
+    gpuIn.min = '0';
+    gpuIn.style.width = '60px';
+    gpuIn.style.flex = '0 0 60px';
+    row.appendChild(gpuIn);
 
-    var removeBtn = document.createElement('button');
-    removeBtn.className = 'btn-icon btn-remove-target';
-    removeBtn.title = 'Remove';
-    removeBtn.textContent = '\u00D7';
-    removeBtn.addEventListener('click', function () {
-      row.remove();
-    });
+    const removeBtn = el('button', 'fs-target-remove', '\u00D7');
+    removeBtn.addEventListener('click', () => row.remove());
     row.appendChild(removeBtn);
 
     dom.fsTargets.appendChild(row);
   }
 
-  function updateNodeSelectors() {
-    document.querySelectorAll('.fs-node-select').forEach(function (select) {
-      var currentVal = select.value;
-      var defaultOpt = document.createElement('option');
-      defaultOpt.value = '';
-      defaultOpt.textContent = '-- node --';
-      select.textContent = '';
-      select.appendChild(defaultOpt);
-      state.nodes.forEach(function (n) {
-        var opt = document.createElement('option');
-        opt.value = n.node_id;
-        opt.textContent = n.hostname || n.node_id;
-        if (n.node_id === currentVal) opt.selected = true;
-        select.appendChild(opt);
+  // ===================== RENDER: MODELS =====================
+  function renderModels() {
+    const tbody = dom.modelsTbody;
+    tbody.textContent = '';
+
+    let models = state.leaderboard;
+
+    // If no leaderboard from API, compute from nodes
+    if (models.length === 0) {
+      const modelMap = {};
+      state.nodes.forEach(n => {
+        if (n.inference && n.inference.loaded_models) {
+          n.inference.loaded_models.forEach(m => {
+            if (!modelMap[m]) modelMap[m] = { model: m, nodes: [], totalToks: 0, totalTokens: 0, totalLatency: 0, count: 0 };
+            modelMap[m].nodes.push(n.hostname || n.node_id);
+            modelMap[m].totalToks += (n.toks_per_sec || 0);
+            if (n.inference.tokens_generated) modelMap[m].totalTokens += n.inference.tokens_generated;
+            if (n.inference.avg_latency_ms) { modelMap[m].totalLatency += n.inference.avg_latency_ms; modelMap[m].count++; }
+          });
+        }
       });
+      models = Object.values(modelMap).sort((a, b) => b.totalToks - a.totalToks);
+
+      models.forEach((m, i) => {
+        const tr = el('tr');
+        tr.appendChild(el('td', null, String(i + 1)));
+        const modelTd = el('td');
+        modelTd.appendChild(el('span', 'text-purple', m.model));
+        modelTd.querySelector('span').style.fontWeight = '600';
+        tr.appendChild(modelTd);
+        tr.appendChild(el('td', null, String(m.nodes.length)));
+        const avgTd = el('td', 'text-cyan');
+        avgTd.style.fontFamily = 'var(--font-mono)';
+        avgTd.textContent = (m.totalToks / Math.max(1, m.nodes.length)).toFixed(1);
+        tr.appendChild(avgTd);
+        tr.appendChild(el('td', null, m.totalTokens.toLocaleString()));
+        tr.appendChild(el('td', null, m.count > 0 ? (m.totalLatency / m.count).toFixed(1) + ' ms' : '--'));
+        tbody.appendChild(tr);
+      });
+    } else {
+      models.forEach((m, i) => {
+        const tr = el('tr');
+        tr.appendChild(el('td', null, String(i + 1)));
+        const modelTd = el('td');
+        const mSpan = el('span', 'text-purple', m.model || m.name || '--');
+        mSpan.style.fontWeight = '600';
+        modelTd.appendChild(mSpan);
+        tr.appendChild(modelTd);
+        tr.appendChild(el('td', null, String(m.nodes_count || m.nodes || '--')));
+        const avgTd = el('td', 'text-cyan');
+        avgTd.style.fontFamily = 'var(--font-mono)';
+        avgTd.textContent = m.avg_toks_per_sec != null ? m.avg_toks_per_sec.toFixed(1) : (m.toks_per_sec || '--');
+        tr.appendChild(avgTd);
+        tr.appendChild(el('td', null, m.total_tokens != null ? m.total_tokens.toLocaleString() : '--'));
+        tr.appendChild(el('td', null, m.avg_latency_ms != null ? m.avg_latency_ms.toFixed(1) + ' ms' : '--'));
+        tbody.appendChild(tr);
+      });
+    }
+  }
+
+  // ===================== RENDER: ALERTS =====================
+  function renderAlerts() {
+    const container = dom.alertsList;
+    const filterVal = dom.alertFilter.value;
+    container.textContent = '';
+
+    let filtered = state.alerts;
+    if (filterVal !== 'all') {
+      filtered = state.alerts.filter(a => (a.severity || 'info') === filterVal);
+    }
+
+    if (filtered.length === 0) {
+      container.appendChild(el('div', 'text-muted', 'No alerts.'));
+      return;
+    }
+
+    filtered.forEach(alert => {
+      const severity = (alert.severity || 'info').toLowerCase();
+      const row = el('div', 'alert-row severity-' + severity);
+
+      const icon = el('span', 'alert-severity-icon');
+      if (severity === 'critical') icon.textContent = '\u26A0';
+      else if (severity === 'warning') icon.textContent = '\u26A1';
+      else icon.textContent = '\u2139';
+      row.appendChild(icon);
+
+      const content = el('div', 'alert-content');
+      content.appendChild(el('div', 'alert-message', alert.message || alert.description || '--'));
+      const meta = el('div', 'alert-meta');
+      meta.appendChild(document.createTextNode(alert.timestamp || alert.created_at || '--'));
+      if (alert.node_id) {
+        meta.appendChild(document.createTextNode(' \u2014 '));
+        meta.appendChild(el('span', 'alert-node', alert.hostname || alert.node_id));
+      }
+      content.appendChild(meta);
+      row.appendChild(content);
+
+      if (!alert.acknowledged) {
+        const actions = el('div', 'alert-actions');
+        const ackBtn = el('button', 'btn btn-sm', 'Acknowledge');
+        ackBtn.addEventListener('click', () => ackAlert(alert.id || alert._id));
+        actions.appendChild(ackBtn);
+        row.appendChild(actions);
+      }
+
+      container.appendChild(row);
     });
   }
 
-  // ---- Command Modal ----
+  async function ackAlert(id) {
+    try {
+      await api('POST', '/api/v1/alerts/' + id + '/acknowledge');
+      addTermLine('success', 'Alert ' + id + ' acknowledged.');
+      fetchAlerts();
+    } catch (e) {
+      addTermLine('error', 'Acknowledge failed: ' + e.message);
+    }
+  }
+
+  function updateAlertBadge() {
+    const unacked = state.alerts.filter(a => !a.acknowledged).length;
+    if (unacked > 0) {
+      dom.navBadgeAlerts.textContent = unacked;
+      dom.navBadgeAlerts.classList.remove('hidden');
+    } else {
+      dom.navBadgeAlerts.classList.add('hidden');
+    }
+  }
+
+  // ===================== RENDER: BENCHMARKS =====================
+  function renderBenchmarks() {
+    const tbody = dom.benchmarksTbody;
+    tbody.textContent = '';
+
+    if (state.benchmarks.length === 0) {
+      const tr = el('tr');
+      const td = el('td', 'text-muted', 'No benchmarks recorded yet.');
+      td.colSpan = 6;
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
+
+    state.benchmarks.forEach(b => {
+      const tr = el('tr');
+      tr.appendChild(el('td', null, b.hostname || b.node_id || '--'));
+      tr.appendChild(el('td', 'text-purple', b.model || '--'));
+      const toksTd = el('td', 'text-cyan');
+      toksTd.style.fontFamily = 'var(--font-mono)';
+      toksTd.style.fontWeight = '700';
+      toksTd.textContent = b.toks_per_sec != null ? b.toks_per_sec.toFixed(1) : '--';
+      tr.appendChild(toksTd);
+      tr.appendChild(el('td', null, b.avg_latency_ms != null ? b.avg_latency_ms.toFixed(1) : '--'));
+      tr.appendChild(el('td', null, b.vram_used_mb != null ? String(b.vram_used_mb) : '--'));
+      tr.appendChild(el('td', 'text-muted', b.timestamp || b.date || '--'));
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ===================== RENDER: POWER =====================
+  function renderPower() {
+    const grid = dom.powerGrid;
+    grid.textContent = '';
+
+    const pw = state.power;
+    const totalW = state.summary.total_power_w || pw.total_watts || 0;
+    const costPerKwh = pw.cost_per_kwh || 0.10;
+    const dailyCost = (totalW / 1000) * 24 * costPerKwh;
+    const monthlyCost = dailyCost * 30;
+    const efficiency = (totalW > 0 && state.summary.total_toks_per_sec > 0)
+      ? (state.summary.total_toks_per_sec / (totalW / 1000)).toFixed(1) : '--';
+
+    const cards = [
+      { title: 'Total Power Draw', value: Math.round(totalW), unit: 'W', sub: (state.summary.total_gpus || 0) + ' GPUs across ' + (state.summary.online_nodes || 0) + ' nodes' },
+      { title: 'Daily Cost', value: '$' + dailyCost.toFixed(2), unit: '/day', sub: 'At $' + costPerKwh.toFixed(2) + '/kWh' },
+      { title: 'Monthly Estimate', value: '$' + monthlyCost.toFixed(2), unit: '/month', sub: '30-day projection' },
+      { title: 'Efficiency', value: efficiency, unit: 'tok/s/kW', sub: 'Inference per kilowatt' },
+    ];
+
+    cards.forEach(c => {
+      const card = el('div', 'power-card');
+      card.appendChild(el('div', 'power-card-title', c.title));
+      const valDiv = el('div', 'power-card-value');
+      valDiv.appendChild(document.createTextNode(String(c.value) + ' '));
+      valDiv.appendChild(el('span', 'power-card-unit', c.unit));
+      card.appendChild(valDiv);
+      card.appendChild(el('div', 'power-card-sub', c.sub));
+      grid.appendChild(card);
+    });
+
+    // Per-node power breakdown
+    if (state.nodes.length > 0) {
+      state.nodes.forEach(node => {
+        const nodePwr = totalNodePower(node);
+        if (nodePwr > 0) {
+          const card = el('div', 'power-card');
+          card.appendChild(el('div', 'power-card-title', node.hostname || node.node_id));
+          const valDiv = el('div', 'power-card-value');
+          valDiv.appendChild(document.createTextNode(Math.round(nodePwr) + ' '));
+          valDiv.appendChild(el('span', 'power-card-unit', 'W'));
+          card.appendChild(valDiv);
+          const gpuCount = node.gpus ? node.gpus.length : 0;
+          card.appendChild(el('div', 'power-card-sub', gpuCount + ' GPU' + (gpuCount !== 1 ? 's' : '')));
+          grid.appendChild(card);
+        }
+      });
+    }
+  }
+
+  // ===================== COMMAND MODAL =====================
   function openCommandModal(nodeId, hostname) {
-    state.commandTarget = { nodeId: nodeId, hostname: hostname };
+    state.commandTarget = { nodeId, hostname };
     dom.cmdNodeName.textContent = hostname || nodeId;
     dom.cmdAction.value = 'install_model';
     dom.cmdModel.value = '';
@@ -810,339 +1164,355 @@
 
   async function sendCommand() {
     if (!state.commandTarget) return;
-
-    var action = dom.cmdAction.value;
-    var payload = { action: action };
-
-    var model = dom.cmdModel.value.trim();
+    const payload = { action: dom.cmdAction.value };
+    const model = dom.cmdModel.value.trim();
     if (model) payload.model = model;
-
-    var gpu = dom.cmdGpu.value.trim();
+    const gpu = dom.cmdGpu.value.trim();
     if (gpu !== '') payload.gpu = parseInt(gpu, 10);
 
     try {
       await api('POST', '/api/v1/nodes/' + state.commandTarget.nodeId + '/commands', payload);
-      logEvent('command_sent', action + ' -> ' + state.commandTarget.hostname);
+      addTermLine('success', payload.action + ' -> ' + state.commandTarget.hostname);
       closeCommandModal();
     } catch (e) {
-      logEvent('system', 'Command failed: ' + e.message);
+      addTermLine('error', 'Command failed: ' + e.message);
     }
   }
 
-  // ---- Activity Log ----
-  function logEvent(type, message) {
-    var entry = {
-      type: type,
-      message: message,
-      time: timestamp(),
-    };
-
-    state.events.unshift(entry);
-    if (state.events.length > MAX_LOG_ENTRIES) {
-      state.events.length = MAX_LOG_ENTRIES;
-    }
-
-    var div = document.createElement('div');
-    div.className = 'log-entry event-' + type;
-    div.textContent = '[' + entry.time + '] [' + type + '] ' + message;
-
-    dom.logEntries.insertBefore(div, dom.logEntries.firstChild);
-
-    // Trim DOM entries
-    while (dom.logEntries.children.length > MAX_LOG_ENTRIES) {
-      dom.logEntries.removeChild(dom.logEntries.lastChild);
-    }
-  }
-
-  function clearLog() {
-    state.events = [];
-    dom.logEntries.textContent = '';
-    logEvent('system', 'Log cleared.');
-  }
-
-  // ---- Terminal ----
-  function terminalTimestamp() {
-    var d = new Date();
-    var hh = String(d.getHours()).padStart(2, '0');
-    var mm = String(d.getMinutes()).padStart(2, '0');
-    var ss = String(d.getSeconds()).padStart(2, '0');
-    return hh + ':' + mm + ':' + ss;
-  }
-
-  /**
-   * Map SSE event types to terminal type categories for filtering.
-   * Returns: 'alerts' | 'commands' | 'nodes' | 'other'
-   */
-  function terminalCategory(type) {
+  // ===================== TERMINAL =====================
+  function termCategory(type) {
     if (type === 'alert') return 'alerts';
     if (type === 'command_sent' || type === 'command') return 'commands';
     if (type === 'node_online' || type === 'node_offline') return 'nodes';
     return 'other';
   }
 
-  function addTerminalLine(type, message) {
-    var ts = terminalTimestamp();
-    var entry = { type: type, message: message, ts: ts, category: terminalCategory(type) };
-
+  function addTermLine(type, message) {
+    const now = ts();
+    const entry = { type, message, ts: now, cat: termCategory(type) };
     terminalLines.push(entry);
-    if (terminalLines.length > MAX_TERMINAL_LINES) {
-      terminalLines.shift();
-    }
-
-    renderTerminalLine(entry);
+    if (terminalLines.length > MAX_TERMINAL_LINES) terminalLines.shift();
+    renderTermLine(entry);
   }
 
-  function renderTerminalLine(entry) {
-    // Check filter
-    if (terminalFilter !== 'all' && entry.category !== terminalFilter) return;
+  function renderTermLine(entry) {
+    if (terminalFilter !== 'all' && entry.cat !== terminalFilter) return;
 
-    var line = document.createElement('div');
-    line.className = 'terminal-line term-' + entry.type;
+    const line = el('div', 'terminal-line t-' + entry.type);
 
-    var tsSpan = document.createElement('span');
-    tsSpan.className = 'term-timestamp';
-    tsSpan.textContent = '[' + entry.ts + ']';
+    const tsSpan = el('span', 'term-ts', '[' + entry.ts + ']');
     line.appendChild(tsSpan);
 
-    var typeSpan = document.createElement('span');
-    typeSpan.className = 'term-type';
-    typeSpan.textContent = '[' + entry.type.toUpperCase() + ']';
+    const typeSpan = el('span', 'term-type', '[' + entry.type.toUpperCase() + ']');
     line.appendChild(typeSpan);
 
     line.appendChild(document.createTextNode(' ' + entry.message));
 
     dom.terminalOutput.appendChild(line);
 
-    // Trim DOM to max lines
     while (dom.terminalOutput.children.length > MAX_TERMINAL_LINES) {
       dom.terminalOutput.removeChild(dom.terminalOutput.firstChild);
     }
 
-    // Auto-scroll unless paused
     if (!terminalPaused) {
       dom.terminalOutput.scrollTop = dom.terminalOutput.scrollHeight;
     }
   }
 
-  function rebuildTerminalOutput() {
+  function rebuildTerminal() {
     dom.terminalOutput.textContent = '';
-    terminalLines.forEach(function (entry) {
-      renderTerminalLine(entry);
-    });
+    terminalLines.forEach(e => renderTermLine(e));
   }
 
-  function clearTerminal() {
-    terminalLines = [];
-    dom.terminalOutput.textContent = '';
-    addTerminalLine('system', 'Terminal cleared.');
-  }
-
-  function toggleTerminalPause() {
-    terminalPaused = !terminalPaused;
-    dom.btnTerminalPause.textContent = terminalPaused ? 'Resume' : 'Pause';
-    dom.btnTerminalPause.style.borderColor = terminalPaused ? 'var(--yellow)' : '';
-    dom.btnTerminalPause.style.color = terminalPaused ? 'var(--yellow)' : '';
-    if (!terminalPaused) {
-      dom.terminalOutput.scrollTop = dom.terminalOutput.scrollHeight;
-    }
-  }
-
-  function handleTerminalFilterChange() {
-    terminalFilter = dom.terminalFilter.value;
-    rebuildTerminalOutput();
-  }
-
-  async function handleTerminalCommand(raw) {
-    var input = raw.trim();
+  async function handleTermCommand(raw) {
+    const input = raw.trim();
     if (!input) return;
 
-    // Store in history
-    terminalCommandHistory.push(input);
-    if (terminalCommandHistory.length > 50) terminalCommandHistory.shift();
-    terminalHistoryIdx = terminalCommandHistory.length;
+    terminalHistory.push(input);
+    if (terminalHistory.length > 50) terminalHistory.shift();
+    terminalHistIdx = terminalHistory.length;
 
-    addTerminalLine('command', '$ ' + input);
+    addTermLine('command', '$ ' + input);
 
-    var parts = input.split(/\s+/);
-    var cmd = parts[0].toLowerCase();
+    const parts = input.split(/\s+/);
+    const cmd = parts[0].toLowerCase();
 
     try {
       if (cmd === 'deploy') {
-        var model = parts.slice(1).join(' ');
-        if (!model) {
-          addTerminalLine('error', 'Usage: deploy <model>');
-          return;
-        }
-        addTerminalLine('info', 'Deploying model: ' + model + '...');
-        var res = await api('POST', '/api/v1/deploy', { model: model });
-        addTerminalLine('success', 'Deploy initiated: ' + (res.message || res.status || JSON.stringify(res)));
+        const model = parts.slice(1).join(' ');
+        if (!model) { addTermLine('error', 'Usage: deploy <model>'); return; }
+        addTermLine('info', 'Deploying ' + model + '...');
+        const res = await api('POST', '/api/v1/deploy', { model });
+        addTermLine('success', 'Deploy: ' + (res.message || res.status || JSON.stringify(res)));
       } else if (cmd === 'status') {
-        addTerminalLine('info', 'Fetching summary...');
-        var summary = await api('GET', '/api/v1/summary');
-        var lines = [
-          'Nodes: ' + (summary.total_nodes || '--') + ' (online: ' + (summary.online_nodes || '--') + ')',
-          'GPUs: ' + (summary.total_gpus || '--'),
-          'VRAM: ' + formatBytes(summary.used_vram_mb) + ' / ' + formatBytes(summary.total_vram_mb),
-          'tok/s: ' + (summary.total_toks_per_sec != null ? summary.total_toks_per_sec.toFixed(1) : '--'),
-          'Requests: ' + (summary.total_requests != null ? summary.total_requests.toLocaleString() : '--'),
-        ];
-        lines.forEach(function (l) { addTerminalLine('info', '  ' + l); });
+        addTermLine('info', 'Fetching summary...');
+        const s = await api('GET', '/api/v1/summary');
+        addTermLine('info', '  Nodes: ' + (s.total_nodes || '--') + ' (online: ' + (s.online_nodes || '--') + ')');
+        addTermLine('info', '  GPUs: ' + (s.total_gpus || '--'));
+        addTermLine('info', '  VRAM: ' + formatBytes(s.used_vram_mb) + '/' + formatBytes(s.total_vram_mb));
+        addTermLine('info', '  tok/s: ' + (s.total_toks_per_sec != null ? s.total_toks_per_sec.toFixed(1) : '--'));
       } else if (cmd === 'nodes') {
-        addTerminalLine('info', 'Fetching nodes...');
-        var data = await api('GET', '/api/v1/nodes');
-        var nodeList = Array.isArray(data) ? data : (data.nodes || data.data || []);
-        if (nodeList.length === 0) {
-          addTerminalLine('warning', 'No nodes found.');
-        } else {
-          nodeList.forEach(function (n) {
-            var online = n.status === 'online' || n.is_online || n.online !== false;
-            var name = n.hostname || n.node_id || 'unknown';
-            var status = online ? 'ONLINE' : 'OFFLINE';
-            var gpuCount = n.gpu_count || (n.gpus ? n.gpus.length : 0);
-            addTerminalLine(online ? 'success' : 'error',
-              '  ' + name + ' [' + status + '] GPUs: ' + gpuCount +
-              ' tok/s: ' + (n.toks_per_sec != null ? n.toks_per_sec.toFixed(1) : '--'));
-          });
-        }
+        addTermLine('info', 'Fetching nodes...');
+        const data = await api('GET', '/api/v1/nodes');
+        const list = Array.isArray(data) ? data : (data.nodes || data.data || []);
+        if (list.length === 0) { addTermLine('warning', 'No nodes found.'); return; }
+        list.forEach(n => {
+          const on = isOnline(n);
+          const gpuCount = n.gpu_count || (n.gpus ? n.gpus.length : 0);
+          addTermLine(on ? 'success' : 'error',
+            '  ' + (n.hostname || n.node_id) + ' [' + (on ? 'ONLINE' : 'OFFLINE') + '] GPUs: ' + gpuCount +
+            ' tok/s: ' + (n.toks_per_sec != null ? n.toks_per_sec.toFixed(1) : '--'));
+        });
       } else if (cmd === 'alert' && parts[1] && parts[1].toLowerCase() === 'ack') {
-        var alertId = parts[2];
-        if (!alertId) {
-          addTerminalLine('error', 'Usage: alert ack <id>');
-          return;
-        }
-        addTerminalLine('info', 'Acknowledging alert ' + alertId + '...');
-        var ackRes = await api('POST', '/api/v1/alerts/' + alertId + '/acknowledge');
-        addTerminalLine('success', 'Alert ' + alertId + ' acknowledged. ' + (ackRes.message || ''));
+        const alertId = parts[2];
+        if (!alertId) { addTermLine('error', 'Usage: alert ack <id>'); return; }
+        addTermLine('info', 'Acknowledging alert ' + alertId + '...');
+        await api('POST', '/api/v1/alerts/' + alertId + '/acknowledge');
+        addTermLine('success', 'Alert ' + alertId + ' acknowledged.');
+        fetchAlerts();
+      } else if (cmd === 'help') {
+        addTermLine('info', 'Commands: deploy <model>, status, nodes, alert ack <id>, help');
       } else {
-        addTerminalLine('warning', 'Unknown command: ' + cmd + '. Available: deploy, status, nodes, alert ack');
+        addTermLine('warning', 'Unknown command: ' + cmd + '. Type "help" for available commands.');
       }
     } catch (e) {
-      addTerminalLine('error', 'Command failed: ' + e.message);
+      addTermLine('error', 'Failed: ' + e.message);
     }
   }
 
-  async function fetchHealthScore() {
-    try {
-      var data = await api('GET', '/api/v1/health/score');
-      var score = data.score != null ? data.score : data.health_score;
-      if (score != null) {
-        dom.terminalHealthScore.textContent = score + ' %';
-        if (score >= 80) {
-          dom.terminalHealthScore.style.color = 'var(--green)';
-          dom.terminalHealthScore.style.borderColor = 'var(--green)';
-        } else if (score >= 50) {
-          dom.terminalHealthScore.style.color = 'var(--yellow)';
-          dom.terminalHealthScore.style.borderColor = 'var(--yellow)';
-        } else {
-          dom.terminalHealthScore.style.color = 'var(--red)';
-          dom.terminalHealthScore.style.borderColor = 'var(--red)';
+  // ===================== NAVIGATION =====================
+  function switchView(viewName) {
+    state.activeView = viewName;
+
+    // Update nav
+    $$('.nav-item').forEach(item => {
+      item.classList.toggle('active', item.dataset.view === viewName);
+    });
+
+    // Show/hide views
+    $$('.view-panel').forEach(panel => {
+      panel.classList.toggle('active', panel.id === 'view-' + viewName);
+    });
+
+    // Lazy load data for view
+    switch (viewName) {
+      case 'flight-sheets': fetchFlightSheets(); break;
+      case 'models': fetchLeaderboard(); renderModels(); break;
+      case 'alerts': fetchAlerts(); break;
+      case 'benchmarks': fetchBenchmarks(); break;
+      case 'power': fetchPower(); renderPower(); break;
+    }
+  }
+
+  // ===================== EVENTS =====================
+  function bindEvents() {
+    // Sidebar nav
+    $$('.nav-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        switchView(item.dataset.view);
+        // On mobile, close sidebar
+        if (window.innerWidth <= 1100) {
+          dom.sidebar.classList.remove('open');
+        }
+      });
+    });
+
+    // Sidebar toggle (mobile)
+    dom.sidebarToggle.addEventListener('click', () => {
+      dom.sidebar.classList.toggle('open');
+    });
+
+    // Close sidebar on outside click (mobile)
+    document.addEventListener('click', (e) => {
+      if (window.innerWidth <= 1100 && dom.sidebar.classList.contains('open')) {
+        if (!dom.sidebar.contains(e.target) && e.target !== dom.sidebarToggle) {
+          dom.sidebar.classList.remove('open');
         }
       }
-    } catch (e) {
-      dom.terminalHealthScore.textContent = '-- %';
-    }
-  }
+    });
 
-  // ---- Quote rotation ----
-  function rotateQuote() {
-    quoteIndex = (quoteIndex + 1) % QUOTES.length;
-    dom.quote.style.opacity = '0';
-    setTimeout(function () {
-      dom.quote.textContent = QUOTES[quoteIndex];
-      dom.quote.style.opacity = '1';
-    }, 300);
-  }
+    // Node search
+    dom.nodeSearch.addEventListener('input', () => renderNodes());
 
-  // ---- Event bindings ----
-  function bindEvents() {
-    dom.btnToggleFlight.addEventListener('click', function () {
-      dom.flightPanel.classList.toggle('hidden');
-      if (!dom.flightPanel.classList.contains('hidden')) {
-        fetchFlightSheets();
+    // Refresh nodes
+    dom.btnRefreshNodes.addEventListener('click', () => {
+      fetchNodes(); fetchSummary(); fetchHealthScore();
+    });
+
+    // Flight sheets
+    dom.btnNewFs.addEventListener('click', () => {
+      dom.fsCreateForm.classList.toggle('hidden');
+      if (!dom.fsCreateForm.classList.contains('hidden') && dom.fsTargets.children.length === 0) {
+        addFsTargetRow();
       }
     });
-
-    dom.btnCloseFlight.addEventListener('click', function () {
-      dom.flightPanel.classList.add('hidden');
-    });
-
+    dom.btnCancelFs.addEventListener('click', () => dom.fsCreateForm.classList.add('hidden'));
     dom.btnAddTarget.addEventListener('click', addFsTargetRow);
     dom.btnCreateFs.addEventListener('click', createFlightSheet);
 
+    // Alert filter
+    dom.alertFilter.addEventListener('change', renderAlerts);
+
+    // Command modal
     dom.btnCloseCmd.addEventListener('click', closeCommandModal);
     dom.btnCancelCmd.addEventListener('click', closeCommandModal);
     dom.btnSendCmd.addEventListener('click', sendCommand);
-
-    dom.cmdModal.addEventListener('click', function (e) {
+    dom.cmdModal.addEventListener('click', (e) => {
       if (e.target === dom.cmdModal) closeCommandModal();
     });
 
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') {
-        closeCommandModal();
-        dom.flightPanel.classList.add('hidden');
+    // Action dropdown items
+    dom.actionDropdown.querySelectorAll('.action-dropdown-item').forEach(item => {
+      item.addEventListener('click', () => {
+        if (!dropdownTarget) return;
+        const action = item.dataset.action;
+        if (action === 'install_model') {
+          openCommandModal(dropdownTarget.nodeId, dropdownTarget.hostname);
+        } else if (action === 'benchmark') {
+          api('POST', '/api/v1/nodes/' + dropdownTarget.nodeId + '/commands', { action: 'benchmark' })
+            .then(() => addTermLine('success', 'Benchmark started on ' + dropdownTarget.hostname))
+            .catch(e => addTermLine('error', 'Benchmark failed: ' + e.message));
+        } else if (action === 'reboot') {
+          if (confirm('Reboot ' + dropdownTarget.hostname + '?')) {
+            api('POST', '/api/v1/nodes/' + dropdownTarget.nodeId + '/commands', { action: 'reboot' })
+              .then(() => addTermLine('warning', 'Reboot command sent to ' + dropdownTarget.hostname))
+              .catch(e => addTermLine('error', 'Reboot failed: ' + e.message));
+          }
+        } else if (action === 'remove') {
+          if (confirm('Remove node ' + dropdownTarget.hostname + '?')) {
+            api('POST', '/api/v1/nodes/' + dropdownTarget.nodeId + '/commands', { action: 'remove' })
+              .then(() => { addTermLine('warning', 'Node ' + dropdownTarget.hostname + ' removed.'); fetchNodes(); })
+              .catch(e => addTermLine('error', 'Remove failed: ' + e.message));
+          }
+        }
+        hideActionDropdown();
+      });
+    });
+
+    // Close dropdown on outside click
+    document.addEventListener('click', (e) => {
+      if (!dom.actionDropdown.contains(e.target) && !e.target.classList.contains('actions-btn')) {
+        hideActionDropdown();
       }
     });
 
-    dom.btnClearLog.addEventListener('click', clearLog);
+    // Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeCommandModal();
+        hideActionDropdown();
+      }
+    });
 
-    // Terminal bindings
-    dom.btnTerminalClear.addEventListener('click', clearTerminal);
-    dom.btnTerminalPause.addEventListener('click', toggleTerminalPause);
-    dom.terminalFilter.addEventListener('change', handleTerminalFilterChange);
+    // Terminal
+    dom.btnTermClear.addEventListener('click', () => {
+      terminalLines = [];
+      dom.terminalOutput.textContent = '';
+      addTermLine('system', 'Terminal cleared.');
+    });
 
-    dom.terminalInput.addEventListener('keydown', function (e) {
+    dom.btnTermPause.addEventListener('click', () => {
+      terminalPaused = !terminalPaused;
+      dom.btnTermPause.textContent = terminalPaused ? 'Resume' : 'Pause';
+      dom.btnTermPause.style.borderColor = terminalPaused ? 'var(--yellow)' : '';
+      dom.btnTermPause.style.color = terminalPaused ? 'var(--yellow)' : '';
+      if (!terminalPaused) dom.terminalOutput.scrollTop = dom.terminalOutput.scrollHeight;
+    });
+
+    dom.btnTermToggle.addEventListener('click', () => {
+      dom.terminalPanel.classList.toggle('collapsed');
+      dom.btnTermToggle.textContent = dom.terminalPanel.classList.contains('collapsed') ? '\u25B2' : '\u25BC';
+    });
+
+    dom.terminalFilter.addEventListener('change', () => {
+      terminalFilter = dom.terminalFilter.value;
+      rebuildTerminal();
+    });
+
+    dom.terminalInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        var val = dom.terminalInput.value;
+        const val = dom.terminalInput.value;
         dom.terminalInput.value = '';
-        handleTerminalCommand(val);
+        handleTermCommand(val);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        if (terminalCommandHistory.length > 0 && terminalHistoryIdx > 0) {
-          terminalHistoryIdx--;
-          dom.terminalInput.value = terminalCommandHistory[terminalHistoryIdx];
+        if (terminalHistory.length > 0 && terminalHistIdx > 0) {
+          terminalHistIdx--;
+          dom.terminalInput.value = terminalHistory[terminalHistIdx];
         }
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        if (terminalHistoryIdx < terminalCommandHistory.length - 1) {
-          terminalHistoryIdx++;
-          dom.terminalInput.value = terminalCommandHistory[terminalHistoryIdx];
+        if (terminalHistIdx < terminalHistory.length - 1) {
+          terminalHistIdx++;
+          dom.terminalInput.value = terminalHistory[terminalHistIdx];
         } else {
-          terminalHistoryIdx = terminalCommandHistory.length;
+          terminalHistIdx = terminalHistory.length;
           dom.terminalInput.value = '';
         }
       }
     });
+
+    // Terminal resize handle
+    let resizing = false;
+    let startY = 0;
+    let startH = 0;
+
+    dom.terminalPanel.querySelector('.terminal-handle').addEventListener('mousedown', (e) => {
+      resizing = true;
+      startY = e.clientY;
+      startH = dom.terminalPanel.offsetHeight;
+      document.body.style.cursor = 'ns-resize';
+      document.body.style.userSelect = 'none';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!resizing) return;
+      const diff = startY - e.clientY;
+      const newH = Math.max(100, Math.min(600, startH + diff));
+      dom.terminalPanel.style.height = newH + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (resizing) {
+        resizing = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
   }
 
-  // ---- Init ----
+  // ===================== INIT =====================
   function init() {
     bindEvents();
 
-    quoteIndex = Math.floor(Math.random() * QUOTES.length);
-    dom.quote.textContent = QUOTES[quoteIndex];
-    dom.quote.style.transition = 'opacity 0.3s';
-
-    checkHealth();
-
+    // Initial data loads
     fetchNodes();
     fetchSummary();
+    fetchHealthScore();
     fetchFlightSheets();
+    fetchAlerts();
+    fetchBenchmarks();
+    fetchPower();
+    fetchLeaderboard();
 
     connectSSE();
-    fetchHealthScore();
 
-    setInterval(function () {
+    // Polling
+    setInterval(() => {
       fetchNodes();
       fetchSummary();
-      checkHealth();
       fetchHealthScore();
+
+      // Also refresh current view data
+      switch (state.activeView) {
+        case 'alerts': fetchAlerts(); break;
+        case 'power': fetchPower(); break;
+      }
     }, POLL_INTERVAL);
 
-    setInterval(rotateQuote, 10000);
-
-    logEvent('system', 'Dashboard ready. CLAWtopus is watching.');
-    addTerminalLine('system', 'CLAWtopus Terminal initialized. Type "status" for cluster summary.');
+    addTermLine('system', 'TentaCLAW HiveMind initialized. Type "help" for commands.');
   }
 
   if (document.readyState === 'loading') {

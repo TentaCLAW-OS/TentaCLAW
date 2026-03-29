@@ -3,176 +3,356 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TentaCLAW HiveMind Dashboard</title>
+  <title>TentaCLAW - GPU Cluster Management</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐙</text></svg>" />
 </head>
 <body>
-  <!-- ========== HEADER ========== -->
-  <header id="header">
-    <div class="header-top">
-      <pre class="ascii-art" aria-hidden="true">
-     ___
-    /   \
-   | o o |
-    \ _ /
-   /||||||\
-  / |||||||\
- /  | | | | \
-    ~ ~ ~ ~
-      </pre>
-      <div class="header-title">
-        <h1>TentaCLAW <span class="accent">HiveMind</span></h1>
-        <p class="tagline">Eight arms. One mind. Zero compromises.</p>
-        <p class="quote" id="claw-quote">"Booting tentacles..."</p>
+
+  <!-- ========== LEFT SIDEBAR ========== -->
+  <nav id="sidebar" class="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+          <circle cx="14" cy="14" r="12" stroke="#00FFFF" stroke-width="2" fill="none"/>
+          <circle cx="14" cy="14" r="6" fill="#00FFFF" opacity="0.3"/>
+          <circle cx="14" cy="14" r="3" fill="#00FFFF"/>
+        </svg>
       </div>
-      <div class="header-actions">
-        <button class="btn btn-outline" id="btn-toggle-flight" title="Toggle Flight Sheets">Flight Sheets</button>
-        <span class="health-badge" id="health-badge">CHECKING...</span>
+      <div class="brand-text">
+        <span class="brand-name">TentaCLAW</span>
+        <span class="brand-sub">HiveMind</span>
       </div>
     </div>
-    <div class="summary-bar" id="summary-bar">
-      <div class="summary-item">
-        <span class="summary-label">Nodes</span>
-        <span class="summary-value" id="sum-nodes">--</span>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">Online</span>
-        <span class="summary-value green" id="sum-online">--</span>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">GPUs</span>
-        <span class="summary-value" id="sum-gpus">--</span>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">VRAM</span>
-        <span class="summary-value" id="sum-vram">--</span>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">tok/s</span>
-        <span class="summary-value cyan" id="sum-toks">--</span>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">Requests</span>
-        <span class="summary-value" id="sum-requests">--</span>
-      </div>
+
+    <div class="sidebar-nav">
+      <a class="nav-item active" data-view="nodes" href="#">
+        <span class="nav-icon">&#x1F5A5;</span>
+        <span class="nav-label">Nodes</span>
+        <span class="nav-badge" id="nav-badge-nodes">--</span>
+      </a>
+      <a class="nav-item" data-view="flight-sheets" href="#">
+        <span class="nav-icon">&#x1F4CB;</span>
+        <span class="nav-label">Flight Sheets</span>
+      </a>
+      <a class="nav-item" data-view="models" href="#">
+        <span class="nav-icon">&#x1F9E0;</span>
+        <span class="nav-label">Models</span>
+      </a>
+      <a class="nav-item" data-view="alerts" href="#">
+        <span class="nav-icon">&#x26A1;</span>
+        <span class="nav-label">Alerts</span>
+        <span class="nav-badge nav-badge-alert hidden" id="nav-badge-alerts">0</span>
+      </a>
+      <a class="nav-item" data-view="benchmarks" href="#">
+        <span class="nav-icon">&#x1F4CA;</span>
+        <span class="nav-label">Benchmarks</span>
+      </a>
+      <a class="nav-item" data-view="power" href="#">
+        <span class="nav-icon">&#x1F4B0;</span>
+        <span class="nav-label">Power / Cost</span>
+      </a>
+      <a class="nav-item" data-view="settings" href="#">
+        <span class="nav-icon">&#x2699;</span>
+        <span class="nav-label">Settings</span>
+      </a>
     </div>
-  </header>
 
-  <!-- ========== MAIN LAYOUT ========== -->
-  <div class="main-layout">
-    <!-- NODE GRID -->
-    <main id="node-grid" class="node-grid">
-      <div class="empty-state" id="empty-state">
-        <pre class="ascii-art-large">
-     ___
-    /   \
-   | - - |
-    \ o /
-   /||||||\
-  ~ ~ ~ ~ ~
-        </pre>
-        <p>No nodes connected yet.</p>
-        <p class="dim">Waiting for agents to phone home...</p>
-      </div>
-    </main>
+    <div class="sidebar-footer">
+      <pre class="sidebar-ascii">
+   ___
+  /o o\
+  \ ~ /
+ /|||||\
+~ ~ ~ ~ ~</pre>
+      <div class="sidebar-version">CLAWtopus v2.0</div>
+    </div>
+  </nav>
 
-    <!-- FLIGHT SHEETS SIDEBAR -->
-    <aside id="flight-panel" class="flight-panel hidden">
-      <div class="panel-header">
-        <h2>Flight Sheets</h2>
-        <button class="btn-close" id="btn-close-flight" title="Close">&times;</button>
+  <!-- ========== MAIN WRAPPER ========== -->
+  <div class="main-wrapper">
+
+    <!-- ========== TOP STATS BAR ========== -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">&#9776;</button>
+        <div class="farm-selector">
+          <span class="farm-label">Farm</span>
+          <span class="farm-hash" id="farm-hash" title="Farm Hash">Loading...</span>
+        </div>
       </div>
-      <div class="panel-body">
-        <div class="flight-create">
-          <h3>New Flight Sheet</h3>
-          <input type="text" id="fs-name" placeholder="Sheet name" class="input" />
-          <input type="text" id="fs-desc" placeholder="Description" class="input" />
-          <div id="fs-targets" class="fs-targets">
-            <div class="fs-target-row" data-idx="0">
-              <select class="input fs-node-select" data-field="node_id"><option value="">-- node --</option></select>
-              <input type="text" class="input" data-field="model" placeholder="Model" />
-              <input type="number" class="input input-sm" data-field="gpu" placeholder="GPU#" min="0" />
-              <button class="btn-icon btn-remove-target" title="Remove">&times;</button>
+      <div class="top-bar-stats">
+        <div class="stat-pill">
+          <span class="stat-pill-label">Nodes</span>
+          <span class="stat-pill-value" id="stat-nodes-online">--</span>
+          <span class="stat-pill-sep">/</span>
+          <span class="stat-pill-total" id="stat-nodes-total">--</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-pill-label">GPUs</span>
+          <span class="stat-pill-value" id="stat-gpus">--</span>
+        </div>
+        <div class="stat-pill stat-pill-wide">
+          <span class="stat-pill-label">VRAM</span>
+          <div class="stat-bar-mini">
+            <div class="stat-bar-mini-fill" id="stat-vram-bar" style="width: 0%"></div>
+          </div>
+          <span class="stat-pill-value stat-pill-value-sm" id="stat-vram-text">--</span>
+        </div>
+        <div class="stat-pill stat-pill-accent">
+          <span class="stat-pill-label">tok/s</span>
+          <span class="stat-pill-value" id="stat-toks">--</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-pill-label">Power</span>
+          <span class="stat-pill-value" id="stat-power">--</span>
+          <span class="stat-pill-unit">W</span>
+        </div>
+        <div class="stat-pill" id="stat-health-pill">
+          <span class="stat-pill-label">Health</span>
+          <span class="stat-pill-value health-score" id="stat-health">--</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-pill-label">Cost</span>
+          <span class="stat-pill-value" id="stat-cost">--</span>
+          <span class="stat-pill-unit">$/day</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ========== CONTENT AREA ========== -->
+    <div class="content-area">
+
+      <!-- NODES VIEW -->
+      <section class="view-panel active" id="view-nodes">
+        <div class="view-header">
+          <h2 class="view-title">Nodes</h2>
+          <div class="view-actions">
+            <input type="text" class="search-input" id="node-search" placeholder="Search nodes..." />
+            <button class="btn btn-sm" id="btn-refresh-nodes" title="Refresh">&#x21BB; Refresh</button>
+          </div>
+        </div>
+        <div class="nodes-table-wrapper">
+          <table class="nodes-table" id="nodes-table">
+            <thead>
+              <tr>
+                <th class="th-status"></th>
+                <th class="th-hostname">Hostname</th>
+                <th class="th-gpus">GPUs</th>
+                <th class="th-vram">VRAM</th>
+                <th class="th-models">Models</th>
+                <th class="th-toks">tok/s</th>
+                <th class="th-uptime">Uptime</th>
+                <th class="th-power">Power</th>
+                <th class="th-actions"></th>
+              </tr>
+            </thead>
+            <tbody id="nodes-tbody">
+            </tbody>
+          </table>
+          <div class="empty-state" id="empty-state">
+            <div class="empty-icon">&#x1F50C;</div>
+            <p class="empty-title">No nodes connected</p>
+            <p class="empty-sub">Waiting for agents to phone home...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- FLIGHT SHEETS VIEW -->
+      <section class="view-panel" id="view-flight-sheets">
+        <div class="view-header">
+          <h2 class="view-title">Flight Sheets</h2>
+          <button class="btn btn-primary btn-sm" id="btn-new-fs">+ New Flight Sheet</button>
+        </div>
+        <div class="fs-create-form hidden" id="fs-create-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Name</label>
+              <input type="text" class="form-input" id="fs-name" placeholder="e.g. Production LLMs" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Description</label>
+              <input type="text" class="form-input" id="fs-desc" placeholder="Description..." />
             </div>
           </div>
-          <div class="fs-actions">
-            <button class="btn btn-small" id="btn-add-target">+ Target</button>
-            <button class="btn btn-primary btn-small" id="btn-create-fs">Create</button>
+          <div class="form-label" style="margin-top: 12px;">Targets</div>
+          <div id="fs-targets" class="fs-targets"></div>
+          <div class="form-actions">
+            <button class="btn btn-sm" id="btn-add-target">+ Add Target</button>
+            <button class="btn btn-primary btn-sm" id="btn-create-fs">Create Sheet</button>
+            <button class="btn btn-sm" id="btn-cancel-fs">Cancel</button>
           </div>
         </div>
-        <hr class="divider" />
-        <h3>Existing Sheets</h3>
-        <div id="fs-list" class="fs-list">
-          <p class="dim">Loading...</p>
+        <div class="fs-list" id="fs-list"></div>
+      </section>
+
+      <!-- MODELS VIEW -->
+      <section class="view-panel" id="view-models">
+        <div class="view-header">
+          <h2 class="view-title">Model Leaderboard</h2>
+        </div>
+        <table class="data-table" id="models-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Model</th>
+              <th>Nodes</th>
+              <th>Avg tok/s</th>
+              <th>Total Tokens</th>
+              <th>Avg Latency</th>
+            </tr>
+          </thead>
+          <tbody id="models-tbody"></tbody>
+        </table>
+      </section>
+
+      <!-- ALERTS VIEW -->
+      <section class="view-panel" id="view-alerts">
+        <div class="view-header">
+          <h2 class="view-title">Alerts</h2>
+          <div class="view-actions">
+            <select class="form-select" id="alert-filter">
+              <option value="all">All Severities</option>
+              <option value="critical">Critical</option>
+              <option value="warning">Warning</option>
+              <option value="info">Info</option>
+            </select>
+          </div>
+        </div>
+        <div class="alerts-list" id="alerts-list"></div>
+      </section>
+
+      <!-- BENCHMARKS VIEW -->
+      <section class="view-panel" id="view-benchmarks">
+        <div class="view-header">
+          <h2 class="view-title">Benchmarks</h2>
+        </div>
+        <table class="data-table" id="benchmarks-table">
+          <thead>
+            <tr>
+              <th>Node</th>
+              <th>Model</th>
+              <th>tok/s</th>
+              <th>Latency (ms)</th>
+              <th>VRAM (MB)</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="benchmarks-tbody"></tbody>
+        </table>
+      </section>
+
+      <!-- POWER/COST VIEW -->
+      <section class="view-panel" id="view-power">
+        <div class="view-header">
+          <h2 class="view-title">Power &amp; Cost</h2>
+        </div>
+        <div class="power-grid" id="power-grid"></div>
+      </section>
+
+      <!-- SETTINGS VIEW -->
+      <section class="view-panel" id="view-settings">
+        <div class="view-header">
+          <h2 class="view-title">Settings</h2>
+        </div>
+        <div class="settings-content">
+          <div class="settings-group">
+            <h3 class="settings-group-title">Cluster Configuration</h3>
+            <div class="settings-item">
+              <span class="settings-label">Farm Hash</span>
+              <span class="settings-value" id="settings-farm-hash">--</span>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">Poll Interval</span>
+              <span class="settings-value">5s</span>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">SSE Connection</span>
+              <span class="settings-value" id="settings-sse-status">Connecting...</span>
+            </div>
+          </div>
+          <div class="settings-group">
+            <h3 class="settings-group-title">About</h3>
+            <div class="settings-item">
+              <span class="settings-label">Version</span>
+              <span class="settings-value">TentaCLAW HiveMind v2.0.0</span>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">Dashboard</span>
+              <span class="settings-value">Pure HTML/CSS/JS &mdash; Zero dependencies</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /content-area -->
+
+    <!-- ========== TERMINAL PANEL ========== -->
+    <section class="terminal-panel" id="terminal-panel">
+      <div class="terminal-handle" id="terminal-handle">
+        <div class="terminal-handle-bar"></div>
+      </div>
+      <div class="terminal-header">
+        <div class="terminal-title-group">
+          <span class="terminal-title">Terminal</span>
+          <span class="terminal-sse-dot" id="terminal-sse-dot" title="SSE Status"></span>
+        </div>
+        <div class="terminal-controls">
+          <select class="form-select form-select-sm" id="terminal-filter" title="Filter events">
+            <option value="all">All</option>
+            <option value="alerts">Alerts</option>
+            <option value="commands">Commands</option>
+            <option value="nodes">Nodes</option>
+          </select>
+          <button class="btn btn-xs" id="btn-terminal-pause">Pause</button>
+          <button class="btn btn-xs" id="btn-terminal-clear">Clear</button>
+          <button class="btn btn-xs" id="btn-terminal-toggle" title="Collapse/Expand">&#x25BC;</button>
         </div>
       </div>
-    </aside>
-  </div>
+      <div class="terminal-output" id="terminal-output"></div>
+      <div class="terminal-input-row">
+        <span class="terminal-prompt">$</span>
+        <input type="text" class="terminal-input" id="terminal-input" placeholder="deploy &lt;model&gt;, status, nodes, alert ack &lt;id&gt;" autocomplete="off" spellcheck="false" />
+      </div>
+    </section>
+
+  </div><!-- /main-wrapper -->
 
   <!-- ========== COMMAND MODAL ========== -->
   <div class="modal-overlay hidden" id="cmd-modal">
     <div class="modal">
       <div class="modal-header">
-        <h3>Send Command to <span id="cmd-node-name">node</span></h3>
-        <button class="btn-close" id="btn-close-cmd">&times;</button>
+        <h3>Command: <span id="cmd-node-name">node</span></h3>
+        <button class="modal-close" id="btn-close-cmd">&times;</button>
       </div>
       <div class="modal-body">
-        <label class="label">Action</label>
-        <select class="input" id="cmd-action">
+        <label class="form-label">Action</label>
+        <select class="form-input" id="cmd-action">
           <option value="install_model">Install Model</option>
           <option value="reload_model">Reload Model</option>
           <option value="unload_model">Unload Model</option>
           <option value="restart_inference">Restart Inference</option>
           <option value="reboot">Reboot Node</option>
         </select>
-        <label class="label">Model (optional)</label>
-        <input type="text" class="input" id="cmd-model" placeholder="e.g. llama3:70b" />
-        <label class="label">GPU # (optional)</label>
-        <input type="number" class="input" id="cmd-gpu" placeholder="e.g. 0" min="0" />
+        <label class="form-label">Model (optional)</label>
+        <input type="text" class="form-input" id="cmd-model" placeholder="e.g. llama3:70b" />
+        <label class="form-label">GPU # (optional)</label>
+        <input type="number" class="form-input" id="cmd-gpu" placeholder="e.g. 0" min="0" />
       </div>
       <div class="modal-footer">
         <button class="btn" id="btn-cancel-cmd">Cancel</button>
-        <button class="btn btn-primary" id="btn-send-cmd">Send Command</button>
+        <button class="btn btn-primary" id="btn-send-cmd">Send</button>
       </div>
     </div>
   </div>
 
-  <!-- ========== CLAWTOPUS TERMINAL ========== -->
-  <section class="terminal-panel" id="terminal-panel">
-    <div class="terminal-header">
-      <div class="terminal-title-group">
-        <span class="terminal-title">CLAWtopus Terminal</span>
-        <span class="terminal-health-score" id="terminal-health-score" title="Health Score">-- %</span>
-      </div>
-      <div class="terminal-controls">
-        <select class="input terminal-filter" id="terminal-filter" title="Filter events">
-          <option value="all">All</option>
-          <option value="alerts">Alerts</option>
-          <option value="commands">Commands</option>
-          <option value="nodes">Nodes</option>
-        </select>
-        <button class="btn btn-small btn-outline" id="btn-terminal-pause" title="Pause/Resume auto-scroll">Pause</button>
-        <button class="btn btn-small btn-outline" id="btn-terminal-clear" title="Clear terminal">Clear</button>
-      </div>
-    </div>
-    <div class="terminal-output" id="terminal-output"></div>
-    <div class="terminal-input-row">
-      <span class="terminal-prompt">$</span>
-      <input type="text" class="terminal-input" id="terminal-input" placeholder="Type a command... (deploy, status, nodes, alert ack)" autocomplete="off" spellcheck="false" />
-    </div>
-  </section>
-
-  <!-- ========== ACTIVITY LOG ========== -->
-  <footer class="activity-log">
-    <div class="log-header">
-      <h3>Activity Log</h3>
-      <button class="btn btn-small btn-outline" id="btn-clear-log">Clear</button>
-    </div>
-    <div class="log-entries" id="log-entries">
-      <div class="log-entry dim">[system] Dashboard initialized. Connecting to HiveMind...</div>
-    </div>
-  </footer>
+  <!-- ========== NODE ACTION DROPDOWN (reused) ========== -->
+  <div class="action-dropdown hidden" id="action-dropdown">
+    <button class="action-dropdown-item" data-action="install_model">Deploy Model</button>
+    <button class="action-dropdown-item" data-action="benchmark">Benchmark</button>
+    <button class="action-dropdown-item" data-action="reboot">Reboot</button>
+    <button class="action-dropdown-item action-dropdown-danger" data-action="remove">Remove</button>
+  </div>
 
   <script src="app.js"></script>
 </body>
