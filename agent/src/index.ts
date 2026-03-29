@@ -190,9 +190,40 @@ function getMockGpuStats(): GpuStats[] {
     return gpus;
 }
 
+// =============================================================================
+// GPU Auto-Detection — NVIDIA (nvidia-smi) / AMD (sysfs+amdgpu) / Intel
+// =============================================================================
+
+type GpuVendor = 'nvidia' | 'amd' | 'intel' | 'unknown';
+
+function detectGpuVendor(): GpuVendor {
+    try {
+        const lspci = execSync('lspci 2>/dev/null | grep -i "vga\\|3d\\|display"', { encoding: 'utf-8' });
+        if (lspci.toLowerCase().includes('nvidia')) return 'nvidia';
+        if (lspci.toLowerCase().includes('amd') || lspci.toLowerCase().includes('radeon')) return 'amd';
+        if (lspci.toLowerCase().includes('intel')) return 'intel';
+    } catch {}
+    // Fallback: check for driver presence
+    try {
+        if (fs.existsSync('/dev/nvidiactl')) return 'nvidia';
+        if (fs.existsSync('/dev/kfd')) return 'amd';
+    } catch {}
+    return 'unknown';
+}
+
+function getGpuStats(): GpuStats[] {
+    const vendor = detectGpuVendor();
+    console.log('[agent] GPU vendor: ' + vendor);
+    switch (vendor) {
+        case 'nvidia': return getNvidiaStats();
+        case 'amd': return getAmdGpuStats();
+        case 'intel': return getIntelGpuStats();
+        default: return [];
+    }
+}
+
 function getNvidiaStats(): GpuStats[] {
     try {
-        // Static command — no user input, safe to use execFileSync
         const output = execFileSync('nvidia-smi', [
             '--query-gpu=index,pci.bus_id,name,memory.used,memory.total,temperature.gpu,utilization.gpu,power.draw,fan.speed,clocks.sm,clocks.mem',
             '--format=csv,noheader,nounits'
@@ -216,6 +247,129 @@ function getNvidiaStats(): GpuStats[] {
     } catch {
         return [];
     }
+}
+
+function getAmdGpuStats(): GpuStats[] {
+    // Uses amdgpu kernel driver sysfs interface — no ROCm needed
+    const gpus: GpuStats[] = [];
+    try {
+        const cards = fs.readdirSync('/sys/class/drm').filter(d => /^card\d+$/.test(d));
+        for (const card of cards) {
+            const base = `/sys/class/drm/${card}/device`;
+            if (!fs.existsSync(base + '/gpu_busy_percent')) continue; // Not an amdgpu device
+
+            const readSysfs = (file: string): string => {
+                try { return fs.readFileSync(`${base}/${file}`, 'utf-8').trim(); } catch { return ''; }
+            };
+
+            // GPU name from lspci for this device
+            let name = 'AMD GPU';
+            try {
+                const uevent = readSysfs('uevent');
+                const pciSlot = uevent.match(/PCI_SLOT_NAME=(.*)/)?.[1] || '';
+                if (pciSlot) {
+                    const lspciOut = execSync(`lspci -s ${pciSlot} 2>/dev/null`, { encoding: 'utf-8' });
+                    const match = lspciOut.match(/:\s+(.*)/);
+                    if (match) name = match[1].replace(/\(rev.*\)/, '').trim();
+                }
+            } catch {}
+
+            // VRAM from hwmon or mem_info
+            let vramTotal = 0, vramUsed = 0;
+            try {
+                vramTotal = Math.round(parseInt(readSysfs('mem_info_vram_total')) / 1048576);
+                vramUsed = Math.round(parseInt(readSysfs('mem_info_vram_used')) / 1048576);
+            } catch {}
+
+            // Temperature from hwmon
+            let temp = 0;
+            try {
+                const hwmonDir = fs.readdirSync(`${base}/hwmon`)[0];
+                if (hwmonDir) {
+                    const tempStr = fs.readFileSync(`${base}/hwmon/${hwmonDir}/temp1_input`, 'utf-8').trim();
+                    temp = Math.round(parseInt(tempStr) / 1000);
+                }
+            } catch {}
+
+            // Utilization
+            const util = parseInt(readSysfs('gpu_busy_percent')) || 0;
+
+            // Power
+            let power = 0;
+            try {
+                const hwmonDir = fs.readdirSync(`${base}/hwmon`)[0];
+                if (hwmonDir) {
+                    const powerStr = fs.readFileSync(`${base}/hwmon/${hwmonDir}/power1_average`, 'utf-8').trim();
+                    power = Math.round(parseInt(powerStr) / 1000000); // microwatts to watts
+                }
+            } catch {}
+
+            // Fan
+            let fan = 0;
+            try {
+                const hwmonDir = fs.readdirSync(`${base}/hwmon`)[0];
+                if (hwmonDir) {
+                    const pwm = parseInt(fs.readFileSync(`${base}/hwmon/${hwmonDir}/pwm1`, 'utf-8').trim());
+                    fan = Math.round((pwm / 255) * 100);
+                }
+            } catch {}
+
+            // Clocks
+            let clockGfx = 0, clockMem = 0;
+            try {
+                const gfxClk = readSysfs('pp_dpm_sclk');
+                const activeLine = gfxClk.split('\n').find(l => l.includes('*'));
+                if (activeLine) clockGfx = parseInt(activeLine.match(/(\d+)Mhz/)?.[1] || '0');
+            } catch {}
+            try {
+                const memClk = readSysfs('pp_dpm_mclk');
+                const activeLine = memClk.split('\n').find(l => l.includes('*'));
+                if (activeLine) clockMem = parseInt(activeLine.match(/(\d+)Mhz/)?.[1] || '0');
+            } catch {}
+
+            const pciSlot = readSysfs('uevent').match(/PCI_SLOT_NAME=(.*)/)?.[1] || card;
+
+            gpus.push({
+                busId: pciSlot,
+                name,
+                vramTotalMb: vramTotal,
+                vramUsedMb: vramUsed,
+                temperatureC: temp,
+                utilizationPct: util,
+                powerDrawW: power,
+                fanSpeedPct: fan,
+                clockSmMhz: clockGfx,
+                clockMemMhz: clockMem,
+            });
+        }
+    } catch (err) {
+        console.error('[agent] AMD GPU detection error: ' + err);
+    }
+    return gpus;
+}
+
+function getIntelGpuStats(): GpuStats[] {
+    // Basic Intel iGPU detection via sysfs
+    try {
+        const cards = fs.readdirSync('/sys/class/drm').filter(d => /^card\d+$/.test(d));
+        for (const card of cards) {
+            const base = `/sys/class/drm/${card}/device`;
+            try {
+                const vendor = fs.readFileSync(`${base}/vendor`, 'utf-8').trim();
+                if (vendor === '0x8086') {
+                    return [{
+                        busId: card,
+                        name: 'Intel Integrated GPU',
+                        vramTotalMb: 0, vramUsedMb: 0,
+                        temperatureC: 0, utilizationPct: 0,
+                        powerDrawW: 0, fanSpeedPct: 0,
+                        clockSmMhz: 0, clockMemMhz: 0,
+                    }];
+                }
+            } catch {}
+        }
+    } catch {}
+    return [];
 }
 
 function getMockSystemStats() {
@@ -275,7 +429,7 @@ function getInferenceStats(mockMode: boolean) {
 }
 
 function collectStats(config: AgentConfig): StatsPayload {
-    const gpus = config.mockMode ? getMockGpuStats() : getNvidiaStats();
+    const gpus = config.mockMode ? getMockGpuStats() : getGpuStats();
     const system = config.mockMode ? getMockSystemStats() : getLinuxSystemStats();
     const inference = getInferenceStats(config.mockMode);
 
@@ -760,13 +914,30 @@ async function runSelfHeal(config: ReturnType<typeof loadConfig>): Promise<SelfH
         }
     }
 
-    // 4. Check GPU driver (Linux + NVIDIA only, skip in mock mode)
+    // 4. Check GPU driver (Linux only, skip in mock mode)
     if (process.platform === 'linux' && !config.mockMode) {
-        try {
-            execSync('nvidia-smi --query-gpu=name --format=csv,noheader', { timeout: 5000 });
-            results.push({ check: 'gpu_driver', status: 'ok', message: 'NVIDIA driver responding' });
-        } catch {
-            results.push({ check: 'gpu_driver', status: 'failed', message: 'nvidia-smi failed — GPU driver may be crashed. Needs manual reboot.' });
+        const vendor = detectGpuVendor();
+        if (vendor === 'nvidia') {
+            try {
+                execSync('nvidia-smi --query-gpu=name --format=csv,noheader', { timeout: 5000 });
+                results.push({ check: 'gpu_driver', status: 'ok', message: 'NVIDIA driver responding' });
+            } catch {
+                results.push({ check: 'gpu_driver', status: 'failed', message: 'nvidia-smi failed — GPU driver may be crashed' });
+            }
+        } else if (vendor === 'amd') {
+            try {
+                const kfd = fs.existsSync('/dev/kfd');
+                const drm = fs.readdirSync('/sys/class/drm').some(d => /^card\d+$/.test(d));
+                if (kfd && drm) {
+                    results.push({ check: 'gpu_driver', status: 'ok', message: 'AMD amdgpu driver active (/dev/kfd present)' });
+                } else {
+                    results.push({ check: 'gpu_driver', status: 'failed', message: 'AMD GPU detected but /dev/kfd missing' });
+                }
+            } catch {
+                results.push({ check: 'gpu_driver', status: 'failed', message: 'AMD GPU driver check failed' });
+            }
+        } else {
+            results.push({ check: 'gpu_driver', status: 'ok', message: `GPU vendor: ${vendor}` });
         }
     }
 
