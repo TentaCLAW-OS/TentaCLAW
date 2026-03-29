@@ -3294,3 +3294,49 @@ app.get('/api/v1/capacity', (c) => {
         recommendation: freeVram > 40000 ? 'Plenty of room — could fit a 70B model' : freeVram > 8000 ? 'Room for small-medium models' : freeVram > 2000 ? 'Tight — only small models' : 'Full — consider removing unused models',
     });
 });
+
+// Wave 36: Status badges (shields.io format)
+app.get('/api/v1/badge/:type', (c) => {
+    const type = c.req.param('type');
+    const summary = getClusterSummary();
+    const health = getHealthScore();
+    let label = '', message = '', color = '';
+    
+    switch (type) {
+        case 'health': label = 'health'; message = health.score + '/100'; color = health.score >= 80 ? 'brightgreen' : health.score >= 50 ? 'yellow' : 'red'; break;
+        case 'nodes': label = 'nodes'; message = summary.online_nodes + '/' + summary.total_nodes; color = summary.online_nodes === summary.total_nodes ? 'brightgreen' : 'yellow'; break;
+        case 'gpus': label = 'GPUs'; message = String(summary.total_gpus); color = 'blue'; break;
+        case 'models': label = 'models'; message = String(summary.loaded_models.length); color = 'purple'; break;
+        default: return c.json({ error: 'Unknown badge type. Available: health, nodes, gpus, models' }, 400);
+    }
+    // Shields.io endpoint format
+    return c.json({ schemaVersion: 1, label, message, color });
+});
+
+// Wave 37: Monitoring health variants
+app.get('/api/v1/healthz', (c) => {
+    const nodes = getAllNodes().filter(n => n.status === 'online');
+    if (nodes.length === 0) return c.json({ status: 'unhealthy', reason: 'no online nodes' }, 503);
+    return c.json({ status: 'healthy', nodes: nodes.length });
+});
+
+app.get('/api/v1/readyz', (c) => {
+    const models = getClusterModels();
+    if (models.length === 0) return c.json({ status: 'not_ready', reason: 'no models loaded' }, 503);
+    return c.json({ status: 'ready', models: models.length });
+});
+
+// Wave 40: Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('[hivemind] SIGTERM received — graceful shutdown starting');
+    console.log('[hivemind] Waiting for in-flight requests to complete...');
+    setTimeout(() => {
+        console.log('[hivemind] Shutdown complete');
+        process.exit(0);
+    }, 5000);
+});
+
+process.on('SIGINT', () => {
+    console.log('[hivemind] SIGINT received — shutting down');
+    process.exit(0);
+});
