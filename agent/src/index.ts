@@ -1837,3 +1837,36 @@ function getLocalIp(): string {
 process.on('SIGINT', () => { console.log('\n[agent] Shutting down...'); process.exit(0); });
 process.on('SIGTERM', () => { console.log('\n[agent] Shutting down...'); process.exit(0); });
 main().catch(error => { console.error('[agent] Fatal: ' + error); process.exit(1); });
+
+// =============================================================================
+// Wave 46-50: Agent Enhancements
+// =============================================================================
+
+// Auto-benchmark on first boot
+function shouldAutoBenchmark(): boolean {
+    try {
+        return !fs.existsSync('/etc/tentaclaw/.benchmarked');
+    } catch { return false; }
+}
+
+function markBenchmarked(): void {
+    try {
+        fs.mkdirSync('/etc/tentaclaw', { recursive: true });
+        fs.writeFileSync('/etc/tentaclaw/.benchmarked', new Date().toISOString());
+    } catch {}
+}
+
+// Network quality check
+function checkNetworkLatency(gatewayUrl: string): Promise<number> {
+    return new Promise((resolve) => {
+        const start = Date.now();
+        const transport = gatewayUrl.startsWith('https') ? https : http;
+        const req = transport.get(gatewayUrl + '/health', { timeout: 5000 }, (res) => {
+            let data = '';
+            res.on('data', (c: Buffer) => { data += c.toString(); });
+            res.on('end', () => resolve(Date.now() - start));
+        });
+        req.on('error', () => resolve(-1));
+        req.on('timeout', () => { req.destroy(); resolve(-1); });
+    });
+}

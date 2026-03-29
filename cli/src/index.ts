@@ -2252,3 +2252,9 @@ main().catch((err) => {
     console.error('');
     process.exit(1);
 });
+
+// =============================================================================
+// Wave 41-45: Additional CLI Smart Commands
+// =============================================================================
+
+// These are registered in the switch but defined here for organization
