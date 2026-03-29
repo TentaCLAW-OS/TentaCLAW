@@ -180,6 +180,19 @@ function initSchema(db: Database.Database): void {
 
         CREATE INDEX IF NOT EXISTS idx_oc_node ON overclock_profiles(node_id);
 
+        CREATE TABLE IF NOT EXISTS prompt_cache (
+            hash TEXT PRIMARY KEY,
+            model TEXT NOT NULL,
+            prompt_preview TEXT,
+            response TEXT NOT NULL,
+            tokens_saved INTEGER DEFAULT 0,
+            hits INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            expires_at TEXT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_cache_model ON prompt_cache(model);
+
         CREATE TABLE IF NOT EXISTS model_aliases (
             alias TEXT PRIMARY KEY,
             target TEXT NOT NULL,
@@ -1286,6 +1299,47 @@ export function getAllTags(): Array<{ tag: string; count: number }> {
     return d.prepare(
         'SELECT tag, COUNT(*) as count FROM node_tags GROUP BY tag ORDER BY count DESC'
     ).all() as Array<{ tag: string; count: number }>;
+}
+
+// =============================================================================
+// Prompt Cache (Wave 10)
+// =============================================================================
+
+export function getCachedResponse(promptHash: string): { response: string; tokens_saved: number } | null {
+    const d = getDb();
+    const row = d.prepare(`
+        SELECT response, tokens_saved FROM prompt_cache
+        WHERE hash = ? AND (expires_at IS NULL OR expires_at > datetime('now'))
+    `).get(promptHash) as any;
+
+    if (row) {
+        d.prepare('UPDATE prompt_cache SET hits = hits + 1 WHERE hash = ?').run(promptHash);
+        return { response: row.response, tokens_saved: row.tokens_saved || 0 };
+    }
+    return null;
+}
+
+export function cacheResponse(promptHash: string, model: string, promptPreview: string, response: string, tokensSaved: number, ttlMinutes: number = 60): void {
+    const d = getDb();
+    const expiresAt = new Date(Date.now() + ttlMinutes * 60000).toISOString().replace('T', ' ').slice(0, 19);
+    d.prepare(`INSERT OR REPLACE INTO prompt_cache (hash, model, prompt_preview, response, tokens_saved, expires_at) VALUES (?, ?, ?, ?, ?, ?)`).run(
+        promptHash, model, promptPreview.slice(0, 100), response, tokensSaved, expiresAt
+    );
+}
+
+export function getCacheStats(): { entries: number; total_hits: number; total_tokens_saved: number } {
+    const d = getDb();
+    const stats = d.prepare(`
+        SELECT COUNT(*) as entries, COALESCE(SUM(hits), 0) as total_hits, COALESCE(SUM(tokens_saved * hits), 0) as total_tokens_saved
+        FROM prompt_cache WHERE expires_at IS NULL OR expires_at > datetime('now')
+    `).get() as any;
+    return stats;
+}
+
+export function pruneCache(): number {
+    const d = getDb();
+    const result = d.prepare("DELETE FROM prompt_cache WHERE expires_at <= datetime('now')").run();
+    return result.changes;
 }
 
 // =============================================================================

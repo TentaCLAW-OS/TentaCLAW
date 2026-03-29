@@ -16,6 +16,7 @@ import path from 'path';
 import dgram from 'dgram';
 import os from 'os';
 import { WebSocketServer, WebSocket as WsWebSocket } from 'ws';
+import { createHash } from 'crypto';
 import type { StatsPayload, GatewayResponse, CommandAction } from '../../shared/types';
 import {
     getDb,
@@ -82,6 +83,10 @@ import {
     getAllModelAliases,
     deleteModelAlias,
     ensureDefaultAliases,
+    getCachedResponse,
+    cacheResponse,
+    getCacheStats,
+    pruneCache,
     createApiKey,
     validateApiKey,
     trackApiKeyTokens,
@@ -798,6 +803,21 @@ app.post('/v1/chat/completions', async (c) => {
         }, 503);
     }
 
+    // Check prompt cache (skip for streaming)
+    if (!body.stream) {
+        const cacheKey = createHash('sha256').update(JSON.stringify({ model: resolvedModel, messages: body.messages })).digest('hex');
+        const noCache = c.req.header('Cache-Control') === 'no-cache';
+
+        if (!noCache) {
+            const cached = getCachedResponse(cacheKey);
+            if (cached) {
+                const result = JSON.parse(cached.response);
+                result._tentaclaw = { cached: true, tokens_saved: cached.tokens_saved };
+                return c.json(result);
+            }
+        }
+    }
+
     // Proxy the request to the target node — use resolved model name
     const proxyBody = { ...body, model: resolvedModel };
     const ollamaUrl = 'http://' + (target.ip_address || target.hostname) + ':11434/v1/chat/completions';
@@ -838,7 +858,17 @@ app.post('/v1/chat/completions', async (c) => {
             resolved_model: resolvedModel,
             alias_used: model !== resolvedModel ? model : undefined,
             fallback_used: usedFallback ? resolvedModel : undefined,
+            cached: false,
         };
+
+        // Cache the response (non-streaming only)
+        if (!body.stream && proxyReq.ok) {
+            const cacheKey = createHash('sha256').update(JSON.stringify({ model: resolvedModel, messages: body.messages })).digest('hex');
+            const usage = (result as any).usage;
+            const tokensSaved = (usage?.total_tokens) || 0;
+            cacheResponse(cacheKey, resolvedModel, JSON.stringify(body.messages).slice(0, 100), JSON.stringify(result), tokensSaved);
+        }
+
         return c.json(result, proxyReq.status as any);
 
     } catch (err: any) {
@@ -1883,6 +1913,19 @@ app.post('/api/v1/models/smart-deploy', async (c) => {
 
 app.get('/api/v1/inference/stats', (c) => {
     return c.json(getRequestStats());
+});
+
+// =============================================================================
+// Prompt Cache (Wave 10)
+// =============================================================================
+
+app.get('/api/v1/cache/stats', (c) => {
+    return c.json(getCacheStats());
+});
+
+app.post('/api/v1/cache/purge', (c) => {
+    const pruned = pruneCache();
+    return c.json({ status: 'purged', expired_entries_removed: pruned });
 });
 
 // =============================================================================
