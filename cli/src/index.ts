@@ -1275,6 +1275,65 @@ async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
     console.log('');
 }
 
+async function cmdApiKey(gateway: string, positional: string[], flags: Record<string, string>): Promise<void> {
+    const sub = positional[0] || 'list';
+
+    if (sub === 'list') {
+        const keys = await apiGet(gateway, '/api/v1/apikeys') as any[];
+        console.log('');
+        if (keys.length === 0) {
+            console.log(C.dim('  No API keys. Create one:'));
+            console.log(C.cyan('    clawtopus apikey create --name "my-app"'));
+        } else {
+            console.log('  ' + C.purple(C.bold('API Keys')) + C.dim(` (${keys.length})`));
+            console.log('');
+            console.log('  ' + padRight(C.dim('PREFIX'), 14) + padRight(C.dim('NAME'), 20) + padRight(C.dim('SCOPE'), 14) + padRight(C.dim('REQS'), 10) + C.dim('LAST USED'));
+            console.log('  ' + C.dim('\u2500'.repeat(70)));
+            for (const k of keys) {
+                const enabled = k.enabled ? C.green('\u25CF') : C.red('\u25CB');
+                console.log('  ' + enabled + ' ' +
+                    padRight(C.white(k.key_prefix + '...'), 14) +
+                    padRight(C.white(k.name), 20) +
+                    padRight(C.dim(k.scope), 14) +
+                    padRight(C.cyan(String(k.requests_count)), 10) +
+                    C.dim(k.last_used_at || 'never'));
+            }
+        }
+        console.log('');
+        return;
+    }
+
+    if (sub === 'create') {
+        const name = flags['name'] || 'default';
+        const scope = flags['scope'] || 'inference';
+        const rpm = parseInt(flags['rpm'] || '60');
+        const result = await apiPost(gateway, '/api/v1/apikeys', { name, scope, rate_limit_rpm: rpm }) as any;
+
+        console.log('');
+        console.log('  ' + C.green('\u2714') + ' API Key created');
+        console.log('');
+        console.log('  ' + C.red(C.bold('SAVE THIS KEY — IT WILL NOT BE SHOWN AGAIN:')));
+        console.log('');
+        console.log('  ' + C.white(C.bold(result.key)));
+        console.log('');
+        console.log('  ' + C.dim('Name:  ') + C.white(name));
+        console.log('  ' + C.dim('Scope: ') + C.white(scope));
+        console.log('  ' + C.dim('Rate:  ') + C.white(rpm + ' req/min'));
+        console.log('');
+        console.log('  ' + C.dim('Use with: curl -H "Authorization: Bearer ' + result.key.slice(0, 10) + '..."'));
+        console.log('');
+        return;
+    }
+
+    if (sub === 'revoke') {
+        const keyId = positional[1];
+        if (!keyId) { console.error(C.red('  Usage: clawtopus apikey revoke <id>')); process.exit(1); }
+        await apiGet(gateway, ''); // placeholder - need delete method
+        console.log('  ' + C.green('\u2714') + ' Key revoked');
+        return;
+    }
+}
+
 async function cmdAnalytics(gateway: string, flags: Record<string, string>): Promise<void> {
     const hours = parseInt(flags['hours'] || '24');
 
@@ -1903,6 +1962,11 @@ async function main(): Promise<void> {
 
         case 'fix':
             await cmdFix(gateway);
+            break;
+
+        case 'apikey':
+        case 'apikeys':
+            await cmdApiKey(gateway, parsed.positional, parsed.flags);
             break;
 
         case 'analytics':

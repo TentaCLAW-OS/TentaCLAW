@@ -180,6 +180,24 @@ function initSchema(db: Database.Database): void {
 
         CREATE INDEX IF NOT EXISTS idx_oc_node ON overclock_profiles(node_id);
 
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            key_hash TEXT NOT NULL UNIQUE,
+            key_prefix TEXT NOT NULL,
+            scope TEXT DEFAULT 'inference',
+            rate_limit_rpm INTEGER DEFAULT 60,
+            monthly_token_limit INTEGER DEFAULT 0,
+            tokens_used INTEGER DEFAULT 0,
+            requests_count INTEGER DEFAULT 0,
+            last_used_at TEXT,
+            expires_at TEXT,
+            enabled INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+
         CREATE TABLE IF NOT EXISTS inference_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             node_id TEXT NOT NULL,
@@ -1261,6 +1279,64 @@ export function getAllTags(): Array<{ tag: string; count: number }> {
     return d.prepare(
         'SELECT tag, COUNT(*) as count FROM node_tags GROUP BY tag ORDER BY count DESC'
     ).all() as Array<{ tag: string; count: number }>;
+}
+
+// =============================================================================
+// API Key Management (Wave 7)
+// =============================================================================
+
+import { createHash, randomBytes } from 'crypto';
+
+export function createApiKey(name: string, scope: string = 'inference', rateLimitRpm: number = 60): { id: string; key: string; prefix: string } {
+    const d = getDb();
+    const id = generateId();
+    const rawKey = 'tc_' + randomBytes(24).toString('hex'); // tc_<48 hex chars>
+    const keyHash = createHash('sha256').update(rawKey).digest('hex');
+    const prefix = rawKey.slice(0, 10);
+
+    d.prepare(`INSERT INTO api_keys (id, name, key_hash, key_prefix, scope, rate_limit_rpm) VALUES (?, ?, ?, ?, ?, ?)`).run(
+        id, name, keyHash, prefix, scope, rateLimitRpm
+    );
+
+    return { id, key: rawKey, prefix };
+}
+
+export function validateApiKey(rawKey: string): { valid: boolean; keyId?: string; name?: string; scope?: string; rateLimitRpm?: number } {
+    const d = getDb();
+    const keyHash = createHash('sha256').update(rawKey).digest('hex');
+    const row = d.prepare('SELECT * FROM api_keys WHERE key_hash = ? AND enabled = 1').get(keyHash) as any;
+
+    if (!row) return { valid: false };
+
+    // Check expiration
+    if (row.expires_at && new Date(row.expires_at + 'Z') < new Date()) {
+        return { valid: false };
+    }
+
+    // Update last used
+    d.prepare("UPDATE api_keys SET last_used_at = datetime('now'), requests_count = requests_count + 1 WHERE id = ?").run(row.id);
+
+    return { valid: true, keyId: row.id, name: row.name, scope: row.scope, rateLimitRpm: row.rate_limit_rpm };
+}
+
+export function trackApiKeyTokens(keyId: string, tokens: number): void {
+    const d = getDb();
+    d.prepare('UPDATE api_keys SET tokens_used = tokens_used + ? WHERE id = ?').run(tokens, keyId);
+}
+
+export function getAllApiKeys(): any[] {
+    const d = getDb();
+    return d.prepare('SELECT id, name, key_prefix, scope, rate_limit_rpm, monthly_token_limit, tokens_used, requests_count, last_used_at, expires_at, enabled, created_at FROM api_keys ORDER BY created_at DESC').all() as any[];
+}
+
+export function revokeApiKey(id: string): boolean {
+    const d = getDb();
+    return d.prepare('UPDATE api_keys SET enabled = 0 WHERE id = ?').run(id).changes > 0;
+}
+
+export function deleteApiKey(id: string): boolean {
+    const d = getDb();
+    return d.prepare('DELETE FROM api_keys WHERE id = ?').run(id).changes > 0;
 }
 
 // =============================================================================

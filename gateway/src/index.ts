@@ -76,6 +76,12 @@ import {
     getModelDistribution,
     logInferenceRequest,
     getInferenceAnalytics,
+    createApiKey,
+    validateApiKey,
+    trackApiKeyTokens,
+    getAllApiKeys,
+    revokeApiKey,
+    deleteApiKey,
     recordUptimeEvent,
     getNodeUptime,
     getFleetUptime,
@@ -1849,6 +1855,32 @@ app.post('/api/v1/models/smart-deploy', async (c) => {
 
 app.get('/api/v1/inference/stats', (c) => {
     return c.json(getRequestStats());
+});
+
+// =============================================================================
+// API Key Management (Wave 7)
+// =============================================================================
+
+app.get('/api/v1/apikeys', (c) => {
+    return c.json(getAllApiKeys());
+});
+
+app.post('/api/v1/apikeys', async (c) => {
+    const body = await c.req.json<{ name: string; scope?: string; rate_limit_rpm?: number }>();
+    if (!body.name) return c.json({ error: 'name required' }, 400);
+
+    const result = createApiKey(body.name, body.scope || 'inference', body.rate_limit_rpm || 60);
+    return c.json({
+        id: result.id,
+        key: result.key, // Only shown ONCE at creation
+        prefix: result.prefix,
+        message: 'Save this key — it will not be shown again.',
+    }, 201);
+});
+
+app.delete('/api/v1/apikeys/:id', (c) => {
+    if (!revokeApiKey(c.req.param('id'))) return c.json({ error: 'Key not found' }, 404);
+    return c.json({ status: 'revoked' });
 });
 
 app.get('/api/v1/inference/analytics', (c) => {
