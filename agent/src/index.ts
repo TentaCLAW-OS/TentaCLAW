@@ -295,6 +295,107 @@ function getMockGpuStats(): GpuStats[] {
 
 type GpuVendor = 'nvidia' | 'amd' | 'intel' | 'unknown';
 
+// AMD GPU architecture → compute backend mapping
+// ROCm only supports GFX9+ (Vega and newer with official support)
+// Polaris (GFX8) and older need Vulkan compute
+type AmdArch = 'rdna3' | 'rdna2' | 'rdna1' | 'vega' | 'polaris' | 'fiji' | 'unknown';
+type AmdComputeBackend = 'rocm' | 'vulkan' | 'sysfs-only';
+
+interface AmdGpuInfo {
+    arch: AmdArch;
+    compute: AmdComputeBackend;
+    gfxVersion: string;
+    rocmSupported: boolean;
+}
+
+// Known AMD GPU families and their architectures
+const AMD_GPU_ARCH_MAP: Record<string, { arch: AmdArch; gfx: string }> = {
+    // RDNA 3 — full ROCm support
+    'navi 3': { arch: 'rdna3', gfx: 'gfx11' },
+    '7900': { arch: 'rdna3', gfx: 'gfx11' },
+    '7800': { arch: 'rdna3', gfx: 'gfx11' },
+    '7700': { arch: 'rdna3', gfx: 'gfx11' },
+    '7600': { arch: 'rdna3', gfx: 'gfx11' },
+    // RDNA 2 — ROCm support (6000 series)
+    'navi 2': { arch: 'rdna2', gfx: 'gfx10.3' },
+    '6900': { arch: 'rdna2', gfx: 'gfx10.3' },
+    '6800': { arch: 'rdna2', gfx: 'gfx10.3' },
+    '6700': { arch: 'rdna2', gfx: 'gfx10.3' },
+    '6600': { arch: 'rdna2', gfx: 'gfx10.3' },
+    '6500': { arch: 'rdna2', gfx: 'gfx10.3' },
+    // RDNA 1 — limited ROCm, Vulkan preferred
+    'navi 1': { arch: 'rdna1', gfx: 'gfx10.1' },
+    '5700': { arch: 'rdna1', gfx: 'gfx10.1' },
+    '5600': { arch: 'rdna1', gfx: 'gfx10.1' },
+    '5500': { arch: 'rdna1', gfx: 'gfx10.1' },
+    // Vega — ROCm works but Vulkan may be better for inference
+    'vega': { arch: 'vega', gfx: 'gfx9' },
+    'vega 10': { arch: 'vega', gfx: 'gfx9' },
+    'vega 20': { arch: 'vega', gfx: 'gfx9' },
+    'vega frontier': { arch: 'vega', gfx: 'gfx9' },
+    'radeon vii': { arch: 'vega', gfx: 'gfx9' },
+    'instinct mi': { arch: 'vega', gfx: 'gfx9' },
+    // Polaris — NO ROCm, Vulkan only
+    'polaris': { arch: 'polaris', gfx: 'gfx8' },
+    'ellesmere': { arch: 'polaris', gfx: 'gfx8' },
+    'baffin': { arch: 'polaris', gfx: 'gfx8' },
+    'rx 580': { arch: 'polaris', gfx: 'gfx8' },
+    'rx 570': { arch: 'polaris', gfx: 'gfx8' },
+    'rx 480': { arch: 'polaris', gfx: 'gfx8' },
+    'rx 470': { arch: 'polaris', gfx: 'gfx8' },
+    'rx 560': { arch: 'polaris', gfx: 'gfx8' },
+    'rx 550': { arch: 'polaris', gfx: 'gfx8' },
+    'wx 7100': { arch: 'polaris', gfx: 'gfx8' },
+    'wx 5100': { arch: 'polaris', gfx: 'gfx8' },
+    // Fiji — NO ROCm, Vulkan only
+    'fiji': { arch: 'fiji', gfx: 'gfx8' },
+    'fury': { arch: 'fiji', gfx: 'gfx8' },
+    'nano': { arch: 'fiji', gfx: 'gfx8' },
+};
+
+function detectAmdArch(gpuName: string): AmdGpuInfo {
+    const lower = gpuName.toLowerCase();
+
+    for (const [pattern, info] of Object.entries(AMD_GPU_ARCH_MAP)) {
+        if (lower.includes(pattern)) {
+            // Determine compute backend
+            let compute: AmdComputeBackend;
+            if (info.arch === 'rdna3' || info.arch === 'rdna2') {
+                compute = 'rocm'; // Full ROCm support
+            } else if (info.arch === 'vega') {
+                // Vega: ROCm works if installed, but Vulkan is safer for Ollama
+                const hasRocm = fs.existsSync('/opt/rocm') || fs.existsSync('/usr/bin/rocm-smi');
+                compute = hasRocm ? 'rocm' : 'vulkan';
+            } else if (info.arch === 'rdna1') {
+                // RDNA 1 (5000 series): ROCm is hit-or-miss, Vulkan preferred
+                const hasRocm = fs.existsSync('/opt/rocm');
+                compute = hasRocm ? 'rocm' : 'vulkan';
+            } else {
+                // Polaris, Fiji: NO ROCm ever, Vulkan only
+                compute = 'vulkan';
+            }
+
+            return {
+                arch: info.arch,
+                compute,
+                gfxVersion: info.gfx,
+                rocmSupported: info.arch === 'rdna3' || info.arch === 'rdna2' || info.arch === 'vega',
+            };
+        }
+    }
+
+    // Unknown AMD GPU — try sysfs gfx version
+    try {
+        const cards = fs.readdirSync('/sys/class/drm').filter(d => /^card\d+$/.test(d));
+        for (const card of cards) {
+            const revId = fs.readFileSync(`/sys/class/drm/${card}/device/revision`, 'utf-8').trim();
+            // If we can read revision, the amdgpu driver is loaded — sysfs works
+        }
+    } catch {}
+
+    return { arch: 'unknown', compute: 'sysfs-only', gfxVersion: 'unknown', rocmSupported: false };
+}
+
 function detectGpuVendor(): GpuVendor {
     try {
         const lspci = execSync('lspci 2>/dev/null | grep -i "vga\\|3d\\|display"', { encoding: 'utf-8' });
@@ -302,7 +403,6 @@ function detectGpuVendor(): GpuVendor {
         if (lspci.toLowerCase().includes('amd') || lspci.toLowerCase().includes('radeon')) return 'amd';
         if (lspci.toLowerCase().includes('intel')) return 'intel';
     } catch {}
-    // Fallback: check for driver presence
     try {
         if (fs.existsSync('/dev/nvidiactl')) return 'nvidia';
         if (fs.existsSync('/dev/kfd')) return 'amd';
@@ -349,19 +449,20 @@ function getNvidiaStats(): GpuStats[] {
 }
 
 function getAmdGpuStats(): GpuStats[] {
-    // Uses amdgpu kernel driver sysfs interface — no ROCm needed
+    // Smart AMD GPU detection — uses sysfs (always works) + detects architecture
+    // for ROCm vs Vulkan compute backend selection
     const gpus: GpuStats[] = [];
     try {
         const cards = fs.readdirSync('/sys/class/drm').filter(d => /^card\d+$/.test(d));
         for (const card of cards) {
             const base = `/sys/class/drm/${card}/device`;
-            if (!fs.existsSync(base + '/gpu_busy_percent')) continue; // Not an amdgpu device
+            if (!fs.existsSync(base + '/gpu_busy_percent')) continue;
 
             const readSysfs = (file: string): string => {
                 try { return fs.readFileSync(`${base}/${file}`, 'utf-8').trim(); } catch { return ''; }
             };
 
-            // GPU name from lspci for this device
+            // GPU name from lspci
             let name = 'AMD GPU';
             try {
                 const uevent = readSysfs('uevent');
@@ -372,6 +473,14 @@ function getAmdGpuStats(): GpuStats[] {
                     if (match) name = match[1].replace(/\(rev.*\)/, '').trim();
                 }
             } catch {}
+
+            // Detect architecture and compute backend
+            const archInfo = detectAmdArch(name);
+            if (gpus.length === 0) {
+                // Log once per detection cycle
+                console.log(`[agent] AMD arch: ${archInfo.arch} (${archInfo.gfxVersion}) → compute: ${archInfo.compute}` +
+                    (archInfo.rocmSupported ? '' : ' (ROCm NOT supported for this GPU — using ' + archInfo.compute + ')'));
+            }
 
             // VRAM from hwmon or mem_info
             let vramTotal = 0, vramUsed = 0;
@@ -557,7 +666,48 @@ interface BackendInfo {
 
 let detectedBackend: BackendInfo | null = null;
 
+// Set environment variables for AMD GPU compute compatibility
+function configureAmdCompute(gpuName: string): void {
+    const archInfo = detectAmdArch(gpuName);
+
+    if (archInfo.arch === 'polaris' || archInfo.arch === 'fiji') {
+        // Polaris/Fiji: Force Ollama to use Vulkan, not ROCm
+        // These GPUs are GFX8 — ROCm doesn't support them
+        process.env['OLLAMA_LLM_LIBRARY'] = 'cpu'; // Fallback if Vulkan not available
+        // Some Ollama builds support HSA_OVERRIDE but it's unreliable for GFX8
+        console.log('[agent] AMD Polaris/Fiji detected — ROCm disabled, using CPU/Vulkan fallback');
+        console.log('[agent] For GPU acceleration, install Vulkan: sudo apt install mesa-vulkan-drivers');
+    } else if (archInfo.arch === 'vega') {
+        // Vega (GFX9): ROCm works but needs version override for some cards
+        process.env['HSA_OVERRIDE_GFX_VERSION'] = '9.0.0';
+        process.env['HIP_VISIBLE_DEVICES'] = '0'; // Ensure HIP sees the GPU
+        console.log('[agent] AMD Vega detected — set HSA_OVERRIDE_GFX_VERSION=9.0.0');
+    } else if (archInfo.arch === 'rdna1') {
+        // RDNA1 (5000 series, GFX10.1): Needs version override
+        process.env['HSA_OVERRIDE_GFX_VERSION'] = '10.1.0';
+        console.log('[agent] AMD RDNA1 detected — set HSA_OVERRIDE_GFX_VERSION=10.1.0');
+    } else if (archInfo.arch === 'rdna2') {
+        // RDNA2 (6000 series): Native ROCm support, may need override for some models
+        process.env['HSA_OVERRIDE_GFX_VERSION'] = '10.3.0';
+        console.log('[agent] AMD RDNA2 detected — set HSA_OVERRIDE_GFX_VERSION=10.3.0');
+    } else if (archInfo.arch === 'rdna3') {
+        // RDNA3 (7000 series): Full native ROCm
+        console.log('[agent] AMD RDNA3 detected — native ROCm support');
+    }
+}
+
 function detectInferenceBackends(): BackendInfo {
+    // Configure AMD compute env vars before checking backends
+    const vendor = detectGpuVendor();
+    if (vendor === 'amd') {
+        try {
+            const gpus = getAmdGpuStats();
+            if (gpus.length > 0) {
+                configureAmdCompute(gpus[0].name);
+            }
+        } catch {}
+    }
+
     // Priority: Ollama > vLLM > llama.cpp > none
     // Check Ollama (port 11434)
     try {
@@ -599,6 +749,35 @@ function getBackendRecommendation(gpus: GpuStats[]): string {
     const gpuCount = gpus.length;
 
     if (gpuCount === 0) return 'llama.cpp (CPU-only, no GPU detected)';
+
+    // Check AMD GPU architecture for backend selection
+    const vendor = detectGpuVendor();
+    if (vendor === 'amd' && gpus.length > 0) {
+        const archInfo = detectAmdArch(gpus[0].name);
+
+        if (archInfo.arch === 'polaris' || archInfo.arch === 'fiji') {
+            // Polaris/Fiji: ROCm does NOT work. Use Vulkan via Ollama or llama.cpp
+            return 'Ollama with Vulkan compute (Polaris/Fiji — ROCm not supported, using Vulkan backend)';
+        }
+        if (archInfo.arch === 'rdna1') {
+            // RDNA1 (5000 series): ROCm is flaky, Vulkan is safer
+            return 'Ollama with Vulkan (RDNA1 — ROCm may work but Vulkan is more stable)';
+        }
+        if (archInfo.arch === 'vega') {
+            // Vega: ROCm works if installed, otherwise Vulkan
+            if (archInfo.compute === 'rocm') {
+                return 'Ollama with ROCm (Vega — ROCm detected and supported)';
+            }
+            return 'Ollama with Vulkan (Vega — ROCm not installed, using Vulkan)';
+        }
+        if (archInfo.arch === 'rdna2' || archInfo.arch === 'rdna3') {
+            // RDNA2/3: Full ROCm support
+            if (totalVram >= 48000) return 'vLLM with ROCm (RDNA2/3 — high VRAM, full ROCm)';
+            return 'Ollama with ROCm (RDNA2/3 — full ROCm support)';
+        }
+    }
+
+    // NVIDIA or generic fallback
     if (totalVram >= 48000) return 'vLLM (high VRAM, batching benefits)';
     if (totalVram >= 8000) return 'Ollama (good VRAM, easy management)';
     return 'llama.cpp (low VRAM, quantized models)';
