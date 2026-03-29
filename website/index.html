@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TentaCLAW OS — AI Inference Cluster Operating System</title>
+  <meta name="description" content="TentaCLAW OS turns your pile of GPUs into a unified AI inference cluster. Zero config. Auto-discovery. Self-healing.">
+  <meta name="theme-color" content="#0a0e14">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0a0e14; --surface:#0f1419; --border:#1b2230; --teal:#00d4aa; --purple:#8b5cf6; --text:#e2e8f0; --muted:#64748b; }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text)}
+    .hero{min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:2rem;position:relative;overflow:hidden}
+    .hero::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle at 30% 40%,rgba(0,212,170,0.06) 0%,transparent 50%),radial-gradient(circle at 70% 60%,rgba(139,92,246,0.04) 0%,transparent 40%)}
+    .hero-content{position:relative;z-index:1;max-width:800px}
+    h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(2.5rem,6vw,4.5rem);font-weight:700;margin-bottom:1.5rem;line-height:1.1}
+    h1 span{color:var(--teal)}
+    .tagline{font-size:1.3rem;color:var(--muted);margin-bottom:2.5rem;max-width:600px;margin-left:auto;margin-right:auto}
+    .install-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.2rem 2rem;display:inline-flex;align-items:center;gap:1rem;margin-bottom:2rem;font-family:'JetBrains Mono',monospace;font-size:0.95rem}
+    .install-box code{color:var(--teal)}
+    .install-box button{background:var(--teal);color:#000;border:none;padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:0.85rem}
+    .cta-row{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
+    .btn{padding:0.8rem 2rem;border-radius:8px;font-weight:600;font-size:1rem;text-decoration:none;transition:all 0.2s}
+    .btn-primary{background:var(--teal);color:#000}
+    .btn-primary:hover{opacity:0.9;transform:translateY(-1px)}
+    .btn-secondary{background:transparent;color:var(--text);border:1px solid var(--border)}
+    .btn-secondary:hover{border-color:var(--teal)}
+    .stats{display:flex;gap:3rem;justify-content:center;margin-top:3rem;flex-wrap:wrap}
+    .stat-num{font-family:'Space Grotesk',sans-serif;font-size:2.5rem;font-weight:700;color:var(--teal)}
+    .stat-label{font-size:0.85rem;color:var(--muted);margin-top:0.25rem}
+    .features{padding:6rem 2rem;max-width:1200px;margin:0 auto}
+    .features h2{font-family:'Space Grotesk',sans-serif;font-size:2.5rem;text-align:center;margin-bottom:3rem}
+    .feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem}
+    .feature-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:2rem}
+    .feature-card h3{color:var(--teal);margin-bottom:0.75rem;font-size:1.2rem}
+    .feature-card p{color:var(--muted);line-height:1.6}
+    .comparison{padding:6rem 2rem;max-width:1000px;margin:0 auto}
+    .comparison h2{font-family:'Space Grotesk',sans-serif;font-size:2.5rem;text-align:center;margin-bottom:3rem}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:left;padding:1rem;border-bottom:1px solid var(--border);color:var(--muted);font-size:0.85rem;text-transform:uppercase;letter-spacing:1px}
+    td{padding:1rem;border-bottom:1px solid var(--border)}
+    td:first-child{font-weight:600}
+    .check{color:var(--teal)}
+    .cross{color:var(--muted)}
+    footer{text-align:center;padding:3rem;color:var(--muted);font-size:0.85rem;border-top:1px solid var(--border)}
+    footer a{color:var(--teal);text-decoration:none}
+    @media(max-width:768px){.install-box{flex-direction:column;text-align:center}.stats{gap:1.5rem}}
+  </style>
+</head>
+<body>
+  <section class="hero">
+    <div class="hero-content">
+      <h1>Turn your GPUs into<br><span>one AI cluster</span></h1>
+      <p class="tagline">TentaCLAW OS manages your AI inference hardware. Auto-discovery, load balancing, self-healing, one dashboard. Zero config.</p>
+      <div class="install-box">
+        <code>curl -fsSL tentaclaw.io/install | bash</code>
+        <button onclick="navigator.clipboard.writeText('curl -fsSL tentaclaw.io/install | bash')">Copy</button>
+      </div>
+      <div class="cta-row">
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW" class="btn btn-primary">View on GitHub</a>
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW#quick-start" class="btn btn-secondary">Quick Start</a>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-num">200+</div><div class="stat-label">API Endpoints</div></div>
+        <div class="stat"><div class="stat-num">85+</div><div class="stat-label">CLI Commands</div></div>
+        <div class="stat"><div class="stat-num">0</div><div class="stat-label">Config Files Needed</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="features">
+    <h2>What TentaCLAW does</h2>
+    <div class="feature-grid">
+      <div class="feature-card"><h3>Zero Config</h3><p>Plug in a machine, boot it up. TentaCLAW detects GPUs, finds the gateway, and starts serving inference. No config files, no ports, no IPs.</p></div>
+      <div class="feature-card"><h3>Smart Load Balancing</h3><p>Requests route to the best node automatically. VRAM-aware, circuit breaker, auto-retry on failure. Your cluster acts as one.</p></div>
+      <div class="feature-card"><h3>Self-Healing</h3><p>5-level watchdog: restart service, kill process, reset GPU, reboot. If something breaks at 3am, TentaCLAW fixes it.</p></div>
+      <div class="feature-card"><h3>OpenAI Compatible</h3><p>Drop-in replacement for OpenAI API. Function calling, JSON mode, streaming, embeddings. Point any client at your cluster.</p></div>
+      <div class="feature-card"><h3>Model Management</h3><p>Search models, check VRAM fit, deploy to best node. Auto mode lets the system decide everything for you.</p></div>
+      <div class="feature-card"><h3>Real-Time Dashboard</h3><p>GPU temps, VRAM bars, inference flow, node health. Big numbers, live data. See everything at a glance.</p></div>
+    </div>
+  </section>
+
+  <section class="comparison">
+    <h2>How TentaCLAW compares</h2>
+    <table>
+      <thead><tr><th>Feature</th><th>TentaCLAW</th><th>Ollama</th><th>vLLM</th><th>LM Studio</th></tr></thead>
+      <tbody>
+        <tr><td>Multi-node cluster</td><td class="check">Yes</td><td class="cross">No</td><td class="cross">No</td><td class="cross">No</td></tr>
+        <tr><td>Web dashboard</td><td class="check">Yes</td><td class="cross">No</td><td class="cross">No</td><td class="check">Yes</td></tr>
+        <tr><td>Auto-discovery</td><td class="check">Yes</td><td class="cross">No</td><td class="cross">No</td><td class="cross">No</td></tr>
+        <tr><td>Self-healing</td><td class="check">Yes</td><td class="cross">No</td><td class="cross">No</td><td class="cross">No</td></tr>
+        <tr><td>OpenAI API</td><td class="check">Yes</td><td class="check">Yes</td><td class="check">Yes</td><td class="check">Yes</td></tr>
+        <tr><td>AMD + NVIDIA</td><td class="check">Yes</td><td class="check">Yes</td><td class="check">Yes</td><td class="check">Yes</td></tr>
+        <tr><td>CLI + Dashboard</td><td class="check">Both</td><td class="cross">CLI only</td><td class="cross">API only</td><td class="cross">GUI only</td></tr>
+        <tr><td>Zero config</td><td class="check">Yes</td><td class="check">Yes</td><td class="cross">No</td><td class="check">Yes</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    <p>TentaCLAW OS — Eight arms. One mind. Zero compromises.</p>
+    <p style="margin-top:0.5rem"><a href="https://github.com/TentaCLAW-OS/TentaCLAW">GitHub</a> &middot; <a href="https://github.com/TentaCLAW-OS/TentaCLAW#quick-start">Docs</a></p>
+    <p style="margin-top:0.5rem">MIT License</p>
+  </footer>
+</body>
+</html>
