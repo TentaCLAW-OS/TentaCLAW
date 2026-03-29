@@ -2225,6 +2225,7 @@ async function main(): Promise<void> {
             break;
         }
 
+case 'capacity':            await cmdCapacity(gateway);            break;        case 'suggestions':        case 'suggest':            await cmdSuggestions(gateway);            break;        case 'gpu-map':        case 'gpus':            await cmdGpuMap(gateway);            break;
         case 'help':
         case '--help':
         case '-h':
@@ -2258,3 +2259,61 @@ main().catch((err) => {
 // =============================================================================
 
 // These are registered in the switch but defined here for organization
+
+// =============================================================================
+// Waves 61-70: CLI Power-Ups
+// =============================================================================
+
+async function cmdCapacity(gateway: string): Promise<void> {
+    const data = await apiGet(gateway, '/api/v1/capacity') as any;
+    console.log('');
+    console.log('  ' + C.purple(C.bold('Cluster Capacity')));
+    console.log('');
+    console.log('  ' + padRight(C.dim('Total VRAM'), 22) + C.white(data.total_vram_gb + ' GB'));
+    console.log('  ' + padRight(C.dim('Used'), 22) + C.yellow(data.used_vram_gb + ' GB'));
+    console.log('  ' + padRight(C.dim('Free'), 22) + C.green(data.free_vram_gb + ' GB'));
+    console.log('  ' + padRight(C.dim('Utilization'), 22) + (data.utilization_pct > 80 ? C.red : C.white)(data.utilization_pct + '%'));
+    console.log('');
+    console.log('  ' + C.cyan(data.recommendation));
+    if (data.can_still_fit && data.can_still_fit.length > 0) {
+        console.log('');
+        console.log('  ' + C.dim('Models that still fit:'));
+        for (const m of data.can_still_fit.slice(0, 5)) {
+            console.log('    ' + C.green('\u2714') + ' ' + C.white(m.model) + C.dim(' (' + Math.round(m.vram_mb / 1024) + 'GB)'));
+        }
+    }
+    console.log('');
+}
+
+async function cmdSuggestions(gateway: string): Promise<void> {
+    const data = await apiGet(gateway, '/api/v1/suggestions') as any;
+    console.log('');
+    if (data.suggestions.length === 0) {
+        console.log('  ' + C.green('\u2714 No suggestions — cluster is running great!'));
+    } else {
+        console.log('  ' + C.purple(C.bold('Suggestions')));
+        console.log('');
+        for (const s of data.suggestions) {
+            const icon = s.priority === 'critical' ? C.red('\u2718') : s.priority === 'high' ? C.yellow('\u26A0') : C.cyan('\u25CF');
+            console.log('  ' + icon + ' ' + C.white(s.action) + C.dim(' — ' + s.reason));
+            if (s.command) console.log('    ' + C.cyan(s.command));
+        }
+    }
+    console.log('');
+}
+
+async function cmdGpuMap(gateway: string): Promise<void> {
+    const data = await apiGet(gateway, '/api/v1/gpu-map') as any;
+    console.log('');
+    console.log('  ' + C.purple(C.bold('GPU Map')) + C.dim(' (' + data.total_gpus + ' GPUs)'));
+    console.log('');
+    console.log('  ' + padRight(C.dim('NODE'), 14) + padRight(C.dim('GPU'), 30) + padRight(C.dim('VRAM'), 16) + padRight(C.dim('TEMP'), 8) + C.dim('UTIL'));
+    console.log('  ' + C.dim('\u2500'.repeat(75)));
+    for (const g of data.gpus) {
+        const tempColor = g.temp < 60 ? C.green : g.temp < 80 ? C.yellow : C.red;
+        const vramBar = Math.round(g.vram_pct / 5);
+        const bar = C.cyan('\u2588'.repeat(vramBar)) + C.dim('\u2591'.repeat(20 - vramBar));
+        console.log('  ' + padRight(C.white(g.hostname), 14) + padRight(C.dim(g.name?.slice(0, 28) || '?'), 30) + padRight(bar + ' ' + g.vram_pct + '%', 16) + padRight(tempColor(g.temp + '\u00B0C'), 8) + C.dim(g.util + '%'));
+    }
+    console.log('');
+}
