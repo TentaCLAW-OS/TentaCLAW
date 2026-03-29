@@ -1302,6 +1302,73 @@ export function getAllTags(): Array<{ tag: string; count: number }> {
 }
 
 // =============================================================================
+// Config Export/Import (Wave 15)
+// =============================================================================
+
+export function exportClusterConfig(): Record<string, unknown> {
+    return {
+        version: '0.2.0',
+        exported_at: new Date().toISOString(),
+        aliases: getAllModelAliases(),
+        flight_sheets: getAllFlightSheets(),
+        schedules: getAllSchedules(),
+        tags: getAllTags(),
+        notification_channels: getAllNotificationChannels(),
+        node_tags: (() => {
+            const d = getDb();
+            return d.prepare('SELECT * FROM node_tags').all();
+        })(),
+    };
+}
+
+export function importClusterConfig(config: Record<string, any>): { imported: string[]; errors: string[] } {
+    const imported: string[] = [];
+    const errors: string[] = [];
+
+    // Import aliases
+    if (config.aliases && Array.isArray(config.aliases)) {
+        for (const a of config.aliases) {
+            try {
+                setModelAlias(a.alias, a.target, a.fallbacks || []);
+                imported.push('alias:' + a.alias);
+            } catch (e) { errors.push('alias:' + a.alias + ': ' + e); }
+        }
+    }
+
+    // Import flight sheets
+    if (config.flight_sheets && Array.isArray(config.flight_sheets)) {
+        for (const fs of config.flight_sheets) {
+            try {
+                createFlightSheet(fs.name, fs.description || '', fs.targets || []);
+                imported.push('flight_sheet:' + fs.name);
+            } catch (e) { errors.push('flight_sheet:' + fs.name + ': ' + e); }
+        }
+    }
+
+    // Import schedules
+    if (config.schedules && Array.isArray(config.schedules)) {
+        for (const s of config.schedules) {
+            try {
+                createSchedule(s.name, s.type, s.cron, s.config || {});
+                imported.push('schedule:' + s.name);
+            } catch (e) { errors.push('schedule:' + s.name + ': ' + e); }
+        }
+    }
+
+    // Import notification channels
+    if (config.notification_channels && Array.isArray(config.notification_channels)) {
+        for (const ch of config.notification_channels) {
+            try {
+                createNotificationChannel(ch.type, ch.name, ch.config || {});
+                imported.push('notification:' + ch.name);
+            } catch (e) { errors.push('notification:' + ch.name + ': ' + e); }
+        }
+    }
+
+    return { imported, errors };
+}
+
+// =============================================================================
 // Unified Event Timeline (Wave 14)
 // =============================================================================
 

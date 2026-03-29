@@ -91,6 +91,8 @@ import {
     setMaintenanceMode,
     isInMaintenance,
     getClusterTimeline,
+    exportClusterConfig,
+    importClusterConfig,
     createApiKey,
     validateApiKey,
     trackApiKeyTokens,
@@ -1917,6 +1919,20 @@ app.post('/api/v1/models/smart-deploy', async (c) => {
 
 app.get('/api/v1/inference/stats', (c) => {
     return c.json(getRequestStats());
+});
+
+// =============================================================================
+// Config Export/Import (Wave 15)
+// =============================================================================
+
+app.get('/api/v1/config/export', (c) => {
+    return c.json(exportClusterConfig());
+});
+
+app.post('/api/v1/config/import', async (c) => {
+    const body = await c.req.json();
+    const result = importClusterConfig(body);
+    return c.json(result);
 });
 
 // =============================================================================
