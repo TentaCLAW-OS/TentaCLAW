@@ -794,6 +794,80 @@ app.post('/v1/embeddings', async (c) => {
 });
 
 // =============================================================================
+// Node Logs (agent sends log lines in stats, gateway stores last N)
+// =============================================================================
+
+const nodeLogBuffers = new Map<string, { lines: string[]; maxLines: number }>();
+
+app.get('/api/v1/nodes/:nodeId/logs', (c) => {
+    const nodeId = c.req.param('nodeId');
+    const limit = parseInt(c.req.query('limit') || '100');
+    const buffer = nodeLogBuffers.get(nodeId);
+    if (!buffer) return c.json({ logs: [] });
+    return c.json({ logs: buffer.lines.slice(-limit) });
+});
+
+app.post('/api/v1/nodes/:nodeId/logs', async (c) => {
+    const nodeId = c.req.param('nodeId');
+    const body = await c.req.json();
+    const lines = Array.isArray(body.lines) ? body.lines : [String(body.message || '')];
+
+    let buffer = nodeLogBuffers.get(nodeId);
+    if (!buffer) {
+        buffer = { lines: [], maxLines: 500 };
+        nodeLogBuffers.set(nodeId, buffer);
+    }
+
+    buffer.lines.push(...lines);
+    if (buffer.lines.length > buffer.maxLines) {
+        buffer.lines = buffer.lines.slice(-buffer.maxLines);
+    }
+
+    return c.json({ status: 'ok', stored: lines.length });
+});
+
+// =============================================================================
+// Cluster Export / Import (backup & restore)
+// =============================================================================
+
+app.get('/api/v1/export', (c) => {
+    const d = getDb();
+    const nodes = d.prepare('SELECT * FROM nodes').all();
+    const flightSheets = d.prepare('SELECT * FROM flight_sheets').all();
+    const schedules = d.prepare('SELECT * FROM schedules').all();
+
+    return c.json({
+        version: '0.1.0',
+        exported_at: new Date().toISOString(),
+        nodes,
+        flight_sheets: (flightSheets as any[]).map(fs => ({ ...fs, targets: JSON.parse(fs.targets) })),
+        schedules: (schedules as any[]).map(s => ({ ...s, config: JSON.parse(s.config) })),
+    });
+});
+
+app.post('/api/v1/import', async (c) => {
+    const body = await c.req.json();
+    let imported = { nodes: 0, flight_sheets: 0, schedules: 0 };
+
+    if (body.flight_sheets) {
+        for (const fs of body.flight_sheets) {
+            createFlightSheet(fs.name, fs.description || '', fs.targets || []);
+            imported.flight_sheets++;
+        }
+    }
+
+    if (body.schedules) {
+        for (const s of body.schedules) {
+            createSchedule(s.name, s.type, s.cron, s.config || {});
+            imported.schedules++;
+        }
+    }
+
+    console.log('[hivemind] Import: ' + imported.flight_sheets + ' flight sheets, ' + imported.schedules + ' schedules');
+    return c.json({ status: 'imported', imported });
+});
+
+// =============================================================================
 // Prometheus Metrics
 // =============================================================================
 
