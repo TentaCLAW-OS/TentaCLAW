@@ -1302,6 +1302,43 @@ export function getAllTags(): Array<{ tag: string; count: number }> {
 }
 
 // =============================================================================
+// Unified Event Timeline (Wave 14)
+// =============================================================================
+
+export function getClusterTimeline(limit: number = 50): Array<{
+    type: string; source: string; node_id?: string; message: string; severity: string; created_at: string;
+}> {
+    const d = getDb();
+    // Union across multiple event tables for a unified timeline
+    const events = d.prepare(`
+        SELECT 'node_event' as type, 'node' as source, node_id, event || ': ' || COALESCE(detail, '') as message, 'info' as severity, created_at
+        FROM node_events
+        UNION ALL
+        SELECT 'watchdog' as type, 'watchdog' as source, node_id,
+            action || ': ' || COALESCE(detail, '') as message,
+            CASE WHEN level >= 3 THEN 'critical' WHEN level >= 2 THEN 'warning' ELSE 'info' END as severity,
+            created_at
+        FROM watchdog_events
+        UNION ALL
+        SELECT 'alert' as type, 'alert' as source, node_id,
+            type || ': ' || message as message,
+            severity,
+            created_at
+        FROM alerts
+        UNION ALL
+        SELECT 'uptime' as type, 'uptime' as source, node_id,
+            event || ': ' || COALESCE(from_status, '?') || ' -> ' || COALESCE(to_status, '?') as message,
+            CASE WHEN to_status = 'offline' THEN 'warning' ELSE 'info' END as severity,
+            created_at
+        FROM uptime_events
+        ORDER BY created_at DESC
+        LIMIT ?
+    `).all(limit) as any[];
+
+    return events;
+}
+
+// =============================================================================
 // Maintenance Mode (Wave 13)
 // =============================================================================
 

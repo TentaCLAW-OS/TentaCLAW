@@ -1275,6 +1275,34 @@ async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
     console.log('');
 }
 
+async function cmdEvents(gateway: string, flags: Record<string, string>): Promise<void> {
+    const limit = parseInt(flags['limit'] || '20');
+    const data = await apiGet(gateway, `/api/v1/timeline?limit=${limit}`) as any[];
+
+    console.log('');
+    if (data.length === 0) {
+        console.log('  ' + C.dim('No events yet.'));
+        console.log('');
+        return;
+    }
+
+    console.log('  ' + C.purple(C.bold('Cluster Timeline')) + C.dim(` (${data.length} events)`));
+    console.log('');
+
+    for (const evt of data) {
+        const sevIcon = evt.severity === 'critical' ? C.red('\u2718') :
+                       evt.severity === 'warning' ? C.yellow('\u26A0') : C.dim('\u25CB');
+        const srcColor = evt.source === 'watchdog' ? C.red :
+                        evt.source === 'alert' ? C.yellow :
+                        evt.source === 'uptime' ? C.cyan : C.dim;
+        const nodeShort = evt.node_id ? evt.node_id.split('-').pop() : '';
+        const time = evt.created_at ? evt.created_at.slice(11, 19) : '';
+
+        console.log(`  ${sevIcon} ${C.dim(time)} ${srcColor(padRight(evt.source, 10))} ${padRight(C.white(nodeShort), 12)} ${C.dim(evt.message.slice(0, 60))}`);
+    }
+    console.log('');
+}
+
 async function cmdMaintenance(gateway: string, positional: string[]): Promise<void> {
     const nodeId = positional[0];
     const action = positional[1] || 'on';
@@ -2075,6 +2103,11 @@ async function main(): Promise<void> {
 
         case 'notify':
             await cmdNotify(gateway, parsed.positional, parsed.flags);
+            break;
+
+        case 'events':
+        case 'timeline':
+            await cmdEvents(gateway, parsed.flags);
             break;
 
         case 'maintenance':

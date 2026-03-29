@@ -90,6 +90,7 @@ import {
     getClusterPower,
     setMaintenanceMode,
     isInMaintenance,
+    getClusterTimeline,
     createApiKey,
     validateApiKey,
     trackApiKeyTokens,
@@ -1916,6 +1917,15 @@ app.post('/api/v1/models/smart-deploy', async (c) => {
 
 app.get('/api/v1/inference/stats', (c) => {
     return c.json(getRequestStats());
+});
+
+// =============================================================================
+// Event Timeline (Wave 14)
+// =============================================================================
+
+app.get('/api/v1/timeline', (c) => {
+    const limit = parseInt(c.req.query('limit') || '50');
+    return c.json(getClusterTimeline(limit));
 });
 
 // =============================================================================
