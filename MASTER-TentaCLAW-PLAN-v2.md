@@ -520,3 +520,49 @@ Between every 10 waves:
 > **"Eight arms. One mind. Zero compromises."**
 >
 > — CLAWtopus 🐙
+
+---
+
+# RESEARCH FINDINGS (Added from deep research agent)
+
+## What Made OpenClaw Go Viral
+- Hit 9,000 GitHub stars in 24 hours, 60K+ in one week
+- Hook: "The AI that actually does things" — practical autonomy
+- Endorsed by Andrej Karpathy and David Sacks
+- User-generated content: screenshots, setup photos went organic
+- Free tier = users became marketers
+- WARNING: rapid growth exposed security vulnerabilities (230+ malicious scripts)
+
+## Competitive Landscape
+| Product | Our Advantage |
+|---------|--------------|
+| Ollama | We add multi-node, dashboard, watchdog. They're single-machine only |
+| vLLM | We add ease-of-use. vLLM needs manual VLLM_HOST_IP config |
+| LM Studio | We add multi-node. They're desktop app only |
+| LocalAI | We add dashboard + self-healing. They're API-only |
+| GPUStack | We add personality + simplicity. They target Kubernetes users |
+| HiveOS | We're the AI version. They're mining only |
+
+## Developer Pain Points (from r/LocalLLaMA)
+1. Multi-GPU scaling is a 1-2 week project manually
+2. Ollama doesn't support distributed inference at all
+3. VRAM math is painful — users don't know what fits
+4. Docker + GPU = black magic
+5. No unified dashboard for multi-node
+
+## Launch Channels (Priority Order)
+1. r/LocalLLaMA (750K+, direct audience)
+2. Hacker News (Show HN: TentaCLAW — HiveOS for AI inference)
+3. Product Hunt (launch day Tuesday-Thursday)
+4. Twitter/X (founder personality + community)
+5. YouTube (NetworkChuck, Jeff Geerling, Fireship)
+
+## Assets Found on F: Drive
+1. **F:/Daphney-OG/website/** — 30-page website template (hero, particles, purple/cyan)
+   → ADAPT for tentaclaw.io landing page
+2. **F:/nexus-command/** — Next.js + xterm.js + react-virtual + node-pty
+   → USE tech stack for dashboard rewrite
+3. **F:/Daphney-OG/website/assets/clawdia-mascot.svg** — Animated octopus SVG
+   → ALREADY using as TentaCLAW mascot
+4. **F:/Daphney-OG/website/styles.css** — Space Grotesk font, ocean gradient
+   → REFERENCE for tentaclaw.io design system
