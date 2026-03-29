@@ -215,17 +215,28 @@ app.get('/', (c) => {
 app.post('/api/v1/register', async (c) => {
     const body = await c.req.json();
 
-    if (!body.node_id || !body.farm_hash || !body.hostname) {
-        return c.json({ error: 'Missing required fields: node_id, farm_hash, hostname' }, 400);
+    if (!body.node_id || typeof body.node_id !== 'string' || body.node_id.trim() === '') {
+        return c.json({ error: 'node_id must be a non-empty string' }, 400);
+    }
+    if (!body.farm_hash || typeof body.farm_hash !== 'string') {
+        return c.json({ error: 'farm_hash must be a non-empty string' }, 400);
+    }
+    if (!body.hostname || typeof body.hostname !== 'string') {
+        return c.json({ error: 'hostname must be a non-empty string' }, 400);
     }
 
+    // Sanitize gpu_count — must be a non-negative reasonable integer (max 128 GPUs per node)
+    const rawGpu = typeof body.gpu_count === 'number' ? body.gpu_count : 0;
+    const gpuCount = Number.isFinite(rawGpu) && rawGpu >= 0 && rawGpu <= 128
+        ? Math.floor(rawGpu) : 0;
+
     const node = registerNode({
-        node_id: body.node_id,
-        farm_hash: body.farm_hash,
-        hostname: body.hostname,
+        node_id: String(body.node_id).trim().slice(0, 256),
+        farm_hash: String(body.farm_hash).trim().slice(0, 64),
+        hostname: String(body.hostname).trim().slice(0, 256),
         ip_address: body.ip_address,
         mac_address: body.mac_address,
-        gpu_count: body.gpu_count || 0,
+        gpu_count: gpuCount,
         os_version: body.os_version,
     });
 
@@ -1250,7 +1261,11 @@ app.post('/api/v1/nodes/:id/tags', async (c) => {
     const body = await c.req.json<{ tags: string[] }>();
     if (!body.tags || !Array.isArray(body.tags)) return c.json({ error: 'tags array required' }, 400);
 
-    for (const tag of body.tags) {
+    // Filter to only valid non-empty strings
+    const validTags = body.tags.filter(t => typeof t === 'string' && t.trim().length > 0);
+    if (validTags.length === 0) return c.json({ error: 'tags must contain at least one non-empty string' }, 400);
+
+    for (const tag of validTags) {
         addNodeTag(c.req.param('id'), tag);
     }
     return c.json(getNodeTags(c.req.param('id')));
