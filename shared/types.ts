@@ -176,6 +176,64 @@ export interface Alert {
 }
 
 // =============================================================================
+// SSH Keys
+// =============================================================================
+
+export interface SshKey {
+    id: string;
+    node_id: string;
+    label: string;
+    public_key: string;
+    fingerprint: string;
+    created_at: string;
+}
+
+// =============================================================================
+// Node Tags
+// =============================================================================
+
+export interface NodeTag {
+    node_id: string;
+    tag: string;
+    created_at: string;
+}
+
+// =============================================================================
+// Daphney Events (Gateway → DaphneyBrain UE5)
+// =============================================================================
+
+export type DaphneyEventType = 'node_online' | 'node_offline' | 'inference_request' | 'inference_complete' |
+    'gpu_temp_change' | 'alert_fired' | 'model_loaded' | 'model_unloaded' | 'cluster_topology';
+
+export interface DaphneyEvent {
+    type: DaphneyEventType;
+    timestamp: string;
+    node_id?: string;
+    data: unknown;
+    topology?: {
+        total_nodes: number;
+        online_nodes: number;
+        total_gpus: number;
+        nodes: Array<{ id: string; hostname: string; status: string; gpu_count: number }>;
+    };
+}
+
+// =============================================================================
+// Model Pull Progress
+// =============================================================================
+
+export interface ModelPullProgress {
+    node_id: string;
+    model: string;
+    status: 'downloading' | 'verifying' | 'complete' | 'error';
+    progress_pct: number;
+    bytes_downloaded: number;
+    bytes_total: number;
+    started_at: string;
+    updated_at: string;
+}
+
+// =============================================================================
 // SSE Events (Gateway → Dashboard)
 // =============================================================================
 

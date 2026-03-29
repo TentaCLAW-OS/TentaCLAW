@@ -29,6 +29,11 @@ BUILD="$(date +%Y%m%d%H%M)"
 # Architecture
 ARCH="${ARCH:-amd64}"
 
+# Build tier (minimal or 20,000-claws)
+#   minimal          - Just enough to boot and run agent on any hardware
+#   20,000-claws     - Full upgrade: dev tools, GPU drivers, agent, gateway, everything
+TIER="${TIER:-20,000-claws}"
+
 # Paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_ROOT="${BUILD_ROOT:-/tmp/tentaclaw-build}"
@@ -89,6 +94,10 @@ TentaCLAW OS — ISO Build Script
 
 Usage: $(basename "$0") [OPTIONS]
 
+Build Tiers:
+    --tier minimal          Bare bones ISO (just enough to boot and auto-run agent)
+    --tier 20,000-claws    Full upgrade: dev tools, GPU drivers, agent, gateway, everything
+
 Options:
     --version VERSION    Set version (default: 0.1.0)
     --arch ARCH          Set architecture: amd64, arm64 (default: amd64)
@@ -97,7 +106,8 @@ Options:
     --help               Show this help
 
 Examples:
-    $(basename "$0")
+    $(basename "$0") --tier minimal            # Bare bones, boots anywhere
+    $(basename "$0") --tier 20,000-claws     # Full upgrade
     $(basename "$0") --version 0.1.0
     $(basename "$0") --arch arm64 --output /tmp/test.iso
 
@@ -107,6 +117,10 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --tier)
+            TIER="$2"
+            shift 2
+            ;;
         --version)
             VERSION="$2"
             shift 2
@@ -143,19 +157,26 @@ check_deps() {
     log "Checking dependencies..."
 
     local missing=()
-    local tools="debootstrap xorriso grub-mkimage xz gzip tar jq npm node"
 
-    for tool in $tools; do
-        if ! command -v "$tool" &>/dev/null; then
-            missing+=("$tool")
-        fi
-    done
-
-    # Check for cross-compile tools if not amd64
-    if [ "$ARCH" = "arm64" ]; then
-        if ! command -v qemu-aarch64-static &>/dev/null; then
-            missing+=("qemu-aarch64-static")
-        fi
+    if [ "$TIER" = "20,000-claws" ]; then
+        local tools="debootstrap xorriso grub-mkimage xz gzip tar jq npm node"
+        for tool in $tools; do
+            if ! command -v "$tool" &>/dev/null; then
+                missing+=("$tool")
+            fi
+        done
+        if [ "$ARCH" = "arm64" ]; then
+            if ! command -v qemu-aarch64-static &>/dev/null; then
+                missing+=("qemu-aarch64-static")
+            fi
+        done
+    else
+        local tools="debootstrap xorriso xz gzip tar"
+        for tool in $tools; do
+            if ! command -v "$tool" &>/dev/null; then
+                missing+=("$tool")
+            fi
+        done
     fi
 
     if [ ${#missing[@]} -gt 0 ]; then
@@ -164,6 +185,7 @@ check_deps() {
         exit 1
     fi
 
+    log "Build tier: ${YELLOW}$TIER${RESET}"
     log_success "All dependencies satisfied"
 }
 
@@ -802,7 +824,7 @@ main() {
     echo -e "${BOLD}${CYAN}═══════════════════════════════════════════════════════════════${RESET}"
     echo -e "${BOLD}${CYAN}║${RESET}   ${PURPLE}TentaCLAW OS${CYAN} — ISO Builder                           ${BOLD}${CYAN}║${RESET}"
     echo -e "${BOLD}${CYAN}║${RESET}   ${TEAL}Eight arms. One mind. Zero compromises.${RESET}                       ${BOLD}${CYAN}║${RESET}"
-    echo -e "${BOLD}${CYAN}║${RESET}   Version ${VERSION} | Architecture ${ARCH}                        ${BOLD}${CYAN}║${RESET}"
+    echo -e "${BOLD}${CYAN}║${RESET}   Version ${VERSION} | Architecture ${ARCH} | Tier: ${TIER}         ${BOLD}${CYAN}║${RESET}"
     echo -e "${BOLD}${CYAN}═══════════════════════════════════════════════════════════════${RESET}"
     echo ""
 
@@ -810,13 +832,19 @@ main() {
     setup_build_root
     bootstrap_rootfs
     install_packages
-    install_nodejs
-    install_gpu_drivers
-    install_agent
-    install_gateway
-    install_scripts
-    install_inference_runtime
     configure_system
+
+    if [ "$TIER" = "20,000-claws" ]; then
+        install_nodejs
+        install_gpu_drivers
+        install_agent
+        install_gateway
+        install_inference_runtime
+    else
+        log "Skipping 20,000-claws-only components (Node.js, GPU drivers, agent, gateway, inference runtime)"
+    fi
+
+    install_scripts
     create_initrd
     install_kernel
     create_bootloader

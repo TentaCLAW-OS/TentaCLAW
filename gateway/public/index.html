@@ -48,6 +48,10 @@
         <span class="nav-icon">&#x1F4CA;</span>
         <span class="nav-label">Benchmarks</span>
       </a>
+      <a class="nav-item" data-view="playground" href="#">
+        <span class="nav-icon">&#x1F4AC;</span>
+        <span class="nav-label">Inference</span>
+      </a>
       <a class="nav-item" data-view="power" href="#">
         <span class="nav-icon">&#x1F4B0;</span>
         <span class="nav-label">Power / Cost</span>
@@ -142,6 +146,7 @@
                 <th class="th-vram">VRAM</th>
                 <th class="th-models">Models</th>
                 <th class="th-toks">tok/s</th>
+                <th class="th-sparkline">Temp</th>
                 <th class="th-uptime">Uptime</th>
                 <th class="th-power">Power</th>
                 <th class="th-actions"></th>
@@ -240,6 +245,32 @@
           </thead>
           <tbody id="benchmarks-tbody"></tbody>
         </table>
+      </section>
+
+      <!-- INFERENCE PLAYGROUND VIEW -->
+      <section class="view-panel" id="view-playground">
+        <div class="view-header">
+          <h2 class="view-title">Inference Playground</h2>
+          <div class="view-actions">
+            <select class="form-select" id="playground-model">
+              <option value="">Select model...</option>
+            </select>
+          </div>
+        </div>
+        <div class="playground-wrapper">
+          <div class="playground-messages" id="playground-messages">
+            <div class="playground-empty">
+              <div class="empty-icon">&#x1F9E0;</div>
+              <p>Select a model and start chatting with your cluster.</p>
+              <p class="empty-sub">Requests are load-balanced across nodes via the OpenAI-compatible proxy.</p>
+            </div>
+          </div>
+          <div class="playground-input-row">
+            <input type="text" class="playground-input" id="playground-input" placeholder="Type a message..." autocomplete="off" />
+            <button class="btn btn-primary" id="btn-playground-send">Send</button>
+          </div>
+          <div class="playground-status" id="playground-status"></div>
+        </div>
       </section>
 
       <!-- POWER/COST VIEW -->

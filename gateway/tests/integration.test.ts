@@ -35,9 +35,11 @@ process.env.TENTACLAW_DB_PATH = ':memory:';
 
 function clearDb() {
     const db = getDb();
-    for (const table of ['stats', 'commands', 'flight_sheets', 'alerts', 'benchmarks', 'node_events', 'schedules', 'nodes']) {
+    db.pragma('foreign_keys = OFF');
+    for (const table of ['ssh_keys', 'node_tags', 'model_pulls', 'nodes', 'stats', 'commands', 'flight_sheets', 'alerts', 'benchmarks', 'node_events', 'schedules']) {
         db.prepare('DELETE FROM ' + table).run();
     }
+    db.pragma('foreign_keys = ON');
 }
 
 function mockStats(nodeId: string, overrides?: Partial<StatsPayload>): StatsPayload {

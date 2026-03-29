@@ -17,6 +17,9 @@ import type {
     FlightSheetTarget,
     NodeStatus,
     CommandAction,
+    SshKey,
+    NodeTag,
+    ModelPullProgress,
 } from '../../shared/types';
 
 // =============================================================================
@@ -141,6 +144,40 @@ function initSchema(db: Database.Database): void {
             next_run TEXT,
             created_at TEXT DEFAULT (datetime('now'))
         );
+
+        CREATE TABLE IF NOT EXISTS ssh_keys (
+            id TEXT PRIMARY KEY,
+            node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+            label TEXT NOT NULL,
+            public_key TEXT NOT NULL,
+            fingerprint TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_ssh_keys_node ON ssh_keys(node_id);
+
+        CREATE TABLE IF NOT EXISTS node_tags (
+            node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+            tag TEXT NOT NULL,
+            created_at TEXT DEFAULT (datetime('now')),
+            PRIMARY KEY (node_id, tag)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_node_tags_tag ON node_tags(tag);
+
+        CREATE TABLE IF NOT EXISTS model_pulls (
+            id TEXT PRIMARY KEY,
+            node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+            model TEXT NOT NULL,
+            status TEXT DEFAULT 'downloading',
+            progress_pct REAL DEFAULT 0,
+            bytes_downloaded INTEGER DEFAULT 0,
+            bytes_total INTEGER DEFAULT 0,
+            started_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_model_pulls_node ON model_pulls(node_id);
     `);
 }
 
@@ -953,6 +990,119 @@ export function getDueSchedules(): Schedule[] {
         'SELECT * FROM schedules WHERE enabled = 1 AND (next_run IS NULL OR next_run <= ?)'
     ).all(now) as any[];
     return rows.map(r => ({ ...r, config: JSON.parse(r.config), enabled: !!r.enabled }));
+}
+
+// =============================================================================
+// SSH Key Management
+// =============================================================================
+
+export function addSshKey(nodeId: string, label: string, publicKey: string): SshKey {
+    const d = getDb();
+    const id = generateId();
+    // Compute a simple fingerprint from the key (SHA-256 of the base64 portion)
+    const keyParts = publicKey.trim().split(/\s+/);
+    const keyData = keyParts.length >= 2 ? keyParts[1] : keyParts[0];
+    // Simple hash for fingerprint — just first 16 chars of base64
+    const fingerprint = 'SHA256:' + keyData.slice(0, 43).replace(/[+/=]/g, '');
+
+    d.prepare(`
+        INSERT INTO ssh_keys (id, node_id, label, public_key, fingerprint)
+        VALUES (?, ?, ?, ?, ?)
+    `).run(id, nodeId, label, publicKey.trim(), fingerprint);
+
+    return d.prepare('SELECT * FROM ssh_keys WHERE id = ?').get(id) as SshKey;
+}
+
+export function getNodeSshKeys(nodeId: string): SshKey[] {
+    const d = getDb();
+    return d.prepare('SELECT * FROM ssh_keys WHERE node_id = ? ORDER BY created_at DESC').all(nodeId) as SshKey[];
+}
+
+export function deleteSshKey(keyId: string): boolean {
+    const d = getDb();
+    return d.prepare('DELETE FROM ssh_keys WHERE id = ?').run(keyId).changes > 0;
+}
+
+// =============================================================================
+// Node Tags
+// =============================================================================
+
+export function addNodeTag(nodeId: string, tag: string): void {
+    const d = getDb();
+    d.prepare('INSERT OR IGNORE INTO node_tags (node_id, tag) VALUES (?, ?)').run(nodeId, tag.toLowerCase().trim());
+}
+
+export function removeNodeTag(nodeId: string, tag: string): boolean {
+    const d = getDb();
+    return d.prepare('DELETE FROM node_tags WHERE node_id = ? AND tag = ?').run(nodeId, tag.toLowerCase().trim()).changes > 0;
+}
+
+export function getNodeTags(nodeId: string): string[] {
+    const d = getDb();
+    const rows = d.prepare('SELECT tag FROM node_tags WHERE node_id = ? ORDER BY tag').all(nodeId) as { tag: string }[];
+    return rows.map(r => r.tag);
+}
+
+export function getNodesByTag(tag: string): NodeWithStats[] {
+    const d = getDb();
+    const nodeIds = d.prepare(
+        'SELECT node_id FROM node_tags WHERE tag = ?'
+    ).all(tag.toLowerCase().trim()) as { node_id: string }[];
+
+    return nodeIds.map(r => getNode(r.node_id)).filter((n): n is NodeWithStats => n !== null);
+}
+
+export function getAllTags(): Array<{ tag: string; count: number }> {
+    const d = getDb();
+    return d.prepare(
+        'SELECT tag, COUNT(*) as count FROM node_tags GROUP BY tag ORDER BY count DESC'
+    ).all() as Array<{ tag: string; count: number }>;
+}
+
+// =============================================================================
+// Model Pull Progress
+// =============================================================================
+
+export function startModelPull(nodeId: string, model: string): ModelPullProgress {
+    const d = getDb();
+    const id = generateId();
+    d.prepare(`
+        INSERT INTO model_pulls (id, node_id, model) VALUES (?, ?, ?)
+    `).run(id, nodeId, model);
+    return d.prepare('SELECT * FROM model_pulls WHERE id = ?').get(id) as ModelPullProgress;
+}
+
+export function updateModelPull(nodeId: string, model: string, progress: {
+    status?: string;
+    progress_pct?: number;
+    bytes_downloaded?: number;
+    bytes_total?: number;
+}): void {
+    const d = getDb();
+    const sets: string[] = ["updated_at = datetime('now')"];
+    const vals: unknown[] = [];
+
+    if (progress.status) { sets.push('status = ?'); vals.push(progress.status); }
+    if (progress.progress_pct !== undefined) { sets.push('progress_pct = ?'); vals.push(progress.progress_pct); }
+    if (progress.bytes_downloaded !== undefined) { sets.push('bytes_downloaded = ?'); vals.push(progress.bytes_downloaded); }
+    if (progress.bytes_total !== undefined) { sets.push('bytes_total = ?'); vals.push(progress.bytes_total); }
+
+    vals.push(nodeId, model);
+    d.prepare(`UPDATE model_pulls SET ${sets.join(', ')} WHERE node_id = ? AND model = ? AND status = 'downloading'`).run(...vals);
+}
+
+export function getActiveModelPulls(nodeId: string): ModelPullProgress[] {
+    const d = getDb();
+    return d.prepare(
+        "SELECT * FROM model_pulls WHERE node_id = ? AND status IN ('downloading', 'verifying') ORDER BY started_at DESC"
+    ).all(nodeId) as ModelPullProgress[];
+}
+
+export function getAllActiveModelPulls(): ModelPullProgress[] {
+    const d = getDb();
+    return d.prepare(
+        "SELECT * FROM model_pulls WHERE status IN ('downloading', 'verifying') ORDER BY started_at DESC"
+    ).all() as ModelPullProgress[];
 }
 
 /**

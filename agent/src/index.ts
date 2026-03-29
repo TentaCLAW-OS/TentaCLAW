@@ -16,6 +16,7 @@
 
 import * as fs from 'fs';
 import * as os from 'os';
+import * as dgram from 'dgram';
 import { execSync, execFileSync } from 'child_process';
 import * as https from 'https';
 import * as http from 'http';
@@ -639,6 +640,16 @@ async function main() {
     console.log('[agent] Interval:  ' + config.agentInterval + 's');
     console.log('');
 
+    // Start auto-discovery
+    startDiscoveryBroadcast(config);
+    if (!config.gatewayUrl) {
+        console.log('[agent] No gateway configured — listening for discovery...');
+        startDiscoveryListener((url) => {
+            (config as any).gatewayUrl = url;
+            console.log('[agent] Gateway auto-discovered: ' + url);
+        });
+    }
+
     const stats = collectStats(config);
     console.log('[agent] GPU count: ' + stats.gpu_count);
     for (const gpu of stats.gpus) {
@@ -677,6 +688,76 @@ async function main() {
 
         await new Promise(resolve => setTimeout(resolve, config.agentInterval * 1000));
     }
+}
+
+// =============================================================================
+// Auto-Discovery — UDP Broadcast
+// =============================================================================
+
+const DISCOVERY_PORT = 41337;
+const DISCOVERY_MAGIC = 'TENTACLAW-DISCOVER';
+
+function startDiscoveryBroadcast(config: ReturnType<typeof loadConfig>): void {
+    try {
+        const sock = dgram.createSocket('udp4');
+        sock.on('error', () => {}); // Silently ignore broadcast errors
+
+        sock.bind(0, () => {
+            sock.setBroadcast(true);
+
+            const announce = () => {
+                const payload = JSON.stringify({
+                    magic: DISCOVERY_MAGIC,
+                    node_id: config.nodeId,
+                    farm_hash: config.farmHash,
+                    hostname: config.hostname,
+                    gpu_count: MOCK_MODE ? MOCK_GPU_COUNT : 0,
+                    ip: getLocalIp(),
+                    port: 0,  // Agent doesn't listen, it pushes to gateway
+                    version: '0.2.0',
+                });
+                const buf = Buffer.from(payload);
+                sock.send(buf, 0, buf.length, DISCOVERY_PORT, '255.255.255.255', () => {});
+            };
+
+            announce();
+            setInterval(announce, 30000); // Broadcast every 30s
+            console.log('[agent] Auto-discovery broadcast active on port ' + DISCOVERY_PORT);
+        });
+    } catch {
+        console.log('[agent] Auto-discovery broadcast unavailable (non-fatal)');
+    }
+}
+
+function startDiscoveryListener(onGatewayFound: (url: string) => void): void {
+    try {
+        const sock = dgram.createSocket('udp4');
+        sock.on('message', (msg, rinfo) => {
+            try {
+                const data = JSON.parse(msg.toString());
+                if (data.magic === 'TENTACLAW-GATEWAY' && data.url) {
+                    console.log('[agent] Discovered gateway at ' + data.url + ' from ' + rinfo.address);
+                    onGatewayFound(data.url);
+                }
+            } catch {}
+        });
+        sock.bind(DISCOVERY_PORT + 1, () => {
+            console.log('[agent] Listening for gateway discovery on port ' + (DISCOVERY_PORT + 1));
+        });
+        sock.on('error', () => {});
+    } catch {}
+}
+
+function getLocalIp(): string {
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+        for (const iface of ifaces[name] || []) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+    return '127.0.0.1';
 }
 
 process.on('SIGINT', () => { console.log('\n[agent] Shutting down...'); process.exit(0); });

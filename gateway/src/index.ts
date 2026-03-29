@@ -13,6 +13,8 @@ import { cors } from 'hono/cors';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import path from 'path';
+import dgram from 'dgram';
+import os from 'os';
 import type { StatsPayload, GatewayResponse, CommandAction } from '../../shared/types';
 import {
     getDb,
@@ -53,6 +55,18 @@ import {
     toggleSchedule,
     getDueSchedules,
     markScheduleRun,
+    addSshKey,
+    getNodeSshKeys,
+    deleteSshKey,
+    addNodeTag,
+    removeNodeTag,
+    getNodeTags,
+    getNodesByTag,
+    getAllTags,
+    startModelPull,
+    updateModelPull,
+    getActiveModelPulls,
+    getAllActiveModelPulls,
 } from './db';
 
 // =============================================================================
@@ -248,6 +262,16 @@ app.post('/api/v1/nodes/:nodeId/stats', async (c) => {
         hostname: stats.hostname,
         gpu_count: stats.gpu_count,
         toks_per_sec: stats.toks_per_sec,
+        timestamp: new Date().toISOString(),
+    });
+
+    // Broadcast to Daphney
+    broadcastDaphney('stats_update', {
+        type: 'gpu_temp_change',
+        node_id: nodeId,
+        hostname: stats.hostname,
+        gpus: stats.gpus.map(g => ({ name: g.name, temp: g.temperatureC, util: g.utilizationPct })),
+        inference: stats.inference,
         timestamp: new Date().toISOString(),
     });
 
@@ -653,6 +677,12 @@ app.get('/api/v1/nodes/:nodeId/sparklines', (c) => {
 // =============================================================================
 // OpenAI-Compatible API (drop-in replacement)
 // =============================================================================
+
+// List cluster models (TentaCLAW format)
+app.get('/api/v1/models', (c) => {
+    const models = getClusterModels();
+    return c.json({ models });
+});
 
 // List available models (OpenAI format)
 app.get('/v1/models', (c) => {
@@ -1157,6 +1187,240 @@ app.post('/api/v1/schedules/:id/toggle', async (c) => {
 });
 
 // =============================================================================
+// SSH Key Management
+// =============================================================================
+
+app.get('/api/v1/nodes/:id/ssh-keys', (c) => {
+    const node = getNode(c.req.param('id'));
+    if (!node) return c.json({ error: 'Node not found' }, 404);
+    return c.json(getNodeSshKeys(c.req.param('id')));
+});
+
+app.post('/api/v1/nodes/:id/ssh-keys', async (c) => {
+    const node = getNode(c.req.param('id'));
+    if (!node) return c.json({ error: 'Node not found' }, 404);
+
+    const body = await c.req.json<{ label: string; public_key: string }>();
+    if (!body.label || !body.public_key) return c.json({ error: 'label and public_key required' }, 400);
+    if (!body.public_key.startsWith('ssh-')) return c.json({ error: 'Invalid SSH public key format' }, 400);
+
+    const key = addSshKey(c.req.param('id'), body.label, body.public_key);
+    // Queue command to deploy key to node
+    queueCommand(c.req.param('id'), 'install_model', { ssh_key: body.public_key, ssh_label: body.label });
+    broadcastSSE('ssh_key_added', { node_id: c.req.param('id'), key });
+    return c.json(key, 201);
+});
+
+app.delete('/api/v1/ssh-keys/:keyId', (c) => {
+    if (!deleteSshKey(c.req.param('keyId'))) return c.json({ error: 'Key not found' }, 404);
+    return c.json({ status: 'deleted' });
+});
+
+// =============================================================================
+// Node Tags
+// =============================================================================
+
+app.get('/api/v1/tags', (c) => {
+    return c.json(getAllTags());
+});
+
+app.get('/api/v1/tags/:tag/nodes', (c) => {
+    return c.json(getNodesByTag(c.req.param('tag')));
+});
+
+app.get('/api/v1/nodes/:id/tags', (c) => {
+    const node = getNode(c.req.param('id'));
+    if (!node) return c.json({ error: 'Node not found' }, 404);
+    return c.json(getNodeTags(c.req.param('id')));
+});
+
+app.post('/api/v1/nodes/:id/tags', async (c) => {
+    const node = getNode(c.req.param('id'));
+    if (!node) return c.json({ error: 'Node not found' }, 404);
+
+    const body = await c.req.json<{ tags: string[] }>();
+    if (!body.tags || !Array.isArray(body.tags)) return c.json({ error: 'tags array required' }, 400);
+
+    for (const tag of body.tags) {
+        addNodeTag(c.req.param('id'), tag);
+    }
+    return c.json(getNodeTags(c.req.param('id')));
+});
+
+app.delete('/api/v1/nodes/:id/tags/:tag', (c) => {
+    if (!removeNodeTag(c.req.param('id'), c.req.param('tag'))) {
+        return c.json({ error: 'Tag not found on node' }, 404);
+    }
+    return c.json({ status: 'removed' });
+});
+
+// =============================================================================
+// Model Pull Progress
+// =============================================================================
+
+app.get('/api/v1/nodes/:id/pulls', (c) => {
+    return c.json(getActiveModelPulls(c.req.param('id')));
+});
+
+app.get('/api/v1/pulls', (c) => {
+    return c.json(getAllActiveModelPulls());
+});
+
+app.post('/api/v1/nodes/:id/pulls', async (c) => {
+    const nodeId = c.req.param('id');
+    const node = getNode(nodeId);
+    if (!node) return c.json({ error: 'Node not found' }, 404);
+
+    const body = await c.req.json<{ model: string }>();
+    if (!body.model) return c.json({ error: 'model required' }, 400);
+
+    const pull = startModelPull(nodeId, body.model);
+    queueCommand(nodeId, 'install_model', { model: body.model });
+    broadcastSSE('model_pull_started', { node_id: nodeId, model: body.model });
+    return c.json(pull, 201);
+});
+
+app.put('/api/v1/nodes/:id/pulls/:model', async (c) => {
+    const body = await c.req.json<{
+        status?: string;
+        progress_pct?: number;
+        bytes_downloaded?: number;
+        bytes_total?: number;
+    }>();
+
+    updateModelPull(c.req.param('id'), c.req.param('model'), body);
+
+    if (body.progress_pct !== undefined) {
+        broadcastSSE('model_pull_progress', {
+            node_id: c.req.param('id'),
+            model: c.req.param('model'),
+            progress_pct: body.progress_pct,
+            status: body.status,
+        });
+    }
+
+    return c.json({ status: 'updated' });
+});
+
+// =============================================================================
+// Model Search (Ollama Library + Cluster VRAM Check)
+// =============================================================================
+
+// Common Ollama models with approximate VRAM requirements
+const OLLAMA_MODEL_CATALOG = [
+    { name: 'llama3.1:8b', params: '8B', vram_mb: 5120, tags: ['general', 'chat'] },
+    { name: 'llama3.1:70b', params: '70B', vram_mb: 40960, tags: ['general', 'chat', 'large'] },
+    { name: 'llama3.2:3b', params: '3B', vram_mb: 2048, tags: ['general', 'chat', 'small'] },
+    { name: 'llama3.2:1b', params: '1B', vram_mb: 1024, tags: ['general', 'chat', 'tiny'] },
+    { name: 'codellama:7b', params: '7B', vram_mb: 4608, tags: ['code'] },
+    { name: 'codellama:34b', params: '34B', vram_mb: 20480, tags: ['code', 'large'] },
+    { name: 'mistral:7b', params: '7B', vram_mb: 4608, tags: ['general', 'chat'] },
+    { name: 'mixtral:8x7b', params: '46.7B', vram_mb: 28672, tags: ['general', 'moe'] },
+    { name: 'deepseek-coder:6.7b', params: '6.7B', vram_mb: 4096, tags: ['code'] },
+    { name: 'deepseek-coder:33b', params: '33B', vram_mb: 20480, tags: ['code', 'large'] },
+    { name: 'phi3:3.8b', params: '3.8B', vram_mb: 2560, tags: ['general', 'small'] },
+    { name: 'qwen2:7b', params: '7B', vram_mb: 4608, tags: ['general', 'multilingual'] },
+    { name: 'qwen2:72b', params: '72B', vram_mb: 43008, tags: ['general', 'multilingual', 'large'] },
+    { name: 'gemma2:9b', params: '9B', vram_mb: 5632, tags: ['general'] },
+    { name: 'gemma2:27b', params: '27B', vram_mb: 16384, tags: ['general', 'large'] },
+    { name: 'nomic-embed-text', params: '137M', vram_mb: 512, tags: ['embedding'] },
+    { name: 'all-minilm:33m', params: '33M', vram_mb: 256, tags: ['embedding', 'tiny'] },
+    { name: 'hermes3:8b', params: '8B', vram_mb: 5120, tags: ['chat', 'function-calling'] },
+    { name: 'starcoder2:7b', params: '7B', vram_mb: 4608, tags: ['code'] },
+    { name: 'yi:34b', params: '34B', vram_mb: 20480, tags: ['general', 'multilingual'] },
+];
+
+app.get('/api/v1/model-search', (c) => {
+    const query = (c.req.query('q') || '').toLowerCase();
+    const tag = c.req.query('tag') || '';
+
+    let results = OLLAMA_MODEL_CATALOG;
+
+    if (query) {
+        results = results.filter(m => m.name.includes(query) || m.tags.some(t => t.includes(query)));
+    }
+    if (tag) {
+        results = results.filter(m => m.tags.includes(tag));
+    }
+
+    // Check cluster VRAM capacity
+    const summary = getClusterSummary();
+    const maxGpuVram = summary.total_vram_mb > 0 ? summary.total_vram_mb : 0;
+
+    return c.json({
+        models: results.map(m => ({
+            ...m,
+            fits_cluster: m.vram_mb <= maxGpuVram,
+            loaded: false, // TODO: check against currently loaded models
+        })),
+        cluster_vram_mb: maxGpuVram,
+        tags: [...new Set(OLLAMA_MODEL_CATALOG.flatMap(m => m.tags))].sort(),
+    });
+});
+
+// =============================================================================
+// Daphney Bridge (SSE for DaphneyBrain UE5)
+// =============================================================================
+
+const daphneyClients: SSEClient[] = [];
+
+app.get('/api/v1/daphney/stream', (c) => {
+    const stream = new ReadableStream({
+        start(controller) {
+            const client: SSEClient = {
+                id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+                controller,
+            };
+            daphneyClients.push(client);
+
+            // Send initial topology snapshot
+            const summary = getClusterSummary();
+            const allNodes = getAllNodes();
+            const payload = `event: cluster_topology\ndata: ${JSON.stringify({
+                type: 'cluster_topology',
+                timestamp: new Date().toISOString(),
+                topology: {
+                    total_nodes: summary.total_nodes,
+                    online_nodes: summary.online_nodes,
+                    total_gpus: summary.total_gpus,
+                    nodes: allNodes.map(n => ({
+                        id: n.id,
+                        hostname: n.hostname,
+                        status: n.status,
+                        gpu_count: n.gpu_count,
+                        farm_hash: n.farm_hash,
+                    })),
+                },
+            })}\n\n`;
+            controller.enqueue(new TextEncoder().encode(payload));
+        },
+        cancel() {
+            // Remove disconnected daphney client
+        },
+    });
+
+    return new Response(stream, {
+        headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+        },
+    });
+});
+
+function broadcastDaphney(eventType: string, data: unknown): void {
+    const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
+    const encoded = new TextEncoder().encode(payload);
+    for (let i = daphneyClients.length - 1; i >= 0; i--) {
+        try {
+            daphneyClients[i].controller.enqueue(encoded);
+        } catch {
+            daphneyClients.splice(i, 1);
+        }
+    }
+}
+
+// =============================================================================
 // SSE Endpoint
 // =============================================================================
 
@@ -1296,4 +1560,76 @@ serve({
     console.log(`[hivemind] API: http://${HOST}:${info.port}/api/v1`);
     console.log(`[hivemind] Health: http://${HOST}:${info.port}/health`);
     console.log('');
+
+    // Auto-discovery: listen for agent broadcasts and respond
+    startDiscoveryService(info.port);
 });
+
+// =============================================================================
+// Auto-Discovery Service
+// =============================================================================
+
+const DISCOVERY_PORT = 41337;
+
+function startDiscoveryService(gatewayPort: number): void {
+    try {
+        // Listen for agent broadcasts
+        const listener = dgram.createSocket('udp4');
+        listener.on('message', (msg, rinfo) => {
+            try {
+                const data = JSON.parse(msg.toString());
+                if (data.magic === 'TENTACLAW-DISCOVER') {
+                    console.log(`[hivemind] Discovery: agent ${data.node_id} at ${rinfo.address}`);
+                    // Auto-register if we can see them
+                    registerNode({
+                        node_id: data.node_id,
+                        farm_hash: data.farm_hash || 'AUTO',
+                        hostname: data.hostname || rinfo.address,
+                        ip_address: rinfo.address,
+                        gpu_count: data.gpu_count || 0,
+                        os_version: data.version,
+                    });
+                    broadcastSSE('node_discovered', { node_id: data.node_id, ip: rinfo.address });
+                }
+            } catch {}
+        });
+        listener.bind(DISCOVERY_PORT, () => {
+            console.log(`[hivemind] Discovery listener on UDP port ${DISCOVERY_PORT}`);
+        });
+        listener.on('error', () => {});
+
+        // Broadcast gateway presence so agents can find us
+        const broadcaster = dgram.createSocket('udp4');
+        broadcaster.on('error', () => {});
+        broadcaster.bind(0, () => {
+            broadcaster.setBroadcast(true);
+            const announce = () => {
+                const localIp = getLocalIp();
+                const payload = JSON.stringify({
+                    magic: 'TENTACLAW-GATEWAY',
+                    url: `http://${localIp}:${gatewayPort}`,
+                    version: '0.2.0',
+                });
+                const buf = Buffer.from(payload);
+                broadcaster.send(buf, 0, buf.length, DISCOVERY_PORT + 1, '255.255.255.255', () => {});
+            };
+            announce();
+            setInterval(announce, 30000);
+            console.log(`[hivemind] Broadcasting gateway presence every 30s`);
+        });
+    } catch {
+        console.log('[hivemind] Auto-discovery unavailable (non-fatal)');
+    }
+}
+
+function getLocalIp(): string {
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+        for (const iface of ifaces[name] || []) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                return iface.address;
+            }
+        }
+    }
+    return '127.0.0.1';
+}

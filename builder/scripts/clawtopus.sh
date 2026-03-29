@@ -220,6 +220,7 @@ clawtopus_quote() {
         "I've got arms for days."
         "Local inference or bust."
         "No SaaS. No cry."
+        "Smoke em' if you got em' boyz."
     )
 
     local idx=$((RANDOM % ${#quotes[@]}))

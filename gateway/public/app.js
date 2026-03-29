@@ -21,6 +21,7 @@
     commandTarget: null,
     activeView: 'nodes',
     expandedNodes: new Set(),
+    sparklineCache: {},  // nodeId -> { timestamps, avg_temp, avg_util, toks_per_sec, fetchedAt }
   };
 
   const MAX_TERMINAL_LINES = 300;
@@ -102,6 +103,12 @@
     btnSendCmd:      $('#btn-send-cmd'),
     // Action dropdown
     actionDropdown:  $('#action-dropdown'),
+    // Playground
+    playgroundModel:    $('#playground-model'),
+    playgroundMessages: $('#playground-messages'),
+    playgroundInput:    $('#playground-input'),
+    btnPlaygroundSend:  $('#btn-playground-send'),
+    playgroundStatus:   $('#playground-status'),
   };
 
   // ===================== HELPERS =====================
@@ -294,6 +301,147 @@
       state.leaderboard = Array.isArray(data) ? data : (data.leaderboard || data.models || data.data || []);
       renderModels();
     } catch (e) { /* silent */ }
+  }
+
+  // ===================== SPARKLINE DATA =====================
+  const SPARKLINE_TTL = 15000; // cache sparkline data for 15s
+
+  async function fetchSparkline(nodeId) {
+    const cached = state.sparklineCache[nodeId];
+    if (cached && (Date.now() - cached.fetchedAt) < SPARKLINE_TTL) return cached;
+    try {
+      const data = await api('GET', '/api/v1/nodes/' + nodeId + '/sparkline');
+      const entry = {
+        timestamps: data.timestamps || [],
+        avg_temp: data.avg_temp || [],
+        avg_util: data.avg_util || [],
+        toks_per_sec: data.toks_per_sec || [],
+        fetchedAt: Date.now(),
+      };
+      state.sparklineCache[nodeId] = entry;
+      return entry;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function buildSparklineSVG(values, color, width, height) {
+    if (!values || values.length < 2) return null;
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', width);
+    svg.setAttribute('height', height);
+    svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+    svg.setAttribute('class', 'sparkline-svg');
+
+    const min = Math.min.apply(null, values);
+    const max = Math.max.apply(null, values);
+    const range = max - min || 1;
+    const padY = 2;
+    const usableH = height - padY * 2;
+
+    const points = values.map(function (v, i) {
+      const x = (i / (values.length - 1)) * width;
+      const y = padY + usableH - ((v - min) / range) * usableH;
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+
+    // Gradient fill under the line
+    const defs = document.createElementNS(ns, 'defs');
+    const grad = document.createElementNS(ns, 'linearGradient');
+    grad.setAttribute('id', 'spark-grad-' + Math.random().toString(36).substring(2, 8));
+    grad.setAttribute('x1', '0');
+    grad.setAttribute('y1', '0');
+    grad.setAttribute('x2', '0');
+    grad.setAttribute('y2', '1');
+    const stop1 = document.createElementNS(ns, 'stop');
+    stop1.setAttribute('offset', '0%');
+    stop1.setAttribute('stop-color', color);
+    stop1.setAttribute('stop-opacity', '0.3');
+    const stop2 = document.createElementNS(ns, 'stop');
+    stop2.setAttribute('offset', '100%');
+    stop2.setAttribute('stop-color', color);
+    stop2.setAttribute('stop-opacity', '0.02');
+    grad.appendChild(stop1);
+    grad.appendChild(stop2);
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    // Area fill
+    var firstPt = values.length > 0 ? (padY + usableH - ((values[0] - min) / range) * usableH) : height;
+    var lastPt = values.length > 0 ? (padY + usableH - ((values[values.length - 1] - min) / range) * usableH) : height;
+    var areaPoints = '0,' + height + ' 0,' + firstPt.toFixed(1) + ' ' + points + ' ' + width + ',' + lastPt.toFixed(1) + ' ' + width + ',' + height;
+    var polygon = document.createElementNS(ns, 'polygon');
+    polygon.setAttribute('points', areaPoints);
+    polygon.setAttribute('fill', 'url(#' + grad.getAttribute('id') + ')');
+    svg.appendChild(polygon);
+
+    // Line
+    const polyline = document.createElementNS(ns, 'polyline');
+    polyline.setAttribute('points', points);
+    polyline.setAttribute('fill', 'none');
+    polyline.setAttribute('stroke', color);
+    polyline.setAttribute('stroke-width', '1.5');
+    polyline.setAttribute('stroke-linecap', 'round');
+    polyline.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(polyline);
+
+    // End dot
+    if (values.length > 0) {
+      var lastVal = values[values.length - 1];
+      var lastX = width;
+      var lastY = padY + usableH - ((lastVal - min) / range) * usableH;
+      var dot = document.createElementNS(ns, 'circle');
+      dot.setAttribute('cx', lastX.toFixed(1));
+      dot.setAttribute('cy', lastY.toFixed(1));
+      dot.setAttribute('r', '2');
+      dot.setAttribute('fill', color);
+      svg.appendChild(dot);
+    }
+
+    return svg;
+  }
+
+  function renderSparklineCell(td, nodeId) {
+    fetchSparkline(nodeId).then(function (data) {
+      td.textContent = '';
+      if (!data || !data.avg_temp || data.avg_temp.length < 2) {
+        td.textContent = '--';
+        td.classList.add('text-muted');
+        return;
+      }
+      var wrapper = el('div', 'sparkline-cell');
+      var svg = buildSparklineSVG(data.avg_temp, '#00FFFF', 80, 20);
+      if (svg) {
+        wrapper.appendChild(svg);
+        // Show latest temp value below
+        var latest = data.avg_temp[data.avg_temp.length - 1];
+        var tempLabel = el('span', 'sparkline-value ' + tempColorClass(latest), Math.round(latest) + '\u00B0');
+        wrapper.appendChild(tempLabel);
+      }
+      td.appendChild(wrapper);
+    });
+  }
+
+  // ===================== OVERCLOCK PROFILES =====================
+  var OVERCLOCK_PROFILES = [
+    { id: 'stock',     label: 'Stock',     desc: 'Default clocks' },
+    { id: 'gaming',    label: 'Gaming',    desc: 'Balanced OC' },
+    { id: 'mining',    label: 'Mining',    desc: 'Low power, high mem' },
+    { id: 'inference', label: 'Inference', desc: 'Optimized for LLM' },
+  ];
+
+  async function applyOverclockProfile(nodeId, profileId, hostname) {
+    try {
+      addTermLine('info', 'Applying overclock "' + profileId + '" to ' + (hostname || nodeId) + '...');
+      await api('POST', '/api/v1/nodes/' + nodeId + '/command', {
+        action: 'overclock',
+        payload: { profile: profileId }
+      });
+      addTermLine('success', 'Overclock "' + profileId + '" applied to ' + (hostname || nodeId));
+    } catch (e) {
+      addTermLine('error', 'Overclock failed: ' + e.message);
+    }
   }
 
   // ===================== SSE =====================
@@ -546,12 +694,23 @@
       tdToks.appendChild(toksVal);
       row.appendChild(tdToks);
 
-      // 7. Uptime
+      // 7. Sparkline (temp history)
+      const tdSpark = el('td', 'td-sparkline');
+      tdSpark.textContent = '...';
+      tdSpark.classList.add('text-muted');
+      if (nodeId && online) {
+        renderSparklineCell(tdSpark, nodeId);
+      } else {
+        tdSpark.textContent = '--';
+      }
+      row.appendChild(tdSpark);
+
+      // 8. Uptime
       const tdUp = el('td');
       tdUp.appendChild(el('span', 'uptime-text', formatUptime(node.uptime_secs)));
       row.appendChild(tdUp);
 
-      // 8. Power
+      // 9. Power
       const tdPwr = el('td');
       tdPwr.style.textAlign = 'right';
       const pwr = totalNodePower(node);
@@ -561,7 +720,7 @@
       if (pwr > 0) tdPwr.appendChild(el('span', 'power-unit', 'W'));
       row.appendChild(tdPwr);
 
-      // 9. Actions
+      // 10. Actions
       const tdAct = el('td');
       const actBtn = el('button', 'actions-btn', '\u22EE');
       actBtn.title = 'Actions';
@@ -583,7 +742,7 @@
       const detailRow = el('tr', 'node-detail-row');
       detailRow.dataset.nodeId = nodeId + '-detail';
       const detailTd = document.createElement('td');
-      detailTd.colSpan = 9;
+      detailTd.colSpan = 10;
       const detailInner = el('div', 'node-detail-inner' + (expanded ? ' expanded' : ''));
       buildNodeDetailDOM(detailInner, node);
       detailTd.appendChild(detailInner);
@@ -756,6 +915,28 @@
     });
     deployDiv.appendChild(deployBtn);
     container.appendChild(deployDiv);
+
+    // Overclock profiles
+    container.appendChild(el('div', 'detail-section-title', 'Overclock Profile'));
+    const ocDiv = el('div', 'detail-overclock');
+
+    OVERCLOCK_PROFILES.forEach(function (profile) {
+      const btn = el('button', 'oc-profile-btn', profile.label);
+      btn.title = profile.desc;
+      btn.dataset.profile = profile.id;
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        // Highlight selected
+        ocDiv.querySelectorAll('.oc-profile-btn').forEach(function (b) {
+          b.classList.remove('oc-active');
+        });
+        btn.classList.add('oc-active');
+        applyOverclockProfile(nid, profile.id, node.hostname || node.node_id);
+      });
+      ocDiv.appendChild(btn);
+    });
+
+    container.appendChild(ocDiv);
   }
 
   function buildDetailBar(label, percent, text, colorClass) {
@@ -1301,6 +1482,7 @@
       case 'alerts': fetchAlerts(); break;
       case 'benchmarks': fetchBenchmarks(); break;
       case 'power': fetchPower(); renderPower(); break;
+      case 'playground': populatePlaygroundModels(); break;
     }
   }
 
@@ -1483,6 +1665,114 @@
     });
   }
 
+  // ===================== INFERENCE PLAYGROUND =====================
+  let playgroundHistory = [];
+
+  function populatePlaygroundModels() {
+    const select = dom.playgroundModel;
+    if (!select) return;
+    // Populate from cluster models
+    fetch('/api/v1/models')
+      .then(r => r.json())
+      .then(data => {
+        const models = data.models || [];
+        // Keep the first placeholder option
+        select.innerHTML = '<option value="">Select model...</option>';
+        for (const m of models) {
+          const opt = document.createElement('option');
+          opt.value = m.model;
+          opt.textContent = m.model + ' (' + m.node_count + ' nodes)';
+          select.appendChild(opt);
+        }
+      })
+      .catch(() => {});
+  }
+
+  function addPlaygroundMessage(role, content, meta) {
+    const container = dom.playgroundMessages;
+    if (!container) return;
+
+    // Remove empty state
+    const empty = container.querySelector('.playground-empty');
+    if (empty) empty.remove();
+
+    const div = document.createElement('div');
+    div.className = 'playground-msg playground-msg-' + role;
+    div.textContent = content;
+
+    if (meta) {
+      const metaDiv = document.createElement('div');
+      metaDiv.className = 'playground-msg-meta';
+      metaDiv.textContent = meta;
+      div.appendChild(metaDiv);
+    }
+
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  async function sendPlaygroundMessage() {
+    const input = dom.playgroundInput;
+    const model = dom.playgroundModel?.value;
+    const text = input?.value.trim();
+
+    if (!text) return;
+    if (!model) {
+      if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Please select a model first.';
+      return;
+    }
+
+    addPlaygroundMessage('user', text);
+    input.value = '';
+    if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Sending to ' + model + '...';
+
+    playgroundHistory.push({ role: 'user', content: text });
+
+    try {
+      const startTime = Date.now();
+      const resp = await fetch('/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: model,
+          messages: playgroundHistory,
+          stream: false,
+        }),
+      });
+
+      const elapsed = Date.now() - startTime;
+      const data = await resp.json();
+
+      if (data.error) {
+        addPlaygroundMessage('assistant', 'Error: ' + data.error);
+        if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Error';
+      } else {
+        const choice = data.choices?.[0];
+        const content = choice?.message?.content || '(empty response)';
+        const nodeId = data.node_id || 'unknown';
+        addPlaygroundMessage('assistant', content, 'Node: ' + nodeId + ' | ' + elapsed + 'ms');
+        playgroundHistory.push({ role: 'assistant', content: content });
+        if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Served by ' + nodeId + ' in ' + elapsed + 'ms';
+      }
+    } catch (err) {
+      addPlaygroundMessage('assistant', 'Error: ' + err.message);
+      if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Connection error';
+    }
+  }
+
+  // Bind playground events
+  if (dom.btnPlaygroundSend) {
+    dom.btnPlaygroundSend.addEventListener('click', sendPlaygroundMessage);
+  }
+  if (dom.playgroundInput) {
+    dom.playgroundInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendPlaygroundMessage();
+      }
+    });
+  }
+
   // ===================== INIT =====================
   function init() {
     bindEvents();
@@ -1496,6 +1786,7 @@
     fetchBenchmarks();
     fetchPower();
     fetchLeaderboard();
+    populatePlaygroundModels();
 
     connectSSE();
 

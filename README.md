@@ -55,6 +55,18 @@ Instead of flight sheets for miners, you have flight sheets for models.
 
 ---
 
+## What's New in v0.2.0
+
+- **CLAWtopus CLI** — CLAWDIA rebranded. Inference router + cluster management with `clawtopus chat`, `models`, `health`, `tags`, `alerts`, `benchmarks`
+- **Inference Playground** — Chat with your cluster models directly from the dashboard
+- **Node Tags** — Label nodes as `production`, `inference`, `staging` etc. Filter by tag
+- **SSH Key Management** — Push SSH keys to nodes via API, stored in DB with fingerprints
+- **Model Pull Progress** — Track download progress when deploying models to nodes
+- **Auto-Discovery** — UDP broadcast on port 41337. Agents and gateways find each other on LAN
+- **Daphney Bridge** — SSE endpoint at `/api/v1/daphney/stream` for DaphneyBrain UE5 integration
+- **Model Search** — Browse Ollama model catalog with VRAM requirements and cluster fit check
+- **52 tests** — 42 gateway (unit + integration) + 10 agent tests, all passing
+
 ## Features
 
 | | |
@@ -128,28 +140,43 @@ cd agent && npx tsx src/index.ts --mock --name gpu-rig-02 --gpus 4
 
 The mock agent generates realistic stats for fake GPUs (RTX 3090, 4070 Ti Super, etc.) and pushes them to the gateway every 5 seconds. Open the dashboard to see your simulated cluster.
 
-## CLI
+## CLAWtopus CLI
 
-Manage your cluster from any terminal:
+The inference router and cluster management tool. Eight arms on the command line.
 
 ```bash
 cd cli && npm install && npm run build
 
 # Cluster overview
-npx tentaclaw status
+npx clawtopus status
 
-# List nodes
-npx tentaclaw nodes
+# List nodes & models
+npx clawtopus nodes
+npx clawtopus models
+
+# Health score (0-100)
+npx clawtopus health
+
+# Interactive chat with a cluster model
+npx clawtopus chat --model llama3.1:8b
 
 # Deploy a model to all nodes
-npx tentaclaw deploy llama3.1:8b
+npx clawtopus deploy llama3.1:8b
 
-# Send a command to a specific node
-npx tentaclaw command TENTACLAW-FARM7K3P-node1 install_model --model hermes3:8b
+# Tag nodes for organization
+npx clawtopus tags add NODE-001 production
+npx clawtopus tags nodes production
 
-# List and apply flight sheets
-npx tentaclaw flight-sheets
-npx tentaclaw apply <sheet-id>
+# View alerts and benchmarks
+npx clawtopus alerts
+npx clawtopus benchmarks
+
+# Flight sheets
+npx clawtopus flight-sheets
+npx clawtopus apply <sheet-id>
+
+# Send commands
+npx clawtopus command TENTACLAW-FARM7K3P-node1 install_model --model hermes3:8b
 ```
 
 ---
@@ -177,10 +204,11 @@ npx tentaclaw apply <sheet-id>
 
 ```
   ┌──────────────┐      ┌───────────────────────────────────────┐
-  │  CLI Tool    │      │      HiveMind Gateway (:8080)         │
-  │              │─────►│                                       │
-  │  tentaclaw   │      │  REST API    Web Dashboard    SSE     │
-  │  status      │      │  /api/v1/*   /dashboard       Events  │
+  │ CLAWtopus    │      │      HiveMind Gateway (:8080)         │
+  │ CLI          │─────►│                                       │
+  │              │      │  REST API    Web Dashboard    SSE     │
+  │  clawtopus   │      │  /api/v1/*   /dashboard       Events  │
+  │  status      │      │  /v1/*       /daphney         UDP     │
   └──────────────┘      └──────────────────┬────────────────────┘
                                            │
                     POST stats ◄───────────┼──────────► Commands
@@ -202,11 +230,11 @@ npx tentaclaw apply <sheet-id>
 
 | Component | Language | Description |
 |-----------|----------|-------------|
-| **Gateway** (`gateway/`) | TypeScript + Hono + SQLite | Central coordinator — REST API, web dashboard, SSE real-time updates |
-| **Agent** (`agent/`) | TypeScript (zero deps) | Node daemon — collects GPU/system stats, pushes to gateway, executes commands |
-| **CLI** (`cli/`) | TypeScript (zero deps) | Command-line cluster management — status, deploy, commands |
+| **Gateway** (`gateway/`) | TypeScript + Hono + SQLite | Central coordinator — 65+ REST endpoints, web dashboard, SSE, Daphney bridge, OpenAI-compat proxy |
+| **Agent** (`agent/`) | TypeScript (zero deps) | Node daemon — GPU stats, command execution, auto-discovery, overclock profiles |
+| **CLAWtopus CLI** (`cli/`) | TypeScript (zero deps) | Inference router + cluster management — chat, models, health, tags, deploy |
 | **Builder** (`builder/`) | Bash | ISO/PXE build system — debootstrap Ubuntu 24.04, custom initrd |
-| **Shared** (`shared/`) | TypeScript | Shared type definitions for agent ↔ gateway contract |
+| **Shared** (`shared/`) | TypeScript | Shared type definitions — agent ↔ gateway ↔ CLI contract |
 
 ---
 
@@ -276,28 +304,38 @@ The mascot of TentaCLAW OS. An octopus who lives in your terminal and coordinate
 | `GET` | `/api/v1/nodes/:id` | Get single node detail |
 | `POST` | `/api/v1/nodes/:id/commands` | Queue a command for a node |
 | `GET` | `/api/v1/summary` | Cluster summary (GPUs, VRAM, tok/s) |
+| `GET` | `/api/v1/health/score` | Cluster health score (0-100, A-F grading) |
 | `GET/POST` | `/api/v1/flight-sheets` | List/create flight sheets |
 | `POST` | `/api/v1/flight-sheets/:id/apply` | Apply flight sheet to nodes |
 | `GET` | `/api/v1/alerts` | Recent alerts (temp, VRAM, disk) |
 | `GET/POST` | `/api/v1/benchmarks` | Benchmark results |
+| `GET/POST` | `/api/v1/nodes/:id/ssh-keys` | SSH key management |
+| `GET/POST` | `/api/v1/nodes/:id/tags` | Node tagging system |
+| `GET` | `/api/v1/tags` | List all tags with counts |
+| `GET` | `/api/v1/nodes/:id/pulls` | Active model pull progress |
+| `GET` | `/api/v1/model-search` | Search Ollama model catalog |
+| `POST` | `/v1/chat/completions` | OpenAI-compatible inference proxy |
+| `GET` | `/v1/models` | OpenAI-compatible model list |
 | `GET` | `/api/v1/events` | SSE stream for real-time dashboard |
+| `GET` | `/api/v1/daphney/stream` | SSE stream for DaphneyBrain UE5 |
 
 ## Project Structure
 
 ```
 tentaclaw-os/
 ├── agent/               # Node daemon (TypeScript, zero deps)
-│   ├── src/index.ts     # Agent with --mock mode for dev
+│   ├── src/index.ts     # Agent with --mock mode, auto-discovery, overclock
+│   ├── src/spawner.ts   # Multi-node mock spawner (16 presets)
 │   └── tests/           # 10 tests
 ├── gateway/             # HiveMind Gateway (Hono + SQLite)
-│   ├── src/index.ts     # REST API + SSE
-│   ├── src/db.ts        # Database layer
-│   ├── public/          # Web dashboard (HTML/CSS/JS)
-│   └── tests/           # 19 tests
-├── cli/                 # CLI tool (tentaclaw status/deploy/...)
-│   └── src/index.ts     # 530+ lines, zero deps
+│   ├── src/index.ts     # 65+ REST API endpoints, SSE, OpenAI proxy, Daphney bridge
+│   ├── src/db.ts        # Database layer (11 tables)
+│   ├── public/          # HiveOS-style web dashboard (HTML/CSS/JS)
+│   └── tests/           # 42 tests (unit + integration)
+├── cli/                 # CLAWtopus CLI (inference router + cluster management)
+│   └── src/index.ts     # chat, models, health, tags, deploy, alerts, benchmarks
 ├── shared/              # Shared TypeScript types
-│   └── types.ts         # Agent ↔ Gateway contract
+│   └── types.ts         # Agent ↔ Gateway ↔ CLI contract
 ├── builder/             # ISO/PXE build system
 │   ├── build-iso.sh     # Bootable ISO builder
 │   ├── scripts/
