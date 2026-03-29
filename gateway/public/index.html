@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TentaCLAW OS - GPU Cluster Dashboard</title>
+  <title>TentaCLAW OS - GPU Cluster Command Center</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="logo.svg" type="image/svg+xml" />
 </head>
@@ -134,35 +134,16 @@
             </button>
           </div>
         </div>
-        <div class="nodes-table-wrapper">
-          <table class="nodes-table" id="nodes-table">
-            <thead>
-              <tr>
-                <th class="th-status"></th>
-                <th class="th-hostname">Worker</th>
-                <th class="th-gpus">GPUs</th>
-                <th class="th-vram">VRAM</th>
-                <th class="th-models">Models</th>
-                <th class="th-toks">tok/s</th>
-                <th class="th-sparkline">Temp</th>
-                <th class="th-uptime">Uptime</th>
-                <th class="th-power">Power</th>
-                <th class="th-actions"></th>
-              </tr>
-            </thead>
-            <tbody id="nodes-tbody">
-            </tbody>
-          </table>
-          <div class="empty-state" id="empty-state">
-            <svg class="empty-icon-svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
-              <rect x="4" y="8" width="40" height="14" rx="3" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
-              <rect x="4" y="26" width="40" height="14" rx="3" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
-              <circle cx="12" cy="15" r="2" fill="currentColor" opacity="0.2"/>
-              <circle cx="12" cy="33" r="2" fill="currentColor" opacity="0.2"/>
-            </svg>
-            <p class="empty-title">No workers connected</p>
-            <p class="empty-sub">Waiting for agents to register with the gateway.</p>
-          </div>
+        <div class="node-grid" id="node-grid"></div>
+        <div class="empty-state" id="empty-state">
+          <svg class="empty-icon-svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <rect x="4" y="8" width="40" height="14" rx="3" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+            <rect x="4" y="26" width="40" height="14" rx="3" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+            <circle cx="12" cy="15" r="2" fill="currentColor" opacity="0.2"/>
+            <circle cx="12" cy="33" r="2" fill="currentColor" opacity="0.2"/>
+          </svg>
+          <p class="empty-title">No workers connected</p>
+          <p class="empty-sub">Waiting for agents to register with the gateway.</p>
         </div>
       </section>
 
@@ -354,7 +335,7 @@
       <div class="terminal-output" id="terminal-output"></div>
       <div class="terminal-input-row">
         <span class="terminal-prompt">$</span>
-        <input type="text" class="terminal-input" id="terminal-input" placeholder="deploy <model>, status, nodes, alert ack <id>" autocomplete="off" spellcheck="false" />
+        <input type="text" class="terminal-input" id="terminal-input" placeholder="status, nodes, models, health, doctor, power, deploy <model>, help" autocomplete="off" spellcheck="false" />
       </div>
     </section>
 

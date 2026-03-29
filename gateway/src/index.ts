@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * TentaCLAW HiveMind Gateway
+ * TentaCLAW TentaCLAW Gateway
  *
  * The central coordinator for your AI inference cluster.
  * Receives stats from agents, dispatches commands, serves the dashboard.
@@ -153,7 +153,7 @@ app.onError((err, c) => {
     if (err.message?.includes('Unexpected') || err.message?.includes('JSON')) {
         return c.json({ error: 'Invalid JSON body' }, 400);
     }
-    console.error('[hivemind] Unhandled error:', err.message);
+    console.error('[tentaclaw] Unhandled error:', err.message);
     return c.json({ error: 'Internal server error' }, 500);
 });
 
@@ -235,7 +235,7 @@ if (RATE_LIMIT > 0) {
 app.get('/health', (c) => {
     return c.json({
         status: 'ok',
-        service: 'tentaclaw-hivemind',
+        service: 'tentaclaw-gateway',
         version: '0.1.0',
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
@@ -244,7 +244,7 @@ app.get('/health', (c) => {
 
 app.get('/', (c) => {
     return c.json({
-        name: 'TentaCLAW HiveMind Gateway',
+        name: 'TentaCLAW TentaCLAW Gateway',
         version: '0.1.0',
         tagline: 'Eight arms. One mind. Zero compromises.',
         endpoints: {
@@ -290,7 +290,7 @@ app.post('/api/v1/register', async (c) => {
     broadcastSSE('node_online', { node_id: node.id, hostname: node.hostname, timestamp: new Date().toISOString() });
     recordNodeEvent(node.id, 'registered', 'Farm: ' + node.farm_hash);
 
-    console.log(`[hivemind] Node registered: ${node.id} (${node.hostname}) — Farm: ${node.farm_hash}`);
+    console.log(`[tentaclaw] Node registered: ${node.id} (${node.hostname}) — Farm: ${node.farm_hash}`);
 
     return c.json({ status: 'registered', node });
 });
@@ -425,7 +425,7 @@ app.post('/api/v1/nodes/:nodeId/commands', async (c) => {
         timestamp: new Date().toISOString(),
     });
 
-    console.log(`[hivemind] Command queued: ${command.action} → ${nodeId}`);
+    console.log(`[tentaclaw] Command queued: ${command.action} → ${nodeId}`);
 
     return c.json({ status: 'queued', command });
 });
@@ -459,7 +459,7 @@ app.post('/api/v1/flight-sheets', async (c) => {
     }
 
     const sheet = createFlightSheet(body.name, body.description || '', body.targets);
-    console.log(`[hivemind] Flight sheet created: ${sheet.name} (${sheet.id})`);
+    console.log(`[tentaclaw] Flight sheet created: ${sheet.name} (${sheet.id})`);
     return c.json({ status: 'created', flight_sheet: sheet });
 });
 
@@ -495,7 +495,7 @@ app.post('/api/v1/flight-sheets/:id/apply', (c) => {
         timestamp: new Date().toISOString(),
     });
 
-    console.log(`[hivemind] Flight sheet applied: ${id} — ${commands.length} commands queued`);
+    console.log(`[tentaclaw] Flight sheet applied: ${id} — ${commands.length} commands queued`);
 
     return c.json({ status: 'applied', commands_queued: commands.length, commands });
 });
@@ -578,7 +578,7 @@ app.post('/api/v1/nodes/:nodeId/benchmark', async (c) => {
         timestamp: new Date().toISOString(),
     });
 
-    console.log('[hivemind] Benchmark stored: ' + nodeId + ' — ' + body.model + ' @ ' + body.tokens_per_sec + ' tok/s');
+    console.log('[tentaclaw] Benchmark stored: ' + nodeId + ' — ' + body.model + ' @ ' + body.tokens_per_sec + ' tok/s');
 
     return c.json({ status: 'stored', benchmark });
 });
@@ -596,7 +596,7 @@ app.post('/api/v1/nodes/:nodeId/benchmark/run', async (c) => {
 
     const command = queueCommand(nodeId, 'benchmark' as any, { model });
 
-    console.log('[hivemind] Benchmark queued: ' + nodeId + ' — ' + model);
+    console.log('[tentaclaw] Benchmark queued: ' + nodeId + ' — ' + model);
 
     return c.json({ status: 'queued', command });
 });
@@ -623,7 +623,7 @@ app.post('/api/v1/nodes/:nodeId/models/pull', async (c) => {
     if (!node) return c.json({ error: 'Node not found' }, 404);
 
     const command = queueCommand(nodeId, 'install_model', { model: body.model });
-    console.log('[hivemind] Model pull queued: ' + body.model + ' → ' + nodeId);
+    console.log('[tentaclaw] Model pull queued: ' + body.model + ' → ' + nodeId);
     return c.json({ status: 'queued', command });
 });
 
@@ -635,7 +635,7 @@ app.delete('/api/v1/nodes/:nodeId/models/:model', (c) => {
     if (!node) return c.json({ error: 'Node not found' }, 404);
 
     const command = queueCommand(nodeId, 'remove_model', { model });
-    console.log('[hivemind] Model removal queued: ' + model + ' → ' + nodeId);
+    console.log('[tentaclaw] Model removal queued: ' + model + ' → ' + nodeId);
     return c.json({ status: 'queued', command });
 });
 
@@ -671,7 +671,7 @@ app.post('/api/v1/deploy', async (c) => {
         timestamp: new Date().toISOString(),
     });
 
-    console.log('[hivemind] Deploy: ' + body.model + ' → ' + commands.length + ' nodes');
+    console.log('[tentaclaw] Deploy: ' + body.model + ' → ' + commands.length + ' nodes');
     return c.json({ status: 'deployed', model: body.model, commands_queued: commands.length, commands });
 });
 
@@ -1188,7 +1188,7 @@ app.post('/api/v1/import', async (c) => {
         }
     }
 
-    console.log('[hivemind] Import: ' + imported.flight_sheets + ' flight sheets, ' + imported.schedules + ' schedules');
+    console.log('[tentaclaw] Import: ' + imported.flight_sheets + ' flight sheets, ' + imported.schedules + ' schedules');
     return c.json({ status: 'imported', imported });
 });
 
@@ -1304,7 +1304,7 @@ app.get('/api/v1/topology', (c) => {
     }));
 
     return c.json({
-        gateway: { id: 'gateway', label: 'HiveMind Gateway', position: { x: 400, y: 0 } },
+        gateway: { id: 'gateway', label: 'TentaCLAW Gateway', position: { x: 400, y: 0 } },
         farms,
         connections: nodes.map(n => ({ from: 'gateway', to: n.id, status: n.status })),
     });
@@ -1317,7 +1317,7 @@ app.get('/api/v1/topology', (c) => {
 app.get('/api/v1/config', (c) => {
     return c.json({
         version: '0.1.0',
-        service: 'tentaclaw-hivemind',
+        service: 'tentaclaw-gateway',
         features: {
             auth_enabled: !!API_KEY,
             rate_limiting: RATE_LIMIT > 0,
@@ -1432,7 +1432,7 @@ app.get('/api/v1/leaderboard', (c) => {
 
 app.get('/api/v1/discover', (c) => {
     return c.json({
-        service: 'tentaclaw-hivemind',
+        service: 'tentaclaw-gateway',
         version: '0.1.0',
         api: '/api/v1',
         register: '/api/v1/register',
@@ -1459,7 +1459,7 @@ app.post('/api/v1/schedules', async (c) => {
     }
 
     const schedule = createSchedule(body.name, body.type, body.cron, body.config || {});
-    console.log('[hivemind] Schedule created: ' + schedule.name + ' (' + schedule.cron + ')');
+    console.log('[tentaclaw] Schedule created: ' + schedule.name + ' (' + schedule.cron + ')');
     return c.json({ status: 'created', schedule });
 });
 
@@ -2714,7 +2714,7 @@ setInterval(() => {
     const staleIds = markStaleNodes(60);
     for (const id of staleIds) {
         broadcastSSE('node_offline', { node_id: id, timestamp: new Date().toISOString() });
-        console.log(`[hivemind] Node went offline: ${id}`);
+        console.log(`[tentaclaw] Node went offline: ${id}`);
     }
 }, 30_000);
 
@@ -2722,7 +2722,7 @@ setInterval(() => {
 setInterval(() => {
     const pruned = pruneStats(7);
     if (pruned > 0) {
-        console.log(`[hivemind] Pruned ${pruned} old stats records`);
+        console.log(`[tentaclaw] Pruned ${pruned} old stats records`);
     }
 }, 86_400_000);
 
@@ -2730,7 +2730,7 @@ setInterval(() => {
 setInterval(() => {
     const due = getDueSchedules();
     for (const schedule of due) {
-        console.log('[hivemind] Running schedule: ' + schedule.name + ' (' + schedule.type + ')');
+        console.log('[tentaclaw] Running schedule: ' + schedule.name + ' (' + schedule.type + ')');
 
         try {
             switch (schedule.type) {
@@ -2764,12 +2764,12 @@ setInterval(() => {
                     break;
                 }
                 default:
-                    console.log('[hivemind] Unknown schedule type: ' + schedule.type);
+                    console.log('[tentaclaw] Unknown schedule type: ' + schedule.type);
             }
 
             markScheduleRun(schedule.id);
         } catch (err) {
-            console.error('[hivemind] Schedule error: ' + err);
+            console.error('[tentaclaw] Schedule error: ' + err);
         }
     }
 }, 60_000);
@@ -2787,7 +2787,7 @@ ensureDefaultAliases();
 
 console.log(`
 \x1b[38;2;0;255;255m        ╭──────────────────────────────────────╮\x1b[0m
-\x1b[38;2;0;255;255m   ╭───┤\x1b[0m  \x1b[38;2;140;0;200mTentaCLAW HiveMind Gateway\x1b[0m  \x1b[38;2;0;255;255m├───╮\x1b[0m
+\x1b[38;2;0;255;255m   ╭───┤\x1b[0m  \x1b[38;2;140;0;200mTentaCLAW TentaCLAW Gateway\x1b[0m  \x1b[38;2;0;255;255m├───╮\x1b[0m
 \x1b[38;2;0;255;255m   │\x1b[0m  \x1b[38;2;0;140;140mOne mind to rule them all.\x1b[0m       \x1b[38;2;0;255;255m│\x1b[0m
 \x1b[38;2;0;255;255m   ╰──────────────────────────────────────╯\x1b[0m
 `);
@@ -2797,10 +2797,10 @@ const server = serve({
     port: PORT,
     hostname: HOST,
 }, (info) => {
-    console.log(`[hivemind] Gateway listening on http://${HOST}:${info.port}`);
-    console.log(`[hivemind] Dashboard: http://${HOST}:${info.port}/dashboard`);
-    console.log(`[hivemind] API: http://${HOST}:${info.port}/api/v1`);
-    console.log(`[hivemind] Health: http://${HOST}:${info.port}/health`);
+    console.log(`[tentaclaw] Gateway listening on http://${HOST}:${info.port}`);
+    console.log(`[tentaclaw] Dashboard: http://${HOST}:${info.port}/dashboard`);
+    console.log(`[tentaclaw] API: http://${HOST}:${info.port}/api/v1`);
+    console.log(`[tentaclaw] Health: http://${HOST}:${info.port}/health`);
     console.log('');
 
     // Remote shell WebSocket server
@@ -2824,7 +2824,7 @@ function startDiscoveryService(gatewayPort: number): void {
             try {
                 const data = JSON.parse(msg.toString());
                 if (data.magic === 'TENTACLAW-DISCOVER') {
-                    console.log(`[hivemind] Discovery: agent ${data.node_id} at ${rinfo.address}`);
+                    console.log(`[tentaclaw] Discovery: agent ${data.node_id} at ${rinfo.address}`);
                     // Auto-register if we can see them
                     registerNode({
                         node_id: data.node_id,
@@ -2839,7 +2839,7 @@ function startDiscoveryService(gatewayPort: number): void {
             } catch {}
         });
         listener.bind(DISCOVERY_PORT, () => {
-            console.log(`[hivemind] Discovery listener on UDP port ${DISCOVERY_PORT}`);
+            console.log(`[tentaclaw] Discovery listener on UDP port ${DISCOVERY_PORT}`);
         });
         listener.on('error', () => {});
 
@@ -2860,10 +2860,10 @@ function startDiscoveryService(gatewayPort: number): void {
             };
             announce();
             setInterval(announce, 30000);
-            console.log(`[hivemind] Broadcasting gateway presence every 30s`);
+            console.log(`[tentaclaw] Broadcasting gateway presence every 30s`);
         });
     } catch {
-        console.log('[hivemind] Auto-discovery unavailable (non-fatal)');
+        console.log('[tentaclaw] Auto-discovery unavailable (non-fatal)');
     }
 }
 
@@ -3328,16 +3328,16 @@ app.get('/api/v1/readyz', (c) => {
 
 // Wave 40: Graceful shutdown
 process.on('SIGTERM', () => {
-    console.log('[hivemind] SIGTERM received — graceful shutdown starting');
-    console.log('[hivemind] Waiting for in-flight requests to complete...');
+    console.log('[tentaclaw] SIGTERM received — graceful shutdown starting');
+    console.log('[tentaclaw] Waiting for in-flight requests to complete...');
     setTimeout(() => {
-        console.log('[hivemind] Shutdown complete');
+        console.log('[tentaclaw] Shutdown complete');
         process.exit(0);
     }, 5000);
 });
 
 process.on('SIGINT', () => {
-    console.log('[hivemind] SIGINT received — shutting down');
+    console.log('[tentaclaw] SIGINT received — shutting down');
     process.exit(0);
 });
 
@@ -3360,7 +3360,7 @@ function startAutoDoctor() {
             console.error('[auto] Error: ' + err);
         }
     }, 300_000); // Every 5 min
-    console.log('[hivemind] Auto-doctor running every 5 minutes');
+    console.log('[tentaclaw] Auto-doctor running every 5 minutes');
 }
 
 // Start auto-doctor after DB init

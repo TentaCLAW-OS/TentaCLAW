@@ -3,7 +3,7 @@
  * CLAWtopus CLI — Eight arms. One mind. Zero compromises.
  *
  * Inference router + cluster management for TentaCLAW OS.
- * Talks to the HiveMind Gateway API. Pure Node.js, zero dependencies.
+ * Talks to the TentaCLAW Gateway API. Pure Node.js, zero dependencies.
  *
  * Usage:
  *   clawtopus status                                  # Cluster overview
@@ -31,8 +31,9 @@ import * as https from 'https';
 // =============================================================================
 
 const C = {
-    cyan:    (s: string) => `\x1b[38;2;0;255;255m${s}\x1b[0m`,
-    purple:  (s: string) => `\x1b[38;2;140;0;200m${s}\x1b[0m`,
+    teal:    (s: string) => `\x1b[38;2;0;212;170m${s}\x1b[0m`,   // #00d4aa — primary brand
+    cyan:    (s: string) => `\x1b[38;2;0;212;170m${s}\x1b[0m`,   // alias for teal
+    purple:  (s: string) => `\x1b[38;2;139;92;246m${s}\x1b[0m`,  // #8b5cf6 — secondary
     green:   (s: string) => `\x1b[38;2;0;255;136m${s}\x1b[0m`,
     red:     (s: string) => `\x1b[38;2;255;70;70m${s}\x1b[0m`,
     yellow:  (s: string) => `\x1b[38;2;255;220;0m${s}\x1b[0m`,
@@ -231,7 +232,7 @@ function handleConnectionError(err: unknown, baseUrl: string): void {
 
         if (msg.includes('ECONNREFUSED') || msg.includes('ECONNRESET') || msg.includes('ENOTFOUND') || code === 'ECONNREFUSED' || code === 'ECONNRESET' || code === 'ENOTFOUND') {
             console.error('');
-            console.error(C.red('  \u2718 Cannot connect to HiveMind Gateway'));
+            console.error(C.red('  \u2718 Cannot connect to TentaCLAW Gateway'));
             console.error('');
             console.error(`    Gateway URL: ${C.yellow(baseUrl)}`);
             console.error('');
@@ -1157,14 +1158,16 @@ async function cmdExplain(gateway: string): Promise<void> {
     const gpuWord = summary.total_gpus === 1 ? 'GPU' : 'GPUs';
     const modelWord = dist.length === 1 ? 'model' : 'models';
 
-    console.log('  ' + C.purple(C.bold('What your cluster is doing right now:')));
+    console.log('  ' + C.teal('\uD83D\uDC19') + ' ' + C.bold('CLAWtopus says:'));
     console.log('');
 
-    // Nodes
-    if (summary.online_nodes === summary.total_nodes) {
-        console.log('  ' + C.green('\u2714') + ` All ${summary.online_nodes} ${nodeWord} are online and healthy.`);
+    // Nodes — with personality
+    if (summary.online_nodes === summary.total_nodes && summary.online_nodes > 0) {
+        console.log('  ' + C.green('\u2714') + ` All ${summary.online_nodes} ${nodeWord} online. We're running smooth.`);
+    } else if (summary.online_nodes === 0) {
+        console.log('  ' + C.red('\u2718') + ' No nodes online. Plug something in.');
     } else {
-        console.log('  ' + C.yellow('\u26A0') + ` ${summary.online_nodes} of ${summary.total_nodes} ${nodeWord} are online.`);
+        console.log('  ' + C.yellow('\u26A0') + ` ${summary.online_nodes} of ${summary.total_nodes} ${nodeWord} online. ${summary.total_nodes - summary.online_nodes} went dark.`);
     }
 
     // GPUs
@@ -1213,7 +1216,8 @@ async function cmdExplain(gateway: string): Promise<void> {
 
 async function cmdFix(gateway: string): Promise<void> {
     console.log('');
-    console.log('  ' + C.purple(C.bold('CLAWtopus Fix')) + C.dim(' — finding and fixing everything'));
+    console.log('');
+    console.log('  ' + C.teal('\uD83D\uDC19') + ' ' + C.bold('Scanning...'));
     console.log('');
 
     const data = await apiGet(gateway, '/api/v1/doctor?autofix=true') as any;
@@ -1222,7 +1226,8 @@ async function cmdFix(gateway: string): Promise<void> {
     const critical = data.results.filter((r: any) => r.status === 'critical');
 
     if (fixed.length === 0 && critical.length === 0) {
-        console.log('  ' + C.green('\u2714 Everything looks good. Nothing to fix.'));
+        console.log('  ' + C.green('\u2714') + ' Everything\'s clean. Nothing to fix.');
+        console.log('  ' + C.dim('  you\'re welcome \uD83D\uDE0E'));
     } else {
         if (fixed.length > 0) {
             console.log('  ' + C.cyan(`\u2692 Fixed ${fixed.length} issue(s):`));
@@ -1995,7 +2000,7 @@ function cmdHelp(): void {
     console.log('');
     console.log('  ' + C.cyan(C.bold('GLOBAL OPTIONS')));
     console.log('');
-    console.log('    ' + padRight(C.yellow('--gateway') + ' <url>', 42) + 'HiveMind Gateway URL');
+    console.log('    ' + padRight(C.yellow('--gateway') + ' <url>', 42) + 'TentaCLAW Gateway URL');
     console.log('');
     console.log('  ' + C.cyan(C.bold('ENVIRONMENT')));
     console.log('');
@@ -2153,6 +2158,27 @@ async function main(): Promise<void> {
         case 'aliases':
             await cmdAlias(gateway, parsed.positional, parsed.flags);
             break;
+
+        case 'vibe': {
+            const s = await apiGet(gateway, '/api/v1/summary') as any;
+            const h = await apiGet(gateway, '/api/v1/health/score') as any;
+            console.log('');
+            console.log('  ' + C.teal('\uD83D\uDC19') + ' ' + (h.score >= 80
+                ? C.green('everything\'s running smooth ' + C.dim('\uD83D\uDE0E'))
+                : h.score >= 50
+                ? C.yellow('we\'re alright... could be better')
+                : C.red('things are rough. run `clawtopus fix`')));
+            console.log('  ' + C.dim(`   ${s.online_nodes} nodes | ${s.total_gpus} GPUs | ${h.score}/100`));
+            console.log('');
+            break;
+        }
+
+        case 'sup': {
+            console.log('');
+            console.log('  ' + C.teal('\uD83D\uDC19 sup'));
+            console.log('');
+            break;
+        }
 
         case 'auto':
             await cmdAuto(gateway);

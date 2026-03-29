@@ -26,7 +26,7 @@ import type {
 // Database Setup
 // =============================================================================
 
-const DB_PATH = process.env.TENTACLAW_DB_PATH || path.join(process.cwd(), 'data', 'hivemind.db');
+const DB_PATH = process.env.TENTACLAW_DB_PATH || path.join(process.cwd(), 'data', 'tentaclaw.db');
 
 let db: Database.Database;
 

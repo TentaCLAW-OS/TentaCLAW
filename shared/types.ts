@@ -1,7 +1,7 @@
 /**
  * TentaCLAW OS — Shared Types
  *
- * Types shared between the Agent daemon and the HiveMind Gateway.
+ * Types shared between the Agent daemon and the TentaCLAW Gateway.
  * CLAWtopus says: "One mind. One type system."
  */
 

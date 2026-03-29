@@ -3,7 +3,7 @@
  * TentaCLAW Agent — Node Daemon
  *
  * The daemon that runs on each TentaCLAW OS node.
- * Pushes stats to HiveMind gateway, receives commands.
+ * Pushes stats to TentaCLAW gateway, receives commands.
  *
  * Usage:
  *   tentaclaw-agent                     # Production (reads /etc/tentaclaw/rig.conf)
@@ -119,7 +119,7 @@ function scanForGateway(): Promise<string | null> {
                 let data = '';
                 res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
                 res.on('end', () => {
-                    if (!found && data.includes('tentaclaw-hivemind')) {
+                    if (!found && data.includes('tentaclaw-tentaclaw')) {
                         found = true;
                         console.log(`[discovery] Found gateway at ${ip}:8080`);
                         resolve(`http://${ip}:8080`);
