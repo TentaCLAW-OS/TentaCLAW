@@ -3216,3 +3216,38 @@ app.get('/api/v1/digest', (c) => {
 
     return c.json({ text, summary, health: health.score, requests_24h: analytics.total_requests });
 });
+
+// Wave 31: GPU Memory Map
+app.get('/api/v1/gpu-map', (c) => {
+    const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
+    const gpuMap = nodes.flatMap(n => {
+        const s = n.latest_stats!;
+        return s.gpus.map((g, i) => ({
+            node_id: n.id, hostname: n.hostname, gpu_index: i,
+            name: g.name?.includes(']') ? g.name.split('] ')[1] || g.name : g.name,
+            vram_total_mb: g.vramTotalMb, vram_used_mb: g.vramUsedMb,
+            vram_free_mb: g.vramTotalMb - g.vramUsedMb,
+            vram_pct: g.vramTotalMb > 0 ? Math.round((g.vramUsedMb / g.vramTotalMb) * 100) : 0,
+            temp: g.temperatureC, util: g.utilizationPct, power: g.powerDrawW, fan: g.fanSpeedPct,
+        }));
+    });
+    return c.json({ total_gpus: gpuMap.length, gpus: gpuMap.sort((a, b) => a.vram_pct - b.vram_pct) });
+});
+
+// Wave 32: Node Lifecycle
+app.get('/api/v1/nodes/:id/lifecycle', (c) => {
+    const nodeId = c.req.param('id');
+    const node = getNode(nodeId);
+    if (!node) return c.json({ error: 'Node not found' }, 404);
+    const events = getNodeEvents(nodeId, 50);
+    const uptime = getNodeUptime(nodeId, 720); // 30 days
+    const watchdog = getWatchdogEvents(nodeId, 20);
+    const health = getNodeHealthScore(nodeId);
+    return c.json({
+        node_id: nodeId, hostname: node.hostname, status: node.status,
+        registered: node.registered_at, last_seen: node.last_seen_at,
+        health, uptime_30d: uptime,
+        recent_events: events.slice(0, 20),
+        watchdog_events: watchdog.slice(0, 10),
+    });
+});
