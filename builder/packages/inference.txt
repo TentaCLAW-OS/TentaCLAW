@@ -1,0 +1,21 @@
+# TentaCLAW OS — Inference Runtime Package List
+
+# Note: These are installed at runtime or on first boot, not in ISO
+# The ISO includes the agent, runtime installers are fetched as needed
+
+# Ollama (installed via official installer script on first boot)
+# curl -fsSL https://ollama.ai/install.sh | sh
+
+# llama.cpp (built from source if needed)
+# Build dependencies:
+build-essential
+cmake
+git
+
+# NVIDIA CUDA (installed on first boot if NVIDIA GPU detected)
+# nvidia-driver-535
+# nvidia-cuda-toolkit
+
+# AMD ROCm (installed on first boot if AMD GPU detected)
+# rocm
+# rocm-utils

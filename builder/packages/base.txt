@@ -1,0 +1,52 @@
+# TentaCLAW OS — Base Package List
+# Ubuntu 24.04 (Noble)
+
+# Core system
+systemd
+udev
+sudo
+wget
+curl
+jq
+vim
+gnupg
+ca-certificates
+apt-transport-https
+
+# Networking
+network-manager
+net-tools
+iputils-ping
+dnsutils
+iproute2
+resolvconf
+
+# Boot
+linux-image-generic
+initramfs-tools
+grub2-common
+grub-pc-bin
+grub-efi-amd64-bin
+
+# SSH
+openssh-server
+
+# Hardware detection
+pciutils
+usbutils
+lshw
+dmidecode
+
+# Misc
+dbus
+policykit-1
+acpi
+acpi-support
+cpufrequtils
+hdparm
+smartmontools
+file
+tree
+less
+bc
+jq

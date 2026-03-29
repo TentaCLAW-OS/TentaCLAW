@@ -154,24 +154,33 @@ detect_nvidia_detailed() {
     log "Querying detailed NVIDIA GPU info..."
 
     # Save full nvidia-smi output for later
-    nvidia-smi --query-gpu=index,pci.bus_id,name,memory.total,temperature.gpu,utilization.gpu,utilization.memory,power.draw,fan.speed,clocks.sm.clock,clocks.mem.clock \
+    nvidia-smi --query-gpu=index,pci.bus_id,name,memory.total,temperature.gpu,utilization.gpu,utilization.memory,power.draw,fan.speed,clocks.sm,clocks.mem \
         --format=csv,noheader,nounits 2>/dev/null > "$NVIDIA_SMI_FILE" || true
+
+    # Reset count — nvidia-smi is the authoritative source when available
+    NVIDIA_COUNT=0
+    NVIDIA_GPUS=""
 
     while IFS=',' read -r idx bus_id name vram temperature util_gpu util_mem power fan clock_sm clock_mem; do
         NVIDIA_COUNT=$((NVIDIA_COUNT + 1))
 
-        # Clean up whitespace
+        # Clean up whitespace (nvidia-smi CSV uses ", " separators)
         bus_id=$(echo "$bus_id" | xargs)
         name=$(echo "$name" | xargs)
         vram=$(echo "$vram" | xargs | tr -d ' ')
         temperature=$(echo "$temperature" | xargs)
         power=$(echo "$power" | xargs | tr -d ' ')
+        clock_sm=$(echo "$clock_sm" | xargs | tr -d ' ')
+        clock_mem=$(echo "$clock_mem" | xargs | tr -d ' ')
 
         NVIDIA_GPUS="${NVIDIA_GPUS}${bus_id}:${name}:${vram}:${temperature}:${power}:${clock_sm}:${clock_mem}|"
 
-        log "  NVIDIA #${idx}: ${name} (${vram}MB) @ ${bus_id} | ${temperature}°C | ${power}W"
+        log "  NVIDIA #${idx}: ${name} (${vram}MB) @ ${bus_id} | ${temperature}C | ${power}W"
 
     done < "$NVIDIA_SMI_FILE"
+
+    # Recalculate total now that we have authoritative NVIDIA count
+    TOTAL_GPUS=$((NVIDIA_COUNT + AMD_COUNT))
 }
 
 # =============================================================================
@@ -232,7 +241,7 @@ EOF
 
     # If nvidia-smi works, append real data
     if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
-        nvidia-smi --query-gpu=index,pci.bus_id,name,memory.used,memory.total,temperature.gpu,utilization.gpu,power.draw,fan.speed,clocks.sm.clock,clocks.mem.clock \
+        nvidia-smi --query-gpu=index,pci.bus_id,name,memory.used,memory.total,temperature.gpu,utilization.gpu,power.draw,fan.speed,clocks.sm,clocks.mem \
             --format=csv,noheader,nounits 2>/dev/null | while IFS=',' read -r idx bus_id name vram_used vram_total temp util power fan clock_sm clock_mem; do
             bus_id=$(echo "$bus_id" | xargs)
             name=$(echo "$name" | xargs)
@@ -245,16 +254,17 @@ EOF
             clock_sm=$(echo "$clock_sm" | xargs | tr -d ' ')
             clock_mem=$(echo "$clock_mem" | xargs | tr -d ' ')
 
-            echo "    ,{\"bus_id\":\"$bus_id\",\"name\":\"$name\",\"vram_used_mb\":$vram_used,\"vram_total_mb\":$vram_total,\"temperature_c\":$temp,\"utilization_pct\":$util,\"power_draw_w\":$power,\"fan_speed_pct\":$fan,\"clock_sm_mhz\":$clock_sm,\"clock_mem_mhz\":$clock_mem}"
+            echo "{\"bus_id\":\"$bus_id\",\"name\":\"$name\",\"vram_used_mb\":$vram_used,\"vram_total_mb\":$vram_total,\"temperature_c\":$temp,\"utilization_pct\":$util,\"power_draw_w\":$power,\"fan_speed_pct\":$fan,\"clock_sm_mhz\":$clock_sm,\"clock_mem_mhz\":$clock_mem}"
         done > /tmp/nvidia-gpus-temp.txt
 
         if [ -s /tmp/nvidia-gpus-temp.txt ]; then
+            # Build valid JSON array using jq
+            local nvidia_arr
+            nvidia_arr=$(jq -s '.' /tmp/nvidia-gpus-temp.txt 2>/dev/null || echo "[]")
             cat > "$GPU_STATS_FILE" << EOF
 {
     "timestamp": $(date +%s),
-    "nvidia": [
-$(cat /tmp/nvidia-gpus-temp.txt | sed 's/^/    /')
-    ],
+    "nvidia": ${nvidia_arr},
     "amd": []
 }
 EOF

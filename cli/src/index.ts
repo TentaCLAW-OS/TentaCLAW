@@ -1,0 +1,846 @@
+#!/usr/bin/env node
+/**
+ * TentaCLAW CLI — Command-line tool for AI inference cluster management
+ *
+ * Talks to the HiveMind Gateway API. Pure Node.js, zero dependencies.
+ * CLAWtopus says: "Eight arms on the command line."
+ *
+ * Usage:
+ *   tentaclaw status                                  # Cluster overview
+ *   tentaclaw nodes                                   # List all nodes
+ *   tentaclaw node <nodeId>                           # Show detailed node info
+ *   tentaclaw deploy <model>                          # Deploy model to all online nodes
+ *   tentaclaw deploy <model> <nodeId>                 # Deploy model to specific node
+ *   tentaclaw command <nodeId> <action> [--model m]   # Send command to node
+ *   tentaclaw flight-sheets                           # List flight sheets
+ *   tentaclaw apply <flightSheetId>                   # Apply a flight sheet
+ *   tentaclaw help                                    # Show help
+ */
+
+import * as http from 'http';
+import * as https from 'https';
+
+// =============================================================================
+// Brand Colors (ANSI true-color escape sequences)
+// =============================================================================
+
+const C = {
+    cyan:    (s: string) => `\x1b[38;2;0;255;255m${s}\x1b[0m`,
+    purple:  (s: string) => `\x1b[38;2;140;0;200m${s}\x1b[0m`,
+    green:   (s: string) => `\x1b[38;2;0;255;136m${s}\x1b[0m`,
+    red:     (s: string) => `\x1b[38;2;255;70;70m${s}\x1b[0m`,
+    yellow:  (s: string) => `\x1b[38;2;255;220;0m${s}\x1b[0m`,
+    dim:     (s: string) => `\x1b[2m${s}\x1b[0m`,
+    bold:    (s: string) => `\x1b[1m${s}\x1b[0m`,
+    white:   (s: string) => `\x1b[97m${s}\x1b[0m`,
+};
+
+// =============================================================================
+// Formatting Helpers
+// =============================================================================
+
+function formatNumber(n: number): string {
+    return n.toLocaleString('en-US');
+}
+
+function formatMb(mb: number): string {
+    if (mb >= 1024) {
+        return (mb / 1024).toFixed(1) + ' GB';
+    }
+    return formatNumber(mb) + ' MB';
+}
+
+function formatUptime(seconds: number): string {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+
+    const parts: string[] = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    parts.push(`${minutes}m`);
+    return parts.join(' ');
+}
+
+function formatToksPerSec(toks: number): string {
+    if (toks === 0) return C.dim('0 tok/s');
+    return C.green(formatNumber(Math.round(toks)) + ' tok/s');
+}
+
+function statusBadge(status: string): string {
+    switch (status) {
+        case 'online':    return C.green('\u25CF online');
+        case 'offline':   return C.red('\u25CF offline');
+        case 'error':     return C.red('\u25CF error');
+        case 'rebooting': return C.yellow('\u25CF rebooting');
+        default:          return C.dim('\u25CF ' + status);
+    }
+}
+
+function padRight(s: string, len: number): string {
+    // Strip ANSI codes to measure visible length
+    const visible = s.replace(/\x1b\[[0-9;]*m/g, '');
+    const pad = Math.max(0, len - visible.length);
+    return s + ' '.repeat(pad);
+}
+
+// =============================================================================
+// CLI Argument Parsing
+// =============================================================================
+
+interface ParsedArgs {
+    command: string;
+    positional: string[];
+    flags: Record<string, string>;
+}
+
+function parseArgs(argv: string[]): ParsedArgs {
+    const raw = argv.slice(2);
+    const positional: string[] = [];
+    const flags: Record<string, string> = {};
+
+    for (let i = 0; i < raw.length; i++) {
+        const arg = raw[i];
+        if (arg.startsWith('--')) {
+            const key = arg.slice(2);
+            const next = raw[i + 1];
+            if (next && !next.startsWith('--')) {
+                flags[key] = next;
+                i++;
+            } else {
+                flags[key] = 'true';
+            }
+        } else {
+            positional.push(arg);
+        }
+    }
+
+    return {
+        command: positional[0] || 'help',
+        positional: positional.slice(1),
+        flags,
+    };
+}
+
+// =============================================================================
+// Gateway URL Resolution
+// =============================================================================
+
+function getGatewayUrl(flags: Record<string, string>): string {
+    return flags['gateway']
+        || process.env['TENTACLAW_GATEWAY']
+        || 'http://localhost:8080';
+}
+
+// =============================================================================
+// HTTP Client — Pure Node.js
+// =============================================================================
+
+interface ApiResponse {
+    status: number;
+    data: unknown;
+}
+
+function apiRequest(method: string, url: string, body?: unknown): Promise<ApiResponse> {
+    return new Promise((resolve, reject) => {
+        const parsed = new URL(url);
+        const options: http.RequestOptions = {
+            hostname: parsed.hostname,
+            port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+            path: parsed.pathname + parsed.search,
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'TentaCLAW-CLI/0.1.0',
+                'Accept': 'application/json',
+            },
+            timeout: 15000,
+        };
+
+        const transport = parsed.protocol === 'https:' ? https : http;
+
+        const req = transport.request(options, (res) => {
+            let data = '';
+            res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+            res.on('end', () => {
+                try {
+                    const parsed = data ? JSON.parse(data) : {};
+                    resolve({ status: res.statusCode || 0, data: parsed });
+                } catch {
+                    resolve({ status: res.statusCode || 0, data: { raw: data } });
+                }
+            });
+        });
+
+        req.on('error', (err: Error) => {
+            reject(err);
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Request timed out after 15s'));
+        });
+
+        if (body) {
+            req.write(JSON.stringify(body));
+        }
+        req.end();
+    });
+}
+
+async function apiGet(baseUrl: string, path: string): Promise<unknown> {
+    const url = baseUrl.replace(/\/+$/, '') + path;
+    try {
+        const resp = await apiRequest('GET', url);
+        if (resp.status >= 400) {
+            const errData = resp.data as Record<string, unknown>;
+            throw new Error(String(errData['error'] || `HTTP ${resp.status}`));
+        }
+        return resp.data;
+    } catch (err) {
+        handleConnectionError(err, baseUrl);
+        process.exit(1);
+    }
+}
+
+async function apiPost(baseUrl: string, path: string, body?: unknown): Promise<unknown> {
+    const url = baseUrl.replace(/\/+$/, '') + path;
+    try {
+        const resp = await apiRequest('POST', url, body);
+        if (resp.status >= 400) {
+            const errData = resp.data as Record<string, unknown>;
+            throw new Error(String(errData['error'] || `HTTP ${resp.status}`));
+        }
+        return resp.data;
+    } catch (err) {
+        handleConnectionError(err, baseUrl);
+        process.exit(1);
+    }
+}
+
+function handleConnectionError(err: unknown, baseUrl: string): void {
+    if (err instanceof Error) {
+        const code = (err as NodeJS.ErrnoException).code || '';
+        const msg = err.message + ' ' + code;
+
+        if (msg.includes('ECONNREFUSED') || msg.includes('ECONNRESET') || msg.includes('ENOTFOUND') || code === 'ECONNREFUSED' || code === 'ECONNRESET' || code === 'ENOTFOUND') {
+            console.error('');
+            console.error(C.red('  \u2718 Cannot connect to HiveMind Gateway'));
+            console.error('');
+            console.error(`    Gateway URL: ${C.yellow(baseUrl)}`);
+            console.error('');
+            console.error('    Make sure the gateway is running:');
+            console.error(C.dim('      cd gateway && npm run dev'));
+            console.error('');
+            console.error('    Or specify a different gateway:');
+            console.error(C.dim('      tentaclaw status --gateway http://192.168.1.100:8080'));
+            console.error(C.dim('      TENTACLAW_GATEWAY=http://host:port tentaclaw status'));
+            console.error('');
+            return;
+        }
+        if (msg.includes('timed out') || code === 'ETIMEDOUT' || code === 'ESOCKETTIMEDOUT') {
+            console.error('');
+            console.error(C.red('  \u2718 Request timed out'));
+            console.error(C.dim(`    Gateway: ${baseUrl}`));
+            console.error('');
+            return;
+        }
+        // Re-throw non-connection errors
+        throw err;
+    }
+    throw err;
+}
+
+// =============================================================================
+// Type Guards for API Responses
+// =============================================================================
+
+interface ClusterSummary {
+    total_nodes: number;
+    online_nodes: number;
+    offline_nodes: number;
+    total_gpus: number;
+    total_vram_mb: number;
+    used_vram_mb: number;
+    total_toks_per_sec: number;
+    loaded_models: string[];
+    farm_hashes: string[];
+}
+
+interface GpuStats {
+    busId: string;
+    name: string;
+    vramTotalMb: number;
+    vramUsedMb: number;
+    temperatureC: number;
+    utilizationPct: number;
+    powerDrawW: number;
+    fanSpeedPct: number;
+    clockSmMhz: number;
+    clockMemMhz: number;
+}
+
+interface StatsPayload {
+    farm_hash: string;
+    node_id: string;
+    hostname: string;
+    uptime_secs: number;
+    gpu_count: number;
+    gpus: GpuStats[];
+    cpu: { usage_pct: number; temp_c: number };
+    ram: { total_mb: number; used_mb: number };
+    disk: { total_gb: number; used_gb: number };
+    network: { bytes_in: number; bytes_out: number };
+    inference: {
+        loaded_models: string[];
+        in_flight_requests: number;
+        tokens_generated: number;
+        avg_latency_ms: number;
+    };
+    toks_per_sec: number;
+    requests_completed: number;
+}
+
+interface NodeWithStats {
+    id: string;
+    farm_hash: string;
+    hostname: string;
+    ip_address: string | null;
+    mac_address: string | null;
+    registered_at: string;
+    last_seen_at: string | null;
+    status: string;
+    gpu_count: number;
+    os_version: string | null;
+    latest_stats: StatsPayload | null;
+}
+
+interface FlightSheetTarget {
+    node_id: string;
+    model: string;
+    gpu?: number;
+}
+
+interface FlightSheet {
+    id: string;
+    name: string;
+    description: string;
+    targets: FlightSheetTarget[];
+    created_at: string;
+    updated_at: string | null;
+}
+
+// =============================================================================
+// ASCII Art
+// =============================================================================
+
+const CLAWTOPUS_FACE = [
+    C.cyan('       .-\'"\'-.      '),
+    C.cyan('      /       \\     '),
+    C.purple('     |  ') + C.green('O') + C.purple('   ') + C.green('O') + C.purple('  |    '),
+    C.purple('     |   ') + C.cyan('\\_/') + C.purple('   |    '),
+    C.cyan('      \\_______/     '),
+    C.purple('     /||') + C.cyan('|') + C.purple('||') + C.cyan('|') + C.purple('||\\    '),
+    C.purple('    / ||') + C.cyan('|') + C.purple('||') + C.cyan('|') + C.purple('|| \\   '),
+];
+
+// =============================================================================
+// Commands
+// =============================================================================
+
+async function cmdStatus(gateway: string): Promise<void> {
+    const data = await apiGet(gateway, '/api/v1/summary') as ClusterSummary;
+
+    console.log('');
+    for (const line of CLAWTOPUS_FACE) {
+        console.log('  ' + line);
+    }
+    console.log('');
+    console.log('  ' + C.purple(C.bold('TentaCLAW Cluster Status')));
+    console.log('  ' + C.dim('Gateway: ' + gateway));
+    console.log('');
+
+    // Nodes
+    const nodesOnline = data.online_nodes;
+    const nodesTotal = data.total_nodes;
+    const nodesColor = nodesOnline === nodesTotal && nodesTotal > 0 ? C.green : (nodesOnline === 0 ? C.red : C.yellow);
+    console.log('  ' + C.cyan('\u2502') + ' Nodes     ' + nodesColor(`${nodesOnline}/${nodesTotal} online`));
+
+    // GPUs
+    console.log('  ' + C.cyan('\u2502') + ' GPUs      ' + C.white(formatNumber(data.total_gpus) + ' total'));
+
+    // VRAM
+    const vramPct = data.total_vram_mb > 0 ? Math.round((data.used_vram_mb / data.total_vram_mb) * 100) : 0;
+    console.log('  ' + C.cyan('\u2502') + ' VRAM      ' + C.white(formatMb(data.used_vram_mb) + ' / ' + formatMb(data.total_vram_mb)) + C.dim(` (${vramPct}%)`));
+
+    // Throughput
+    console.log('  ' + C.cyan('\u2502') + ' Throughput ' + formatToksPerSec(data.total_toks_per_sec));
+
+    // Models
+    const models = data.loaded_models.length > 0 ? data.loaded_models.join(', ') : C.dim('none');
+    console.log('  ' + C.cyan('\u2502') + ' Models    ' + models);
+
+    // Farms
+    if (data.farm_hashes.length > 0) {
+        console.log('  ' + C.cyan('\u2502') + ' Farms     ' + data.farm_hashes.join(', '));
+    }
+
+    console.log('');
+}
+
+async function cmdNodes(gateway: string): Promise<void> {
+    const data = await apiGet(gateway, '/api/v1/nodes') as { nodes: NodeWithStats[] };
+    const nodes = data.nodes;
+
+    if (nodes.length === 0) {
+        console.log('');
+        console.log(C.yellow('  No nodes registered yet.'));
+        console.log(C.dim('  Start an agent: cd agent && npm run dev -- --mock'));
+        console.log('');
+        return;
+    }
+
+    console.log('');
+    console.log('  ' + C.purple(C.bold('Cluster Nodes')) + C.dim(` (${nodes.length} total)`));
+    console.log('');
+
+    // Table header
+    const hdr =
+        padRight(C.dim('STATUS'), 20) +
+        padRight(C.dim('HOSTNAME'), 22) +
+        padRight(C.dim('GPUs'), 8) +
+        padRight(C.dim('VRAM'), 20) +
+        padRight(C.dim('TOK/S'), 14) +
+        C.dim('NODE ID');
+    console.log('  ' + hdr);
+    console.log('  ' + C.dim('\u2500'.repeat(100)));
+
+    for (const node of nodes) {
+        const stats = node.latest_stats;
+        const gpuCount = stats ? String(stats.gpu_count) : String(node.gpu_count);
+
+        let vram = C.dim('-');
+        if (stats && stats.gpus.length > 0) {
+            let totalVram = 0;
+            let usedVram = 0;
+            for (const gpu of stats.gpus) {
+                totalVram += gpu.vramTotalMb;
+                usedVram += gpu.vramUsedMb;
+            }
+            vram = formatMb(usedVram) + '/' + formatMb(totalVram);
+        }
+
+        const toks = stats ? formatToksPerSec(stats.toks_per_sec) : C.dim('-');
+
+        const row =
+            padRight(statusBadge(node.status), 20) +
+            padRight(C.white(node.hostname), 22) +
+            padRight(gpuCount, 8) +
+            padRight(vram, 20) +
+            padRight(toks, 14) +
+            C.dim(node.id);
+
+        console.log('  ' + row);
+    }
+
+    console.log('');
+}
+
+async function cmdNode(gateway: string, nodeId: string): Promise<void> {
+    const data = await apiGet(gateway, '/api/v1/nodes/' + encodeURIComponent(nodeId)) as { node: NodeWithStats };
+    const node = data.node;
+    const stats = node.latest_stats;
+
+    console.log('');
+    console.log('  ' + C.purple(C.bold('Node: ')) + C.white(node.hostname));
+    console.log('  ' + C.dim(node.id));
+    console.log('');
+
+    // Basic info
+    console.log('  ' + C.cyan('\u2502') + ' Status      ' + statusBadge(node.status));
+    console.log('  ' + C.cyan('\u2502') + ' Farm        ' + node.farm_hash);
+    if (node.ip_address) {
+        console.log('  ' + C.cyan('\u2502') + ' IP          ' + node.ip_address);
+    }
+    if (node.mac_address) {
+        console.log('  ' + C.cyan('\u2502') + ' MAC         ' + node.mac_address);
+    }
+    if (node.os_version) {
+        console.log('  ' + C.cyan('\u2502') + ' OS          ' + node.os_version);
+    }
+    console.log('  ' + C.cyan('\u2502') + ' Registered  ' + (node.registered_at || C.dim('unknown')));
+    console.log('  ' + C.cyan('\u2502') + ' Last seen   ' + (node.last_seen_at || C.dim('never')));
+    console.log('');
+
+    if (!stats) {
+        console.log(C.dim('  No stats reported yet.'));
+        console.log('');
+        return;
+    }
+
+    // System stats
+    console.log('  ' + C.cyan(C.bold('System')));
+    console.log('  ' + C.cyan('\u2502') + ' Uptime      ' + formatUptime(stats.uptime_secs));
+    console.log('  ' + C.cyan('\u2502') + ' CPU         ' + stats.cpu.usage_pct + '%' + (stats.cpu.temp_c > 0 ? C.dim(` (${stats.cpu.temp_c}\u00B0C)`) : ''));
+    console.log('  ' + C.cyan('\u2502') + ' RAM         ' + formatMb(stats.ram.used_mb) + ' / ' + formatMb(stats.ram.total_mb));
+    console.log('  ' + C.cyan('\u2502') + ' Disk        ' + stats.disk.used_gb + ' GB / ' + stats.disk.total_gb + ' GB');
+    console.log('  ' + C.cyan('\u2502') + ' Throughput  ' + formatToksPerSec(stats.toks_per_sec));
+    console.log('');
+
+    // GPUs
+    if (stats.gpus.length > 0) {
+        console.log('  ' + C.cyan(C.bold('GPUs')) + C.dim(` (${stats.gpus.length})`));
+        for (let i = 0; i < stats.gpus.length; i++) {
+            const gpu = stats.gpus[i];
+            const vramPct = gpu.vramTotalMb > 0 ? Math.round((gpu.vramUsedMb / gpu.vramTotalMb) * 100) : 0;
+            const tempColor = gpu.temperatureC > 80 ? C.red : (gpu.temperatureC > 65 ? C.yellow : C.green);
+
+            console.log('  ' + C.cyan('\u2502') + ' ' + C.purple(`[${i}]`) + ' ' + C.white(gpu.name));
+            console.log('  ' + C.cyan('\u2502') + '     VRAM     ' + formatMb(gpu.vramUsedMb) + ' / ' + formatMb(gpu.vramTotalMb) + C.dim(` (${vramPct}%)`));
+            console.log('  ' + C.cyan('\u2502') + '     Temp     ' + tempColor(gpu.temperatureC + '\u00B0C'));
+            console.log('  ' + C.cyan('\u2502') + '     Util     ' + gpu.utilizationPct + '%');
+            console.log('  ' + C.cyan('\u2502') + '     Power    ' + gpu.powerDrawW + ' W');
+            console.log('  ' + C.cyan('\u2502') + '     Fan      ' + gpu.fanSpeedPct + '%');
+            console.log('  ' + C.cyan('\u2502') + '     Clock    SM ' + formatNumber(gpu.clockSmMhz) + ' MHz / Mem ' + formatNumber(gpu.clockMemMhz) + ' MHz');
+            console.log('  ' + C.cyan('\u2502') + '     Bus      ' + C.dim(gpu.busId));
+        }
+        console.log('');
+    }
+
+    // Inference
+    const inf = stats.inference;
+    console.log('  ' + C.cyan(C.bold('Inference')));
+    console.log('  ' + C.cyan('\u2502') + ' Models      ' + (inf.loaded_models.length > 0 ? inf.loaded_models.join(', ') : C.dim('none')));
+    console.log('  ' + C.cyan('\u2502') + ' In-flight   ' + inf.in_flight_requests);
+    console.log('  ' + C.cyan('\u2502') + ' Tokens      ' + formatNumber(inf.tokens_generated));
+    console.log('  ' + C.cyan('\u2502') + ' Latency     ' + (inf.avg_latency_ms > 0 ? inf.avg_latency_ms + ' ms' : C.dim('-')));
+    console.log('  ' + C.cyan('\u2502') + ' Requests    ' + formatNumber(stats.requests_completed));
+    console.log('');
+}
+
+async function cmdDeploy(gateway: string, model: string, nodeId?: string): Promise<void> {
+    console.log('');
+
+    if (nodeId) {
+        // Deploy to specific node
+        console.log('  ' + C.purple('Deploying') + ' ' + C.white(model) + ' to node ' + C.cyan(nodeId) + '...');
+        console.log('');
+
+        const data = await apiPost(gateway, '/api/v1/nodes/' + encodeURIComponent(nodeId) + '/commands', {
+            action: 'install_model',
+            model,
+        }) as { status: string; command: { id: string; action: string } };
+
+        console.log('  ' + C.green('\u2714') + ' Command queued: ' + C.dim(data.command.id));
+        console.log('  ' + C.dim('  The agent will pull the model on its next check-in.'));
+    } else {
+        // Deploy to all online nodes
+        console.log('  ' + C.purple('Deploying') + ' ' + C.white(model) + ' to ' + C.cyan('all online nodes') + '...');
+        console.log('');
+
+        const nodesData = await apiGet(gateway, '/api/v1/nodes') as { nodes: NodeWithStats[] };
+        const onlineNodes = nodesData.nodes.filter(n => n.status === 'online');
+
+        if (onlineNodes.length === 0) {
+            console.log('  ' + C.yellow('\u26A0') + '  No online nodes found.');
+            console.log('');
+            return;
+        }
+
+        let queued = 0;
+        for (const node of onlineNodes) {
+            try {
+                const data = await apiPost(gateway, '/api/v1/nodes/' + encodeURIComponent(node.id) + '/commands', {
+                    action: 'install_model',
+                    model,
+                }) as { status: string; command: { id: string } };
+
+                console.log('  ' + C.green('\u2714') + ' ' + padRight(C.white(node.hostname), 24) + C.dim(data.command.id));
+                queued++;
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                console.log('  ' + C.red('\u2718') + ' ' + padRight(C.white(node.hostname), 24) + C.red(msg));
+            }
+        }
+
+        console.log('');
+        console.log('  ' + C.green(String(queued)) + ' command(s) queued across ' + C.cyan(String(onlineNodes.length)) + ' node(s).');
+    }
+
+    console.log('');
+}
+
+async function cmdCommand(gateway: string, nodeId: string, action: string, flags: Record<string, string>): Promise<void> {
+    const validActions = ['reload_model', 'install_model', 'remove_model', 'overclock', 'restart_agent', 'reboot'];
+
+    if (!validActions.includes(action)) {
+        console.error('');
+        console.error(C.red('  \u2718 Unknown action: ') + C.white(action));
+        console.error('');
+        console.error('  Valid actions:');
+        for (const a of validActions) {
+            console.error('    ' + C.cyan(a));
+        }
+        console.error('');
+        process.exit(1);
+    }
+
+    const body: Record<string, unknown> = { action };
+    if (flags['model']) body['model'] = flags['model'];
+    if (flags['gpu']) body['gpu'] = parseInt(flags['gpu']);
+    if (flags['profile']) body['profile'] = flags['profile'];
+    if (flags['priority']) body['priority'] = flags['priority'];
+
+    console.log('');
+    console.log('  ' + C.purple('Sending command') + ' ' + C.white(action) + ' to ' + C.cyan(nodeId) + '...');
+
+    if (body['model']) {
+        console.log('  ' + C.dim('Model: ' + body['model']));
+    }
+    if (body['gpu'] !== undefined) {
+        console.log('  ' + C.dim('GPU: ' + body['gpu']));
+    }
+    console.log('');
+
+    const data = await apiPost(gateway, '/api/v1/nodes/' + encodeURIComponent(nodeId) + '/commands', body) as {
+        status: string;
+        command: { id: string; action: string };
+    };
+
+    console.log('  ' + C.green('\u2714') + ' Command queued: ' + C.dim(data.command.id));
+    console.log('  ' + C.dim('  The agent will execute this on its next check-in.'));
+    console.log('');
+}
+
+async function cmdFlightSheets(gateway: string): Promise<void> {
+    const data = await apiGet(gateway, '/api/v1/flight-sheets') as { flight_sheets: FlightSheet[] };
+    const sheets = data.flight_sheets;
+
+    console.log('');
+    console.log('  ' + C.purple(C.bold('Flight Sheets')) + C.dim(` (${sheets.length} total)`));
+    console.log('');
+
+    if (sheets.length === 0) {
+        console.log(C.dim('  No flight sheets configured.'));
+        console.log(C.dim('  Create one via the Gateway API or Dashboard.'));
+        console.log('');
+        return;
+    }
+
+    for (const sheet of sheets) {
+        console.log('  ' + C.cyan('\u250C') + C.cyan('\u2500'.repeat(60)));
+        console.log('  ' + C.cyan('\u2502') + ' ' + C.white(C.bold(sheet.name)) + C.dim('  ' + sheet.id));
+        if (sheet.description) {
+            console.log('  ' + C.cyan('\u2502') + ' ' + C.dim(sheet.description));
+        }
+        console.log('  ' + C.cyan('\u2502') + ' Created: ' + sheet.created_at);
+        if (sheet.updated_at) {
+            console.log('  ' + C.cyan('\u2502') + ' Updated: ' + sheet.updated_at);
+        }
+        console.log('  ' + C.cyan('\u2502'));
+        console.log('  ' + C.cyan('\u2502') + ' ' + C.dim('Targets:'));
+
+        for (const target of sheet.targets) {
+            const nodeLabel = target.node_id === '*' ? C.yellow('all nodes') : C.cyan(target.node_id);
+            const gpuLabel = target.gpu !== undefined ? C.dim(` (GPU ${target.gpu})`) : '';
+            console.log('  ' + C.cyan('\u2502') + '   ' + C.purple('\u2192') + ' ' + C.white(target.model) + ' \u2192 ' + nodeLabel + gpuLabel);
+        }
+
+        console.log('  ' + C.cyan('\u2514') + C.cyan('\u2500'.repeat(60)));
+        console.log('');
+    }
+}
+
+async function cmdApply(gateway: string, flightSheetId: string): Promise<void> {
+    console.log('');
+    console.log('  ' + C.purple('Applying flight sheet') + ' ' + C.cyan(flightSheetId) + '...');
+    console.log('');
+
+    const data = await apiPost(gateway, '/api/v1/flight-sheets/' + encodeURIComponent(flightSheetId) + '/apply') as {
+        status: string;
+        commands_queued: number;
+        commands: { id: string; action: string; model?: string }[];
+    };
+
+    if (data.commands_queued === 0) {
+        console.log('  ' + C.yellow('\u26A0') + '  No commands were queued.');
+        console.log('  ' + C.dim('  Check that matching nodes are online.'));
+    } else {
+        console.log('  ' + C.green('\u2714') + ' ' + C.green(String(data.commands_queued)) + ' command(s) queued:');
+        console.log('');
+
+        for (const cmd of data.commands) {
+            const modelLabel = cmd.model ? C.white(cmd.model) : C.dim('n/a');
+            console.log('    ' + C.dim(cmd.id) + '  ' + C.cyan(cmd.action) + '  ' + modelLabel);
+        }
+    }
+
+    console.log('');
+}
+
+function cmdHelp(): void {
+    console.log('');
+    console.log('  ' + C.purple(C.bold('TentaCLAW CLI')) + ' ' + C.dim('v0.1.0'));
+    console.log('  ' + C.dim('Command-line tool for managing your AI inference cluster.'));
+    console.log('');
+    console.log('  ' + C.cyan(C.bold('USAGE')));
+    console.log('');
+    console.log('    tentaclaw <command> [options]');
+    console.log('');
+    console.log('  ' + C.cyan(C.bold('COMMANDS')));
+    console.log('');
+    console.log('    ' + padRight(C.green('status'), 42) + 'Cluster overview (nodes, GPUs, VRAM, tok/s)');
+    console.log('    ' + padRight(C.green('nodes'), 42) + 'List all nodes with status');
+    console.log('    ' + padRight(C.green('node') + ' <nodeId>', 42) + 'Show detailed node info');
+    console.log('    ' + padRight(C.green('deploy') + ' <model>', 42) + 'Deploy model to all online nodes');
+    console.log('    ' + padRight(C.green('deploy') + ' <model> <nodeId>', 42) + 'Deploy model to specific node');
+    console.log('    ' + padRight(C.green('command') + ' <nodeId> <action>', 42) + 'Send command to a node');
+    console.log('    ' + padRight(C.green('flight-sheets'), 42) + 'List all flight sheets');
+    console.log('    ' + padRight(C.green('apply') + ' <flightSheetId>', 42) + 'Apply a flight sheet');
+    console.log('    ' + padRight(C.green('help'), 42) + 'Show this help');
+    console.log('');
+    console.log('  ' + C.cyan(C.bold('COMMAND OPTIONS')));
+    console.log('');
+    console.log('    ' + padRight(C.yellow('--model') + ' <name>', 42) + 'Model name (for command)');
+    console.log('    ' + padRight(C.yellow('--gpu') + ' <index>', 42) + 'GPU index (for command)');
+    console.log('    ' + padRight(C.yellow('--profile') + ' <name>', 42) + 'Profile name (for overclock)');
+    console.log('    ' + padRight(C.yellow('--priority') + ' <level>', 42) + 'Priority (for command)');
+    console.log('');
+    console.log('  ' + C.cyan(C.bold('GLOBAL OPTIONS')));
+    console.log('');
+    console.log('    ' + padRight(C.yellow('--gateway') + ' <url>', 42) + 'HiveMind Gateway URL');
+    console.log('');
+    console.log('  ' + C.cyan(C.bold('ENVIRONMENT')));
+    console.log('');
+    console.log('    ' + padRight(C.yellow('TENTACLAW_GATEWAY'), 42) + 'Default gateway URL (default: http://localhost:8080)');
+    console.log('');
+    console.log('  ' + C.cyan(C.bold('ACTIONS')) + C.dim(' (for the command subcommand)'));
+    console.log('');
+    console.log('    ' + padRight('reload_model', 24) + 'Reload a model in the inference engine');
+    console.log('    ' + padRight('install_model', 24) + 'Pull/install a model via Ollama');
+    console.log('    ' + padRight('remove_model', 24) + 'Remove a model from the node');
+    console.log('    ' + padRight('overclock', 24) + 'Apply an overclock profile');
+    console.log('    ' + padRight('restart_agent', 24) + 'Restart the TentaCLAW agent daemon');
+    console.log('    ' + padRight('reboot', 24) + 'Reboot the node');
+    console.log('');
+    console.log('  ' + C.cyan(C.bold('EXAMPLES')));
+    console.log('');
+    console.log(C.dim('    # Check cluster health'));
+    console.log('    tentaclaw status');
+    console.log('');
+    console.log(C.dim('    # Deploy a model across the cluster'));
+    console.log('    tentaclaw deploy llama3.1:8b');
+    console.log('');
+    console.log(C.dim('    # Send a command to a specific node'));
+    console.log('    tentaclaw command NODE-001 install_model --model codellama:7b');
+    console.log('');
+    console.log(C.dim('    # Use a remote gateway'));
+    console.log('    tentaclaw status --gateway http://192.168.1.100:8080');
+    console.log('');
+}
+
+// =============================================================================
+// Main
+// =============================================================================
+
+async function main(): Promise<void> {
+    const parsed = parseArgs(process.argv);
+    const gateway = getGatewayUrl(parsed.flags);
+
+    switch (parsed.command) {
+        case 'status':
+            await cmdStatus(gateway);
+            break;
+
+        case 'nodes':
+            await cmdNodes(gateway);
+            break;
+
+        case 'node': {
+            const nodeId = parsed.positional[0];
+            if (!nodeId) {
+                console.error('');
+                console.error(C.red('  \u2718 Missing node ID'));
+                console.error(C.dim('  Usage: tentaclaw node <nodeId>'));
+                console.error('');
+                process.exit(1);
+            }
+            await cmdNode(gateway, nodeId);
+            break;
+        }
+
+        case 'deploy': {
+            const model = parsed.positional[0];
+            if (!model) {
+                console.error('');
+                console.error(C.red('  \u2718 Missing model name'));
+                console.error(C.dim('  Usage: tentaclaw deploy <model> [nodeId]'));
+                console.error(C.dim('  Example: tentaclaw deploy llama3.1:8b'));
+                console.error('');
+                process.exit(1);
+            }
+            const targetNode = parsed.positional[1];
+            await cmdDeploy(gateway, model, targetNode);
+            break;
+        }
+
+        case 'command': {
+            const nodeId = parsed.positional[0];
+            const action = parsed.positional[1];
+            if (!nodeId || !action) {
+                console.error('');
+                console.error(C.red('  \u2718 Missing arguments'));
+                console.error(C.dim('  Usage: tentaclaw command <nodeId> <action> [--model <m>] [--gpu <n>]'));
+                console.error(C.dim('  Example: tentaclaw command NODE-001 install_model --model llama3.1:8b'));
+                console.error('');
+                process.exit(1);
+            }
+            await cmdCommand(gateway, nodeId, action, parsed.flags);
+            break;
+        }
+
+        case 'flight-sheets':
+            await cmdFlightSheets(gateway);
+            break;
+
+        case 'apply': {
+            const sheetId = parsed.positional[0];
+            if (!sheetId) {
+                console.error('');
+                console.error(C.red('  \u2718 Missing flight sheet ID'));
+                console.error(C.dim('  Usage: tentaclaw apply <flightSheetId>'));
+                console.error(C.dim('  Run "tentaclaw flight-sheets" to see available IDs.'));
+                console.error('');
+                process.exit(1);
+            }
+            await cmdApply(gateway, sheetId);
+            break;
+        }
+
+        case 'help':
+        case '--help':
+        case '-h':
+            cmdHelp();
+            break;
+
+        case 'version':
+        case '--version':
+        case '-v':
+            console.log('tentaclaw-cli v0.1.0');
+            break;
+
+        default:
+            console.error('');
+            console.error(C.red('  \u2718 Unknown command: ') + C.white(parsed.command));
+            console.error(C.dim('  Run "tentaclaw help" for usage.'));
+            console.error('');
+            process.exit(1);
+    }
+}
+
+main().catch((err) => {
+    console.error('');
+    console.error(C.red('  \u2718 Fatal error: ') + (err instanceof Error ? err.message : String(err)));
+    console.error('');
+    process.exit(1);
+});

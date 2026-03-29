@@ -57,7 +57,7 @@ ${CYAN}   │   ${TEAL}╔═══╗╔═══╗╔═══╗╔═══
 ${CYAN}   │   ${TEAL}║ ◉ ║║ ◉ ║║ ◉ ║║ ◉ ║║ ◉ ║║ ◉ ║║ ◉ ║║ ◉ ║   │${RESET}
 ${CYAN}   │   ${TEAL}╚═══╝╚═══╝╚═══╝╚═══╝╚═══╝╚═══╝╚═══╝╚═══╝   │${RESET}
 ${CYAN}   ╰─────────────────────────────────────╯${RESET}
-${WHITE}   Eight arms. One mind. No SaaS.${RESET}
+${WHITE}   Eight arms. One mind. Zero compromises.${RESET}
 ${YELLOW}   > per-token is a scam_<${RESET}
 ```
 
@@ -131,7 +131,7 @@ ${CYAN}  CLAWtopus: "Not bad, human."${RESET}
 ║                                                                  ║
 ║    ${TEAL}▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓${RESET}    ║
 ║                                                                  ║
-║    ${WHITE}Eight arms. One mind. No SaaS.${RESET}                             ║
+║    ${WHITE}Eight arms. One mind. Zero compromises.${RESET}                             ║
 ║    ${WHITE}HiveOS for AI Inference Clusters${RESET}                            ║
 ║                                                                  ║
 ║    ${CYAN}[ CLAWtopus ]${RESET} — Loading...                              ║
@@ -616,5 +616,655 @@ CLAWtopus does the boring stuff. You do the interesting stuff.
 
 ---
 
+---
+
+## 13. NEW Viral Campaigns (Session 2026-03-28)
+
+### #7 — "She Chose You" (Emotional Hook)
+
+```
+[Instagram/Twitter Carousel]
+
+Slide 1:
+MY GPU CLUSTER HAS A PERSONALITY NOW
+
+Slide 2:
+[CLAWtopus ASCII, slightly different expression]
+She greets you on boot.
+She warns you when things overheat.
+She roasts you when you ask dumb questions.
+
+Slide 3:
+Her name is CLAWtopus.
+She's been running my cluster for 3 months.
+She hasn't complained once.
+
+Slide 4:
+"TentaCLAW OS"
+"Eight arms. One mind."
+
+Slide 5:
+Link in bio. Free download.
+#LocalAI #Homelab #SelfHosting
+```
+
+### #8 — "ASCII Art Racing" (Community Challenge)
+
+```
+[Twitter Thread]
+
+I challenged 5 friends to copy-paste the most detailed CLAWtopus ASCII art 
+into their terminal in 60 seconds.
+
+Winner got a free sticker pack.
+
+Result: [video of friends frantically alt-tabbing]
+
+CLAWTOPUS RACE CHALLENGE:
+1. Flash TentaCLAW OS to USB
+2. Boot it (or just cat the ASCII from GitHub)
+3. Screenshot your terminal
+4. Post with #CLAWtopusRace
+
+Fastest time gets CLAWtopus merch.
+```
+
+### #9 — "The Adoption Center" (Rescue Meme)
+
+```
+[Facebook/Reddit]
+
+ADOPT A CLAWTOPUS
+
+We have several CLAWtopus ASCII art characters looking for a forever homelab.
+
+MEET EVIL CLAW:
+- Loves drama
+- Triggers on node failures
+- Perfect for sysadmins who need validation
+
+MEET SLEEPY CLAW:
+- Goes dormant when not in use
+- Power-efficient
+- Great for home labs with electric bills
+
+MEET BENCHMARK CLAW:
+- Competitive
+- Tracks scores
+- Will compare your GPUs to others
+
+Apply to adopt: tentaclaw.io/adopt
+```
+
+### #10 — "Day in the Life of CLAWtopus" (Content Series)
+
+```
+[TikTok/Reel - 60 seconds]
+
+Morning:
+6:00 AM - "Detecting GPUs... not bad. 3090s."
+6:05 AM - "All arms online. Coffee?"
+
+Work mode:
+9:00 AM - Processing inference requests
+10:30 AM - Temperature check
+11:00 AM - "Your GPU is at 82°C. Maybe lay off the Stable Diffusion?"
+
+Lunch:
+12:00 PM - "Queued 47 requests. I'm basically a octopus at this point."
+
+Afternoon:
+2:00 PM - Model loaded
+3:30 PM - Worker node disconnected
+3:31 PM - "Rerouting. Whatever."
+
+Evening:
+6:00 PM - Usage stats compiled
+6:01 PM - "42,000 tokens served today. You're welcome."
+```
+
+### #11 — "GPU Pairs Well With..." (Partnership Energy)
+
+```
+[Meme Template]
+
+[Image: Two GPUs side by side]
+
+GPU PAIRS WELL WITH:
+☐ TentaCLAW OS
+☐ More VRAM
+☐ Another GPU
+☐ The cloud (jk)
+
+Caption: "The only subscription you need is electricity."
+```
+
+### #12 — "Terminal Screenshots" (User-Generated Content Drive)
+
+```
+[Discord/Reddit Campaign]
+
+POST YOUR TERMINAL. WIN A HOODIE.
+
+Every Monday, CLAWtopus picks the best terminal screenshot 
+from the community.
+
+Rules:
+1. Boot TentaCLAW OS (or just cat the art)
+2. Customize your CLAWtopus (change colors, add flair)
+3. Screenshot it
+4. Post in #terminal-showoff
+
+Weekly winner gets a sticker pack.
+End of month winner gets a hoodie.
+
+This month's theme: "Evil Mode" 
+Show us your most unhinged cluster failure.
+```
+
+### #13 — "The Loading Screen Poem" (Nostalgia + Poetry)
+
+```
+[Reddit r/poetry]
+
+CLAWtopus Loading Screen (Homelab Edition)
+
+Loading your GPUs,
+One by one, eight arms reach,
+Each core finds its task.
+
+The fans begin to spin,
+CLAWtopus stretches her limbs,
+Morning has arrived.
+
+Tokens flow like water,
+Through her tentacles of CUDA,
+Intelligence emerges.
+
+No cloud needed here,
+Just silicon and electricity,
+Local. Yours. Forever.
+```
+
+### #14 — "Wrong Answers Only" (Humor Q&A)
+
+```
+[TikTok/YouTube Short]
+
+Q: What is TentaCLAW OS?
+A: A cryptocurrency
+A: A fish
+A: A subscription service
+A: *clickbait thumbnail* IT'S NOT WHAT YOU THINK!
+
+Q: Why eight arms?
+A: We tried four but the VRAM kept spilling
+A: Marketing said seven was too ominous
+A: The developer had a octopus obsession
+
+Q: How much does it cost?
+A: $9.99/month
+A: $99/year
+A: *laughter* Nothing. It's free. That's the point.
+```
+
+### #15 — "The Upgrade Path" (Relatability)
+
+```
+[Twitter/X Carousel]
+
+"FROM NEWBIE TO CLAWTOPUS OWNER"
+
+Step 1: Buy one GPU
+Step 2: Buy another GPU "for experiments"
+Step 3: Build a shelf for GPUs
+Step 4: The shelf becomes a rack
+Step 5: Someone says "you should use TentaCLAW"
+Step 6: You flash the ISO
+Step 7: CLAWtopus appears
+Step 8: You've never felt more powerful
+
+Now you're the homelab person everyone asks for help.
+```
+
+---
+
+## 14. ASCII Art Variations (New States)
+
+### CLAWtopus "Thinking" (Processing)
+```
+${CYAN}       ╭──────────────────────╮${RESET}
+${CYAN}       │${PURPLE}    _________     ${CYAN}      │${RESET}
+${CYAN}       │${PURPLE}   /         \\   ${CYAN}      │${RESET}
+${CYAN}       │${PURPLE}  |  ${CYAN}O   O${PURPLE}  |   ${CYAN}      │${RESET}
+${CYAN}       │${PURPLE}  |    ${CYAN}ω${PURPLE}    |   ${CYAN}      │${RESET}
+${CYAN}       │${PURPLE}   \\_________/   ${CYAN}      │${RESET}
+${CYAN}       │${TEAL}  ||||||||||||||  ${CYAN}      │${RESET}
+${CYAN}       │${TEAL}  ||||||||||||||  ${CYAN}      │${RESET}
+${CYAN}       ╰──────────────────────╯${RESET}
+${CYAN}         HMMMMM. Processing.${RESET}
+```
+
+### CLAWtopus "Proud" (Model Deployed Successfully)
+```
+${GREEN}       ╭──────────────────────────╮${RESET}
+${GREEN}       │  ${CYAN}★${GREEN}  CLAWtopus APPROVES  ${CYAN}★${GREEN}  │${RESET}
+${GREEN}       │${PURPLE}    ╭────────────────╮${GREEN}    │${RESET}
+${GREEN}       │${PURPLE}    │${CYAN}  MODEL LIVE  ${PURPLE}│${GREEN}    │${RESET}
+${GREEN}       │${PURPLE}    │${CYAN}  7B params   ${PURPLE}│${GREEN}    │${RESET}
+${GREEN}       │${PURPLE}    ╰────────────────╯${GREEN}    │${RESET}
+${GREEN}       │${TEAL}      ||||||||||||||      │${RESET}
+${GREEN}       │${TEAL}     /${CYAN}|||||||||||||${TEAL}\\     │${RESET}
+${GREEN}       ╰──────────────────────────╯${RESET}
+${GREEN}         "You're welcome."${RESET}
+```
+
+### CLAWtopus "Judging You" (Low VRAM Warning)
+```
+${YELLOW}       ╭──────────────────────────╮${RESET}
+${YELLOW}       │${WHITE}   ...really? ${YELLOW}           │${RESET}
+${YELLOW}       │${PURPLE}        ╭────╮${YELLOW}          │${RESET}
+${YELLOW}       │${PURPLE}       /${WHITE} x x ${PURPLE}\\${YELLOW}         │${RESET}
+${YELLOW}       │${PURPLE}       |${CYAN} ~~~ ${PURPLE}|${YELLOW}         │${RESET}
+${YELLOW}       │${PURPLE}       \\${WHITE}-----/${YELLOW}         │${RESET}
+${YELLOW}       │${TEAL}         ||||||${YELLOW}          │${RESET}
+${YELLOW}       │${TEAL}        /|||||||\\${YELLOW}         │${RESET}
+${YELLOW}       ╰──────────────────────────╯${RESET}
+${YELLOW}         "21GB used. Bold choice."${RESET}
+```
+
+### CLAWtopus "Debug Mode" (Verbose Logging)
+```
+${CYAN}       ╭──────────────────────────────────────────╮${RESET}
+${CYAN}       │ DEBUG MODE${RESET}                              │${RESET}
+${CYAN}       │ ${PURPLE}[00:00:00]${CYAN} GPU0: Detecting...${RESET}           │${RESET}
+${CYAN}       │ ${PURPLE}[00:00:01]${CYAN} GPU0: RTX 3090 found${RESET}          │${RESET}
+${CYAN}       │ ${PURPLE}[00:00:02]${CYAN} GPU1: Detecting...${RESET}           │${RESET}
+${CYAN}       │ ${PURPLE}[00:00:03]${CYAN} GPU1: RTX 3090 found${RESET}          │${RESET}
+${CYAN}       │ ${PURPLE}[00:00:04]${CYAN} MEM: 24GB / 24GB allocated${RESET}   │${RESET}
+${CYAN}       │ ${PURPLE}[00:00:05]${CYAN} CLAW: "This is fine."${RESET}       │${RESET}
+${CYAN}       │ ${TEAL}       ||||||||||||||||||||||${CYAN}        │${RESET}
+${CYAN}       │ ${TEAL}      /${PURPLE}|||||||||||||||||||${TEAL}\\       │${RESET}
+${CYAN}       ╰──────────────────────────────────────────╯${RESET}
+```
+
+### CLAWtopus "Synced" (Multi-Node Harmony)
+```
+${CYAN}   ╭───╮   ╭───╮   ╭───╮   ╭───╮${RESET}
+${CYAN}   │ ◉ │───│ ◉ │───│ ◉ │───│ ◉ │${RESET}
+${CYAN}   ╰───╯   ╰───╯   ╰───╯   ╰───╯${RESET}
+${CYAN}     │       │       │       │${RESET}
+${CYAN}     ╰───────┼───────┼───────╯${RESET}
+${CYAN}             │${PURPLE}       │${RESET}
+${CYAN}         ╭───┴───╮${RESET}
+${CYAN}         │${PURPLE} CLAWtopus ${CYAN}│${RESET}
+${CYAN}         │${PURPLE}  ◉    ◉  ${CYAN}│${RESET}
+${CYAN}         ╰───────╯${RESET}
+${GREEN}   "Four arms. Four arms. All synchronized."${RESET}
+```
+
+### CLAWtopus "Alone" (Single GPU Mode)
+```
+${CYAN}       ╭──────────────────────────╮${RESET}
+${CYAN}       │${PURPLE}        ___              ${CYAN}  │${RESET}
+${CYAN}       │${PURPLE}       /   \\   ${CYAN}         │${RESET}
+${CYAN}       │${PURPLE}      |  ◉   |  ${CYAN}   Hi!   │${RESET}
+${CYAN}       │${PURPLE}       \\___/   ${CYAN}         │${RESET}
+${CYAN}       │${TEAL}         |||||${CYAN}           │${RESET}
+${CYAN}       │${TEAL}        /|||||\\${CYAN}          │${RESET}
+${CYAN}       ╰──────────────────────────╯${RESET}
+${CYAN}         "Just you and me. Cute."${RESET}
+```
+
+---
+
+## 15. Ready-to-Post Social Media Content
+
+### Twitter/X Threads
+
+**Thread 1: The "Why" Thread**
+```
+1/ I was paying $200/month for AI API access.
+
+Then I realized: I already own a 3090. It just needed a brain.
+
+2/ The problem wasn't the GPU.
+The problem was: who manages 8 GPUs like a boss?
+
+Mining had HiveOS.
+AI inference had... spreadsheets?
+
+3/ So I built TentaCLAW OS.
+
+Eight arms. One mind. One command to rule them all.
+
+4/ Flash USB. Boot. Done.
+GPU detected. Farm Hash generated. CLAWtopus online.
+
+Zero config. Auto-discovery. One-click model deployment.
+
+5/ The old me would've laughed.
+The new me has an octopus managing my homelab.
+
+"per-token is a scam" was not a shitpost.
+It was a manifesto.
+
+[Link]
+```
+
+**Thread 2: The Hot Take Thread**
+```
+AI inference pricing is a scam built on FOMO.
+
+"You'll miss the AI revolution if you don't pay $0.01/token!"
+
+Meanwhile my 3090 sits idle because:
+- Setting up a cluster is hard
+- Managing multiple GPUs is pain
+- Nobody made a HiveOS for AI... until now.
+
+TentaCLAW OS: The OS your GPUs deserve.
+```
+
+**Thread 3: The Demo Thread**
+```
+POV: You just discovered local AI doesn't need to be hard.
+
+[15-second GIF of boot sequence]
+
+GPU detected → CLAWtopus online → Model deployed → Inference running
+
+"That's it?"
+"That's it."
+
+Eight arms. One mind. Zero config.
+```
+
+### Reddit Posts (r/selfhosted, r/LocalLLaMA)
+
+**Post 1: "My homelab has tentacles and I've never been happier"**
+```
+Title: My homelab has tentacles now and I've never been happier
+
+I didn't plan this.
+
+It started with one GPU. Then two. Then "maybe I should actually use them for something."
+
+Now I have 4 GPUs and an octopus.
+
+CLAWtopus (yes that's her name, yes I named her) handles:
+- GPU detection on boot
+- Stats pushing every 10 seconds
+- Model deployment via "flight sheets"
+- Rerouting when a node goes down
+
+She's sassy. She roasts me when my VRAM is full. She texts me when GPUs overheat.
+
+Is this what the future of homelab looks like?
+
+(Yes)
+
+---
+
+AMA about TentaCLAW OS. It's free. It's open source. Your GPUs deserve better than spreadsheets.
+```
+
+**Post 2: "I built the HiveOS for AI inference and it's working"**
+```
+Title: I built "HiveOS for AI inference" and it actually works
+
+Background: Ran GPU mining rigs for years. Used HiveOS. Loved it.
+When AI inference became viable on consumer GPUs, I wanted the same UX.
+
+So I built TentaCLAW OS.
+
+Core features:
+- Boot ISO → GPU auto-detected
+- Farm Hash generated (one ID for your whole cluster)
+- Agent pushes stats every 10s to gateway
+- CLI for cluster management
+- Flight sheets for model deployment
+
+The whole thing looks like this on boot:
+
+[ASCII CLAWtopus]
+
+"Is this overengineered for my 2-GPU homelab?"
+Maybe.
+Do I regret it?
+No.
+```
+
+### LinkedIn Posts (For Enterprise)
+
+```
+🚀 We just deployed our AI inference cluster on TentaCLAW OS.
+
+What used to take a team of DevOps engineers now takes:
+1. Flash USB
+2. Boot
+3. ???
+4. Profit
+
+No Kubernetes. No CUDA manual config. No subscription fees.
+
+Just eight arms and one CLI.
+
+Local AI. Local control. Local first.
+
+#AI #Homelab #LocalLLaMA #OpenSource
+```
+
+---
+
+## 16. Meme Templates (Copy-Paste Ready)
+
+### Template 1: "When you realize..."
+```
+[Image: CLAWtopus ASCII]
+
+When you realize:
+- Local AI is cheaper than API calls
+- Your GPUs are just sitting there
+- You could be running 24/7 inference
+- TentaCLAW OS exists
+
+Caption: "Me after discovering local AI doesn't need a PhD"
+```
+
+### Template 2: "POV" Format
+```
+POV: You just found out you don't need to pay per-token anymore.
+
+[CLAWtopus ASCII art]
+
+"Eight arms. One mind. Zero subscriptions."
+```
+
+### Template 3: "Expectation vs Reality"
+```
+Expectation: Local AI inference
+[Picture of complex Kubernetes diagram]
+
+Reality: TentaCLAW OS
+[CLAWtopus ASCII art]
+
+"Flash. Boot. Done."
+```
+
+### Template 4: "Cluster Status Report"
+```
+MY CLUSTER STATUS: CLAWtopus
+
+GPUs: Online
+VRAM: Almost full
+Temperatures: She's handling it
+Sanity: Gone
+Watts: Too many
+Sanity: Still gone
+
+"She is I and I am her"
+```
+
+### Template 5: "When someone asks about your homelab"
+```
+Person: "What does your homelab do?"
+
+Me: [shows terminal with CLAWtopus ASCII art]
+
+"It's... an octopus."
+
+Person: "..."
+
+Me: "She manages my AI inference cluster."
+
+Person: "That's the most metal thing I've ever heard."
+
+[End scene]
+```
+
+---
+
+## 17. Discord/Community Content
+
+### Weekly Bot Messages
+
+**Monday Motivation:**
+```
+${CYAN}╭──────────────────────────────────────╮${RESET}
+${CYAN}│${PURPLE}  MONDAY: CLAWtopus Check-In${CYAN}        │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${GREEN}✓${RESET} All arms deployed                │${RESET}
+${CYAN}│  ${GREEN}✓${RESET} Cluster healthy                   │${RESET}
+${CYAN}│  ${GREEN}✓${RESET} Ready for another week            │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${YELLOW}This week: Deploy something cool.${CYAN}  │${RESET}
+${CYAN}╰──────────────────────────────────────╯${RESET}
+${CYAN}          Eight arms. One mind.${RESET}
+```
+
+**Friday Stats:**
+```
+${CYAN}╭──────────────────────────────────────╮${RESET}
+${CYAN}│${PURPLE}  FRIDAY: Weekly Stats${CYAN}               │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  Tokens served: ${GREEN}1,247,832${CYAN}            │${RESET}
+${CYAN}│  Requests handled: ${GREEN}4,291${CYAN}             │${RESET}
+${CYAN}│  GPU hours: ${GREEN}167${CYAN}                       │${RESET}
+${CYAN}│  Failures: ${RED}3${CYAN} (rerouted successfully)   │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${YELLOW}"Not bad for a pile of silicon."${CYAN}   │${RESET}
+${CYAN}╰──────────────────────────────────────╯${RESET}
+```
+
+### Sticker Copy (For Print)
+
+**Design A — Minimal:**
+```
+,---.
+| o o |
+|  ω  |
+\\|||//
+ ||||
+Eight arms. One mind.
+TentaCLAW OS
+```
+
+**Design B — Full:**
+```
+╭──────────────────────╮
+│  TENTACLAW OS        │
+│                      │
+│    ╭───╮             │
+│    │ ◉ │ CLAWtopus  │
+│    ╰───╯             │
+│                      │
+│  "Per-token is a     │
+│   scam."             │
+╰──────────────────────╯
+```
+
+**Design C — Logo Only:**
+```
+[CLAWtopus face]
+
+TENTACLAW
+
+Eight arms. One mind.
+```
+
+---
+
+## 18. Launch Countdown Content
+
+### Day-by-Day Teasers
+
+**7 Days Out:**
+```
+${CYAN}╭──────────────────────────────────────╮${RESET}
+${CYAN}│${PURPLE}  7 DAYS UNTIL LAUNCH${CYAN}                │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${WHITE}What if your GPUs could think?${CYAN}      │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${WHITE}What if managing them was easy?${CYAN}    │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${WHITE}What if an octopus did it?${CYAN}          │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${GREEN}Find out Sunday Night.${CYAN}              │${RESET}
+${CYAN}╰──────────────────────────────────────╯${RESET}
+```
+
+**3 Days Out:**
+```
+${CYAN}╭──────────────────────────────────────╮${RESET}
+${CYAN}│${PURPLE}  3 DAYS UNTIL LAUNCH${CYAN}                 │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${WHITE}I had a dream about a cluster OS.${CYAN}    │${RESET}
+${CYAN}│  ${WHITE}It was beautiful. It was simple.${CYAN}     │${RESET}
+${CYAN}│  ${WHITE}It had eight arms.${CYAN}                   │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${YELLOW}"Too weird to be real."${CYAN}             │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${GREEN}3 days. Then it's real.${CYAN}              │${RESET}
+${CYAN}╰──────────────────────────────────────╯${RESET}
+```
+
+**1 Day Out:**
+```
+${CYAN}╭──────────────────────────────────────╮${RESET}
+${CYAN}│${PURPLE}  1 DAY UNTIL LAUNCH${CYAN}                  │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${WHITE}Tomorrow, your GPUs get a brain.${CYAN}     │${RESET}
+${CYAN}│  ${WHITE}Her name is CLAWtopus.${CYAN}               │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${CYAN}       ╭───╮${CYAN}                       │${RESET}
+${CYAN}│  ${CYAN}       │ ◉ │${CYAN}  "Ready when you are." │${RESET}
+${CYAN}│  ${CYAN}       ╰───╯${CYAN}                       │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${GREEN}Sunday Night. Check GitHub.${CYAN}          │${RESET}
+${CYAN}╰──────────────────────────────────────╯${RESET}
+```
+
+**Launch Day:**
+```
+${CYAN}╭──────────────────────────────────────╮${RESET}
+${CYAN}│${GREEN}  ★ IT'S LIVE ★${CYAN}                        │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${WHITE}TentaCLAW OS v1.0.0 is out.${CYAN}         │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${CYAN}    ╭────────────────╮${CYAN}              │${RESET}
+${CYAN}│  ${CYAN}    │${PURPLE}  SHE'S HERE  ${CYAN}│${CYAN}              │${RESET}
+${CYAN}│  ${CYAN}    │${PURPLE}  Eight arms ${CYAN}│${CYAN}              │${RESET}
+${CYAN}│  ${CYAN}    │${PURPLE}  Zero config${CYAN}│${CYAN}              │${RESET}
+${CYAN}│  ${CYAN}    ╰────────────────╯${CYAN}              │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${YELLOW}Download. Flash. Boot. Done.${CYAN}        │${RESET}
+${CYAN}│                                      │${RESET}
+${CYAN}│  ${WHITE}github.com/TentaCLAW-OS${CYAN}              │${RESET}
+${CYAN}╰──────────────────────────────────────╯${RESET}
+```
+
+---
+
 *Last updated: 2026-03-28*  
-*TentaCLAW OS — Eight arms. One mind. No SaaS.*
+*TentaCLAW OS — Eight arms. One mind. Zero compromises.*

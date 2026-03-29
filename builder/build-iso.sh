@@ -699,7 +699,7 @@ main() {
     echo ""
     echo -e "${BOLD}${CYAN}═══════════════════════════════════════════════════════════════${RESET}"
     echo -e "${BOLD}${CYAN}║${RESET}   ${PURPLE}TentaCLAW OS${CYAN} — ISO Builder                           ${BOLD}${CYAN}║${RESET}"
-    echo -e "${BOLD}${CYAN}║${RESET}   ${TEAL}Eight arms. One mind. No SaaS.${RESET}                       ${BOLD}${CYAN}║${RESET}"
+    echo -e "${BOLD}${CYAN}║${RESET}   ${TEAL}Eight arms. One mind. Zero compromises.${RESET}                       ${BOLD}${CYAN}║${RESET}"
     echo -e "${BOLD}${CYAN}║${RESET}   Version ${VERSION} | Architecture ${ARCH}                        ${BOLD}${CYAN}║${RESET}"
     echo -e "${BOLD}${CYAN}═══════════════════════════════════════════════════════════════${RESET}"
     echo ""

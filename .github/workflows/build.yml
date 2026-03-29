@@ -1,0 +1,186 @@
+# TentaCLAW OS — GitHub Actions CI/CD
+# Builds ISO, tests agent + gateway, creates releases
+
+name: Build & Test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g., 0.1.0)'
+        required: false
+        default: ''
+
+env:
+  VERSION: ${{ github.event.inputs.version || github.event.release.tag_name || '0.1.0' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        component: [agent, gateway]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: cd ${{ matrix.component }} && npm ci
+
+      - name: Type check
+        run: cd ${{ matrix.component }} && npx tsc --noEmit
+
+      - name: Run tests
+        run: cd ${{ matrix.component }} && npm test
+
+  build-agent:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build Agent
+        run: cd agent && npm ci && npm run build
+
+      - name: Upload Agent artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tentaclaw-agent-${{ env.VERSION }}
+          path: |
+            agent/dist/
+            agent/package.json
+          retention-days: 30
+
+  build-gateway:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build Gateway
+        run: cd gateway && npm ci && npm run build
+
+      - name: Upload Gateway artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tentaclaw-gateway-${{ env.VERSION }}
+          path: |
+            gateway/dist/
+            gateway/public/
+            gateway/package.json
+          retention-days: 30
+
+  build-iso:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            debootstrap \
+            xorriso \
+            grub-pc-bin \
+            grub-efi-amd64-bin \
+            grub-efi-arm64-bin \
+            mtools \
+            squashfs-tools \
+            gzip \
+            cpio \
+            wget \
+            jq \
+            uuid-runtime \
+            dosfstools \
+            systemd
+
+      - name: Build ISO
+        run: |
+          cd builder
+          chmod +x build-iso.sh
+          ./build-iso.sh --version ${{ env.VERSION }} --arch amd64 --output ../output/
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TentaCLAW-OS-${{ env.VERSION }}-amd64.iso
+          path: output/TentaCLAW-OS-${{ env.VERSION }}-amd64.iso
+          retention-days: 30
+
+  release:
+    needs: [build-iso, build-agent, build-gateway]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release' || github.event.inputs.version != ''
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.VERSION }}
+          name: TentaCLAW OS v${{ env.VERSION }}
+          body: |
+            ## TentaCLAW OS v${{ env.VERSION }}
+
+            **Eight arms. One mind. Zero compromises.**
+
+            ### Downloads
+            - TentaCLAW-OS-${{ env.VERSION }}-amd64.iso — Bootable ISO
+            - tentaclaw-gateway-${{ env.VERSION }} — HiveMind Gateway
+            - tentaclaw-agent-${{ env.VERSION }} — Node Agent
+
+            ### Quick Start
+            ```bash
+            # Flash to USB
+            sudo dd if=TentaCLAW-OS-${{ env.VERSION }}-amd64.iso of=/dev/sdX bs=4M status=progress
+
+            # Or run the gateway standalone
+            cd gateway && npm install && npm start
+            ```
+
+            ### What's New
+            - Zero-config GPU detection (NVIDIA)
+            - Farm Hash registration
+            - HiveMind Gateway with web dashboard
+            - Flight sheet model deployment
+            - SSE real-time dashboard updates
+            - HiveOS-style push model
+            - CLAWtopus ASCII art
+
+          files: |
+            artifacts/TentaCLAW-OS-${{ env.VERSION }}-amd64.iso/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

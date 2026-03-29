@@ -184,31 +184,33 @@ register_with_gateway() {
         return 1
     fi
 
-    # Strip port if no port specified
+    # Parse host and port from gateway URL
     local gw_host=$(echo "$GATEWAY_URL" | cut -d: -f1)
-    local gw_port=$(echo "$GATEWAY_URL" | cut -d: -f2 || echo "7860")
+    local gw_port
+    if echo "$GATEWAY_URL" | grep -q ':'; then
+        gw_port=$(echo "$GATEWAY_URL" | cut -d: -f2)
+    else
+        gw_port="7860"
+    fi
 
     log "Registering with HiveMind gateway at ${gw_host}:${gw_port}..."
 
+    # Determine OS version
+    local os_version
+    os_version=$(cat /etc/tentaclaw/version 2>/dev/null || echo "TentaCLAW-OS-0.1.0")
+
     # Build registration payload
+    # Gateway API contract: POST /api/v1/register
+    # Required fields: node_id, farm_hash, hostname, ip_address, mac_address, gpu_count, os_version
     local register_json=$(cat << EOF
 {
-    "farm_hash": "$FARM_HASH",
     "node_id": "$NODE_ID",
+    "farm_hash": "$FARM_HASH",
     "hostname": "$NODE_HOSTNAME",
+    "ip_address": "$NODE_IP",
+    "mac_address": "$MAC_ADDRESS",
     "gpu_count": $TOTAL_GPUS,
-    "nvidia_count": $NVIDIA_COUNT,
-    "amd_count": $AMD_COUNT,
-    "capabilities": {
-        "vram_mb": $VRAM_MB,
-        "cpu_threads": $CPU_THREADS,
-        "inference_backends": $INFERENCE_BACKENDS,
-        "gpu_names": $GPU_NAMES
-    },
-    "network": {
-        "ip": "$NODE_IP",
-        "mac": "$MAC_ADDRESS"
-    }
+    "os_version": "$os_version"
 }
 EOF
 )
@@ -228,7 +230,7 @@ EOF
             -X POST \
             -H "Content-Type: application/json" \
             -d "$register_json" \
-            "http://${gw_host}:${gw_port}/api/v1/nodes/register" 2>&1 || echo "")
+            "http://${gw_host}:${gw_port}/api/v1/register" 2>&1 || echo "")
 
         if [ -n "$response" ]; then
             log_success "Registration successful!"
@@ -284,7 +286,7 @@ INFERENCE_BACKENDS=ollama,llamacpp
 
 # Agent config
 AGENT_INTERVAL=10
-AGENT_STATS_URL=${GATEWAY_URL:-}/api/v1/nodes/${NODE_ID}/stats
+AGENT_STATS_URL=http://${GATEWAY_URL:-}/api/v1/nodes/${NODE_ID}/stats
 
 # Last registration
 LAST_REGISTER=$(date +%s)

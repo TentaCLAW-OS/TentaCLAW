@@ -145,8 +145,8 @@ dhcp_setup() {
 
     sleep 2
 
-    # Show IP address
-    local ip_addr=$(ip addr show 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}' || echo "no IP")
+    # Show IP address (strip CIDR prefix like /24)
+    local ip_addr=$(ip addr show 2>/dev/null | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}' | cut -d/ -f1 || echo "no IP")
     log "Node IP: ${ip_addr}"
     echo "$ip_addr" > /tmp/node-ip
 }
@@ -208,23 +208,33 @@ wait_for_gateway() {
         return 0
     fi
 
-    # Strip port if present
+    # Strip port if present, default to 7860
     GATEWAY_HOST=$(echo "$GATEWAY_IP" | cut -d: -f1)
-    GATEWAY_PORT=$(echo "$GATEWAY_IP" | cut -d: -f2 || echo "7860")
+    if echo "$GATEWAY_IP" | grep -q ':'; then
+        GATEWAY_PORT=$(echo "$GATEWAY_IP" | cut -d: -f2)
+    else
+        GATEWAY_PORT="7860"
+    fi
 
     log "Waiting for gateway at ${GATEWAY_HOST}:${GATEWAY_PORT}..."
 
     for i in $(seq 1 30); do
-        # Try /health endpoint
-        if curl -sf --connect-timeout 3 "http://${GATEWAY_HOST}:${GATEWAY_PORT}/health" &>/dev/null; then
-            log_success "Gateway is reachable after ${i}s"
-            echo "${GATEWAY_HOST}:${GATEWAY_PORT}" > "$GATEWAY_URL_FILE"
-            return 0
+        # Try /health endpoint and validate response contains status: ok
+        local health_resp
+        health_resp=$(curl -sf --connect-timeout 3 "http://${GATEWAY_HOST}:${GATEWAY_PORT}/health" 2>/dev/null || echo "")
+        if [ -n "$health_resp" ]; then
+            if echo "$health_resp" | jq -e '.status == "ok"' &>/dev/null; then
+                log_success "Gateway health check passed after ${i}s"
+                echo "${GATEWAY_HOST}:${GATEWAY_PORT}" > "$GATEWAY_URL_FILE"
+                return 0
+            else
+                log_warn "Gateway /health responded but status is not 'ok': ${health_resp}"
+            fi
         fi
 
-        # Try root endpoint
+        # Fallback: try root endpoint
         if curl -sf --connect-timeout 3 "http://${GATEWAY_HOST}:${GATEWAY_PORT}/" &>/dev/null; then
-            log_success "Gateway responded after ${i}s"
+            log_success "Gateway responded on / after ${i}s"
             echo "${GATEWAY_HOST}:${GATEWAY_PORT}" > "$GATEWAY_URL_FILE"
             return 0
         fi
@@ -287,8 +297,8 @@ write_network_info
 echo ""
 
 # Show final status
-if [ -s "$GATEWAY_URL_FILE" ] && [ -n "$(cat $GATEWAY_URL_FILE)" ]; then
-    local gw=$(cat $GATEWAY_URL_FILE)
+if [ -s "$GATEWAY_URL_FILE" ] && [ -n "$(cat "$GATEWAY_URL_FILE")" ]; then
+    gw=$(cat "$GATEWAY_URL_FILE")
     log_success "Network ready. Gateway: ${gw}"
     echo -e "  ${GREEN}✓ Connected to HiveMind${RESET}"
 else
