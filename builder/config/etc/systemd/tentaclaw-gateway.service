@@ -1,0 +1,30 @@
+[Unit]
+Description=TentaCLAW HiveMind Gateway — Cluster coordinator and dashboard
+Documentation=https://github.com/TentaCLAW-OS/TentaCLAW
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tentaclaw/gateway
+ExecStart=/usr/bin/node /opt/tentaclaw/gateway/dist/gateway/src/index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tentaclaw-gateway
+
+# Environment
+Environment=TENTACLAW_PORT=8080
+Environment=TENTACLAW_HOST=0.0.0.0
+Environment=TENTACLAW_DB_PATH=/var/lib/tentaclaw/hivemind.db
+EnvironmentFile=-/etc/tentaclaw/gateway.conf
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/tentaclaw /var/log/tentaclaw /etc/tentaclaw
+
+[Install]
+WantedBy=multi-user.target

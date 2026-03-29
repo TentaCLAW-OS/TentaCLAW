@@ -1,27 +1,26 @@
 [Unit]
 Description=TentaCLAW Agent — Node daemon for AI inference cluster
-After=network-online.target
+Documentation=https://github.com/TentaCLAW-OS/TentaCLAW
+After=network-online.target ollama.service
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/tentaclaw-agent
+ExecStartPre=/opt/tentaclaw/scripts/init-top/20-inference-runtime.sh
+ExecStart=/opt/tentaclaw/scripts/init-top/10-tentaclaw-agent.sh
+ExecStartPost=/opt/tentaclaw/scripts/init-top/30-model-boot.sh
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=tentaclaw-agent
-
-# Environment
-Environment=NODE_ID=
-Environment=FARM_HASH=
-Environment=GATEWAY_URL=
+EnvironmentFile=-/etc/tentaclaw/rig.conf
 
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/run/tentaclaw /var/log/tentaclaw /etc/tentaclaw
+ReadWritePaths=/var/run/tentaclaw /var/log/tentaclaw /etc/tentaclaw /opt/tentaclaw
 
 [Install]
 WantedBy=multi-user.target

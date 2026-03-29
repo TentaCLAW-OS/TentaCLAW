@@ -143,7 +143,7 @@ check_deps() {
     log "Checking dependencies..."
 
     local missing=()
-    local tools="debootstrap xorriso grub-mkimage xz gzip tar jq"
+    local tools="debootstrap xorriso grub-mkimage xz gzip tar jq npm node"
 
     for tool in $tools; do
         if ! command -v "$tool" &>/dev/null; then
@@ -309,43 +309,144 @@ install_gpu_drivers() {
 }
 
 # =============================================================================
-# Install TentaCLAW Agent
+# Install Node.js in Rootfs
 # =============================================================================
+
+install_nodejs() {
+    log_step "Installing Node.js"
+
+    # Mount pseudo-filesystems
+    mount -t proc proc "$ROOTFS/proc"
+    mount -t sysfs sys "$ROOTFS/sys"
+    mount --bind /dev "$ROOTFS/dev" 2>/dev/null || mount -t devpts devpts "$ROOTFS/dev/pts"
+
+    # Copy DNS config
+    cp /etc/resolv.conf "$ROOTFS/etc/resolv.conf" 2>/dev/null || true
+
+    # Install Node.js 22.x LTS via NodeSource
+    log "Adding NodeSource repository..."
+    chroot "$ROOTFS" bash -c "curl -fsSL https://deb.nodesource.com/setup_22.x | bash -" 2>&1 | tail -3
+    chroot "$ROOTFS" apt-get install -y -qq nodejs 2>&1 | tail -3
+
+    # Verify installation
+    local node_ver
+    node_ver=$(chroot "$ROOTFS" node --version 2>/dev/null || echo "FAILED")
+    log "Node.js version: $node_ver"
+
+    # Cleanup
+    rm -f "$ROOTFS/etc/resolv.conf"
+    umount "$ROOTFS/proc" 2>/dev/null || true
+    umount "$ROOTFS/sys" 2>/dev/null || true
+    umount "$ROOTFS/dev/pts" 2>/dev/null || true
+    umount "$ROOTFS/dev" 2>/dev/null || true
+
+    log_success "Node.js installed"
+}
 
 install_agent() {
     log_step "Installing TentaCLAW Agent"
 
-    # Create agent directory
-    mkdir -p "$ROOTFS/usr/local/bin"
+    local PROJECT_ROOT="${SCRIPT_DIR}/.."
+
+    # Create target directories
+    mkdir -p "$ROOTFS/opt/tentaclaw/agent"
     mkdir -p "$ROOTFS/etc/tentaclaw"
     mkdir -p "$ROOTFS/var/log/tentaclaw"
     mkdir -p "$ROOTFS/var/run/tentaclaw"
 
-    # Copy agent source (will be built separately)
-    if [ -d "${SCRIPT_DIR}/../agent" ]; then
-        cp -r "${SCRIPT_DIR}/../agent" "$ROOTFS/usr/local/lib/tentaclaw-agent"
+    # Build agent (npm install + npm run build)
+    if [ -d "${PROJECT_ROOT}/agent" ]; then
+        log "Building agent..."
+        (cd "${PROJECT_ROOT}/agent" && npm install --ignore-scripts && npm run build)
+
+        # Copy built agent to rootfs
+        cp -r "${PROJECT_ROOT}/agent/dist" "$ROOTFS/opt/tentaclaw/agent/dist"
+        cp "${PROJECT_ROOT}/agent/package.json" "$ROOTFS/opt/tentaclaw/agent/"
+        cp "${PROJECT_ROOT}/agent/package-lock.json" "$ROOTFS/opt/tentaclaw/agent/" 2>/dev/null || true
+
+        # Install production dependencies inside rootfs
+        mkdir -p "$ROOTFS/opt/tentaclaw/agent/node_modules"
+        (cd "${PROJECT_ROOT}/agent" && npm install --omit=dev --ignore-scripts)
+        cp -r "${PROJECT_ROOT}/agent/node_modules" "$ROOTFS/opt/tentaclaw/agent/"
+
+        log_success "Agent built and installed to /opt/tentaclaw/agent/"
+    else
+        log_error "Agent source not found at ${PROJECT_ROOT}/agent"
     fi
 
-    # Create agent script (placeholder - will be replaced with real binary)
-    cat > "$ROOTFS/usr/local/bin/tentaclaw-agent" << 'AGENT_SCRIPT'
-#!/bin/bash
-# TentaCLAW Agent — Placeholder
-# The real agent will be built and installed separately
-echo "TentaCLAW Agent v0.1.0 — Placeholder"
-echo "Run 'make agent' in the project root to build the real agent."
-AGENT_SCRIPT
-
-    chmod +x "$ROOTFS/usr/local/bin/tentaclaw-agent"
-
-    # Copy init-bottom scripts (these run in initrd)
-    mkdir -p "$ROOTFS/etc/tentaclaw/init-bottom"
-    cp "${SCRIPT_DIR}/scripts/init-bottom/"*.sh "$ROOTFS/etc/tentaclaw/init-bottom/" 2>/dev/null || true
-    cp "${SCRIPT_DIR}/scripts/clawtopus.sh" "$ROOTFS/etc/tentaclaw/" 2>/dev/null || true
-
-    # Copy config templates
-    cp -r "${SCRIPT_DIR}/config/"* "$ROOTFS/etc/tentaclaw/" 2>/dev/null || true
-
     log_success "Agent installed"
+}
+
+install_gateway() {
+    log_step "Installing TentaCLAW Gateway"
+
+    local PROJECT_ROOT="${SCRIPT_DIR}/.."
+
+    # Create target directory
+    mkdir -p "$ROOTFS/opt/tentaclaw/gateway"
+
+    # Build gateway (npm install + npm run build)
+    if [ -d "${PROJECT_ROOT}/gateway" ]; then
+        log "Building gateway..."
+        (cd "${PROJECT_ROOT}/gateway" && npm install --ignore-scripts && npm run build)
+
+        # Copy built gateway to rootfs
+        cp -r "${PROJECT_ROOT}/gateway/dist" "$ROOTFS/opt/tentaclaw/gateway/dist"
+        cp "${PROJECT_ROOT}/gateway/package.json" "$ROOTFS/opt/tentaclaw/gateway/"
+        cp "${PROJECT_ROOT}/gateway/package-lock.json" "$ROOTFS/opt/tentaclaw/gateway/" 2>/dev/null || true
+
+        # Install production dependencies inside rootfs
+        mkdir -p "$ROOTFS/opt/tentaclaw/gateway/node_modules"
+        (cd "${PROJECT_ROOT}/gateway" && npm install --omit=dev --ignore-scripts)
+        cp -r "${PROJECT_ROOT}/gateway/node_modules" "$ROOTFS/opt/tentaclaw/gateway/"
+
+        log_success "Gateway built and installed to /opt/tentaclaw/gateway/"
+    else
+        log_error "Gateway source not found at ${PROJECT_ROOT}/gateway"
+    fi
+
+    log_success "Gateway installed"
+}
+
+install_scripts() {
+    log_step "Installing TentaCLAW scripts and configuration"
+
+    # ── init-top scripts (run post-switchroot via systemd) ──
+    mkdir -p "$ROOTFS/opt/tentaclaw/scripts/init-top"
+    cp "${SCRIPT_DIR}/scripts/init-top/"*.sh "$ROOTFS/opt/tentaclaw/scripts/init-top/" 2>/dev/null || true
+    chmod +x "$ROOTFS/opt/tentaclaw/scripts/init-top/"*.sh 2>/dev/null || true
+
+    # ── CLAWtopus ASCII art library ──
+    cp "${SCRIPT_DIR}/scripts/clawtopus.sh" "$ROOTFS/opt/tentaclaw/scripts/" 2>/dev/null || true
+    chmod +x "$ROOTFS/opt/tentaclaw/scripts/clawtopus.sh" 2>/dev/null || true
+
+    # ── Shared types (optional, for reference) ──
+    if [ -d "${SCRIPT_DIR}/../shared" ]; then
+        mkdir -p "$ROOTFS/opt/tentaclaw/shared"
+        cp -r "${SCRIPT_DIR}/../shared/"* "$ROOTFS/opt/tentaclaw/shared/" 2>/dev/null || true
+    fi
+
+    # ── Config overlay (preserves directory structure) ──
+    # builder/config/ mirrors the rootfs layout: etc/systemd/, etc/ssh/, root/, etc.
+    if [ -d "${SCRIPT_DIR}/config" ]; then
+        cp -r "${SCRIPT_DIR}/config/"* "$ROOTFS/" 2>/dev/null || true
+    fi
+
+    # ── Systemd service ──
+    mkdir -p "$ROOTFS/etc/systemd/system"
+    if [ -f "${SCRIPT_DIR}/config/etc/systemd/tentaclaw-agent.service" ]; then
+        cp "${SCRIPT_DIR}/config/etc/systemd/tentaclaw-agent.service" \
+           "$ROOTFS/etc/systemd/system/tentaclaw-agent.service"
+        # Enable the service for multi-user target
+        mkdir -p "$ROOTFS/etc/systemd/system/multi-user.target.wants"
+        ln -sf /etc/systemd/system/tentaclaw-agent.service \
+               "$ROOTFS/etc/systemd/system/multi-user.target.wants/tentaclaw-agent.service"
+        log_success "tentaclaw-agent.service installed and enabled"
+    else
+        log_warn "tentaclaw-agent.service not found in config"
+    fi
+
+    log_success "Scripts and configuration installed"
 }
 
 # =============================================================================
@@ -392,6 +493,7 @@ ff02::2 ip6-allrouters
 EOF
 
     # Network (use NetworkManager)
+    mkdir -p "$ROOTFS/etc/netplan"
     cat > "$ROOTFS/etc/netplan/01-tentaclaw.yaml" << 'EOF'
 network:
   version: 2
@@ -708,8 +810,11 @@ main() {
     setup_build_root
     bootstrap_rootfs
     install_packages
+    install_nodejs
     install_gpu_drivers
     install_agent
+    install_gateway
+    install_scripts
     install_inference_runtime
     configure_system
     create_initrd

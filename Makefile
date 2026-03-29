@@ -64,6 +64,10 @@ dev:
 	@echo "Then open: http://localhost:8080/dashboard"
 	@echo ""
 
+# Setup (one-command dev environment)
+setup:
+	@bash setup.sh
+
 # === Tests ===
 
 agent-test:
@@ -71,6 +75,14 @@ agent-test:
 
 gateway-test:
 	@cd gateway && npm test
+
+# Test boot chain with mock data (no ISO needed)
+test-boot:
+	@bash builder/test-boot-chain.sh
+
+# Boot ISO in QEMU
+test-qemu:
+	@bash builder/test-qemu.sh
 
 test: agent-test gateway-test
 
