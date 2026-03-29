@@ -1,11 +1,14 @@
 # TentaCLAW OS — Quick Start Guide
 
+> **HiveOS for AI inference clusters**
+
 ## TL;DR
 
 1. Download ISO
 2. Flash to USB
 3. Boot
-4. CLAWtopus does the rest
+4. Join the cluster
+5. Deploy a model
 
 ---
 

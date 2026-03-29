@@ -1,5 +1,4 @@
 <p align="center">
-  <!-- CLAWtopus ASCII Art -->
   <pre>
 
   <span style="color:#00FFFF">        ╭──────────────────────────────────────────────────────────╮</span>
@@ -20,24 +19,42 @@
   <span style="color:#008C8C">   ││           ██║  ██║███████╗██║  ██║██║  ██║ ╚████╔╝ ███████║   ││</span>
   <span style="color:#008C8C">   ││           ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚══════╝   ││</span>
   <span style="color:#00FFFF">   │╰───────────────────────────────────────────────────────────────╯│</span>
-  <span style="color:#00FFFF">   │  <span style="color:#F0F0F0">Eight arms. One mind. Zero compromises.</span>                              │</span>
+  <span style="color:#00FFFF">   │  <span style="color:#F0F0F0">Eight arms. One mind.</span>                                            │</span>
   <span style="color:#00FFFF">   ╰─────────────────────────────────────────────────────────────────╯</span>
 
   </pre>
 
-  <!-- Tagline -->
-  <h2>Eight arms. One mind.</h2>
-  <h3>HiveOS for AI Inference Clusters</h3>
-
-  <p><strong>TentaCLAW OS</strong> turns your pile of GPUs into a unified AI inference cluster — zero config, auto-discovery, one-click model deployment.</p>
+  <h2>HiveOS for AI inference clusters</h2>
+  <p><strong>TentaCLAW OS</strong> turns your pile of GPUs into a self-managing local AI cluster — auto-discovery, node health, model deployment, and one CLI to control the whole tank.</p>
 
   <p align="center">
     <a href="https://www.TentaCLAW.io"><img src="https://img.shields.io/badge/Web-TentaCLAW.io-00FFFF?style=for-the-badge" alt="Website"></a>
     <a href="https://github.com/TentaCLAW-OS"><img src="https://img.shields.io/badge/GitHub-TentaCLAW--OS-8C00C8?style=for-the-badge&logo=github" alt="GitHub"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-8C00C8?style=for-the-badge" alt="License"></a>
   </p>
-
 </p>
+
+> Flash the ISO. Boot the node. Let CLAWtopus do the boring stuff.
+
+### Why it exists
+
+- **Turn spare GPUs into one cluster**
+- **Skip manual CUDA-and-dashboard nonsense**
+- **Run local inference on hardware you actually own**
+- **Get HiveOS-style visibility for AI nodes**
+
+### Launch hooks
+
+- **HiveOS for AI**
+- **Eight arms. One mind.**
+- **Per-token is a scam. Run local.**
+
+### Start here
+
+- [Quick Start](docs/QUICKSTART.md)
+- [Build Guide](BUILD.md)
+- [Brand Guide](BRAND.md)
+- [Launch Plan](docs/LAUNCH.md)
 
 ---
 
@@ -80,27 +97,20 @@ Instead of flight sheets for miners, you have flight sheets for models.
 
 ---
 
-## "Per-Token Is A Scam"
+## Per-Token Is a Scam
 
-Every dollar you pay OpenAI is a dollar you could've spent on more VRAM.
+That line is the hook, not the whole product.
 
-```
-OpenAI GPT-4o:
-  $0.01 per 1K tokens
-  Your usage: 500 tokens/day
-  COST: $15/month = $180/year
+The real point is simpler: if you already own GPUs, you should be able to run inference on them without building a tiny DevOps company around your homelab.
 
-Your RTX 3090 (24GB VRAM):
-  Idle: 10W | Inference: 300W
-  8 hours/day = $23/month = $285/year
+**TentaCLAW OS** gives local AI the missing operating layer:
+- bootable node setup
+- auto-discovery on the LAN
+- cluster registration and health
+- model deployment and routing
+- one dashboard and one CLI for the whole mess
 
-BUT YOU OWN THE GPU FOREVER.
-Cost to run locally: $285/year
-Cost to rent from OpenAI: $180/year
-
-For most people: local is already cheaper.
-And you own your data. And your cluster.
-```
+Own the hardware. Own the inference. Own the failure modes too.
 
 ---
 
