@@ -101,6 +101,15 @@ function broadcastSSE(eventType: string, data: unknown): void {
 
 const app = new Hono();
 
+// Global error handler — catch malformed JSON, unexpected errors
+app.onError((err, c) => {
+    if (err.message?.includes('Unexpected') || err.message?.includes('JSON')) {
+        return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+    console.error('[hivemind] Unhandled error:', err.message);
+    return c.json({ error: 'Internal server error' }, 500);
+});
+
 // CORS for dashboard (same-origin in production, permissive in dev)
 app.use('/*', cors());
 
