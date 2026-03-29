@@ -983,24 +983,74 @@ app.post('/v1/completions', async (c) => {
 // Embeddings proxy
 app.post('/v1/embeddings', async (c) => {
     const body = await c.req.json();
-    const model = body.model;
-    if (!model) return c.json({ error: { message: 'model is required' } }, 400);
+    const model = body.model || 'nomic-embed-text';
+    const input = body.input;
 
-    const target = findBestNode(model);
-    if (!target) return c.json({ error: { message: 'No node has model "' + model + '" loaded' } }, 503);
+    if (!input) return c.json({ error: { message: 'input is required', type: 'invalid_request_error' } }, 400);
+
+    // Resolve alias
+    const resolved = resolveModelAlias(model);
+    let resolvedModel = resolved.target;
+
+    // Find node with embedding model
+    let target = findBestNode(resolvedModel);
+    if (!target && resolved.fallbacks.length > 0) {
+        for (const fb of resolved.fallbacks) {
+            target = findBestNode(fb);
+            if (target) { resolvedModel = fb; break; }
+        }
+    }
+    if (!target) {
+        return c.json({ error: { message: 'No node has embedding model "' + model + '" loaded. Available: nomic-embed-text, all-minilm' } }, 503);
+    }
 
     const ollamaUrl = 'http://' + (target.ip_address || target.hostname) + ':11434/v1/embeddings';
+    const startTime = Date.now();
+
+    // Handle batch input — OpenAI accepts string or string[]
+    const inputs = Array.isArray(input) ? input : [input];
+
     try {
-        const proxyReq = await fetch(ollamaUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+        // Process in batches of 32
+        const allEmbeddings: any[] = [];
+        for (let i = 0; i < inputs.length; i += 32) {
+            const batch = inputs.slice(i, i + 32);
+            for (const text of batch) {
+                const proxyReq = await fetch(ollamaUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: resolvedModel, input: text }),
+                });
+                const result = await proxyReq.json() as any;
+                if (result.data?.[0]) {
+                    allEmbeddings.push({
+                        object: 'embedding',
+                        embedding: result.data[0].embedding,
+                        index: allEmbeddings.length,
+                    });
+                }
+            }
+        }
+
+        const latencyMs = Date.now() - startTime;
+        recordRouteResult(target.node_id, resolvedModel, latencyMs, true);
+        logInferenceRequest(target.node_id, resolvedModel, latencyMs, true, inputs.length, 0);
+
+        return c.json({
+            object: 'list',
+            data: allEmbeddings,
+            model: resolvedModel,
+            usage: { prompt_tokens: inputs.reduce((s, t) => s + t.split(' ').length, 0), total_tokens: inputs.reduce((s, t) => s + t.split(' ').length, 0) },
+            _tentaclaw: {
+                routed_to: target.node_id,
+                hostname: target.hostname,
+                batch_size: inputs.length,
+                latency_ms: latencyMs,
+            },
         });
-        const result = await proxyReq.json() as Record<string, unknown>;
-        result._tentaclaw = { routed_to: target.node_id, hostname: target.hostname };
-        return c.json(result, proxyReq.status as any);
     } catch (err: any) {
-        return c.json({ error: { message: 'Proxy failed: ' + err.message } }, 502);
+        recordRouteResult(target.node_id, resolvedModel, Date.now() - startTime, false);
+        return c.json({ error: { message: 'Embedding proxy failed: ' + err.message } }, 502);
     }
 });
 
