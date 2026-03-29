@@ -694,40 +694,7 @@ function collectStats(config: AgentConfig): StatsPayload {
 // System Info (collected once on startup for registration)
 // =============================================================================
 
-function getSystemInfo(mockMode: boolean): Record<string, string> {
-    if (mockMode) {
-        return {
-            cpu_model: 'AMD Ryzen 9 7950X 16-Core Processor',
-            cpu_cores: String(os.cpus().length),
-            total_ram_mb: String(Math.round(os.totalmem() / 1024 / 1024)),
-            os_platform: os.platform(),
-            os_release: os.release(),
-            arch: os.arch(),
-            node_version: process.version,
-            agent_version: '0.1.0',
-        };
-    }
-
-    const info: Record<string, string> = {
-        cpu_cores: String(os.cpus().length),
-        total_ram_mb: String(Math.round(os.totalmem() / 1024 / 1024)),
-        os_platform: os.platform(),
-        os_release: os.release(),
-        arch: os.arch(),
-        node_version: process.version,
-        agent_version: '0.1.0',
-    };
-
-    try {
-        info.cpu_model = os.cpus()[0]?.model || 'unknown';
-    } catch { info.cpu_model = 'unknown'; }
-
-    try {
-        info.kernel = execFileSync('uname', ['-r'], { encoding: 'utf-8' }).trim();
-    } catch { /* not linux */ }
-
-    return info;
-}
+// (getSystemInfo defined above in Wave 12 section)
 
 // =============================================================================
 // Stats Pusher
