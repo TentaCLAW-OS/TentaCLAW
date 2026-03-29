@@ -1037,7 +1037,6 @@ async function cmdDoctor(gateway: string, flags: Record<string, string>): Promis
 const OLLAMA_CATALOG = [
     { name: 'llama3.1:8b', params: '8B', vram: '5GB', tags: ['chat', 'general', 'meta'], desc: 'Meta Llama 3.1 8B — great all-rounder' },
     { name: 'llama3.1:70b', params: '70B', vram: '41GB', tags: ['chat', 'general', 'meta'], desc: 'Meta Llama 3.1 70B — production quality' },
-    { name: 'llama3.1:405b', params: '405B', vram: '230GB', tags: ['chat', 'general', 'meta'], desc: 'Meta Llama 3.1 405B — frontier class' },
     { name: 'llama3.2:3b', params: '3B', vram: '2GB', tags: ['chat', 'small', 'meta'], desc: 'Meta Llama 3.2 3B — lightweight chat' },
     { name: 'llama3.2:1b', params: '1B', vram: '1GB', tags: ['chat', 'tiny', 'meta'], desc: 'Meta Llama 3.2 1B — edge devices' },
     { name: 'llama3.2-vision:11b', params: '11B', vram: '7GB', tags: ['vision', 'multimodal', 'meta'], desc: 'Llama 3.2 Vision — image understanding' },
@@ -1046,7 +1045,6 @@ const OLLAMA_CATALOG = [
     { name: 'codellama:70b', params: '70B', vram: '41GB', tags: ['code', 'meta'], desc: 'Code Llama 70B — best code model' },
     { name: 'mistral:7b', params: '7B', vram: '4.5GB', tags: ['chat', 'general', 'mistral'], desc: 'Mistral 7B — fast and efficient' },
     { name: 'mixtral:8x7b', params: '47B', vram: '28GB', tags: ['chat', 'moe', 'mistral'], desc: 'Mixtral 8x7B — mixture of experts' },
-    { name: 'mixtral:8x22b', params: '141B', vram: '84GB', tags: ['chat', 'moe', 'mistral'], desc: 'Mixtral 8x22B — large MoE' },
     { name: 'qwen2.5:7b', params: '7B', vram: '4.5GB', tags: ['chat', 'multilingual', 'alibaba'], desc: 'Qwen 2.5 7B — strong multilingual' },
     { name: 'qwen2.5:32b', params: '32B', vram: '19GB', tags: ['chat', 'multilingual', 'alibaba'], desc: 'Qwen 2.5 32B — balanced quality/speed' },
     { name: 'qwen2.5:72b', params: '72B', vram: '43GB', tags: ['chat', 'multilingual', 'alibaba'], desc: 'Qwen 2.5 72B — frontier multilingual' },
@@ -1060,7 +1058,6 @@ const OLLAMA_CATALOG = [
     { name: 'gemma2:9b', params: '9B', vram: '5.5GB', tags: ['chat', 'general', 'google'], desc: 'Gemma 2 9B — Google open model' },
     { name: 'gemma2:27b', params: '27B', vram: '16GB', tags: ['chat', 'general', 'google'], desc: 'Gemma 2 27B — Google large' },
     { name: 'command-r:35b', params: '35B', vram: '21GB', tags: ['chat', 'rag', 'cohere'], desc: 'Command R — RAG optimized' },
-    { name: 'command-r-plus:104b', params: '104B', vram: '62GB', tags: ['chat', 'rag', 'cohere'], desc: 'Command R+ — enterprise RAG' },
     { name: 'starcoder2:7b', params: '7B', vram: '4.5GB', tags: ['code', 'bigcode'], desc: 'StarCoder2 — multi-language code' },
     { name: 'starcoder2:15b', params: '15B', vram: '9GB', tags: ['code', 'bigcode'], desc: 'StarCoder2 15B — advanced code' },
     { name: 'nomic-embed-text', params: '137M', vram: '512MB', tags: ['embedding', 'nomic'], desc: 'Nomic Embed — text embeddings' },
