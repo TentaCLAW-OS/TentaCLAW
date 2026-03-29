@@ -3340,3 +3340,116 @@ process.on('SIGINT', () => {
     console.log('[hivemind] SIGINT received — shutting down');
     process.exit(0);
 });
+
+// =============================================================================
+// Waves 51-55: Cluster Health Automation
+// =============================================================================
+
+// Auto-run doctor every 5 minutes
+let autoDocInterval: NodeJS.Timeout | null = null;
+
+function startAutoDoctor() {
+    if (autoDocInterval) return;
+    autoDocInterval = setInterval(() => {
+        try {
+            const decisions = runAutoMode();
+            if (decisions.filter(d => d.executed).length > 0) {
+                console.log('[auto] Auto mode executed ' + decisions.filter(d => d.executed).length + ' decision(s)');
+            }
+        } catch (err) {
+            console.error('[auto] Error: ' + err);
+        }
+    }, 300_000); // Every 5 min
+    console.log('[hivemind] Auto-doctor running every 5 minutes');
+}
+
+// Start auto-doctor after DB init
+setTimeout(startAutoDoctor, 10000);
+
+// Cluster utilization endpoint
+app.get('/api/v1/utilization', (c) => {
+    const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
+    const utilization = nodes.map(n => {
+        const s = n.latest_stats!;
+        const gpuUtil = s.gpus.length > 0 ? Math.round(s.gpus.reduce((sum, g) => sum + g.utilizationPct, 0) / s.gpus.length) : 0;
+        const vramUtil = s.gpus.length > 0 ? Math.round(s.gpus.reduce((sum, g) => sum + g.vramUsedMb, 0) / s.gpus.reduce((sum, g) => sum + g.vramTotalMb, 0) * 100) : 0;
+        const cpuUtil = s.cpu.usage_pct;
+        const ramUtil = s.ram.total_mb > 0 ? Math.round((s.ram.used_mb / s.ram.total_mb) * 100) : 0;
+        return { node_id: n.id, hostname: n.hostname, gpu_util_pct: gpuUtil, vram_util_pct: vramUtil, cpu_util_pct: cpuUtil, ram_util_pct: ramUtil };
+    });
+    const avgGpu = utilization.length > 0 ? Math.round(utilization.reduce((s, u) => s + u.gpu_util_pct, 0) / utilization.length) : 0;
+    const avgVram = utilization.length > 0 ? Math.round(utilization.reduce((s, u) => s + u.vram_util_pct, 0) / utilization.length) : 0;
+    return c.json({ cluster_gpu_util_pct: avgGpu, cluster_vram_util_pct: avgVram, nodes: utilization });
+});
+
+// Hot/cold node detection
+app.get('/api/v1/nodes/hot', (c) => {
+    const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
+    const hot = nodes.filter(n => n.latest_stats!.gpus.some(g => g.temperatureC > 75)).map(n => ({
+        node_id: n.id, hostname: n.hostname,
+        max_temp: Math.max(...n.latest_stats!.gpus.map(g => g.temperatureC)),
+        gpus: n.latest_stats!.gpus.filter(g => g.temperatureC > 75).map(g => ({ name: g.name, temp: g.temperatureC })),
+    }));
+    return c.json({ hot_nodes: hot, count: hot.length });
+});
+
+app.get('/api/v1/nodes/idle', (c) => {
+    const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
+    const idle = nodes.filter(n => {
+        const avgUtil = n.latest_stats!.gpus.reduce((s, g) => s + g.utilizationPct, 0) / Math.max(n.latest_stats!.gpus.length, 1);
+        return avgUtil < 5;
+    }).map(n => ({ node_id: n.id, hostname: n.hostname, gpu_count: n.gpu_count, models: n.latest_stats!.inference.loaded_models.length }));
+    return c.json({ idle_nodes: idle, count: idle.length });
+});
+
+// =============================================================================
+// Waves 56-60: Error Classification + Retry Intelligence
+// =============================================================================
+
+app.get('/api/v1/errors', (c) => {
+    const hours = parseInt(c.req.query('hours') || '24');
+    const d = getDb();
+    const since = new Date(Date.now() - hours * 3600000).toISOString().replace('T', ' ').slice(0, 19);
+    const errors = d.prepare("SELECT node_id, model, error, created_at FROM inference_log WHERE success = 0 AND created_at >= ? ORDER BY created_at DESC LIMIT 50").all(since) as any[];
+    
+    // Classify errors
+    const classified = errors.map(e => ({
+        ...e,
+        category: e.error?.includes('timeout') ? 'timeout' : e.error?.includes('ECONNREFUSED') ? 'connection' : e.error?.includes('memory') ? 'oom' : 'unknown',
+    }));
+
+    const byCategory = new Map<string, number>();
+    for (const e of classified) {
+        byCategory.set(e.category, (byCategory.get(e.category) || 0) + 1);
+    }
+
+    return c.json({
+        total: errors.length,
+        by_category: Object.fromEntries(byCategory),
+        recent: classified.slice(0, 20),
+    });
+});
+
+// Suggestions endpoint — what should user do next
+app.get('/api/v1/suggestions', (c) => {
+    const suggestions: Array<{ priority: string; action: string; reason: string; command?: string }> = [];
+    const summary = getClusterSummary();
+    const health = getHealthScore();
+    const models = getClusterModels();
+    const nodes = getAllNodes().filter(n => n.status === 'online');
+
+    if (summary.online_nodes === 0) {
+        suggestions.push({ priority: 'critical', action: 'Add nodes', reason: 'No nodes online — cluster is empty', command: 'Boot a machine with TentaCLAW agent' });
+    }
+    if (models.length === 0 && nodes.length > 0) {
+        suggestions.push({ priority: 'high', action: 'Deploy a model', reason: 'No models loaded', command: 'clawtopus deploy llama3.1:8b' });
+    }
+    if (models.filter(m => m.node_count < 2).length > 3) {
+        suggestions.push({ priority: 'medium', action: 'Add redundancy', reason: models.filter(m => m.node_count < 2).length + ' models only on 1 node', command: 'clawtopus auto' });
+    }
+    if (health.score < 80) {
+        suggestions.push({ priority: 'medium', action: 'Fix health issues', reason: 'Health score: ' + health.score + '/100', command: 'clawtopus fix' });
+    }
+
+    return c.json({ suggestions });
+});
