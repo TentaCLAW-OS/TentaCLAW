@@ -3251,3 +3251,46 @@ app.get('/api/v1/nodes/:id/lifecycle', (c) => {
         watchdog_events: watchdog.slice(0, 10),
     });
 });
+
+// Wave 33: Per-model rate tracking
+app.get('/api/v1/models/:model/stats', (c) => {
+    const model = decodeURIComponent(c.req.param('model'));
+    const d = getDb();
+    const hour = d.prepare("SELECT COUNT(*) as cnt, AVG(latency_ms) as avg_lat FROM inference_log WHERE model = ? AND created_at >= datetime('now', '-1 hour')").get(model) as any || {};
+    const day = d.prepare("SELECT COUNT(*) as cnt, AVG(latency_ms) as avg_lat FROM inference_log WHERE model = ? AND created_at >= datetime('now', '-24 hours')").get(model) as any || {};
+    const nodes = d.prepare("SELECT DISTINCT node_id FROM inference_log WHERE model = ?").all(model) as any[];
+    return c.json({ model, last_hour: { requests: hour.cnt || 0, avg_latency_ms: Math.round(hour.avg_lat || 0) }, last_24h: { requests: day.cnt || 0, avg_latency_ms: Math.round(day.avg_lat || 0) }, served_by_nodes: nodes.length });
+});
+
+// Wave 34: Model coverage report
+app.get('/api/v1/models/coverage', (c) => {
+    const models = getClusterModels();
+    const onlineCount = getAllNodes().filter(n => n.status === 'online').length;
+    const coverage = models.map(m => ({
+        model: m.model, node_count: m.node_count, coverage_pct: onlineCount > 0 ? Math.round((m.node_count / onlineCount) * 100) : 0,
+        redundant: m.node_count >= 2, estimated_vram_mb: estimateModelVram(m.model),
+    }));
+    const avgCoverage = coverage.length > 0 ? Math.round(coverage.reduce((s, m) => s + m.coverage_pct, 0) / coverage.length) : 0;
+    return c.json({ total_models: coverage.length, online_nodes: onlineCount, avg_coverage_pct: avgCoverage, redundant_models: coverage.filter(m => m.redundant).length, models: coverage });
+});
+
+// Wave 35: Capacity planning
+app.get('/api/v1/capacity', (c) => {
+    const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
+    const totalVram = nodes.reduce((s, n) => s + n.latest_stats!.gpus.reduce((gs, g) => gs + g.vramTotalMb, 0), 0);
+    const usedVram = nodes.reduce((s, n) => s + n.latest_stats!.gpus.reduce((gs, g) => gs + g.vramUsedMb, 0), 0);
+    const freeVram = totalVram - usedVram;
+
+    // What models could still fit?
+    const canFit: Array<{ model: string; vram_mb: number }> = [];
+    for (const [model, vram] of Object.entries({ 'llama3.2:1b': 1024, 'llama3.2:3b': 2048, 'phi3:3.8b': 2560, 'mistral:7b': 4608, 'llama3.1:8b': 5120, 'codellama:13b': 8192, 'qwen3:14b': 9216, 'codellama:34b': 20480, 'llama3.1:70b': 41000 })) {
+        if (vram <= freeVram) canFit.push({ model, vram_mb: vram });
+    }
+
+    return c.json({
+        total_vram_gb: Math.round(totalVram / 1024), used_vram_gb: Math.round(usedVram / 1024), free_vram_gb: Math.round(freeVram / 1024),
+        utilization_pct: totalVram > 0 ? Math.round((usedVram / totalVram) * 100) : 0,
+        can_still_fit: canFit.sort((a, b) => b.vram_mb - a.vram_mb),
+        recommendation: freeVram > 40000 ? 'Plenty of room — could fit a 70B model' : freeVram > 8000 ? 'Room for small-medium models' : freeVram > 2000 ? 'Tight — only small models' : 'Full — consider removing unused models',
+    });
+});
