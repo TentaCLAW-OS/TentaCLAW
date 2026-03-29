@@ -1870,3 +1870,33 @@ function checkNetworkLatency(gatewayUrl: string): Promise<number> {
         req.on('timeout', () => { req.destroy(); resolve(-1); });
     });
 }
+
+// =============================================================================
+// Waves 81-90: Agent Hardening
+// =============================================================================
+
+// Report agent version and capabilities to gateway
+function getAgentCapabilities() {
+    return {
+        version: '0.2.0',
+        gpu_vendor: detectGpuVendor(),
+        backends: ['ollama'], // Will expand
+        features: ['watchdog', 'self-heal', 'auto-discovery', 'remote-shell', 'gpu-stats'],
+        os: process.platform,
+        arch: process.arch,
+        node_version: process.version,
+        uptime_seconds: Math.round(process.uptime()),
+    };
+}
+
+// Heartbeat — lightweight status check
+function getHeartbeat() {
+    return {
+        alive: true,
+        uptime: Math.round(process.uptime()),
+        memory_mb: Math.round(process.memoryUsage().rss / 1048576),
+        last_stats_push: watchdogState.lastCheck,
+        watchdog_level: watchdogState.escalationLevel,
+        offline_queue: recovery.offlineQueue.length,
+    };
+}
