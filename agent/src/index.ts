@@ -334,12 +334,115 @@ async function pushStats(config: AgentConfig, stats: StatsPayload): Promise<Gate
 }
 
 // =============================================================================
+// Benchmark Runner
+// =============================================================================
+
+async function runBenchmark(command: GatewayCommand, mockMode: boolean): Promise<void> {
+    const model = command.model || 'llama3.1:8b';
+    console.log('[agent] Running benchmark: ' + model);
+
+    let result: { tokens_per_sec: number; prompt_eval_rate: number; eval_rate: number; total_duration_ms: number };
+
+    if (mockMode) {
+        // Simulate benchmark (1-3 seconds)
+        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+        result = {
+            tokens_per_sec: Math.round(80 + Math.random() * 180),
+            prompt_eval_rate: Math.round(100 + Math.random() * 200),
+            eval_rate: Math.round(80 + Math.random() * 180),
+            total_duration_ms: Math.round(3000 + Math.random() * 7000),
+        };
+        console.log('[agent] [mock] Benchmark complete: ' + result.tokens_per_sec + ' tok/s');
+    } else {
+        try {
+            const start = Date.now();
+            // Run a short generation to measure throughput
+            const output = execFileSync('curl', [
+                '-s', 'http://localhost:11434/api/generate',
+                '-d', JSON.stringify({
+                    model,
+                    prompt: 'Write a short paragraph about artificial intelligence.',
+                    stream: false,
+                }),
+            ], { encoding: 'utf-8', timeout: 60000 });
+
+            const elapsed = Date.now() - start;
+            const data = JSON.parse(output);
+
+            result = {
+                tokens_per_sec: data.eval_count && data.eval_duration
+                    ? Math.round((data.eval_count / data.eval_duration) * 1e9)
+                    : 0,
+                prompt_eval_rate: data.prompt_eval_count && data.prompt_eval_duration
+                    ? Math.round((data.prompt_eval_count / data.prompt_eval_duration) * 1e9)
+                    : 0,
+                eval_rate: data.eval_count && data.eval_duration
+                    ? Math.round((data.eval_count / data.eval_duration) * 1e9)
+                    : 0,
+                total_duration_ms: elapsed,
+            };
+
+            console.log('[agent] Benchmark complete: ' + result.tokens_per_sec + ' tok/s (' + elapsed + 'ms)');
+        } catch (e) {
+            console.error('[agent] Benchmark failed: ' + e);
+            return;
+        }
+    }
+
+    // Post result back to gateway
+    await postBenchmarkResult(model, result);
+}
+
+async function postBenchmarkResult(model: string, result: {
+    tokens_per_sec: number;
+    prompt_eval_rate: number;
+    eval_rate: number;
+    total_duration_ms: number;
+}): Promise<void> {
+    const config = loadConfig();
+    if (!config.gatewayUrl) return;
+
+    const url = config.gatewayUrl + '/api/v1/nodes/' + config.nodeId + '/benchmark';
+
+    return new Promise((resolve) => {
+        const parsed = new URL(url);
+        const req = (parsed.protocol === 'https:' ? https : http).request({
+            hostname: parsed.hostname,
+            port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+            path: parsed.pathname,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'User-Agent': 'TentaCLAW-Agent/0.1.0' },
+            timeout: 10000,
+        }, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                if (res.statusCode === 200) {
+                    console.log('[agent] Benchmark result posted to gateway');
+                }
+                resolve();
+            });
+        });
+
+        req.on('error', () => resolve());
+        req.on('timeout', () => { req.destroy(); resolve(); });
+        req.write(JSON.stringify({ model, ...result }));
+        req.end();
+    });
+}
+
+// =============================================================================
 // Command Executor — uses execFileSync for all dynamic input
 // =============================================================================
 
 async function executeCommand(command: GatewayCommand, mockMode: boolean): Promise<void> {
     const label = command.model ? command.action + ' (' + command.model + ')' : command.action;
     console.log('[agent] Executing: ' + label);
+
+    if (command.action === 'benchmark') {
+        await runBenchmark(command, mockMode);
+        return;
+    }
 
     if (mockMode) {
         console.log('[agent] [mock] Simulated: ' + label);
