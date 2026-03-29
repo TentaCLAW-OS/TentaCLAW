@@ -2007,6 +2007,52 @@ app.get('/api/v1/inference/stats', (c) => {
 });
 
 // =============================================================================
+// Version & Capabilities (Wave 19)
+// =============================================================================
+
+app.get('/api/v1/version', (c) => {
+    return c.json({
+        name: 'TentaCLAW OS',
+        version: '0.2.0',
+        mascot: 'CLAWtopus',
+        tagline: 'Eight arms. One mind. Zero compromises.',
+        api_version: 'v1',
+        features: [
+            'zero-config-discovery', 'auto-backend-detection', 'smart-load-balancing',
+            'circuit-breaker', 'auto-retry', 'vram-aware-routing', 'model-aliases',
+            'fallback-chains', 'prompt-caching', 'function-calling', 'json-mode',
+            'embeddings-batching', 'api-keys', 'auto-mode', 'watchdog',
+            'notifications', 'remote-shell', 'doctor', 'power-tracking',
+            'fleet-reliability', 'event-timeline', 'config-export-import',
+            'maintenance-mode', 'hardware-inventory', 'model-package-manager',
+        ],
+        openai_compatible: ['/v1/chat/completions', '/v1/completions', '/v1/embeddings', '/v1/models'],
+    });
+});
+
+app.get('/api/v1/capabilities', (c) => {
+    const nodes = getAllNodes().filter(n => n.status === 'online');
+    const models = getClusterModels();
+    const aliases = getAllModelAliases();
+
+    return c.json({
+        nodes: nodes.length,
+        gpus: nodes.reduce((s, n) => s + n.gpu_count, 0),
+        models: models.map(m => m.model),
+        aliases: aliases.map(a => ({ alias: a.alias, target: a.target })),
+        backends: [...new Set(nodes.map(n => (n.latest_stats as any)?.backend?.type).filter(Boolean))],
+        features: {
+            function_calling: true,
+            json_mode: true,
+            streaming: true,
+            embeddings: true,
+            prompt_caching: true,
+            auto_mode: true,
+        },
+    });
+});
+
+// =============================================================================
 // Fleet Reliability (Wave 16)
 // =============================================================================
 
