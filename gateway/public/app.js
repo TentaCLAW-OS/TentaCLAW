@@ -1804,6 +1804,7 @@
 
   // ===================== INFERENCE PLAYGROUND =====================
   let playgroundHistory = [];
+  let playgroundSystemPrompt = 'You are CLAWtopus, a helpful AI assistant running on a TentaCLAW OS cluster. Be concise and helpful.';
 
   function populatePlaygroundModels() {
     const select = dom.playgroundModel;
@@ -1864,6 +1865,11 @@
 
     playgroundHistory.push({ role: 'user', content: text });
 
+    // Build messages with system prompt
+    const messages = [];
+    if (playgroundSystemPrompt) messages.push({ role: 'system', content: playgroundSystemPrompt });
+    messages.push(...playgroundHistory);
+
     try {
       const startTime = Date.now();
       const resp = await fetch('/v1/chat/completions', {
@@ -1871,7 +1877,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: model,
-          messages: playgroundHistory,
+          messages: messages,
           stream: true,
         }),
       });
@@ -1950,6 +1956,31 @@
   // Bind playground events
   if (dom.btnPlaygroundSend) {
     dom.btnPlaygroundSend.addEventListener('click', sendPlaygroundMessage);
+  }
+
+  // Clear conversation
+  const btnClear = document.getElementById('btn-playground-clear');
+  if (btnClear) {
+    btnClear.addEventListener('click', () => {
+      playgroundHistory = [];
+      const container = dom.playgroundMessages;
+      if (container) {
+        container.innerHTML = '<div class="playground-empty"><p>Conversation cleared. Select a model and start chatting.</p></div>';
+      }
+      if (dom.playgroundStatus) dom.playgroundStatus.textContent = '';
+    });
+  }
+
+  // System prompt
+  const btnSystem = document.getElementById('btn-playground-system');
+  if (btnSystem) {
+    btnSystem.addEventListener('click', () => {
+      const newPrompt = prompt('System prompt (sets the AI personality):', playgroundSystemPrompt);
+      if (newPrompt !== null) {
+        playgroundSystemPrompt = newPrompt;
+        addTermLine('info', 'System prompt updated: ' + (newPrompt.slice(0, 50) || '(empty)'));
+      }
+    });
   }
   if (dom.playgroundInput) {
     dom.playgroundInput.addEventListener('keydown', (e) => {
