@@ -1,6 +1,6 @@
 /* ============================================================
-   TentaCLAW HiveMind Dashboard — app.js
-   HiveOS-style GPU cluster management UI.
+   TentaCLAW OS Dashboard — app.js
+   Professional GPU cluster management UI.
    Pure vanilla JS, no frameworks, no dependencies.
    ============================================================ */
 
@@ -21,7 +21,8 @@
     commandTarget: null,
     activeView: 'nodes',
     expandedNodes: new Set(),
-    sparklineCache: {},  // nodeId -> { timestamps, avg_temp, avg_util, toks_per_sec, fetchedAt }
+    sparklineCache: {},
+    initialLoad: true,
   };
 
   const MAX_TERMINAL_LINES = 300;
@@ -209,9 +210,11 @@
     try {
       const data = await api('GET', '/api/v1/nodes');
       state.nodes = Array.isArray(data) ? data : (data.nodes || data.data || []);
+      state.initialLoad = false;
       renderNodes();
       computeSummary();
     } catch (e) {
+      state.initialLoad = false;
       addTermLine('error', 'Failed to fetch nodes: ' + e.message);
     }
   }
@@ -304,7 +307,7 @@
   }
 
   // ===================== SPARKLINE DATA =====================
-  const SPARKLINE_TTL = 15000; // cache sparkline data for 15s
+  const SPARKLINE_TTL = 15000;
 
   async function fetchSparkline(nodeId) {
     const cached = state.sparklineCache[nodeId];
@@ -357,7 +360,7 @@
     const stop1 = document.createElementNS(ns, 'stop');
     stop1.setAttribute('offset', '0%');
     stop1.setAttribute('stop-color', color);
-    stop1.setAttribute('stop-opacity', '0.3');
+    stop1.setAttribute('stop-opacity', '0.25');
     const stop2 = document.createElementNS(ns, 'stop');
     stop2.setAttribute('offset', '100%');
     stop2.setAttribute('stop-color', color);
@@ -381,7 +384,7 @@
     polyline.setAttribute('points', points);
     polyline.setAttribute('fill', 'none');
     polyline.setAttribute('stroke', color);
-    polyline.setAttribute('stroke-width', '1.5');
+    polyline.setAttribute('stroke-width', '1.2');
     polyline.setAttribute('stroke-linecap', 'round');
     polyline.setAttribute('stroke-linejoin', 'round');
     svg.appendChild(polyline);
@@ -394,7 +397,7 @@
       var dot = document.createElementNS(ns, 'circle');
       dot.setAttribute('cx', lastX.toFixed(1));
       dot.setAttribute('cy', lastY.toFixed(1));
-      dot.setAttribute('r', '2');
+      dot.setAttribute('r', '1.5');
       dot.setAttribute('fill', color);
       svg.appendChild(dot);
     }
@@ -411,10 +414,9 @@
         return;
       }
       var wrapper = el('div', 'sparkline-cell');
-      var svg = buildSparklineSVG(data.avg_temp, '#00FFFF', 80, 20);
+      var svg = buildSparklineSVG(data.avg_temp, '#22d3ee', 70, 18);
       if (svg) {
         wrapper.appendChild(svg);
-        // Show latest temp value below
         var latest = data.avg_temp[data.avg_temp.length - 1];
         var tempLabel = el('span', 'sparkline-value ' + tempColorClass(latest), Math.round(latest) + '\u00B0');
         wrapper.appendChild(tempLabel);
@@ -452,7 +454,7 @@
       state.sseConnected = true;
       dom.termSseDot.classList.add('connected');
       if (dom.settingsSseStatus) dom.settingsSseStatus.textContent = 'Connected';
-      addTermLine('system', 'SSE connected \u2014 real-time updates active.');
+      addTermLine('system', 'SSE connected -- real-time updates active.');
     };
 
     evtSource.onmessage = (event) => {
@@ -502,7 +504,7 @@
         fetchAlerts();
         break;
       case 'benchmark_complete':
-        addTermLine('benchmark_complete', 'Benchmark: ' + (data.model || '?') + ' \u2014 ' + (data.toks_per_sec || JSON.stringify(data).substring(0, 80)));
+        addTermLine('benchmark_complete', 'Benchmark: ' + (data.model || '?') + ' -- ' + (data.toks_per_sec || JSON.stringify(data).substring(0, 80)));
         fetchBenchmarks();
         break;
       default:
@@ -614,20 +616,17 @@
       tdHost.appendChild(idSub);
       row.appendChild(tdHost);
 
-      // 3. GPU strip
+      // 3. GPU strip — compact pills with temp
       const tdGpus = el('td');
       const strip = el('div', 'gpu-strip');
       if (node.gpus && node.gpus.length > 0) {
         node.gpus.forEach((gpu, i) => {
           const chip = el('div', 'gpu-chip');
           const bar = el('div', 'gpu-chip-bar ' + tempColorClass(gpu.temperatureC));
-          bar.textContent = gpu.temperatureC != null ? Math.round(gpu.temperatureC) : '?';
+          bar.textContent = gpu.temperatureC != null ? Math.round(gpu.temperatureC) + '\u00B0' : '?';
           chip.appendChild(bar);
 
-          const util = el('div', 'gpu-chip-util', (gpu.utilizationPct != null ? Math.round(gpu.utilizationPct) + '%' : ''));
-          chip.appendChild(util);
-
-          // Tooltip (built safely with DOM methods)
+          // Tooltip
           const tip = el('div', 'gpu-chip-tooltip');
           const tipTitle = el('b', null, '#' + i + ' ' + (gpu.name || 'GPU'));
           tip.appendChild(tipTitle);
@@ -857,7 +856,7 @@
     if (node.network) {
       const netDiv = el('div');
       netDiv.style.padding = '4px 0';
-      netDiv.style.fontSize = '0.75rem';
+      netDiv.style.fontSize = '0.7rem';
       netDiv.style.color = 'var(--text-secondary)';
       const netIn = el('span', 'text-cyan', formatBytesNet(node.network.bytes_in));
       const netOut = el('span', 'text-cyan', formatBytesNet(node.network.bytes_out));
@@ -926,7 +925,6 @@
       btn.dataset.profile = profile.id;
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
-        // Highlight selected
         ocDiv.querySelectorAll('.oc-profile-btn').forEach(function (b) {
           b.classList.remove('oc-active');
         });
@@ -1108,8 +1106,8 @@
     gpuIn.dataset.field = 'gpu';
     gpuIn.placeholder = 'GPU#';
     gpuIn.min = '0';
-    gpuIn.style.width = '60px';
-    gpuIn.style.flex = '0 0 60px';
+    gpuIn.style.width = '56px';
+    gpuIn.style.flex = '0 0 56px';
     row.appendChild(gpuIn);
 
     const removeBtn = el('button', 'fs-target-remove', '\u00D7');
@@ -1148,10 +1146,12 @@
         const modelTd = el('td');
         modelTd.appendChild(el('span', 'text-purple', m.model));
         modelTd.querySelector('span').style.fontWeight = '600';
+        modelTd.querySelector('span').style.fontFamily = 'var(--font-mono)';
         tr.appendChild(modelTd);
         tr.appendChild(el('td', null, String(m.nodes.length)));
         const avgTd = el('td', 'text-cyan');
         avgTd.style.fontFamily = 'var(--font-mono)';
+        avgTd.style.fontWeight = '700';
         avgTd.textContent = (m.totalToks / Math.max(1, m.nodes.length)).toFixed(1);
         tr.appendChild(avgTd);
         tr.appendChild(el('td', null, m.totalTokens.toLocaleString()));
@@ -1165,11 +1165,13 @@
         const modelTd = el('td');
         const mSpan = el('span', 'text-purple', m.model || m.name || '--');
         mSpan.style.fontWeight = '600';
+        mSpan.style.fontFamily = 'var(--font-mono)';
         modelTd.appendChild(mSpan);
         tr.appendChild(modelTd);
         tr.appendChild(el('td', null, String(m.nodes_count || m.nodes || '--')));
         const avgTd = el('td', 'text-cyan');
         avgTd.style.fontFamily = 'var(--font-mono)';
+        avgTd.style.fontWeight = '700';
         avgTd.textContent = m.avg_toks_per_sec != null ? m.avg_toks_per_sec.toFixed(1) : (m.toks_per_sec || '--');
         tr.appendChild(avgTd);
         tr.appendChild(el('td', null, m.total_tokens != null ? m.total_tokens.toLocaleString() : '--'));
@@ -1199,10 +1201,15 @@
       const severity = (alert.severity || 'info').toLowerCase();
       const row = el('div', 'alert-row severity-' + severity);
 
+      // SVG icon instead of emoji
       const icon = el('span', 'alert-severity-icon');
-      if (severity === 'critical') icon.textContent = '\u26A0';
-      else if (severity === 'warning') icon.textContent = '\u26A1';
-      else icon.textContent = '\u2139';
+      if (severity === 'critical') {
+        icon.innerHTML = '<svg viewBox="0 0 16 16" fill="none" width="14" height="14"><path d="M8 1L15 13H1L8 1z" stroke="#ef4444" stroke-width="1.5"/><line x1="8" y1="6" x2="8" y2="9" stroke="#ef4444" stroke-width="1.5"/><circle cx="8" cy="11" r="0.7" fill="#ef4444"/></svg>';
+      } else if (severity === 'warning') {
+        icon.innerHTML = '<svg viewBox="0 0 16 16" fill="none" width="14" height="14"><path d="M8 1L15 13H1L8 1z" stroke="#f0b429" stroke-width="1.5"/><line x1="8" y1="6" x2="8" y2="9" stroke="#f0b429" stroke-width="1.5"/><circle cx="8" cy="11" r="0.7" fill="#f0b429"/></svg>';
+      } else {
+        icon.innerHTML = '<svg viewBox="0 0 16 16" fill="none" width="14" height="14"><circle cx="8" cy="8" r="6.5" stroke="#22d3ee" stroke-width="1.2"/><line x1="8" y1="5" x2="8" y2="9" stroke="#22d3ee" stroke-width="1.2"/><circle cx="8" cy="11.5" r="0.7" fill="#22d3ee"/></svg>';
+      }
       row.appendChild(icon);
 
       const content = el('div', 'alert-content');
@@ -1210,7 +1217,7 @@
       const meta = el('div', 'alert-meta');
       meta.appendChild(document.createTextNode(alert.timestamp || alert.created_at || '--'));
       if (alert.node_id) {
-        meta.appendChild(document.createTextNode(' \u2014 '));
+        meta.appendChild(document.createTextNode(' -- '));
         meta.appendChild(el('span', 'alert-node', alert.hostname || alert.node_id));
       }
       content.appendChild(meta);
@@ -1265,7 +1272,10 @@
     state.benchmarks.forEach(b => {
       const tr = el('tr');
       tr.appendChild(el('td', null, b.hostname || b.node_id || '--'));
-      tr.appendChild(el('td', 'text-purple', b.model || '--'));
+      const mTd = el('td', 'text-purple');
+      mTd.style.fontFamily = 'var(--font-mono)';
+      mTd.textContent = b.model || '--';
+      tr.appendChild(mTd);
       const toksTd = el('td', 'text-cyan');
       toksTd.style.fontFamily = 'var(--font-mono)';
       toksTd.style.fontWeight = '700';
@@ -1292,7 +1302,7 @@
       ? (state.summary.total_toks_per_sec / (totalW / 1000)).toFixed(1) : '--';
 
     const cards = [
-      { title: 'Total Power Draw', value: Math.round(totalW), unit: 'W', sub: (state.summary.total_gpus || 0) + ' GPUs across ' + (state.summary.online_nodes || 0) + ' nodes' },
+      { title: 'Total Power Draw', value: Math.round(totalW), unit: 'W', sub: (state.summary.total_gpus || 0) + ' GPUs across ' + (state.summary.online_nodes || 0) + ' workers' },
       { title: 'Daily Cost', value: '$' + dailyCost.toFixed(2), unit: '/day', sub: 'At $' + costPerKwh.toFixed(2) + '/kWh' },
       { title: 'Monthly Estimate', value: '$' + monthlyCost.toFixed(2), unit: '/month', sub: '30-day projection' },
       { title: 'Efficiency', value: efficiency, unit: 'tok/s/kW', sub: 'Inference per kilowatt' },
@@ -1671,12 +1681,10 @@
   function populatePlaygroundModels() {
     const select = dom.playgroundModel;
     if (!select) return;
-    // Populate from cluster models
     fetch('/api/v1/models')
       .then(r => r.json())
       .then(data => {
         const models = data.models || [];
-        // Keep the first placeholder option
         select.innerHTML = '<option value="">Select model...</option>';
         for (const m of models) {
           const opt = document.createElement('option');
@@ -1803,7 +1811,7 @@
       }
     }, POLL_INTERVAL);
 
-    addTermLine('system', 'TentaCLAW HiveMind initialized. Type "help" for commands.');
+    addTermLine('system', 'TentaCLAW OS initialized. Type "help" for commands.');
   }
 
   if (document.readyState === 'loading') {

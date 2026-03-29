@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TentaCLAW - GPU Cluster Management</title>
+  <title>TentaCLAW OS - GPU Cluster Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐙</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230D1117'/><circle cx='16' cy='16' r='8' fill='none' stroke='%2300FFAA' stroke-width='2'/><circle cx='16' cy='16' r='3' fill='%2300FFAA'/></svg>" />
 </head>
 <body>
 
@@ -13,63 +16,61 @@
   <nav id="sidebar" class="sidebar">
     <div class="sidebar-brand">
       <div class="brand-icon">
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-          <circle cx="14" cy="14" r="12" stroke="#00FFFF" stroke-width="2" fill="none"/>
-          <circle cx="14" cy="14" r="6" fill="#00FFFF" opacity="0.3"/>
-          <circle cx="14" cy="14" r="3" fill="#00FFFF"/>
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+          <rect x="1" y="1" width="24" height="24" rx="5" stroke="#00FFAA" stroke-width="1.5" fill="none"/>
+          <circle cx="13" cy="13" r="5" fill="none" stroke="#00FFAA" stroke-width="1.5"/>
+          <circle cx="13" cy="13" r="2" fill="#00FFAA"/>
+          <line x1="13" y1="3" x2="13" y2="7" stroke="#00FFAA" stroke-width="1" opacity="0.5"/>
+          <line x1="13" y1="19" x2="13" y2="23" stroke="#00FFAA" stroke-width="1" opacity="0.5"/>
+          <line x1="3" y1="13" x2="7" y2="13" stroke="#00FFAA" stroke-width="1" opacity="0.5"/>
+          <line x1="19" y1="13" x2="23" y2="13" stroke="#00FFAA" stroke-width="1" opacity="0.5"/>
         </svg>
       </div>
       <div class="brand-text">
         <span class="brand-name">TentaCLAW</span>
-        <span class="brand-sub">HiveMind</span>
+        <span class="brand-sub">OS</span>
       </div>
     </div>
 
     <div class="sidebar-nav">
       <a class="nav-item active" data-view="nodes" href="#">
-        <span class="nav-icon">&#x1F5A5;</span>
-        <span class="nav-label">Nodes</span>
+        <svg class="nav-icon-svg" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/><rect x="1" y="10" width="14" height="5" rx="1" stroke="currentColor" stroke-width="1.2"/><circle cx="4" cy="3.5" r="1" fill="currentColor"/><circle cx="4" cy="12.5" r="1" fill="currentColor"/></svg>
+        <span class="nav-label">Workers</span>
         <span class="nav-badge" id="nav-badge-nodes">--</span>
       </a>
       <a class="nav-item" data-view="flight-sheets" href="#">
-        <span class="nav-icon">&#x1F4CB;</span>
+        <svg class="nav-icon-svg" viewBox="0 0 16 16" fill="none"><path d="M3 1h7l3 3v11H3V1z" stroke="currentColor" stroke-width="1.2"/><path d="M10 1v3h3" stroke="currentColor" stroke-width="1.2"/><line x1="5" y1="7" x2="11" y2="7" stroke="currentColor" stroke-width="1"/><line x1="5" y1="9.5" x2="11" y2="9.5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="1"/></svg>
         <span class="nav-label">Flight Sheets</span>
       </a>
       <a class="nav-item" data-view="models" href="#">
-        <span class="nav-icon">&#x1F9E0;</span>
+        <svg class="nav-icon-svg" viewBox="0 0 16 16" fill="none"><path d="M8 1L14 4.5V11.5L8 15L2 11.5V4.5L8 1z" stroke="currentColor" stroke-width="1.2"/><line x1="8" y1="8" x2="8" y2="15" stroke="currentColor" stroke-width="1"/><line x1="2" y1="4.5" x2="8" y2="8" stroke="currentColor" stroke-width="1"/><line x1="14" y1="4.5" x2="8" y2="8" stroke="currentColor" stroke-width="1"/></svg>
         <span class="nav-label">Models</span>
       </a>
       <a class="nav-item" data-view="alerts" href="#">
-        <span class="nav-icon">&#x26A1;</span>
+        <svg class="nav-icon-svg" viewBox="0 0 16 16" fill="none"><path d="M8 1L15 13H1L8 1z" stroke="currentColor" stroke-width="1.2"/><line x1="8" y1="6" x2="8" y2="9.5" stroke="currentColor" stroke-width="1.2"/><circle cx="8" cy="11.5" r="0.8" fill="currentColor"/></svg>
         <span class="nav-label">Alerts</span>
         <span class="nav-badge nav-badge-alert hidden" id="nav-badge-alerts">0</span>
       </a>
       <a class="nav-item" data-view="benchmarks" href="#">
-        <span class="nav-icon">&#x1F4CA;</span>
+        <svg class="nav-icon-svg" viewBox="0 0 16 16" fill="none"><rect x="1" y="9" width="3" height="6" rx="0.5" stroke="currentColor" stroke-width="1"/><rect x="6.5" y="5" width="3" height="10" rx="0.5" stroke="currentColor" stroke-width="1"/><rect x="12" y="1" width="3" height="14" rx="0.5" stroke="currentColor" stroke-width="1"/></svg>
         <span class="nav-label">Benchmarks</span>
       </a>
       <a class="nav-item" data-view="playground" href="#">
-        <span class="nav-icon">&#x1F4AC;</span>
+        <svg class="nav-icon-svg" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><line x1="4" y1="14" x2="12" y2="14" stroke="currentColor" stroke-width="1.2"/><line x1="8" y1="12" x2="8" y2="14" stroke="currentColor" stroke-width="1"/><path d="M5 6l2 1.5L5 9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><line x1="8.5" y1="9" x2="11" y2="9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
         <span class="nav-label">Inference</span>
       </a>
       <a class="nav-item" data-view="power" href="#">
-        <span class="nav-icon">&#x1F4B0;</span>
+        <svg class="nav-icon-svg" viewBox="0 0 16 16" fill="none"><path d="M9 1L4 9h4l-1 6 5-8H8l1-6z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
         <span class="nav-label">Power / Cost</span>
       </a>
       <a class="nav-item" data-view="settings" href="#">
-        <span class="nav-icon">&#x2699;</span>
+        <svg class="nav-icon-svg" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1"/></svg>
         <span class="nav-label">Settings</span>
       </a>
     </div>
 
     <div class="sidebar-footer">
-      <pre class="sidebar-ascii">
-   ___
-  /o o\
-  \ ~ /
- /|||||\
-~ ~ ~ ~ ~</pre>
-      <div class="sidebar-version">CLAWtopus v2.0</div>
+      <div class="sidebar-version">TentaCLAW OS v0.1.0</div>
     </div>
   </nav>
 
@@ -79,15 +80,17 @@
     <!-- ========== TOP STATS BAR ========== -->
     <header class="top-bar">
       <div class="top-bar-left">
-        <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">&#9776;</button>
+        <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><line x1="1" y1="3" x2="15" y2="3" stroke="currentColor" stroke-width="1.5"/><line x1="1" y1="8" x2="15" y2="8" stroke="currentColor" stroke-width="1.5"/><line x1="1" y1="13" x2="15" y2="13" stroke="currentColor" stroke-width="1.5"/></svg>
+        </button>
         <div class="farm-selector">
-          <span class="farm-label">Farm</span>
+          <span class="farm-label">FARM</span>
           <span class="farm-hash" id="farm-hash" title="Farm Hash">Loading...</span>
         </div>
       </div>
       <div class="top-bar-stats">
         <div class="stat-pill">
-          <span class="stat-pill-label">Nodes</span>
+          <span class="stat-pill-label">Workers</span>
           <span class="stat-pill-value" id="stat-nodes-online">--</span>
           <span class="stat-pill-sep">/</span>
           <span class="stat-pill-total" id="stat-nodes-total">--</span>
@@ -105,7 +108,7 @@
         </div>
         <div class="stat-pill stat-pill-accent">
           <span class="stat-pill-label">tok/s</span>
-          <span class="stat-pill-value" id="stat-toks">--</span>
+          <span class="stat-pill-value stat-pill-value-highlight" id="stat-toks">--</span>
         </div>
         <div class="stat-pill">
           <span class="stat-pill-label">Power</span>
@@ -130,10 +133,13 @@
       <!-- NODES VIEW -->
       <section class="view-panel active" id="view-nodes">
         <div class="view-header">
-          <h2 class="view-title">Nodes</h2>
+          <h2 class="view-title">Workers</h2>
           <div class="view-actions">
-            <input type="text" class="search-input" id="node-search" placeholder="Search nodes..." />
-            <button class="btn btn-sm" id="btn-refresh-nodes" title="Refresh">&#x21BB; Refresh</button>
+            <input type="text" class="search-input" id="node-search" placeholder="Filter workers..." />
+            <button class="btn btn-sm" id="btn-refresh-nodes" title="Refresh">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M14 8A6 6 0 1 1 8 2" stroke="currentColor" stroke-width="1.5"/><path d="M8 1l3 2-3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              Refresh
+            </button>
           </div>
         </div>
         <div class="nodes-table-wrapper">
@@ -141,7 +147,7 @@
             <thead>
               <tr>
                 <th class="th-status"></th>
-                <th class="th-hostname">Hostname</th>
+                <th class="th-hostname">Worker</th>
                 <th class="th-gpus">GPUs</th>
                 <th class="th-vram">VRAM</th>
                 <th class="th-models">Models</th>
@@ -156,9 +162,14 @@
             </tbody>
           </table>
           <div class="empty-state" id="empty-state">
-            <div class="empty-icon">&#x1F50C;</div>
-            <p class="empty-title">No nodes connected</p>
-            <p class="empty-sub">Waiting for agents to phone home...</p>
+            <svg class="empty-icon-svg" width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <rect x="4" y="8" width="40" height="14" rx="3" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+              <rect x="4" y="26" width="40" height="14" rx="3" stroke="currentColor" stroke-width="1.5" opacity="0.3"/>
+              <circle cx="12" cy="15" r="2" fill="currentColor" opacity="0.2"/>
+              <circle cx="12" cy="33" r="2" fill="currentColor" opacity="0.2"/>
+            </svg>
+            <p class="empty-title">No workers connected</p>
+            <p class="empty-sub">Waiting for agents to register with the gateway.</p>
           </div>
         </div>
       </section>
@@ -201,7 +212,7 @@
             <tr>
               <th>#</th>
               <th>Model</th>
-              <th>Nodes</th>
+              <th>Workers</th>
               <th>Avg tok/s</th>
               <th>Total Tokens</th>
               <th>Avg Latency</th>
@@ -235,7 +246,7 @@
         <table class="data-table" id="benchmarks-table">
           <thead>
             <tr>
-              <th>Node</th>
+              <th>Worker</th>
               <th>Model</th>
               <th>tok/s</th>
               <th>Latency (ms)</th>
@@ -260,9 +271,15 @@
         <div class="playground-wrapper">
           <div class="playground-messages" id="playground-messages">
             <div class="playground-empty">
-              <div class="empty-icon">&#x1F9E0;</div>
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" style="margin-bottom:12px;opacity:0.3">
+                <rect x="2" y="4" width="36" height="26" rx="4" stroke="currentColor" stroke-width="1.5"/>
+                <line x1="8" y1="34" x2="32" y2="34" stroke="currentColor" stroke-width="1.5"/>
+                <line x1="20" y1="30" x2="20" y2="34" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M10 14l4 3-4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <line x1="17" y1="20" x2="26" y2="20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
               <p>Select a model and start chatting with your cluster.</p>
-              <p class="empty-sub">Requests are load-balanced across nodes via the OpenAI-compatible proxy.</p>
+              <p class="empty-sub">Requests are load-balanced across workers via the OpenAI-compatible proxy.</p>
             </div>
           </div>
           <div class="playground-input-row">
@@ -306,7 +323,7 @@
             <h3 class="settings-group-title">About</h3>
             <div class="settings-item">
               <span class="settings-label">Version</span>
-              <span class="settings-value">TentaCLAW HiveMind v2.0.0</span>
+              <span class="settings-value">TentaCLAW OS v0.1.0</span>
             </div>
             <div class="settings-item">
               <span class="settings-label">Dashboard</span>
@@ -343,7 +360,7 @@
       <div class="terminal-output" id="terminal-output"></div>
       <div class="terminal-input-row">
         <span class="terminal-prompt">$</span>
-        <input type="text" class="terminal-input" id="terminal-input" placeholder="deploy &lt;model&gt;, status, nodes, alert ack &lt;id&gt;" autocomplete="off" spellcheck="false" />
+        <input type="text" class="terminal-input" id="terminal-input" placeholder="deploy <model>, status, nodes, alert ack <id>" autocomplete="off" spellcheck="false" />
       </div>
     </section>
 
