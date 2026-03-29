@@ -1859,8 +1859,8 @@
 
     addPlaygroundMessage('user', text);
     input.value = '';
-    const waitToken = startPlaygroundComedy(model);
     if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Sending to ' + model + '...';
+    if (dom.btnPlaygroundSend) dom.btnPlaygroundSend.disabled = true;
 
     playgroundHistory.push({ role: 'user', content: text });
 
@@ -1879,23 +1879,25 @@
       const elapsed = Date.now() - startTime;
       const data = await resp.json();
 
-      stopPlaygroundComedy(waitToken);
       if (data.error) {
-        addPlaygroundMessage('assistant', 'Error: ' + data.error);
+        const errMsg = typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error));
+        addPlaygroundMessage('assistant', 'Error: ' + errMsg);
         if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Error';
       } else {
         const choice = data.choices?.[0];
         const content = choice?.message?.content || '(empty response)';
-        const nodeId = data.node_id || 'unknown';
-        addPlaygroundMessage('assistant', content, 'Node: ' + nodeId + ' | ' + elapsed + 'ms');
+        const tc = data._tentaclaw || {};
+        const nodeId = tc.hostname || tc.routed_to || 'cluster';
+        const latency = tc.latency_ms || elapsed;
+        addPlaygroundMessage('assistant', content, nodeId + ' | ' + Math.round(latency / 1000) + 's');
         playgroundHistory.push({ role: 'assistant', content: content });
-        if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Served by ' + nodeId + ' in ' + elapsed + 'ms';
+        if (dom.playgroundStatus) dom.playgroundStatus.textContent = nodeId + ' responded in ' + Math.round(latency / 1000) + 's';
       }
     } catch (err) {
-      stopPlaygroundComedy(waitToken);
-      addPlaygroundMessage('assistant', 'Error: ' + err.message);
-      if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Connection error';
+      addPlaygroundMessage('assistant', 'Connection error: ' + err.message);
+      if (dom.playgroundStatus) dom.playgroundStatus.textContent = 'Connection error — is the cluster running?';
     }
+    if (dom.btnPlaygroundSend) dom.btnPlaygroundSend.disabled = false;
   }
 
   // Bind playground events
