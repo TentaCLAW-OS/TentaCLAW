@@ -1275,6 +1275,31 @@ async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
     console.log('');
 }
 
+async function cmdFleet(gateway: string): Promise<void> {
+    const data = await apiGet(gateway, '/api/v1/fleet') as any[];
+
+    console.log('');
+    console.log('  ' + C.purple(C.bold('Fleet Reliability')) + C.dim(` (${data.length} nodes)`));
+    console.log('');
+    console.log('  ' + padRight(C.dim('NODE'), 18) + padRight(C.dim('HEALTH'), 12) + padRight(C.dim('UPTIME'), 10) + padRight(C.dim('GPUs'), 8) + padRight(C.dim('MODELS'), 10) + C.dim('STATUS'));
+    console.log('  ' + C.dim('\u2500'.repeat(70)));
+
+    for (const n of data) {
+        const hColor = n.health_score >= 80 ? C.green : n.health_score >= 50 ? C.yellow : C.red;
+        const sColor = n.status === 'online' ? C.green : n.status === 'maintenance' ? C.yellow : C.red;
+        console.log(
+            '  ' +
+            padRight(C.white(n.hostname), 18) +
+            padRight(hColor(n.health_score + '/100 ' + n.grade), 12) +
+            padRight(C.dim(n.uptime_pct + '%'), 10) +
+            padRight(C.cyan(String(n.gpu_count)), 8) +
+            padRight(C.dim(String(n.models)), 10) +
+            sColor(n.status)
+        );
+    }
+    console.log('');
+}
+
 async function cmdEvents(gateway: string, flags: Record<string, string>): Promise<void> {
     const limit = parseInt(flags['limit'] || '20');
     const data = await apiGet(gateway, `/api/v1/timeline?limit=${limit}`) as any[];
@@ -2103,6 +2128,11 @@ async function main(): Promise<void> {
 
         case 'notify':
             await cmdNotify(gateway, parsed.positional, parsed.flags);
+            break;
+
+        case 'fleet':
+        case 'reliability':
+            await cmdFleet(gateway);
             break;
 
         case 'events':

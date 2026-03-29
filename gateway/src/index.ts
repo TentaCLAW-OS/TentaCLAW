@@ -93,6 +93,8 @@ import {
     getClusterTimeline,
     exportClusterConfig,
     importClusterConfig,
+    getNodeHealthScore,
+    getFleetReliability,
     createApiKey,
     validateApiKey,
     trackApiKeyTokens,
@@ -1919,6 +1921,18 @@ app.post('/api/v1/models/smart-deploy', async (c) => {
 
 app.get('/api/v1/inference/stats', (c) => {
     return c.json(getRequestStats());
+});
+
+// =============================================================================
+// Fleet Reliability (Wave 16)
+// =============================================================================
+
+app.get('/api/v1/fleet', (c) => {
+    return c.json(getFleetReliability());
+});
+
+app.get('/api/v1/nodes/:id/health-score', (c) => {
+    return c.json(getNodeHealthScore(c.req.param('id')));
 });
 
 // =============================================================================

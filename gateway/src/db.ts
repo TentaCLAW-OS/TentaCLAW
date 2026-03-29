@@ -1302,6 +1302,79 @@ export function getAllTags(): Array<{ tag: string; count: number }> {
 }
 
 // =============================================================================
+// Fleet Reliability (Wave 16)
+// =============================================================================
+
+export function getNodeHealthScore(nodeId: string): { score: number; grade: string; factors: Record<string, number> } {
+    const node = getNode(nodeId);
+    if (!node) return { score: 0, grade: 'F', factors: {} };
+
+    let score = 100;
+    const factors: Record<string, number> = {};
+
+    // Factor 1: Online status (25 pts)
+    factors.online = node.status === 'online' ? 25 : 0;
+    score = score - (25 - factors.online);
+
+    // Factor 2: GPU temps (25 pts)
+    if (node.latest_stats && node.latest_stats.gpus.length > 0) {
+        const avgTemp = node.latest_stats.gpus.reduce((s, g) => s + g.temperatureC, 0) / node.latest_stats.gpus.length;
+        factors.temp = avgTemp < 60 ? 25 : avgTemp < 75 ? 20 : avgTemp < 85 ? 10 : 0;
+    } else {
+        factors.temp = node.status === 'online' ? 20 : 0;
+    }
+    score = score - (25 - factors.temp);
+
+    // Factor 3: Uptime (25 pts)
+    const uptime = getNodeUptime(nodeId, 24);
+    factors.uptime = Math.round(uptime.uptime_pct / 4); // 100% uptime = 25 pts
+    score = score - (25 - factors.uptime);
+
+    // Factor 4: Models loaded (15 pts)
+    if (node.latest_stats) {
+        factors.models = node.latest_stats.inference.loaded_models.length > 0 ? 15 : 0;
+    } else {
+        factors.models = 0;
+    }
+    score = score - (15 - factors.models);
+
+    // Factor 5: Recent watchdog events (10 pts — less is better)
+    const d = getDb();
+    const recentWatchdog = (d.prepare(
+        "SELECT COUNT(*) as cnt FROM watchdog_events WHERE node_id = ? AND created_at >= datetime('now', '-24 hours') AND level >= 2"
+    ).get(nodeId) as { cnt: number }).cnt;
+    factors.stability = recentWatchdog === 0 ? 10 : recentWatchdog <= 2 ? 5 : 0;
+    score = score - (10 - factors.stability);
+
+    score = Math.max(0, Math.min(100, score));
+    const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : score >= 40 ? 'D' : 'F';
+
+    return { score, grade, factors };
+}
+
+export function getFleetReliability(): Array<{
+    node_id: string; hostname: string; health_score: number; grade: string;
+    uptime_pct: number; gpu_count: number; models: number; status: string;
+}> {
+    const nodes = getAllNodes();
+    return nodes.map(n => {
+        const health = getNodeHealthScore(n.id);
+        const uptime = getNodeUptime(n.id, 24);
+        const modelCount = n.latest_stats?.inference?.loaded_models?.length || 0;
+        return {
+            node_id: n.id,
+            hostname: n.hostname,
+            health_score: health.score,
+            grade: health.grade,
+            uptime_pct: uptime.uptime_pct,
+            gpu_count: n.gpu_count,
+            models: modelCount,
+            status: n.status,
+        };
+    }).sort((a, b) => b.health_score - a.health_score);
+}
+
+// =============================================================================
 // Config Export/Import (Wave 15)
 // =============================================================================
 
