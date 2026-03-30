@@ -49,15 +49,16 @@ TentaCLAW OS is an **AI inference cluster operating system**. It manages your GP
 
 ## What's New in v0.2.0
 
-- **CLAWtopus CLI** — CLAWDIA rebranded. Inference router + cluster management with `clawtopus chat`, `models`, `health`, `tags`, `alerts`, `benchmarks`
+- **CLAWtopus CLI** — Inference router + cluster management with `clawtopus chat`, `models`, `health`, `tags`, `alerts`, `benchmarks`
 - **Inference Playground** — Chat with your cluster models directly from the dashboard
 - **Node Tags** — Label nodes as `production`, `inference`, `staging` etc. Filter by tag
 - **SSH Key Management** — Push SSH keys to nodes via API, stored in DB with fingerprints
 - **Model Pull Progress** — Track download progress when deploying models to nodes
 - **Auto-Discovery** — UDP broadcast on port 41337. Agents and gateways find each other on LAN
-- **Daphney Bridge** — SSE endpoint at `/api/v1/daphney/stream` for DaphneyBrain UE5 integration
+- **Game Engine Bridge** — SSE endpoint for real-time UE5/Unity integration
 - **Model Search** — Browse Ollama model catalog with VRAM requirements and cluster fit check
-- **52 tests** — 42 gateway (unit + integration) + 10 agent tests, all passing
+- **BitNet CPU Inference** — 1-bit models run on any CPU at 2-6x speed, 70% less energy. No GPU required.
+- **129+ tests** — 101 gateway + 28 agent tests, strict TypeScript, all passing
 
 ## Features
 
@@ -68,6 +69,7 @@ TentaCLAW OS is an **AI inference cluster operating system**. It manages your GP
 | <span style="color:#00FF88">&#10003;</span> **TentaCLAW-style push model** — nodes push stats, receive commands |
 | <span style="color:#00FF88">&#10003;</span> **One-click model deployment** via flight sheets |
 | <span style="color:#00FF88">&#10003;</span> **Auto-scaling inference** across heterogeneous hardware |
+| <span style="color:#00FF88">&#10003;</span> **BitNet CPU inference** — 1-bit models on any CPU, no GPU needed |
 | <span style="color:#00FF88">&#10003;</span> **CLAWtopus ASCII art** — because your terminal deserves better |
 
 ---
@@ -193,7 +195,7 @@ npx clawtopus command TENTACLAW-FARM7K3P-node1 install_model --model hermes3:8b
   │ CLI          │─────►│                                       │
   │              │      │  REST API    Web Dashboard    SSE     │
   │  clawtopus   │      │  /api/v1/*   /dashboard       Events  │
-  │  status      │      │  /v1/*       /daphney         UDP     │
+  │  status      │      │  /v1/*       /game-bridge     UDP     │
   └──────────────┘      └──────────────────┬────────────────────┘
                                            │
                     POST stats ◄───────────┼──────────► Commands
@@ -215,11 +217,12 @@ npx clawtopus command TENTACLAW-FARM7K3P-node1 install_model --model hermes3:8b
 
 | Component | Language | Description |
 |-----------|----------|-------------|
-| **Gateway** (`gateway/`) | TypeScript + Hono + SQLite | Central coordinator — 65+ REST endpoints, web dashboard, SSE, Daphney bridge, OpenAI-compat proxy |
-| **Agent** (`agent/`) | TypeScript (zero deps) | Node daemon — GPU stats, command execution, auto-discovery, overclock profiles |
-| **CLAWtopus CLI** (`cli/`) | TypeScript (zero deps) | Inference router + cluster management — chat, models, health, tags, deploy |
+| **Gateway** (`gateway/`) | TypeScript + Hono + SQLite | Central coordinator — 200+ REST endpoints, web dashboard, SSE, webhooks, game engine bridge, OpenAI-compat proxy, Prometheus metrics |
+| **Agent** (`agent/`) | TypeScript (zero deps) | Node daemon — NVIDIA/AMD/Intel GPU stats, BitNet CPU inference, auto-discovery (UDP+mDNS), watchdog, overclock |
+| **CLAWtopus CLI** (`cli/`) | TypeScript (zero deps) | 60+ commands — chat, deploy, top, backends, drain/cordon, doctor, auto, joke, fortune + personality |
+| **MCP Server** (`mcp/`) | TypeScript (zero deps) | Model Context Protocol server — AI agents can manage your cluster via tool calls |
 | **Builder** (`builder/`) | Bash | ISO/PXE build system — debootstrap Ubuntu 24.04, custom initrd |
-| **Shared** (`shared/`) | TypeScript | Shared type definitions — agent ↔ gateway ↔ CLI contract |
+| **Shared** (`shared/`) | TypeScript | 15+ shared type definitions — agent ↔ gateway ↔ CLI ↔ MCP contract |
 
 ---
 
@@ -242,6 +245,7 @@ npx clawtopus command TENTACLAW-FARM7K3P-node1 install_model --model hermes3:8b
 | **NVIDIA** | Full | Pascal+, CUDA capable |
 | **AMD** | Partial | ROCm support coming |
 | **Intel** | Planned | Arc GPUs, future |
+| **CPU (BitNet)** | Full | 1-bit inference, any x86_64 CPU |
 
 ---
 
@@ -302,7 +306,7 @@ The mascot of TentaCLAW OS. An octopus who lives in your terminal and coordinate
 | `POST` | `/v1/chat/completions` | OpenAI-compatible inference proxy |
 | `GET` | `/v1/models` | OpenAI-compatible model list |
 | `GET` | `/api/v1/events` | SSE stream for real-time dashboard |
-| `GET` | `/api/v1/daphney/stream` | SSE stream for DaphneyBrain UE5 |
+| `GET` | `/api/v1/game/stream` | SSE stream for game engine integration |
 
 ## Project Structure
 
@@ -313,7 +317,7 @@ tentaclaw-os/
 │   ├── src/spawner.ts   # Multi-node mock spawner (16 presets)
 │   └── tests/           # 10 tests
 ├── gateway/             # TentaCLAW Gateway (Hono + SQLite)
-│   ├── src/index.ts     # 65+ REST API endpoints, SSE, OpenAI proxy, Daphney bridge
+│   ├── src/index.ts     # 200+ REST API endpoints, SSE, OpenAI proxy, game engine bridge
 │   ├── src/db.ts        # Database layer (11 tables)
 │   ├── public/          # TentaCLAW-style web dashboard (HTML/CSS/JS)
 │   └── tests/           # 42 tests (unit + integration)

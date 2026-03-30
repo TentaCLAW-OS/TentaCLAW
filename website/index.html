@@ -177,6 +177,7 @@
         <li><a href="#features">Features</a></li>
         <li><a href="#compare">Compare</a></li>
         <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW">GitHub</a></li>
+        <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW#quick-start">Docs</a></li>
       </ul>
       <a href="https://github.com/TentaCLAW-OS/TentaCLAW" class="nav-cta">Get Started</a>
     </div>
@@ -210,9 +211,9 @@
 
       <div class="hero-stats">
         <div class="hero-stat"><div class="num">200+</div><div class="label">API Endpoints</div></div>
-        <div class="hero-stat"><div class="num">85+</div><div class="label">CLI Commands</div></div>
+        <div class="hero-stat"><div class="num">129+</div><div class="label">Tests Passing</div></div>
         <div class="hero-stat"><div class="num">0</div><div class="label">Config Files</div></div>
-        <div class="hero-stat"><div class="num">40ms</div><div class="label">Avg Response</div></div>
+        <div class="hero-stat"><div class="num">3</div><div class="label">GPU Vendors</div></div>
       </div>
     </div>
   </section>
@@ -236,6 +237,10 @@
         <div><span class="prompt">$</span> <span class="cmd">clawtopus deploy llama3.1:8b</span></div>
         <div><span class="accent">&#x1F419;</span> <span class="output">Deploying to pve-gpu (16GB free)</span></div>
         <div><span class="highlight">&nbsp;&nbsp; &#x2714; Queued. Model downloading.</span></div>
+        <br>
+        <div><span class="prompt">$</span> <span class="cmd">clawtopus deploy bitnet-b1.58 --cpu</span></div>
+        <div><span class="accent">&#x1F419;</span> <span class="output">BitNet on CPU node (no GPU needed)</span></div>
+        <div><span class="highlight">&nbsp;&nbsp; &#x2714; 1-bit inference. 2-6x faster. 70% less energy.</span></div>
         <br>
         <div><span class="prompt">$</span> <span class="cmd">clawtopus fix</span></div>
         <div><span class="accent">&#x1F419;</span> <span class="highlight">Everything's clean. Nothing to fix.</span></div>
@@ -275,6 +280,11 @@
         <p>Search HuggingFace + Ollama. Check VRAM fit before downloading. One command deploys to the best node. Auto mode decides everything.</p>
       </div>
       <div class="feature-card">
+        <div class="feature-icon">&#x1F9EC;</div>
+        <h3>BitNet CPU Inference</h3>
+        <p>No GPU? No problem. BitNet 1-bit models run on any CPU at 2-6x speed with 70% less energy. CLAWtopus routes to the right backend automatically.</p>
+      </div>
+      <div class="feature-card">
         <div class="feature-icon">&#x1F4CA;</div>
         <h3>Real-Time Dashboard</h3>
         <p>GPU temps, VRAM bars, inference flow, node health. Trading terminal aesthetic. Big numbers, live data. Prometheus metrics for Grafana.</p>
@@ -301,6 +311,7 @@
         <tr><td>AMD + NVIDIA</td><td class="yes us">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
         <tr><td>Zero config</td><td class="yes us">Yes</td><td class="yes">Yes</td><td class="no">No</td><td class="yes">Yes</td></tr>
         <tr><td>Prompt caching</td><td class="yes us">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
+        <tr><td>CPU inference (BitNet)</td><td class="yes us">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
       </tbody>
     </table>
   </section>

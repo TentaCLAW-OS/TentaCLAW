@@ -1,4 +1,6 @@
-version: '3.8'
+# TentaCLAW OS — Docker Compose
+# Run the full stack with: docker compose up
+# CLAWtopus says: "One command. Eight arms. Let's go."
 
 services:
   gateway:
@@ -12,7 +14,41 @@ services:
     environment:
       - TENTACLAW_PORT=8080
       - TENTACLAW_HOST=0.0.0.0
+      - TENTACLAW_LOG_FORMAT=json
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Mock agent — generates fake GPU stats for testing
+  mock-agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      - TENTACLAW_GATEWAY_URL=http://gateway:8080
+      - TENTACLAW_MOCK=true
+      - TENTACLAW_HOSTNAME=mock-rig-01
+    restart: unless-stopped
+
+  # Second mock agent (optional — uncomment to simulate multi-node)
+  # mock-agent-2:
+  #   build:
+  #     context: .
+  #     dockerfile: agent/Dockerfile
+  #   depends_on:
+  #     gateway:
+  #       condition: service_healthy
+  #   environment:
+  #     - TENTACLAW_GATEWAY_URL=http://gateway:8080
+  #     - TENTACLAW_MOCK=true
+  #     - TENTACLAW_HOSTNAME=mock-rig-02
 
 volumes:
   gateway-data:

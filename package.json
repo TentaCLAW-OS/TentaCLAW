@@ -1,0 +1,25 @@
+{
+    "name": "tentaclaw-os",
+    "version": "0.1.0",
+    "private": true,
+    "description": "TentaCLAW OS — Distributed AI inference cluster operating system",
+    "workspaces": [
+        "gateway",
+        "agent",
+        "cli",
+        "shared",
+        "mcp"
+    ],
+    "scripts": {
+        "lint": "eslint . --ext .ts",
+        "format": "prettier --write \"**/*.ts\""
+    },
+    "author": "TentaCLAW Project",
+    "license": "MIT",
+    "devDependencies": {
+        "@typescript-eslint/eslint-plugin": "^8.57.2",
+        "@typescript-eslint/parser": "^8.57.2",
+        "eslint": "^10.1.0",
+        "prettier": "^3.8.1"
+    }
+}

@@ -1,0 +1,8 @@
+{
+    "name": "tentaclaw-shared",
+    "version": "0.1.0",
+    "description": "TentaCLAW Shared — Common types and utilities",
+    "main": "types.ts",
+    "author": "TentaCLAW Project",
+    "license": "MIT"
+}

@@ -1,9 +1,9 @@
 # TentaCLAW OS — Makefile
 # Easy build targets for common operations
 
-.PHONY: all iso pxe agent gateway cli help clean distclean deps dev demo
+.PHONY: all iso pxe agent gateway cli mcp help clean distclean deps dev demo test typecheck lint format docker-build docker-up docker-down docker-logs
 
-VERSION ?= 0.1.0
+VERSION ?= 0.2.0
 ARCH ?= amd64
 TIER ?= 20,000-claws
 
@@ -32,7 +32,7 @@ agent:
 	@cd agent && npm install && npm run build
 
 gateway:
-	@echo "Building TentaCLAW HiveMind Gateway..."
+	@echo "Building TentaCLAW TentaCLAW Gateway..."
 	@cd gateway && npm install && npm run build
 
 cli:
@@ -95,6 +95,38 @@ test-qemu:
 
 test: agent-test gateway-test
 
+# Type check all components (no emit, just verify)
+typecheck:
+	@echo "Type checking all components..."
+	@cd gateway && npx -p typescript tsc --noEmit
+	@cd agent && npx -p typescript tsc --noEmit
+	@cd cli && npx -p typescript tsc --noEmit
+	@echo "All clean!"
+
+# Lint all TypeScript files
+lint:
+	@cd gateway && npx eslint src/ --ext .ts || true
+	@cd agent && npx eslint src/ --ext .ts || true
+	@cd cli && npx eslint src/ --ext .ts || true
+
+# Format all TypeScript files
+format:
+	@npx prettier --write "**/*.ts" --ignore-path .gitignore
+
+# Docker targets
+docker-build:
+	@docker compose build
+
+docker-up:
+	@docker compose up -d
+	@echo "Gateway: http://localhost:8080/dashboard"
+
+docker-down:
+	@docker compose down
+
+docker-logs:
+	@docker compose logs -f
+
 test-iso:
 	@echo "Testing ISO in QEMU..."
 	@which qemu-system-x86_64 > /dev/null 2>&1 || { echo "QEMU not found. Install with: apt-get install qemu-system-x86"; exit 1; }
@@ -146,7 +178,7 @@ help:
 	@echo "    make iso-minimal       Build bare bones ISO (agent auto-starts on any hardware)"
 	@echo "    make iso-20k-claws     Build 20,000 CLAWS ISO (full upgrade, dev tools)"
 	@echo "    make agent             Build the TentaCLAW Agent"
-	@echo "    make gateway           Build the HiveMind Gateway"
+	@echo "    make gateway           Build the TentaCLAW Gateway"
 	@echo "    make cli               Build the CLI tool"
 	@echo ""
 	@echo "  Tiers:"
@@ -176,7 +208,7 @@ help:
 	@echo "    make iso-minimal     Build bare bones ISO (no build deps needed)"
 	@echo "    make iso-supercool   Build full fat ISO with everything"
 	@echo "    make agent           Build the TentaCLAW Agent"
-	@echo "    make gateway         Build the HiveMind Gateway"
+	@echo "    make gateway         Build the TentaCLAW Gateway"
 	@echo "    make cli             Build the CLI tool"
 	@echo ""
 	@echo "  Tiers:"
