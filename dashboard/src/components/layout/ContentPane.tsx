@@ -1,4 +1,7 @@
 import { useUIStore } from '@/stores/ui';
+import { SummaryTab } from '@/components/tabs/SummaryTab';
+import { ChatTab } from '@/components/tabs/ChatTab';
+import { TerminalTab } from '@/components/tabs/TerminalTab';
 import type { TabId } from '@/lib/types';
 
 const tabLabels: Record<TabId, string> = {
@@ -19,20 +22,21 @@ const tabLabels: Record<TabId, string> = {
 export function ContentPane() {
   const activeTab = useUIStore((s) => s.activeTab);
 
+  // Terminal tab needs full-height container without padding (xterm manages its own scroll)
+  if (activeTab === 'terminal') {
+    return (
+      <div className="flex-1 overflow-hidden" style={{ animation: 'fadeIn 0.3s ease-out' }}>
+        <TerminalTab />
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-y-auto p-5" style={{ animation: 'fadeIn 0.3s ease-out' }}>
       {activeTab === 'summary' ? (
-        <div>
-          <h2
-            className="text-sm font-semibold mb-2"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            Cluster Summary
-          </h2>
-          <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-            Summary Tab &mdash; coming in Task 5
-          </p>
-        </div>
+        <SummaryTab />
+      ) : activeTab === 'chat' ? (
+        <ChatTab />
       ) : (
         <div>
           <h2
