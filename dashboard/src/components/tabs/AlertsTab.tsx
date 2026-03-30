@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { useClusterStore } from '@/stores/cluster';
 import { api } from '@/lib/api';
 import { formatTimeAgo } from '@/lib/format';
+import { CLAWtopusTips } from '@/components/ui/CLAWtopusTips';
+import { emptyStateTips } from '@/lib/personality';
 
 /* ── Alert rule data ── */
 interface AlertRule {
@@ -146,7 +148,7 @@ export function AlertsTab() {
         {alerts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
             <span className="text-2xl opacity-20">&#10003;</span>
-            <p className="text-xs" style={{ color: 'var(--text-dim)' }}>No active alerts &mdash; your cluster is healthy</p>
+            <CLAWtopusTips tip={emptyStateTips.alerts} />
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

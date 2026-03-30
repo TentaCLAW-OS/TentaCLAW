@@ -1,17 +1,46 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useClusterStore } from '@/stores/cluster';
 import { useAuthStore } from '@/stores/auth';
+import { getMood, getPersonalityMessage, getGreeting } from '@/lib/personality';
+import type { Mood } from '@/lib/personality';
 
 export function Header() {
   const nodes = useClusterStore((s) => s.nodes);
   const connected = useClusterStore((s) => s.connected);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const alerts = useClusterStore((s) => s.alerts);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const totalNodes = nodes.filter((n) => n.status === 'online').length;
+  const onlineNodes = nodes.filter((n) => n.status === 'online').length;
   const totalGpus = nodes.reduce((sum, n) => sum + n.gpu_count, 0);
+
+  // CLAWtopus personality state
+  const hasWarning = alerts.some((a) => a.severity === 'warning' && !a.acknowledged);
+  const hasError = alerts.some((a) => a.severity === 'critical' && !a.acknowledged);
+  const currentMood: Mood = getMood(onlineNodes, nodes.length, hasWarning, hasError);
+
+  const pickMessage = useCallback(() => getPersonalityMessage(currentMood), [currentMood]);
+  const [statusMessage, setStatusMessage] = useState(pickMessage);
+  const [messageFading, setMessageFading] = useState(false);
+
+  // Rotate personality message every 30 seconds with fade transition
+  useEffect(() => {
+    // Immediately pick a new message when mood changes
+    setStatusMessage(getPersonalityMessage(currentMood));
+  }, [currentMood]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMessageFading(true);
+      setTimeout(() => {
+        setStatusMessage(pickMessage());
+        setMessageFading(false);
+      }, 300);
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [pickMessage]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -66,8 +95,8 @@ export function Header() {
         </span>
       </div>
 
-      {/* Center: Search */}
-      <div className="flex items-center">
+      {/* Center: Search + CLAWtopus status */}
+      <div className="flex items-center gap-4">
         <input
           type="text"
           placeholder="Search nodes, models, commands... (Ctrl+K)"
@@ -79,13 +108,28 @@ export function Header() {
           }}
           readOnly
         />
+        <div
+          style={{
+            fontStyle: 'italic',
+            fontSize: 10,
+            color: 'rgba(140, 80, 200, 0.6)',
+            fontFamily: "'Inter', sans-serif",
+            letterSpacing: '0.01em',
+            whiteSpace: 'nowrap',
+            opacity: messageFading ? 0 : 1,
+            transition: 'opacity 0.3s ease-in-out',
+            userSelect: 'none',
+          }}
+        >
+          &ldquo;{statusMessage}&rdquo; — <span role="img" aria-label="CLAWtopus">🐙</span>
+        </div>
       </div>
 
       {/* Right: Quick stats + controls */}
       <div className="flex items-center gap-4">
         {/* Quick stats */}
         <div className="flex items-center gap-3 text-[9px] font-mono text-[var(--cyan)]">
-          <span>{totalNodes} nodes</span>
+          <span>{onlineNodes} nodes</span>
           <span>{totalGpus} GPUs</span>
           <span>{nodes.length} total</span>
         </div>

@@ -3,6 +3,8 @@ import { useClusterStore } from '@/stores/cluster';
 import { useDragStore } from '@/hooks/useDragDrop';
 import { api } from '@/lib/api';
 import type { ModelDistribution } from '@/lib/types';
+import { CLAWtopusTips } from '@/components/ui/CLAWtopusTips';
+import { emptyStateTips } from '@/lib/personality';
 
 /* ---------------------------------------------------------------------------
  * VRAM estimation heuristic
@@ -253,7 +255,7 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-12 gap-2">
       <span className="text-2xl opacity-20">🧠</span>
-      <p className="text-xs" style={{ color: 'var(--text-dim)' }}>No models loaded &mdash; deploy a model to get started</p>
+      <CLAWtopusTips tip={emptyStateTips.models} />
     </div>
   );
 }

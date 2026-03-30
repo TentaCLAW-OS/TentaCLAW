@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useClusterStore } from '@/stores/cluster';
 import { Sparkline } from '@/components/ui/Sparkline';
+import { CLAWtopusTips } from '@/components/ui/CLAWtopusTips';
+import { emptyStateTips } from '@/lib/personality';
 
 /* ---------- data ---------- */
 
@@ -69,8 +71,18 @@ export function InferenceTab() {
 
     const cacheHitRate = 72.4;
 
-    return { totalToksPerSec, avgLatency, reqsPerSec, errorRate, cacheHitRate };
+    return { totalToksPerSec, avgLatency, reqsPerSec, errorRate, cacheHitRate, hasActivity: onlineNodes.length > 0 };
   }, [nodes, summary]);
+
+  // Empty state when no nodes are online / no inference activity
+  if (!stats.hasActivity) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-2" style={{ animation: 'slideUp 0.4s ease-out both' }}>
+        <span className="text-2xl opacity-20">&#x26A1;</span>
+        <CLAWtopusTips tip={emptyStateTips.inference} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5" style={{ animation: 'slideUp 0.4s ease-out both' }}>
