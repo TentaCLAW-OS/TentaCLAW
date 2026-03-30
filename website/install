@@ -1,82 +1,569 @@
 #!/bin/bash
+# =============================================================================
 # TentaCLAW OS — One-Line Installer
+# =============================================================================
 # Usage: curl -fsSL tentaclaw.io/install | bash
+#   Or:  curl -fsSL tentaclaw.io/install | bash -s -- --mock
+#   Or:  curl -fsSL tentaclaw.io/install | bash -s -- --no-wizard
+#
+# What this does:
+#   1. Shows the CLAWtopus splash
+#   2. Detects your OS (Ubuntu/Debian, Fedora/RHEL, Arch, macOS)
+#   3. Installs Node.js if missing (via nvm or system package manager)
+#   4. Clones the TentaCLAW repo
+#   5. Installs dependencies (gateway, agent, cli)
+#   6. Symlinks `clawtopus` to PATH
+#   7. Launches the interactive setup wizard
+#
+# Flags:
+#   --no-wizard       Skip the setup wizard at the end
+#   --mock            Pass --mock to the setup wizard
+#   --install-dir DIR Set custom install directory
+#   --help            Show this help
+#
+# CLAWtopus says: "One curl. That's all it takes."
+# =============================================================================
 
 set -euo pipefail
 
-TEAL='\033[38;2;0;212;170m'
+# ──────────────────────────────────────────────────────────────────
+# Brand colors (24-bit true color)
+# ──────────────────────────────────────────────────────────────────
+CYAN='\033[38;2;0;212;170m'
 PURPLE='\033[38;2;139;92;246m'
 GREEN='\033[38;2;0;255;136m'
-RED='\033[31m'
+RED='\033[38;2;255;70;70m'
+YELLOW='\033[38;2;255;220;0m'
 DIM='\033[2m'
+BOLD='\033[1m'
 RESET='\033[0m'
 
-echo ""
-echo -e "${PURPLE}  ╭─────────────────────────────────────╮${RESET}"
-echo -e "${PURPLE}  │${RESET}  ${TEAL}TentaCLAW OS${RESET} Installer              ${PURPLE}│${RESET}"
-echo -e "${PURPLE}  │${RESET}  ${DIM}Eight arms. One mind. Zero config.${RESET}   ${PURPLE}│${RESET}"
-echo -e "${PURPLE}  ╰─────────────────────────────────────╯${RESET}"
-echo ""
+# ──────────────────────────────────────────────────────────────────
+# Defaults
+# ──────────────────────────────────────────────────────────────────
+INSTALL_DIR=""
+NO_WIZARD=false
+WIZARD_FLAGS=""
+REPO_URL="https://github.com/TentaCLAW-OS/TentaCLAW.git"
+OS_TYPE="unknown"
+PKG_MANAGER="unknown"
 
-# Check prerequisites
-check_cmd() {
-    if command -v "$1" &>/dev/null; then
-        echo -e "  ${GREEN}[+]${RESET} $1 found"
-        return 0
+# ──────────────────────────────────────────────────────────────────
+# Parse arguments
+# ──────────────────────────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --no-wizard)
+            NO_WIZARD=true
+            shift
+            ;;
+        --mock)
+            WIZARD_FLAGS="--auto"
+            shift
+            ;;
+        --install-dir)
+            INSTALL_DIR="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "TentaCLAW OS — One-Line Installer"
+            echo ""
+            echo "Usage: curl -fsSL tentaclaw.io/install | bash"
+            echo "       curl -fsSL tentaclaw.io/install | bash -s -- [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --no-wizard       Skip the interactive setup wizard"
+            echo "  --mock            Run setup wizard in auto mode"
+            echo "  --install-dir DIR Custom install directory"
+            echo "  --help, -h        Show this help"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1 (use --help for usage)"
+            exit 1
+            ;;
+    esac
+done
+
+# ──────────────────────────────────────────────────────────────────
+# Helper functions
+# ──────────────────────────────────────────────────────────────────
+command_exists() { command -v "$1" &>/dev/null; }
+
+ok()   { echo -e "  ${GREEN}✓${RESET} $1"; }
+fail() { echo -e "  ${RED}✗${RESET} $1"; }
+warn() { echo -e "  ${YELLOW}!${RESET} $1"; }
+info() { echo -e "  ${DIM}  $1${RESET}"; }
+
+die() {
+    echo ""
+    echo -e "  ${RED}${BOLD}Error:${RESET} $1"
+    echo ""
+    exit 1
+}
+
+# ──────────────────────────────────────────────────────────────────
+# CLAWtopus splash
+# ──────────────────────────────────────────────────────────────────
+print_splash() {
+    echo ""
+    echo -e "${CYAN}${BOLD}"
+    cat << 'OCTOPUS'
+
+                          ___
+                       .-'   `'.
+                      /         \
+                      |         ;
+                      |         |           ___.--,
+             _.._     |0) ~ (0) |    _.---'`__.-( (_.
+      __.--'`_.. '.__.\    '--. \_.-' ,.--'`     `""`
+     ( ,.--'`   ',__/|)  `-. '.  `.   /   _
+     _`) )  .---.__.' /   `. `. \_  `-'  /`.)
+    `)_')  /        /     `.  `\  \ `'  /
+     `'''  |  _    |       `. `. `.  /`
+            ;  \   '.        `. `. `./
+             \  '.   \         `. `.  `-._     _
+              '.  `'. `.         `-. `.    `.__/
+                `'.  `\ `.         `.  `-.
+                   `'  \ `;          `-._`.
+                        ` \               `'
+OCTOPUS
+    echo -e "${RESET}"
+    echo ""
+    echo -e "  ${PURPLE}╭──────────────────────────────────────────────────────╮${RESET}"
+    echo -e "  ${PURPLE}│${RESET}                                                      ${PURPLE}│${RESET}"
+    echo -e "  ${PURPLE}│${RESET}   ${CYAN}${BOLD}TentaCLAW OS${RESET}  ${DIM}v1.0.0${RESET}                              ${PURPLE}│${RESET}"
+    echo -e "  ${PURPLE}│${RESET}   ${DIM}The AI inference cluster operating system${RESET}          ${PURPLE}│${RESET}"
+    echo -e "  ${PURPLE}│${RESET}                                                      ${PURPLE}│${RESET}"
+    echo -e "  ${PURPLE}│${RESET}   ${DIM}Eight arms. One mind. Zero compromises.${RESET}           ${PURPLE}│${RESET}"
+    echo -e "  ${PURPLE}│${RESET}                                                      ${PURPLE}│${RESET}"
+    echo -e "  ${PURPLE}╰──────────────────────────────────────────────────────╯${RESET}"
+    echo ""
+}
+
+# ──────────────────────────────────────────────────────────────────
+# Detect OS and package manager
+# ──────────────────────────────────────────────────────────────────
+detect_os() {
+    echo -e "  ${BOLD}Detecting system...${RESET}"
+    echo ""
+
+    if [[ "${OSTYPE:-}" == "darwin"* ]]; then
+        OS_TYPE="macos"
+        if command_exists brew; then
+            PKG_MANAGER="brew"
+        else
+            PKG_MANAGER="none"
+        fi
+        ok "macOS detected"
+        if [ -z "$INSTALL_DIR" ]; then INSTALL_DIR="$HOME/TentaCLAW"; fi
+
+    elif [ -f /etc/os-release ]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        case "${ID:-}" in
+            ubuntu|debian|pop|linuxmint|elementary|zorin|neon|kali)
+                OS_TYPE="debian"
+                PKG_MANAGER="apt"
+                ok "$PRETTY_NAME detected (apt)"
+                ;;
+            fedora)
+                OS_TYPE="fedora"
+                PKG_MANAGER="dnf"
+                ok "$PRETTY_NAME detected (dnf)"
+                ;;
+            rhel|centos|rocky|alma|ol)
+                OS_TYPE="rhel"
+                if command_exists dnf; then PKG_MANAGER="dnf"
+                else PKG_MANAGER="yum"
+                fi
+                ok "$PRETTY_NAME detected ($PKG_MANAGER)"
+                ;;
+            arch|manjaro|endeavouros|garuda|artix)
+                OS_TYPE="arch"
+                PKG_MANAGER="pacman"
+                ok "$PRETTY_NAME detected (pacman)"
+                ;;
+            opensuse*|sles)
+                OS_TYPE="suse"
+                PKG_MANAGER="zypper"
+                ok "$PRETTY_NAME detected (zypper)"
+                ;;
+            alpine)
+                OS_TYPE="alpine"
+                PKG_MANAGER="apk"
+                ok "$PRETTY_NAME detected (apk)"
+                ;;
+            *)
+                OS_TYPE="linux-other"
+                # Probe for package manager
+                if command_exists apt-get;  then PKG_MANAGER="apt"
+                elif command_exists dnf;    then PKG_MANAGER="dnf"
+                elif command_exists yum;    then PKG_MANAGER="yum"
+                elif command_exists pacman; then PKG_MANAGER="pacman"
+                elif command_exists zypper; then PKG_MANAGER="zypper"
+                elif command_exists apk;    then PKG_MANAGER="apk"
+                fi
+                ok "Linux detected ($PKG_MANAGER)"
+                ;;
+        esac
+
+        # Set default install dir for Linux
+        if [ -z "$INSTALL_DIR" ]; then
+            if [ "$(id -u)" = "0" ]; then
+                INSTALL_DIR="/opt/tentaclaw"
+            else
+                INSTALL_DIR="$HOME/TentaCLAW"
+            fi
+        fi
+
+    elif [[ "${OSTYPE:-}" == "msys" || "${OSTYPE:-}" == "cygwin" ]]; then
+        OS_TYPE="windows"
+        PKG_MANAGER="none"
+        ok "Windows (Git Bash/MSYS2) detected"
+        if [ -z "$INSTALL_DIR" ]; then INSTALL_DIR="$HOME/TentaCLAW"; fi
     else
-        echo -e "  ${RED}[x]${RESET} $1 not found"
-        return 1
+        OS_TYPE="unknown"
+        PKG_MANAGER="none"
+        warn "Unknown OS — will attempt generic install"
+        if [ -z "$INSTALL_DIR" ]; then INSTALL_DIR="$HOME/TentaCLAW"; fi
+    fi
+
+    info "Install directory: $INSTALL_DIR"
+    echo ""
+}
+
+# ──────────────────────────────────────────────────────────────────
+# Install Node.js if missing
+# ──────────────────────────────────────────────────────────────────
+ensure_node() {
+    echo -e "  ${BOLD}Checking prerequisites...${RESET}"
+    echo ""
+
+    # ── Git ──
+    if command_exists git; then
+        ok "git $(git --version 2>/dev/null | awk '{print $3}')"
+    else
+        info "Installing git..."
+        case "$PKG_MANAGER" in
+            apt)     sudo apt-get update -qq && sudo apt-get install -y -qq git >/dev/null 2>&1 ;;
+            dnf)     sudo dnf install -y -q git >/dev/null 2>&1 ;;
+            yum)     sudo yum install -y -q git >/dev/null 2>&1 ;;
+            pacman)  sudo pacman -Sy --noconfirm git >/dev/null 2>&1 ;;
+            zypper)  sudo zypper install -y git >/dev/null 2>&1 ;;
+            apk)     sudo apk add --no-cache git >/dev/null 2>&1 ;;
+            brew)    brew install git >/dev/null 2>&1 ;;
+            *)       die "Cannot install git automatically. Install git and try again." ;;
+        esac
+        if command_exists git; then
+            ok "git installed"
+        else
+            die "Failed to install git. Install it manually and re-run."
+        fi
+    fi
+
+    # ── Node.js ──
+    if command_exists node; then
+        local node_ver
+        node_ver=$(node --version 2>/dev/null || echo "v0")
+        local major
+        major=$(echo "$node_ver" | sed 's/v//' | cut -d. -f1)
+
+        if [ "$major" -ge 18 ] 2>/dev/null; then
+            ok "Node.js $node_ver"
+            if [ "$major" -lt 20 ] 2>/dev/null; then
+                warn "Node.js 20+ recommended (current: $node_ver)"
+            fi
+        else
+            warn "Node.js $node_ver is too old (need 18+), upgrading..."
+            install_node
+        fi
+    else
+        info "Node.js not found — installing..."
+        install_node
+    fi
+
+    # ── npm ──
+    if command_exists npm; then
+        ok "npm $(npm --version 2>/dev/null)"
+    else
+        die "npm not found. It should come with Node.js — try reinstalling Node.js."
+    fi
+
+    echo ""
+}
+
+install_node() {
+    # Strategy 1: Use nvm (preferred — no sudo needed)
+    if command_exists nvm || [ -s "$HOME/.nvm/nvm.sh" ]; then
+        # shellcheck disable=SC1091
+        [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh"
+        nvm install 22 >/dev/null 2>&1
+        nvm use 22 >/dev/null 2>&1
+        if command_exists node; then
+            ok "Node.js $(node --version) installed via nvm"
+            return
+        fi
+    fi
+
+    # Strategy 2: Use system package manager
+    case "$PKG_MANAGER" in
+        apt)
+            curl -fsSL https://deb.nodesource.com/setup_22.x 2>/dev/null | sudo -E bash - >/dev/null 2>&1
+            sudo apt-get install -y -qq nodejs >/dev/null 2>&1
+            ;;
+        dnf)
+            curl -fsSL https://rpm.nodesource.com/setup_22.x 2>/dev/null | sudo bash - >/dev/null 2>&1
+            sudo dnf install -y -q nodejs >/dev/null 2>&1
+            ;;
+        yum)
+            curl -fsSL https://rpm.nodesource.com/setup_22.x 2>/dev/null | sudo bash - >/dev/null 2>&1
+            sudo yum install -y -q nodejs >/dev/null 2>&1
+            ;;
+        pacman)
+            sudo pacman -Sy --noconfirm nodejs npm >/dev/null 2>&1
+            ;;
+        zypper)
+            sudo zypper install -y nodejs22 npm22 >/dev/null 2>&1 || {
+                curl -fsSL https://rpm.nodesource.com/setup_22.x 2>/dev/null | sudo bash - >/dev/null 2>&1
+                sudo zypper install -y nodejs >/dev/null 2>&1
+            }
+            ;;
+        apk)
+            sudo apk add --no-cache nodejs npm >/dev/null 2>&1
+            ;;
+        brew)
+            brew install node@22 >/dev/null 2>&1 || brew install node >/dev/null 2>&1
+            ;;
+        *)
+            # Strategy 3: Install nvm, then Node
+            info "Installing nvm (Node Version Manager)..."
+            curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh 2>/dev/null | bash >/dev/null 2>&1
+            export NVM_DIR="$HOME/.nvm"
+            # shellcheck disable=SC1091
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+            if command_exists nvm; then
+                nvm install 22 >/dev/null 2>&1
+                nvm use 22 >/dev/null 2>&1
+            fi
+            ;;
+    esac
+
+    if command_exists node; then
+        ok "Node.js $(node --version) installed"
+    else
+        die "Could not install Node.js automatically.\n  Install Node.js 20+ from: https://nodejs.org/en/download\n  Or via nvm: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash"
     fi
 }
 
-MISSING=0
-check_cmd git || MISSING=1
-check_cmd node || MISSING=1
-check_cmd npm || MISSING=1
-
-if [ "$MISSING" -eq 1 ]; then
+# ──────────────────────────────────────────────────────────────────
+# Clone or update the repository
+# ──────────────────────────────────────────────────────────────────
+clone_repo() {
+    echo -e "  ${BOLD}Installing TentaCLAW OS...${RESET}"
     echo ""
-    echo -e "  ${RED}Missing prerequisites.${RESET} Install Node.js 22+ and git first:"
-    echo -e "  ${DIM}  curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -${RESET}"
-    echo -e "  ${DIM}  sudo apt-get install -y nodejs git${RESET}"
+
+    if [ -d "$INSTALL_DIR/.git" ]; then
+        ok "Existing installation found at $INSTALL_DIR"
+        info "Pulling latest changes..."
+        (cd "$INSTALL_DIR" && git pull --ff-only 2>/dev/null) || {
+            warn "git pull failed — continuing with existing version"
+        }
+    else
+        info "Cloning repository..."
+        local parent_dir
+        parent_dir=$(dirname "$INSTALL_DIR")
+
+        # Create parent directory with appropriate permissions
+        if [ ! -d "$parent_dir" ]; then
+            if [ -w "$(dirname "$parent_dir")" ] || [ "$(id -u)" = "0" ]; then
+                mkdir -p "$parent_dir"
+            else
+                sudo mkdir -p "$parent_dir"
+                sudo chown "$(whoami):$(id -gn)" "$parent_dir"
+            fi
+        fi
+
+        git clone --depth 1 "$REPO_URL" "$INSTALL_DIR" 2>/dev/null || {
+            die "Failed to clone repository.\n  Check your internet connection and try again.\n  Or: git clone $REPO_URL \"$INSTALL_DIR\""
+        }
+        ok "Repository cloned to $INSTALL_DIR"
+    fi
+
     echo ""
-    exit 1
-fi
+}
 
-echo ""
+# ──────────────────────────────────────────────────────────────────
+# Install npm dependencies for all packages
+# ──────────────────────────────────────────────────────────────────
+install_deps() {
+    echo -e "  ${BOLD}Installing dependencies...${RESET}"
+    echo ""
 
-# Clone or update
-INSTALL_DIR="${HOME}/TentaCLAW"
-if [ -d "$INSTALL_DIR" ]; then
-    echo -e "  ${TEAL}[+]${RESET} Updating existing installation..."
-    cd "$INSTALL_DIR" && git pull --quiet
-else
-    echo -e "  ${TEAL}[+]${RESET} Cloning TentaCLAW OS..."
-    git clone --quiet https://github.com/TentaCLAW-OS/TentaCLAW.git "$INSTALL_DIR"
-fi
+    for pkg in gateway agent cli; do
+        if [ -d "$INSTALL_DIR/$pkg" ] && [ -f "$INSTALL_DIR/$pkg/package.json" ]; then
+            info "npm install in $pkg/..."
+            (cd "$INSTALL_DIR/$pkg" && npm install --silent 2>/dev/null) || {
+                warn "$pkg dependency install had warnings (may still work)"
+            }
+            ok "$pkg dependencies installed"
+        fi
+    done
 
-cd "$INSTALL_DIR"
+    echo ""
+}
 
-# Install dependencies
-echo -e "  ${TEAL}[+]${RESET} Installing gateway dependencies..."
-cd gateway && npm install --silent 2>/dev/null
-cd ..
+# ──────────────────────────────────────────────────────────────────
+# Build CLI and symlink to PATH
+# ──────────────────────────────────────────────────────────────────
+setup_cli() {
+    echo -e "  ${BOLD}Setting up CLAWtopus CLI...${RESET}"
+    echo ""
 
-echo -e "  ${TEAL}[+]${RESET} Installing agent dependencies..."
-cd agent && npm install --silent 2>/dev/null
-cd ..
+    local cli_dir="$INSTALL_DIR/cli"
 
-echo ""
-echo -e "  ${GREEN}[+] TentaCLAW OS installed!${RESET}"
-echo ""
-echo -e "  ${TEAL}Start the gateway:${RESET}"
-echo -e "    cd ${INSTALL_DIR}/gateway && npm run dev"
-echo ""
-echo -e "  ${TEAL}Start a mock agent:${RESET}"
-echo -e "    cd ${INSTALL_DIR}/agent && npx tsx src/index.ts --mock"
-echo ""
-echo -e "  ${TEAL}Open dashboard:${RESET}"
-echo -e "    http://localhost:8080/dashboard"
-echo ""
-echo -e "  ${DIM}CLAWtopus says: \"Welcome aboard. I've got arms for that.\" 🐙${RESET}"
-echo ""
+    if [ ! -f "$cli_dir/package.json" ]; then
+        warn "CLI package not found — skipping"
+        return
+    fi
+
+    # Build TypeScript
+    if [ -f "$cli_dir/tsconfig.json" ]; then
+        info "Building CLI..."
+        (cd "$cli_dir" && npx tsc 2>/dev/null) || {
+            warn "TypeScript build had issues — CLI may work via tsx instead"
+        }
+    fi
+
+    # Try to symlink clawtopus to PATH
+    local symlink_target=""
+    local bin_dir=""
+
+    # Determine the best bin directory
+    if [ -d "$HOME/.local/bin" ]; then
+        bin_dir="$HOME/.local/bin"
+    elif [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
+        bin_dir="/usr/local/bin"
+    elif [ "$(id -u)" = "0" ] && [ -d "/usr/local/bin" ]; then
+        bin_dir="/usr/local/bin"
+    else
+        # Create ~/.local/bin if it doesn't exist
+        bin_dir="$HOME/.local/bin"
+        mkdir -p "$bin_dir"
+    fi
+
+    # Determine the target (compiled JS or tsx wrapper)
+    if [ -f "$cli_dir/dist/index.js" ]; then
+        symlink_target="$cli_dir/dist/index.js"
+    else
+        # Create a wrapper script that uses tsx
+        local wrapper="$cli_dir/clawtopus-wrapper.sh"
+        cat > "$wrapper" << WRAPPER
+#!/bin/bash
+cd "$cli_dir" && exec npx tsx src/index.ts "\$@"
+WRAPPER
+        chmod +x "$wrapper"
+        symlink_target="$wrapper"
+    fi
+
+    # Create symlink
+    if [ -n "$bin_dir" ] && [ -n "$symlink_target" ]; then
+        if [ -w "$bin_dir" ]; then
+            ln -sf "$symlink_target" "$bin_dir/clawtopus" 2>/dev/null || true
+            ln -sf "$symlink_target" "$bin_dir/tentaclaw" 2>/dev/null || true
+        elif [ "$(id -u)" = "0" ] || command_exists sudo; then
+            sudo ln -sf "$symlink_target" "$bin_dir/clawtopus" 2>/dev/null || true
+            sudo ln -sf "$symlink_target" "$bin_dir/tentaclaw" 2>/dev/null || true
+        fi
+
+        if [ -L "$bin_dir/clawtopus" ]; then
+            ok "clawtopus CLI linked to $bin_dir/clawtopus"
+
+            # Check if bin_dir is in PATH
+            if ! echo "$PATH" | tr ':' '\n' | grep -q "^$bin_dir$"; then
+                warn "$bin_dir is not in your PATH"
+                info "Add to your shell config:"
+                info "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
+            fi
+        else
+            warn "Could not symlink CLI (try: npm link in $cli_dir)"
+        fi
+    fi
+
+    echo ""
+}
+
+# ──────────────────────────────────────────────────────────────────
+# Launch the setup wizard
+# ──────────────────────────────────────────────────────────────────
+launch_wizard() {
+    if $NO_WIZARD; then
+        print_manual_instructions
+        return
+    fi
+
+    local wizard="$INSTALL_DIR/scripts/setup-wizard.sh"
+
+    if [ -f "$wizard" ]; then
+        chmod +x "$wizard"
+        echo ""
+        echo -e "  ${PURPLE}${BOLD}Launching setup wizard...${RESET}"
+        echo ""
+        # shellcheck disable=SC2086
+        bash "$wizard" $WIZARD_FLAGS
+    else
+        warn "Setup wizard not found at $wizard"
+        print_manual_instructions
+    fi
+}
+
+# ──────────────────────────────────────────────────────────────────
+# Manual instructions (if wizard is skipped)
+# ──────────────────────────────────────────────────────────────────
+print_manual_instructions() {
+    echo ""
+    echo -e "  ${PURPLE}╭──────────────────────────────────────────────────────╮${RESET}"
+    echo -e "  ${PURPLE}│${RESET}                                                      ${PURPLE}│${RESET}"
+    echo -e "  ${PURPLE}│${RESET}   ${GREEN}${BOLD}TentaCLAW OS installed successfully!${RESET}                ${PURPLE}│${RESET}"
+    echo -e "  ${PURPLE}│${RESET}                                                      ${PURPLE}│${RESET}"
+    echo -e "  ${PURPLE}╰──────────────────────────────────────────────────────╯${RESET}"
+    echo ""
+    echo -e "  ${BOLD}Location:${RESET}  $INSTALL_DIR"
+    echo ""
+    echo -e "  ${BOLD}Quick start:${RESET}"
+    echo -e "    ${CYAN}cd $INSTALL_DIR && bash scripts/quickstart.sh${RESET}"
+    echo ""
+    echo -e "  ${BOLD}Or start manually:${RESET}"
+    echo -e "    ${DIM}# Terminal 1: Gateway${RESET}"
+    echo -e "    cd $INSTALL_DIR/gateway && npm run dev"
+    echo ""
+    echo -e "    ${DIM}# Terminal 2: Agent${RESET}"
+    echo -e "    cd $INSTALL_DIR/agent && npm run dev"
+    echo ""
+    echo -e "    ${DIM}# Open dashboard${RESET}"
+    echo -e "    http://localhost:8080/dashboard"
+    echo ""
+    echo -e "  ${BOLD}Run the setup wizard later:${RESET}"
+    echo -e "    ${CYAN}bash $INSTALL_DIR/scripts/setup-wizard.sh${RESET}"
+    echo ""
+    echo -e "  ${DIM}Docs: https://tentaclaw.io/docs${RESET}"
+    echo -e "  ${DIM}GitHub: https://github.com/TentaCLAW-OS/TentaCLAW${RESET}"
+    echo ""
+    echo -e "  ${DIM}CLAWtopus says: \"Welcome aboard. I've got arms for that.\"${RESET}"
+    echo ""
+}
+
+# ══════════════════════════════════════════════════════════════════
+# Main
+# ══════════════════════════════════════════════════════════════════
+main() {
+    print_splash
+    detect_os
+    ensure_node
+    clone_repo
+    install_deps
+    setup_cli
+    launch_wizard
+}
+
+main "$@"
