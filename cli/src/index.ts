@@ -2658,6 +2658,209 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
             break;
         }
 
+        case 'finetune': {
+            const sub = parsed.positional[0];
+            switch (sub) {
+                case 'create': {
+                    const base = parsed.flags['base'] || parsed.positional[1];
+                    const data = parsed.flags['data'] || parsed.flags['dataset'];
+                    const method = parsed.flags['method'] || 'qlora';
+                    const output = parsed.flags['output'] || 'my-finetuned-model';
+                    if (!base || !data) {
+                        console.error(C.red('  Usage: clawtopus finetune create --base <model> --data <path> [--method qlora] [--output name]'));
+                        process.exit(1);
+                    }
+                    console.log('');
+                    console.log('  ' + C.teal('\uD83D\uDC19') + ' Starting fine-tune job...');
+                    console.log('  ' + C.dim('Base model: ') + C.white(base));
+                    console.log('  ' + C.dim('Dataset:    ') + C.white(data));
+                    console.log('  ' + C.dim('Method:     ') + C.white(method));
+                    console.log('  ' + C.dim('Output:     ') + C.white(output));
+                    const job = await apiPost(gateway, '/api/v1/finetune/jobs', { baseModel: base, dataset: data, method, outputModel: output }) as { id: string };
+                    console.log('  ' + C.green('\u2714') + ' Job created: ' + C.white(job.id));
+                    console.log('  ' + C.dim('"Your data. Your model. Your hardware." \u2014 CLAWtopus'));
+                    console.log('');
+                    break;
+                }
+                case 'status':
+                case 'list': {
+                    const jobs = await apiGet(gateway, '/api/v1/finetune/jobs') as Array<{ id: string; config: { baseModel: string; method: string }; status: string; progress: { currentEpoch: number; totalEpochs: number; loss: number } }>;
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('FINE-TUNE JOBS')));
+                    console.log('');
+                    if (jobs.length === 0) {
+                        console.log('  ' + C.dim('No jobs. Start one: clawtopus finetune create --base llama3.1:8b --data ./data.jsonl'));
+                    }
+                    for (const j of jobs) {
+                        const statusColor = j.status === 'completed' ? C.green : j.status === 'training' ? C.yellow : j.status === 'failed' ? C.red : C.dim;
+                        console.log('  ' + C.white(j.id) + '  ' + statusColor(j.status) + '  ' + C.dim(j.config.baseModel + ' / ' + j.config.method));
+                        if (j.progress && j.status === 'training') {
+                            console.log('    Epoch ' + j.progress.currentEpoch + '/' + j.progress.totalEpochs + '  Loss: ' + (j.progress.loss || 0).toFixed(4));
+                        }
+                    }
+                    console.log('');
+                    break;
+                }
+                case 'cancel': {
+                    const jobId = parsed.positional[1];
+                    if (!jobId) { console.error(C.red('  Usage: clawtopus finetune cancel <job-id>')); process.exit(1); }
+                    await apiPost(gateway, `/api/v1/finetune/jobs/${encodeURIComponent(jobId)}/cancel`, {});
+                    console.log('  ' + C.yellow('\u26A0') + ' Job ' + C.white(jobId) + ' cancelled');
+                    break;
+                }
+                default:
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('FINE-TUNE COMMANDS')));
+                    console.log('');
+                    console.log('    ' + C.green('finetune create') + '  --base <model> --data <path> --method qlora');
+                    console.log('    ' + C.green('finetune status') + '  List all fine-tune jobs');
+                    console.log('    ' + C.green('finetune cancel') + '  <job-id>');
+                    console.log('');
+            }
+            break;
+        }
+
+        case 'benchmark': {
+            const sub = parsed.positional[0];
+            switch (sub) {
+                case 'run': {
+                    const model = parsed.flags['model'] || parsed.positional[1];
+                    const suite = parsed.flags['suite'] || 'standard';
+                    if (!model) { console.error(C.red('  Usage: clawtopus benchmark run --model <name> [--suite standard]')); process.exit(1); }
+                    console.log('');
+                    console.log('  ' + C.teal('\uD83D\uDC19') + ' Running benchmark: ' + C.white(suite) + ' on ' + C.white(model));
+                    const run = await apiPost(gateway, '/api/v1/benchmarks/run', { model, suite }) as { id: string };
+                    console.log('  ' + C.green('\u2714') + ' Benchmark started: ' + C.white(run.id));
+                    console.log('  ' + C.dim('"Numbers don\'t lie." \u2014 CLAWtopus'));
+                    console.log('');
+                    break;
+                }
+                case 'results':
+                case 'list': {
+                    const runs = await apiGet(gateway, '/api/v1/benchmarks/runs') as Array<{ id: string; model: string; suite: string; status: string; results?: { overall_score: number } }>;
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('BENCHMARK RESULTS')));
+                    console.log('');
+                    for (const r of runs) {
+                        const score = r.results ? C.teal(r.results.overall_score + '/100') : C.dim('pending');
+                        console.log('  ' + padRight(C.white(r.model), 25) + padRight(C.dim(r.suite), 15) + padRight(score, 12) + (r.status === 'completed' ? C.green('done') : C.yellow(r.status)));
+                    }
+                    console.log('');
+                    break;
+                }
+                case 'compare': {
+                    const m1 = parsed.positional[1];
+                    const m2 = parsed.positional[2];
+                    if (!m1 || !m2) { console.error(C.red('  Usage: clawtopus benchmark compare <model1> <model2>')); process.exit(1); }
+                    console.log('  ' + C.teal('\uD83D\uDC19') + ' Comparing ' + C.white(m1) + ' vs ' + C.white(m2) + '...');
+                    console.log('  ' + C.dim('(Feature in progress — check dashboard for visual comparison)'));
+                    break;
+                }
+                default:
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('BENCHMARK COMMANDS')));
+                    console.log('');
+                    console.log('    ' + C.green('benchmark run') + '     --model <name> [--suite standard|code|reasoning]');
+                    console.log('    ' + C.green('benchmark results') + ' List all benchmark runs');
+                    console.log('    ' + C.green('benchmark compare') + ' <model1> <model2>');
+                    console.log('');
+            }
+            break;
+        }
+
+        case 'namespace': {
+            const sub = parsed.positional[0];
+            switch (sub) {
+                case 'create': {
+                    const name = parsed.positional[1];
+                    if (!name) { console.error(C.red('  Usage: clawtopus namespace create <name>')); process.exit(1); }
+                    const ns = await apiPost(gateway, '/api/v1/namespaces', { name }) as { name: string };
+                    console.log('  ' + C.green('\u2714') + ' Namespace created: ' + C.white(ns.name));
+                    console.log('  ' + C.dim('"Every family has territories." \u2014 CLAWtopus'));
+                    break;
+                }
+                case 'list':
+                case undefined: {
+                    const nss = await apiGet(gateway, '/api/v1/namespaces') as Array<{ name: string; display_name?: string }>;
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('NAMESPACES')));
+                    console.log('');
+                    for (const ns of nss) {
+                        console.log('  ' + C.white(ns.name) + (ns.display_name ? C.dim(' — ' + ns.display_name) : ''));
+                    }
+                    console.log('');
+                    break;
+                }
+                case 'delete': {
+                    const name = parsed.positional[1];
+                    if (!name) { console.error(C.red('  Usage: clawtopus namespace delete <name>')); process.exit(1); }
+                    await apiPost(gateway, `/api/v1/namespaces/${encodeURIComponent(name)}/delete`, {}).catch(() => apiGet(gateway, `/api/v1/namespaces/${encodeURIComponent(name)}`));
+                    console.log('  ' + C.green('\u2714') + ' Namespace deleted: ' + C.white(name));
+                    break;
+                }
+                default:
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('NAMESPACE COMMANDS')));
+                    console.log('');
+                    console.log('    ' + C.green('namespace create') + ' <name>');
+                    console.log('    ' + C.green('namespace list'));
+                    console.log('    ' + C.green('namespace delete') + ' <name>');
+                    console.log('');
+            }
+            break;
+        }
+
+        case 'apply': {
+            const file = parsed.flags['f'] || parsed.flags['file'] || parsed.positional[0];
+            if (!file) {
+                console.error(C.red('  Usage: clawtopus apply -f deployment.yaml'));
+                process.exit(1);
+            }
+            console.log('');
+            console.log('  ' + C.teal('\uD83D\uDC19') + ' Applying ' + C.white(file) + '...');
+            // Read YAML file and POST to declarative API
+            try {
+                const fs = await import('fs');
+                const content = fs.readFileSync(file, 'utf-8');
+                const result = await apiPost(gateway, '/api/v2/deployments', JSON.parse(content)) as { name: string; status: string };
+                console.log('  ' + C.green('\u2714') + ' Deployment applied: ' + C.white(result.name));
+                console.log('  ' + C.dim('"You declare. I reconcile." \u2014 CLAWtopus'));
+            } catch (err) {
+                console.error('  ' + C.red('\u2718 Failed: ') + (err instanceof Error ? err.message : String(err)));
+            }
+            console.log('');
+            break;
+        }
+
+        case 'deployments': {
+            const deps = await apiGet(gateway, '/api/v2/deployments') as Array<{ metadata: { name: string; namespace: string }; spec: { model: string; replicas: number }; status?: { phase: string; readyReplicas: number } }>;
+            console.log('');
+            console.log('  ' + C.teal(C.bold('DEPLOYMENTS')) + C.dim(' (declarative)'));
+            console.log('');
+            for (const d of deps) {
+                const phase = d.status?.phase || 'Unknown';
+                const phaseColor = phase === 'Running' ? C.green : phase === 'Degraded' ? C.yellow : phase === 'Failed' ? C.red : C.dim;
+                const ready = d.status?.readyReplicas || 0;
+                console.log('  ' + padRight(C.white(d.metadata.name), 25) + padRight(C.dim(d.metadata.namespace), 15) + padRight(C.teal(d.spec.model), 25) + phaseColor(phase) + C.dim(' ' + ready + '/' + d.spec.replicas));
+            }
+            if (deps.length === 0) console.log('  ' + C.dim('No deployments. Apply one: clawtopus apply -f deployment.yaml'));
+            console.log('');
+            break;
+        }
+
+        case 'adapters': {
+            const adapters = await apiGet(gateway, '/api/v1/adapters') as Array<{ name: string; baseModel: string; method: string; sizeMb: number }>;
+            console.log('');
+            console.log('  ' + C.teal(C.bold('LORA ADAPTERS')));
+            console.log('');
+            for (const a of adapters) {
+                console.log('  ' + padRight(C.white(a.name), 30) + padRight(C.dim(a.baseModel), 25) + C.dim(a.method + ' / ' + a.sizeMb + 'MB'));
+            }
+            if (adapters.length === 0) console.log('  ' + C.dim('No adapters. Fine-tune one: clawtopus finetune create --base llama3.1:8b --data ./data.jsonl'));
+            console.log('');
+            break;
+        }
+
         case 'help':
         case '--help':
         case '-h':
