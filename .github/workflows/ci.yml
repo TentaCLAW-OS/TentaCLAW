@@ -1,0 +1,224 @@
+# =============================================================================
+# TentaCLAW OS — Continuous Integration
+# =============================================================================
+# Fast parallel checks: lint, typecheck, test, and build verification.
+# Runs on every push to master and on all pull requests.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: '22'
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lint — ESLint across the entire project
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache root node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: root-deps-${{ hashFiles('package-lock.json') }}
+          restore-keys: root-deps-
+
+      - name: Cache gateway node_modules
+        uses: actions/cache@v4
+        with:
+          path: gateway/node_modules
+          key: gateway-deps-${{ hashFiles('gateway/package-lock.json') }}
+          restore-keys: gateway-deps-
+
+      - name: Cache cli node_modules
+        uses: actions/cache@v4
+        with:
+          path: cli/node_modules
+          key: cli-deps-${{ hashFiles('cli/package-lock.json') }}
+          restore-keys: cli-deps-
+
+      - name: Cache dashboard node_modules
+        uses: actions/cache@v4
+        with:
+          path: dashboard/node_modules
+          key: dashboard-deps-${{ hashFiles('dashboard/package-lock.json') }}
+          restore-keys: dashboard-deps-
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run ESLint
+        run: npm run lint
+
+  # ---------------------------------------------------------------------------
+  # Typecheck — TypeScript compile check for all packages
+  # ---------------------------------------------------------------------------
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache gateway node_modules
+        uses: actions/cache@v4
+        with:
+          path: gateway/node_modules
+          key: gateway-deps-${{ hashFiles('gateway/package-lock.json') }}
+          restore-keys: gateway-deps-
+
+      - name: Cache dashboard node_modules
+        uses: actions/cache@v4
+        with:
+          path: dashboard/node_modules
+          key: dashboard-deps-${{ hashFiles('dashboard/package-lock.json') }}
+          restore-keys: dashboard-deps-
+
+      - name: Cache cli node_modules
+        uses: actions/cache@v4
+        with:
+          path: cli/node_modules
+          key: cli-deps-${{ hashFiles('cli/package-lock.json') }}
+          restore-keys: cli-deps-
+
+      - name: Install gateway dependencies
+        run: cd gateway && npm ci
+
+      - name: Install dashboard dependencies
+        run: cd dashboard && npm install
+
+      - name: Install CLI dependencies
+        run: cd cli && npm ci
+
+      - name: Typecheck gateway
+        run: cd gateway && npx tsc --noEmit
+
+      - name: Typecheck dashboard
+        run: cd dashboard && npx tsc --noEmit
+
+      - name: Typecheck CLI
+        run: cd cli && npx tsc --noEmit
+
+  # ---------------------------------------------------------------------------
+  # Test — Run gateway tests
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache gateway node_modules
+        uses: actions/cache@v4
+        with:
+          path: gateway/node_modules
+          key: gateway-deps-${{ hashFiles('gateway/package-lock.json') }}
+          restore-keys: gateway-deps-
+
+      - name: Install gateway dependencies
+        run: cd gateway && npm ci
+
+      - name: Run gateway tests
+        run: cd gateway && npm test
+        env:
+          CI: true
+
+  # ---------------------------------------------------------------------------
+  # Build Dashboard — Build the React dashboard
+  # ---------------------------------------------------------------------------
+  build-dashboard:
+    name: Build Dashboard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache dashboard node_modules
+        uses: actions/cache@v4
+        with:
+          path: dashboard/node_modules
+          key: dashboard-deps-${{ hashFiles('dashboard/package-lock.json') }}
+          restore-keys: dashboard-deps-
+
+      - name: Install dashboard dependencies
+        run: cd dashboard && npm install
+
+      - name: Build dashboard
+        run: cd dashboard && npm run build
+
+  # ---------------------------------------------------------------------------
+  # Build CLI — Compile the CLI with TypeScript
+  # ---------------------------------------------------------------------------
+  build-cli:
+    name: Build CLI
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache cli node_modules
+        uses: actions/cache@v4
+        with:
+          path: cli/node_modules
+          key: cli-deps-${{ hashFiles('cli/package-lock.json') }}
+          restore-keys: cli-deps-
+
+      - name: Install CLI dependencies
+        run: cd cli && npm ci
+
+      - name: Build CLI
+        run: cd cli && npx tsc

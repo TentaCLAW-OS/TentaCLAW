@@ -1,0 +1,158 @@
+# =============================================================================
+# TentaCLAW OS — Release on Tag
+# =============================================================================
+# Builds all components and creates a GitHub Release with artifacts
+# when a version tag (v*) is pushed.
+#
+# Security: github.ref_name (tag) is set by authenticated pushers with write
+# access. Changelog is written to GITHUB_OUTPUT, never executed as shell.
+# =============================================================================
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  release:
+    name: Build & Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # -- Derive version from tag --
+      - name: Set VERSION env
+        run: echo "VERSION=${{ github.ref_name }}" >> "$GITHUB_ENV"
+
+      # -- Cache all package node_modules --
+      - name: Cache gateway node_modules
+        uses: actions/cache@v4
+        with:
+          path: gateway/node_modules
+          key: gateway-deps-${{ hashFiles('gateway/package-lock.json') }}
+          restore-keys: gateway-deps-
+
+      - name: Cache dashboard node_modules
+        uses: actions/cache@v4
+        with:
+          path: dashboard/node_modules
+          key: dashboard-deps-${{ hashFiles('dashboard/package-lock.json') }}
+          restore-keys: dashboard-deps-
+
+      - name: Cache cli node_modules
+        uses: actions/cache@v4
+        with:
+          path: cli/node_modules
+          key: cli-deps-${{ hashFiles('cli/package-lock.json') }}
+          restore-keys: cli-deps-
+
+      # -- Install dependencies --
+      - name: Install gateway dependencies
+        run: cd gateway && npm ci
+
+      - name: Install dashboard dependencies
+        run: cd dashboard && npm install
+
+      - name: Install CLI dependencies
+        run: cd cli && npm ci
+
+      # -- Build all components --
+      - name: Build gateway
+        run: cd gateway && npm run build
+
+      - name: Build dashboard
+        run: cd dashboard && npm run build
+
+      - name: Build CLI
+        run: cd cli && npx tsc
+
+      # -- Package artifacts --
+      - name: Package gateway
+        run: |
+          mkdir -p artifacts/tentaclaw-gateway
+          cp -r gateway/dist gateway/package.json artifacts/tentaclaw-gateway/
+          cd artifacts && tar czf "tentaclaw-gateway-${VERSION}.tar.gz" tentaclaw-gateway/
+
+      - name: Package dashboard
+        run: |
+          mkdir -p artifacts/tentaclaw-dashboard
+          cp -r dashboard/dist artifacts/tentaclaw-dashboard/
+          cd artifacts && tar czf "tentaclaw-dashboard-${VERSION}.tar.gz" tentaclaw-dashboard/
+
+      - name: Package CLI
+        run: |
+          mkdir -p artifacts/tentaclaw-cli
+          cp -r cli/dist cli/package.json artifacts/tentaclaw-cli/
+          cd artifacts && tar czf "tentaclaw-cli-${VERSION}.tar.gz" tentaclaw-cli/
+
+      # -- Generate changelog from commits since last tag --
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            CHANGES=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges)
+          else
+            CHANGES=$(git log --pretty=format:"- %s (%h)" --no-merges -20)
+          fi
+          {
+            echo "changes<<EOF"
+            echo "$CHANGES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # -- Create GitHub Release --
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: TentaCLAW OS ${{ github.ref_name }}
+          body: |
+            ## TentaCLAW OS ${{ github.ref_name }}
+
+            **Eight arms. One mind. Zero compromises.**
+
+            ### What's Changed
+            ${{ steps.changelog.outputs.changes }}
+
+            ### Artifacts
+            | Package | Description |
+            |---------|-------------|
+            | `tentaclaw-gateway-${{ github.ref_name }}.tar.gz` | Gateway server (Hono + SQLite) |
+            | `tentaclaw-dashboard-${{ github.ref_name }}.tar.gz` | React dashboard (Vite build) |
+            | `tentaclaw-cli-${{ github.ref_name }}.tar.gz` | CLAWtopus CLI |
+
+            ### Quick Start
+            ```bash
+            # Gateway
+            tar xzf tentaclaw-gateway-${{ github.ref_name }}.tar.gz
+            cd tentaclaw-gateway && npm install --production && npm start
+
+            # CLI
+            tar xzf tentaclaw-cli-${{ github.ref_name }}.tar.gz
+            cd tentaclaw-cli && npm install --production
+            node dist/index.js --help
+            ```
+          files: |
+            artifacts/tentaclaw-gateway-${{ env.VERSION }}.tar.gz
+            artifacts/tentaclaw-dashboard-${{ env.VERSION }}.tar.gz
+            artifacts/tentaclaw-cli-${{ env.VERSION }}.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
