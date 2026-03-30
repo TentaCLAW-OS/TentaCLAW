@@ -17,6 +17,9 @@
 
 set -euo pipefail
 
+# Error trap — report the failing line on unexpected errors
+trap 'echo -e "${RED:-}Error on line $LINENO${RESET:-}"; exit 1' ERR
+
 # ──────────────────────────────────────────────────────────────────
 # Brand colors (24-bit true color)
 # ──────────────────────────────────────────────────────────────────
@@ -682,6 +685,9 @@ step_start_services() {
         if curl -sf "http://localhost:${GATEWAY_PORT}/api/v1/cluster" &>/dev/null; then
             ok "Gateway already running on port ${GATEWAY_PORT}"
             gateway_ok=true
+        elif command_exists lsof && lsof -i ":${GATEWAY_PORT}" > /dev/null 2>&1; then
+            fail "Port ${GATEWAY_PORT} already in use by another process"
+            info "Free the port or set TENTACLAW_PORT to a different value"
         else
             # Install deps if needed
             if [ ! -d "$INSTALL_DIR/gateway/node_modules" ]; then

@@ -16,6 +16,9 @@
 
 set -euo pipefail
 
+# Error trap — report the failing line on unexpected errors
+trap 'echo -e "${RED:-}Error on line $LINENO${RESET:-}"; exit 1' ERR
+
 # ──────────────────────────────────────────────────────────────────
 # Brand colors (24-bit true color)
 # ──────────────────────────────────────────────────────────────────
@@ -118,6 +121,34 @@ is_running() {
 }
 
 # ──────────────────────────────────────────────────────────────────
+# Graceful kill helper — SIGTERM first, then SIGKILL after timeout
+# ──────────────────────────────────────────────────────────────────
+graceful_kill() {
+    local pid="$1"
+    local label="${2:-process}"
+
+    # Send SIGTERM first
+    kill "$pid" 2>/dev/null || return 0
+
+    # Wait up to 5 seconds for graceful exit
+    local retries=10
+    while [ $retries -gt 0 ]; do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            return 0
+        fi
+        sleep 0.5 2>/dev/null || sleep 1
+        retries=$((retries - 1))
+    done
+
+    # Force kill if still alive
+    if kill -0 "$pid" 2>/dev/null; then
+        warn "$label (PID $pid) did not exit gracefully, sending SIGKILL..."
+        kill -9 "$pid" 2>/dev/null || true
+        sleep 1
+    fi
+}
+
+# ──────────────────────────────────────────────────────────────────
 # Stop all services
 # ──────────────────────────────────────────────────────────────────
 stop_services() {
@@ -127,33 +158,69 @@ stop_services() {
 
     local stopped=0
 
+    # ── Stop agent by PID file ──
     if is_running "$AGENT_PID_FILE"; then
         local pid
         pid=$(cat "$AGENT_PID_FILE")
-        kill "$pid" 2>/dev/null || true
+        graceful_kill "$pid" "Agent"
         rm -f "$AGENT_PID_FILE"
         ok "Agent stopped (PID $pid)"
         stopped=$((stopped + 1))
     fi
 
+    # ── Stop gateway by PID file ──
     if is_running "$GATEWAY_PID_FILE"; then
         local pid
         pid=$(cat "$GATEWAY_PID_FILE")
-        kill "$pid" 2>/dev/null || true
+        graceful_kill "$pid" "Gateway"
         rm -f "$GATEWAY_PID_FILE"
         ok "Gateway stopped (PID $pid)"
         stopped=$((stopped + 1))
     fi
 
-    # Also try to find and kill any orphaned processes
+    # ── Clean up stale PID files ──
+    for pid_file in "$PID_DIR"/*.pid; do
+        [ -f "$pid_file" ] || continue
+        local stale_pid
+        stale_pid=$(cat "$pid_file" 2>/dev/null || echo "")
+        if [ -n "$stale_pid" ] && ! kill -0 "$stale_pid" 2>/dev/null; then
+            rm -f "$pid_file"
+            info "Cleaned stale PID file: $(basename "$pid_file")"
+        fi
+    done
+
+    # ── Kill by port — find anything still holding the gateway port ──
+    if command_exists lsof; then
+        local port_pid
+        port_pid=$(lsof -ti ":${GATEWAY_PORT}" 2>/dev/null || true)
+        if [ -n "$port_pid" ]; then
+            echo "$port_pid" | while read -r pid; do
+                graceful_kill "$pid" "Process on port ${GATEWAY_PORT}"
+                ok "Killed process on port ${GATEWAY_PORT} (PID $pid)"
+                stopped=$((stopped + 1))
+            done
+        fi
+    elif command_exists ss; then
+        local port_pid
+        port_pid=$(ss -tlnp "sport = :${GATEWAY_PORT}" 2>/dev/null | sed -n 's/.*pid=\([0-9]*\).*/\1/p' || true)
+        if [ -n "$port_pid" ]; then
+            echo "$port_pid" | while read -r pid; do
+                graceful_kill "$pid" "Process on port ${GATEWAY_PORT}"
+                ok "Killed process on port ${GATEWAY_PORT} (PID $pid)"
+                stopped=$((stopped + 1))
+            done
+        fi
+    fi
+
+    # ── Also try to find and kill any orphaned processes ──
     local orphans
     orphans=$(pgrep -f "tentaclaw.*index.ts" 2>/dev/null || true)
     if [ -n "$orphans" ]; then
         echo "$orphans" | while read -r pid; do
-            kill "$pid" 2>/dev/null || true
-            stopped=$((stopped + 1))
+            graceful_kill "$pid" "Orphaned TentaCLAW process"
         done
         ok "Cleaned up orphaned processes"
+        stopped=$((stopped + 1))
     fi
 
     if [ "$stopped" -eq 0 ]; then
@@ -187,6 +254,20 @@ preflight() {
         fail "Node.js not found"
         info "Install Node.js 20+: https://nodejs.org"
         errors=$((errors + 1))
+    else
+        local node_ver
+        node_ver=$(node --version 2>/dev/null || echo "v0")
+        local major
+        major=$(echo "$node_ver" | sed 's/v//' | cut -d. -f1)
+        if [ "$major" -lt 18 ] 2>/dev/null; then
+            fail "Node.js $node_ver too old (need 18+)"
+            errors=$((errors + 1))
+        else
+            ok "Node.js $node_ver"
+            if [ "$major" -lt 20 ] 2>/dev/null; then
+                warn "Node.js 20+ recommended (current: $node_ver)"
+            fi
+        fi
     fi
 
     # Check npx
@@ -227,10 +308,46 @@ preflight() {
 }
 
 # ──────────────────────────────────────────────────────────────────
+# Port conflict detection
+# ──────────────────────────────────────────────────────────────────
+check_port_available() {
+    local port="$1"
+
+    # Try lsof first (macOS + most Linux)
+    if command_exists lsof; then
+        if lsof -i ":${port}" > /dev/null 2>&1; then
+            local occupant
+            occupant=$(lsof -i ":${port}" -t 2>/dev/null | head -1 || echo "unknown")
+            fail "Port ${port} already in use (PID: ${occupant})"
+            info "Is TentaCLAW already running?"
+            info "Run: $0 --stop"
+            info "Or use a different port: $0 --port <PORT>"
+            exit 1
+        fi
+    # Fall back to ss (minimal Linux / Alpine)
+    elif command_exists ss; then
+        if ss -tln "sport = :${port}" 2>/dev/null | grep -q ":${port}"; then
+            fail "Port ${port} already in use"
+            info "Is TentaCLAW already running?"
+            info "Run: $0 --stop"
+            info "Or use a different port: $0 --port <PORT>"
+            exit 1
+        fi
+    # Fall back to /dev/tcp probe (bash built-in)
+    elif (echo >/dev/tcp/127.0.0.1/"${port}") 2>/dev/null; then
+        fail "Port ${port} already in use"
+        info "Is TentaCLAW already running?"
+        info "Run: $0 --stop"
+        info "Or use a different port: $0 --port <PORT>"
+        exit 1
+    fi
+}
+
+# ──────────────────────────────────────────────────────────────────
 # Start gateway
 # ──────────────────────────────────────────────────────────────────
 start_gateway() {
-    # Check if already running
+    # Check if already running (our own gateway responding)
     if curl -sf "http://localhost:${GATEWAY_PORT}/api/v1/cluster" &>/dev/null; then
         ok "Gateway already running on port ${GATEWAY_PORT}"
         return 0
@@ -240,6 +357,9 @@ start_gateway() {
         ok "Gateway process exists (PID $(cat "$GATEWAY_PID_FILE"))"
         return 0
     fi
+
+    # Check for port conflicts before attempting to start
+    check_port_available "$GATEWAY_PORT"
 
     info "Starting gateway on port ${GATEWAY_PORT}..."
 

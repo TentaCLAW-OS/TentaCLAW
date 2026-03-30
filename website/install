@@ -8,7 +8,7 @@
 #
 # What this does:
 #   1. Shows the CLAWtopus splash
-#   2. Detects your OS (Ubuntu/Debian, Fedora/RHEL, Arch, macOS)
+#   2. Detects your OS (Ubuntu/Debian, Fedora, CentOS/RHEL, Arch, Alpine, macOS, WSL2)
 #   3. Installs Node.js if missing (via nvm or system package manager)
 #   4. Clones the TentaCLAW repo
 #   5. Installs dependencies (gateway, agent, cli)
@@ -25,6 +25,9 @@
 # =============================================================================
 
 set -euo pipefail
+
+# Error trap — report the failing line on unexpected errors
+trap 'echo -e "${RED:-}Error on line $LINENO${RESET:-}"; exit 1' ERR
 
 # ──────────────────────────────────────────────────────────────────
 # Brand colors (24-bit true color)
@@ -47,6 +50,7 @@ WIZARD_FLAGS=""
 REPO_URL="https://github.com/TentaCLAW-OS/TentaCLAW.git"
 OS_TYPE="unknown"
 PKG_MANAGER="unknown"
+IS_WSL=false
 
 # ──────────────────────────────────────────────────────────────────
 # Parse arguments
@@ -148,6 +152,14 @@ detect_os() {
     echo -e "  ${BOLD}Detecting system...${RESET}"
     echo ""
 
+    # ── Detect WSL2 early (it reports as Linux but needs special handling) ──
+    IS_WSL=false
+    if [ -f /proc/version ] && grep -qi "microsoft\|wsl" /proc/version 2>/dev/null; then
+        IS_WSL=true
+    elif [ -n "${WSL_DISTRO_NAME:-}" ]; then
+        IS_WSL=true
+    fi
+
     if [[ "${OSTYPE:-}" == "darwin"* ]]; then
         OS_TYPE="macos"
         if command_exists brew; then
@@ -155,44 +167,93 @@ detect_os() {
         else
             PKG_MANAGER="none"
         fi
-        ok "macOS detected"
+
+        # Detect architecture
+        local arch
+        arch=$(uname -m 2>/dev/null || echo "unknown")
+        case "$arch" in
+            arm64|aarch64) ok "macOS detected (Apple Silicon / arm64)" ;;
+            x86_64)        ok "macOS detected (Intel / x86_64)" ;;
+            *)             ok "macOS detected ($arch)" ;;
+        esac
+
+        if [ "$PKG_MANAGER" = "none" ]; then
+            warn "Homebrew not found — some features may require manual setup"
+            info "Install Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+        fi
+
         if [ -z "$INSTALL_DIR" ]; then INSTALL_DIR="$HOME/TentaCLAW"; fi
 
     elif [ -f /etc/os-release ]; then
         # shellcheck disable=SC1091
         . /etc/os-release
+        local wsl_note=""
+        if $IS_WSL; then wsl_note=" (WSL2)"; fi
+
         case "${ID:-}" in
-            ubuntu|debian|pop|linuxmint|elementary|zorin|neon|kali)
+            ubuntu|debian|pop|linuxmint|elementary|zorin|neon|kali|raspbian)
                 OS_TYPE="debian"
                 PKG_MANAGER="apt"
-                ok "$PRETTY_NAME detected (apt)"
+                ok "${PRETTY_NAME}${wsl_note} detected (apt)"
+
+                # Verify supported versions for Ubuntu/Debian
+                case "${ID:-}" in
+                    ubuntu)
+                        local ver="${VERSION_ID:-0}"
+                        case "$ver" in
+                            20.04|22.04|24.04|24.10) ;; # Supported
+                            *) info "Ubuntu $ver — not tested but should work (tested: 20.04, 22.04, 24.04)" ;;
+                        esac
+                        ;;
+                    debian)
+                        local ver="${VERSION_ID:-0}"
+                        case "$ver" in
+                            11|12) ;; # Supported
+                            *) info "Debian $ver — not tested but should work (tested: 11, 12)" ;;
+                        esac
+                        ;;
+                esac
                 ;;
             fedora)
                 OS_TYPE="fedora"
                 PKG_MANAGER="dnf"
-                ok "$PRETTY_NAME detected (dnf)"
+                ok "${PRETTY_NAME}${wsl_note} detected (dnf)"
+
+                local ver="${VERSION_ID:-0}"
+                case "$ver" in
+                    38|39|40|41) ;; # Supported
+                    *) info "Fedora $ver — not tested but should work (tested: 38, 39, 40)" ;;
+                esac
                 ;;
             rhel|centos|rocky|alma|ol)
                 OS_TYPE="rhel"
                 if command_exists dnf; then PKG_MANAGER="dnf"
                 else PKG_MANAGER="yum"
                 fi
-                ok "$PRETTY_NAME detected ($PKG_MANAGER)"
+                ok "${PRETTY_NAME}${wsl_note} detected ($PKG_MANAGER)"
+
+                # CentOS Stream 9 / RHEL 9 are the recommended targets
+                local ver="${VERSION_ID:-0}"
+                local major_ver="${ver%%.*}"
+                if [ "$major_ver" -lt 8 ] 2>/dev/null; then
+                    warn "RHEL/CentOS $ver is quite old — version 8+ recommended"
+                fi
                 ;;
             arch|manjaro|endeavouros|garuda|artix)
                 OS_TYPE="arch"
                 PKG_MANAGER="pacman"
-                ok "$PRETTY_NAME detected (pacman)"
+                ok "${PRETTY_NAME}${wsl_note} detected (pacman)"
                 ;;
             opensuse*|sles)
                 OS_TYPE="suse"
                 PKG_MANAGER="zypper"
-                ok "$PRETTY_NAME detected (zypper)"
+                ok "${PRETTY_NAME}${wsl_note} detected (zypper)"
                 ;;
             alpine)
                 OS_TYPE="alpine"
                 PKG_MANAGER="apk"
-                ok "$PRETTY_NAME detected (apk)"
+                ok "${PRETTY_NAME}${wsl_note} detected (apk)"
+                info "Alpine uses musl libc — some Node.js native modules may need --build-from-source"
                 ;;
             *)
                 OS_TYPE="linux-other"
@@ -204,9 +265,14 @@ detect_os() {
                 elif command_exists zypper; then PKG_MANAGER="zypper"
                 elif command_exists apk;    then PKG_MANAGER="apk"
                 fi
-                ok "Linux detected ($PKG_MANAGER)"
+                ok "Linux detected${wsl_note} ($PKG_MANAGER)"
                 ;;
         esac
+
+        if $IS_WSL; then
+            info "Running under WSL2 — GPU passthrough requires NVIDIA WSL drivers"
+            info "See: https://docs.nvidia.com/cuda/wsl-user-guide/"
+        fi
 
         # Set default install dir for Linux
         if [ -z "$INSTALL_DIR" ]; then
@@ -402,11 +468,16 @@ install_deps() {
 
     for pkg in gateway agent cli; do
         if [ -d "$INSTALL_DIR/$pkg" ] && [ -f "$INSTALL_DIR/$pkg/package.json" ]; then
-            info "npm install in $pkg/..."
-            (cd "$INSTALL_DIR/$pkg" && npm install --silent 2>/dev/null) || {
-                warn "$pkg dependency install had warnings (may still work)"
-            }
-            ok "$pkg dependencies installed"
+            # Skip if node_modules already exists and looks populated
+            if [ -d "$INSTALL_DIR/$pkg/node_modules" ] && [ "$(ls -A "$INSTALL_DIR/$pkg/node_modules" 2>/dev/null | head -1)" ]; then
+                ok "$pkg dependencies already installed"
+            else
+                info "npm install in $pkg/..."
+                (cd "$INSTALL_DIR/$pkg" && npm install --silent 2>/dev/null) || {
+                    warn "$pkg dependency install had warnings (may still work)"
+                }
+                ok "$pkg dependencies installed"
+            fi
         fi
     done
 
@@ -424,6 +495,12 @@ setup_cli() {
 
     if [ ! -f "$cli_dir/package.json" ]; then
         warn "CLI package not found — skipping"
+        return
+    fi
+
+    # Check if CLI is already set up and on PATH
+    if command_exists clawtopus; then
+        ok "CLAWtopus CLI already on PATH ($(command -v clawtopus))"
         return
     fi
 
