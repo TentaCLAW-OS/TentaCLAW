@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pricing — TentaCLAW OS</title>
+  <meta name="description" content="TentaCLAW OS pricing: Free forever for the community, Pro for teams, Enterprise for scale. Own your GPUs. Zero per-token fees.">
+  <meta name="theme-color" content="#040810">
+  <meta property="og:title" content="Pricing — TentaCLAW OS">
+  <meta property="og:description" content="Community free forever. Pro $29/node/mo. Enterprise $99/node/mo. No per-token fees. No vendor lock-in.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.tentaclaw.io/pricing">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --abyss: #040810;
+      --deep: #060a10;
+      --ocean: #0a1018;
+      --surface: #0e1520;
+      --panel: #121a28;
+      --border: rgba(0,212,170,0.12);
+      --border-dim: rgba(255,255,255,0.06);
+      --border-hover: rgba(0,212,170,0.25);
+      --teal: #00d4aa;
+      --teal-glow: rgba(0,212,170,0.3);
+      --teal-dim: rgba(0,212,170,0.08);
+      --purple: #8b5cf6;
+      --purple-glow: rgba(139,92,246,0.2);
+      --purple-dim: rgba(139,92,246,0.08);
+      --cyan: #22d3ee;
+      --green: #00ff88;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --text: #e8edf5;
+      --dim: #5a6a82;
+      --muted: #3a4a5f;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior: smooth; }
+    body { font-family:'Inter',sans-serif; background:var(--abyss); color:var(--text); overflow-x:hidden; -webkit-font-smoothing:antialiased; }
+    h1,h2,h3,h4,h5 { font-family:'Space Grotesk',sans-serif; }
+    ::selection { background:var(--purple); color:#fff; }
+    a { color:var(--teal); text-decoration:none; transition:color 0.2s; }
+    a:hover { color:#fff; }
+
+    /* ===== PARTICLES ===== */
+    .particles { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+    .particle { position:absolute; width:2px; height:2px; background:var(--teal); border-radius:50%; opacity:0; animation:drift linear infinite; }
+    @keyframes drift {
+      0% { opacity:0; transform:translateY(0) translateX(0); }
+      10% { opacity:0.5; }
+      90% { opacity:0.2; }
+      100% { opacity:0; transform:translateY(-100vh) translateX(60px); }
+    }
+
+    /* ===== GRID OVERLAY ===== */
+    .grid-overlay {
+      position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none;
+      background-image:
+        linear-gradient(rgba(0,212,170,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,170,0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 70% 50% at 50% 30%, black 0%, transparent 70%);
+      -webkit-mask-image: radial-gradient(ellipse 70% 50% at 50% 30%, black 0%, transparent 70%);
+    }
+
+    /* ===== NAV ===== */
+    nav {
+      position:fixed; top:0; left:0; right:0; z-index:100; padding:14px 0;
+      background:rgba(4,8,16,0.8); backdrop-filter:blur(24px) saturate(1.2);
+      border-bottom:1px solid var(--border-dim);
+    }
+    .nav-inner { max-width:1280px; margin:0 auto; padding:0 32px; display:flex; align-items:center; justify-content:space-between; }
+    .nav-logo { display:flex; align-items:center; gap:10px; font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:700; color:var(--text); text-decoration:none; }
+    .nav-logo span { color:var(--teal); }
+    .nav-links { display:flex; gap:28px; list-style:none; }
+    .nav-links a { color:var(--dim); font-size:14px; font-weight:500; transition:color 0.2s; }
+    .nav-links a:hover { color:var(--text); }
+    .nav-links a.active { color:var(--teal); }
+    .nav-right { display:flex; align-items:center; gap:16px; }
+    .nav-star {
+      display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600;
+      color:var(--dim); padding:6px 12px; border:1px solid var(--border-dim); border-radius:8px;
+      transition:all 0.2s;
+    }
+    .nav-star:hover { border-color:var(--border-hover); color:var(--amber); }
+    .nav-star svg { width:14px; height:14px; }
+    .nav-cta {
+      background:var(--teal); color:#000; padding:8px 20px; border-radius:8px;
+      font-weight:600; font-size:14px; border:none; cursor:pointer; transition:all 0.2s;
+    }
+    .nav-cta:hover { transform:translateY(-1px); box-shadow:0 4px 20px var(--teal-glow); color:#000; }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeInDown { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes fadeInUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+    /* ===== PRICING HERO ===== */
+    .pricing-hero {
+      text-align:center; padding:160px 24px 60px; position:relative;
+    }
+    .pricing-hero::before {
+      content:''; position:absolute; top:0; left:0; right:0; bottom:0;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% 20%, rgba(0,212,170,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 70% 60%, rgba(139,92,246,0.04) 0%, transparent 50%);
+    }
+    .pricing-hero-content { position:relative; z-index:1; max-width:800px; margin:0 auto; }
+    .pricing-hero h1 {
+      font-size:clamp(2.5rem,5vw,4rem); font-weight:800; line-height:1.1;
+      margin-bottom:20px; letter-spacing:-2px;
+      animation:fadeInUp 0.8s ease-out both;
+    }
+    .pricing-hero h1 .glow {
+      color:var(--teal);
+      text-shadow:0 0 60px var(--teal-glow), 0 0 120px rgba(0,212,170,0.1);
+    }
+    .pricing-hero .subtitle {
+      font-size:1.2rem; color:var(--dim); max-width:560px; margin:0 auto 12px;
+      line-height:1.7; animation:fadeInUp 0.8s ease-out 0.1s both;
+    }
+    .pricing-hero .tagline {
+      font-family:'Space Grotesk',sans-serif; font-size:1rem; font-weight:700;
+      margin-bottom:8px; letter-spacing:-0.3px;
+      animation:fadeInUp 0.8s ease-out 0.15s both;
+    }
+    .pricing-hero .tagline span {
+      background:linear-gradient(135deg, var(--purple), var(--teal));
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      background-clip:text;
+    }
+
+    /* ===== PRICING CARDS ===== */
+    .pricing-section { position:relative; z-index:1; padding:40px 24px 80px; }
+    .pricing-grid {
+      display:grid; grid-template-columns:repeat(3,1fr); gap:24px;
+      max-width:1120px; margin:0 auto;
+      animation:fadeInUp 0.8s ease-out 0.25s both;
+    }
+    .pricing-card {
+      background:var(--ocean); border:1px solid var(--border-dim);
+      border-radius:16px; padding:36px 32px 40px; position:relative;
+      transition:all 0.3s; display:flex; flex-direction:column;
+    }
+    .pricing-card:hover {
+      border-color:var(--border-hover);
+      transform:translateY(-4px);
+      box-shadow:0 20px 60px rgba(0,0,0,0.3);
+    }
+    .pricing-card.featured {
+      border-color:var(--teal);
+      background:linear-gradient(180deg, rgba(0,212,170,0.04) 0%, var(--ocean) 40%);
+      box-shadow:0 0 40px rgba(0,212,170,0.08);
+    }
+    .pricing-card.featured:hover {
+      box-shadow:0 0 60px rgba(0,212,170,0.12), 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .badge-popular {
+      position:absolute; top:-13px; left:50%; transform:translateX(-50%);
+      background:linear-gradient(135deg, var(--teal), #00b894);
+      color:#000; font-family:'Space Grotesk',sans-serif; font-size:12px;
+      font-weight:700; padding:4px 16px; border-radius:100px;
+      text-transform:uppercase; letter-spacing:0.5px;
+      box-shadow:0 4px 16px rgba(0,212,170,0.3);
+    }
+    .card-tier {
+      font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600;
+      text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;
+    }
+    .card-tier.community { color:var(--dim); }
+    .card-tier.pro { color:var(--teal); }
+    .card-tier.enterprise { color:var(--purple); }
+
+    .card-price {
+      font-family:'Space Grotesk',sans-serif; font-size:3.2rem; font-weight:800;
+      letter-spacing:-2px; margin-bottom:4px; line-height:1;
+    }
+    .card-price .currency { font-size:1.6rem; vertical-align:super; opacity:0.7; }
+    .card-price-sub { font-size:14px; color:var(--dim); margin-bottom:24px; }
+    .card-desc { font-size:14px; color:var(--dim); line-height:1.6; margin-bottom:28px; min-height:44px; }
+
+    .card-cta {
+      display:block; width:100%; text-align:center; padding:14px 24px;
+      border-radius:10px; font-weight:600; font-size:15px;
+      cursor:pointer; transition:all 0.2s; border:none;
+      text-decoration:none; margin-bottom:28px;
+    }
+    .card-cta.primary {
+      background:var(--teal); color:#000;
+    }
+    .card-cta.primary:hover {
+      transform:translateY(-2px); box-shadow:0 8px 30px var(--teal-glow); color:#000;
+    }
+    .card-cta.secondary {
+      background:transparent; color:var(--teal);
+      border:1px solid var(--border);
+    }
+    .card-cta.secondary:hover {
+      background:var(--teal-dim); border-color:var(--teal);
+      transform:translateY(-2px);
+    }
+    .card-cta.purple-cta {
+      background:transparent; color:var(--purple);
+      border:1px solid rgba(139,92,246,0.3);
+    }
+    .card-cta.purple-cta:hover {
+      background:var(--purple-dim); border-color:var(--purple);
+      transform:translateY(-2px);
+    }
+
+    .card-features { list-style:none; flex:1; }
+    .card-features li {
+      font-size:14px; color:var(--dim); padding:8px 0;
+      display:flex; align-items:flex-start; gap:10px;
+      border-bottom:1px solid var(--border-dim);
+    }
+    .card-features li:last-child { border-bottom:none; }
+    .card-features li svg {
+      width:18px; height:18px; flex-shrink:0; margin-top:1px;
+    }
+    .card-features li .check { color:var(--teal); }
+    .card-features li .check-purple { color:var(--purple); }
+    .card-features li span { color:var(--text); font-weight:500; }
+
+    /* ===== COMPARISON TABLE ===== */
+    .compare-section {
+      position:relative; z-index:1; padding:80px 24px;
+      max-width:1120px; margin:0 auto;
+    }
+    .compare-section h2 {
+      text-align:center; font-size:clamp(1.8rem,3vw,2.4rem); font-weight:700;
+      margin-bottom:48px; letter-spacing:-1px;
+      animation:fadeInUp 0.8s ease-out both;
+    }
+    .compare-section h2 .glow { color:var(--teal); }
+    .compare-table-wrap {
+      overflow-x:auto; border-radius:16px;
+      border:1px solid var(--border-dim);
+      animation:fadeInUp 0.8s ease-out 0.1s both;
+    }
+    .compare-table {
+      width:100%; border-collapse:collapse;
+      font-size:14px; min-width:700px;
+    }
+    .compare-table thead th {
+      padding:18px 20px; text-align:left;
+      background:var(--surface); font-family:'Space Grotesk',sans-serif;
+      font-weight:600; font-size:13px; text-transform:uppercase;
+      letter-spacing:0.5px; color:var(--dim);
+      border-bottom:1px solid var(--border-dim);
+    }
+    .compare-table thead th:nth-child(3) { color:var(--teal); }
+    .compare-table tbody td {
+      padding:14px 20px; border-bottom:1px solid var(--border-dim);
+      background:var(--ocean);
+    }
+    .compare-table tbody tr:last-child td { border-bottom:none; }
+    .compare-table tbody td:first-child {
+      font-weight:500; color:var(--text);
+    }
+    .compare-table .cat-row td {
+      background:var(--surface); font-family:'Space Grotesk',sans-serif;
+      font-weight:600; font-size:13px; text-transform:uppercase;
+      letter-spacing:0.5px; color:var(--teal); padding:12px 20px;
+    }
+    .compare-table .yes { color:var(--teal); font-weight:600; }
+    .compare-table .no { color:var(--muted); }
+    .compare-table .val { color:var(--dim); }
+
+    /* ===== FAQ SECTION ===== */
+    .faq-section {
+      position:relative; z-index:1; padding:80px 24px 120px;
+      max-width:800px; margin:0 auto;
+    }
+    .faq-section h2 {
+      text-align:center; font-size:clamp(1.8rem,3vw,2.4rem); font-weight:700;
+      margin-bottom:48px; letter-spacing:-1px;
+    }
+    .faq-item {
+      border:1px solid var(--border-dim); border-radius:12px;
+      margin-bottom:12px; overflow:hidden;
+      transition:border-color 0.2s;
+    }
+    .faq-item:hover { border-color:var(--border-hover); }
+    .faq-item.open { border-color:var(--border); }
+    .faq-q {
+      width:100%; text-align:left; padding:20px 24px;
+      background:var(--ocean); border:none; color:var(--text);
+      font-family:'Inter',sans-serif; font-size:15px; font-weight:600;
+      cursor:pointer; display:flex; align-items:center; justify-content:space-between;
+      gap:16px; transition:background 0.2s;
+    }
+    .faq-q:hover { background:var(--surface); }
+    .faq-q .arrow {
+      width:20px; height:20px; color:var(--dim);
+      transition:transform 0.3s, color 0.2s; flex-shrink:0;
+    }
+    .faq-item.open .faq-q .arrow { transform:rotate(180deg); color:var(--teal); }
+    .faq-a {
+      max-height:0; overflow:hidden;
+      transition:max-height 0.3s ease-out, padding 0.3s ease-out;
+    }
+    .faq-item.open .faq-a { max-height:400px; }
+    .faq-a-inner {
+      padding:0 24px 20px; font-size:14px; color:var(--dim); line-height:1.8;
+    }
+    .faq-a-inner strong { color:var(--text); font-weight:600; }
+    .faq-a-inner a { color:var(--teal); }
+
+    /* ===== CTA BANNER ===== */
+    .cta-banner {
+      position:relative; z-index:1; max-width:1120px; margin:0 auto 120px;
+      padding:0 24px;
+    }
+    .cta-banner-inner {
+      background:linear-gradient(135deg, rgba(0,212,170,0.06) 0%, rgba(139,92,246,0.06) 100%);
+      border:1px solid var(--border); border-radius:20px;
+      padding:64px 48px; text-align:center;
+    }
+    .cta-banner h2 {
+      font-size:clamp(1.6rem,3vw,2.2rem); font-weight:700; margin-bottom:16px;
+      letter-spacing:-1px;
+    }
+    .cta-banner .cta-sub { font-size:16px; color:var(--dim); margin-bottom:32px; max-width:500px; margin-left:auto; margin-right:auto; line-height:1.7; }
+    .cta-buttons { display:flex; gap:16px; justify-content:center; flex-wrap:wrap; }
+    .cta-btn {
+      padding:14px 32px; border-radius:10px; font-weight:600; font-size:15px;
+      cursor:pointer; transition:all 0.2s; text-decoration:none; border:none;
+    }
+    .cta-btn.primary { background:var(--teal); color:#000; }
+    .cta-btn.primary:hover { transform:translateY(-2px); box-shadow:0 8px 30px var(--teal-glow); color:#000; }
+    .cta-btn.ghost { background:transparent; color:var(--text); border:1px solid var(--border-dim); }
+    .cta-btn.ghost:hover { border-color:var(--border-hover); transform:translateY(-2px); }
+
+    /* ===== FOOTER ===== */
+    footer {
+      position:relative; z-index:1;
+      border-top:1px solid var(--border-dim);
+      padding:40px 24px; text-align:center;
+    }
+    .footer-inner {
+      max-width:1120px; margin:0 auto;
+      display:flex; align-items:center; justify-content:space-between;
+      flex-wrap:wrap; gap:16px;
+    }
+    .footer-brand {
+      font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:600;
+      color:var(--dim);
+    }
+    .footer-brand span { color:var(--teal); }
+    .footer-links { display:flex; gap:24px; }
+    .footer-links a { color:var(--muted); font-size:13px; font-weight:500; }
+    .footer-links a:hover { color:var(--teal); }
+    .footer-copy { font-size:12px; color:var(--muted); width:100%; text-align:center; margin-top:16px; }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width:960px) {
+      .pricing-grid { grid-template-columns:1fr; max-width:440px; margin:0 auto; }
+      .pricing-card.featured { order:-1; }
+      .compare-table { font-size:13px; }
+    }
+    @media (max-width:768px) {
+      .nav-links { display:none; }
+      .nav-star { display:none; }
+      .pricing-hero { padding:120px 20px 40px; }
+      .cta-banner-inner { padding:40px 24px; }
+      .footer-inner { justify-content:center; text-align:center; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Particles -->
+  <div class="particles" id="particles"></div>
+  <div class="grid-overlay"></div>
+
+  <!-- Nav -->
+  <nav>
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+          <circle cx="16" cy="16" r="14" stroke="#00d4aa" stroke-width="2" fill="none"/>
+          <circle cx="16" cy="16" r="6" fill="#00d4aa" opacity="0.3"/>
+          <circle cx="16" cy="16" r="3" fill="#00d4aa"/>
+          <line x1="16" y1="2" x2="16" y2="8" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="16" y1="24" x2="16" y2="30" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="2" y1="16" x2="8" y2="16" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="24" y1="16" x2="30" y2="16" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="6" y1="6" x2="10" y2="10" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+          <line x1="22" y1="22" x2="26" y2="26" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+          <line x1="26" y1="6" x2="22" y2="10" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+          <line x1="10" y1="22" x2="6" y2="26" stroke="#00d4aa" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+        </svg>
+        Tenta<span>CLAW</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/">Home</a></li>
+        <li><a href="/#features">Features</a></li>
+        <li><a href="/#compare">Compare</a></li>
+        <li><a href="/#clawhub">CLAWHub</a></li>
+        <li><a href="/pricing" class="active">Pricing</a></li>
+        <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW#quick-start">Docs</a></li>
+      </ul>
+      <div class="nav-right">
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW" class="nav-star" title="Star on GitHub">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/></svg>
+          Star
+        </a>
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW#quick-start" class="nav-cta">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Pricing Hero -->
+  <section class="pricing-hero">
+    <div class="pricing-hero-content">
+      <p class="tagline"><span>Per-token pricing is a scam. Own your inference.</span></p>
+      <h1>Simple, <span class="glow">honest</span> pricing</h1>
+      <p class="subtitle">
+        Community edition is free forever. No node limits. No GPU caps.<br>
+        Pay only when you need team features and enterprise compliance.
+      </p>
+    </div>
+  </section>
+
+  <!-- Pricing Cards -->
+  <section class="pricing-section">
+    <div class="pricing-grid">
+      <!-- Community -->
+      <div class="pricing-card">
+        <div class="card-tier community">Community</div>
+        <div class="card-price">Free</div>
+        <div class="card-price-sub">Forever. No credit card.</div>
+        <p class="card-desc">Full-power GPU orchestration for individuals and open-source projects.</p>
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW#quick-start" class="card-cta secondary">Get Started Free</a>
+        <ul class="card-features">
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Unlimited nodes and GPUs</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>All 6 inference backends</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>CLAWHub marketplace</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Web dashboard</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>CLI with 111 commands</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Auto-discovery + self-healing</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Prometheus metrics</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>OpenAI + Anthropic API compatible</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Community Discord support</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Pro (Featured) -->
+      <div class="pricing-card featured">
+        <div class="badge-popular">Most Popular</div>
+        <div class="card-tier pro">Pro</div>
+        <div class="card-price"><span class="currency">$</span>29</div>
+        <div class="card-price-sub">per node / month</div>
+        <p class="card-desc">Team features, multi-tenancy, and cloud burst for growing organizations.</p>
+        <a href="#contact" class="card-cta primary">Start 14-Day Trial</a>
+        <ul class="card-features">
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Everything in Community</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>SSO (Google, Azure AD, Okta)</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Namespaces + multi-tenancy</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Resource quotas + chargeback</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Cloud burst (RunPod / Lambda)</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Priority email support</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Fine-tuning orchestration</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Custom CLAWHub publishing</span>
+          </li>
+          <li>
+            <svg class="check" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Advanced observability (Langfuse)</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Enterprise -->
+      <div class="pricing-card">
+        <div class="card-tier enterprise">Enterprise</div>
+        <div class="card-price"><span class="currency">$</span>99</div>
+        <div class="card-price-sub">per node / month</div>
+        <p class="card-desc">Compliance, federation, and dedicated support for mission-critical deployments.</p>
+        <a href="mailto:enterprise@tentaclaw.io" class="card-cta purple-cta">Contact Sales</a>
+        <ul class="card-features">
+          <li>
+            <svg class="check-purple" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Everything in Pro</span>
+          </li>
+          <li>
+            <svg class="check-purple" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Dedicated support engineer</span>
+          </li>
+          <li>
+            <svg class="check-purple" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Custom SLA (99.9%+)</span>
+          </li>
+          <li>
+            <svg class="check-purple" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>SOC2 / HIPAA compliance reports</span>
+          </li>
+          <li>
+            <svg class="check-purple" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Federation (multi-cluster)</span>
+          </li>
+          <li>
+            <svg class="check-purple" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Air-gapped deployment</span>
+          </li>
+          <li>
+            <svg class="check-purple" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Custom integrations</span>
+          </li>
+          <li>
+            <svg class="check-purple" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>On-site training</span>
+          </li>
+          <li>
+            <svg class="check-purple" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+            <span>Volume discounts</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Comparison Table -->
+  <section class="compare-section" id="compare">
+    <h2>Full feature <span class="glow">comparison</span></h2>
+    <div class="compare-table-wrap">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th style="width:40%">Feature</th>
+            <th style="width:20%">Community</th>
+            <th style="width:20%">Pro</th>
+            <th style="width:20%">Enterprise</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Core -->
+          <tr class="cat-row"><td colspan="4">Core Infrastructure</td></tr>
+          <tr>
+            <td>Nodes / GPUs</td>
+            <td class="yes">Unlimited</td>
+            <td class="yes">Unlimited</td>
+            <td class="yes">Unlimited</td>
+          </tr>
+          <tr>
+            <td>Inference backends</td>
+            <td class="yes">All 6</td>
+            <td class="yes">All 6</td>
+            <td class="yes">All 6</td>
+          </tr>
+          <tr>
+            <td>Auto-discovery + self-healing</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Smart routing + load balancing</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Web dashboard</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>CLI (111 commands)</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>OpenAI + Anthropic API</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+
+          <!-- Marketplace -->
+          <tr class="cat-row"><td colspan="4">CLAWHub Marketplace</td></tr>
+          <tr>
+            <td>Install any package</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Publish custom packages</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Private package registry</td>
+            <td class="no">&mdash;</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+
+          <!-- Observability -->
+          <tr class="cat-row"><td colspan="4">Observability</td></tr>
+          <tr>
+            <td>Prometheus metrics</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Langfuse integration</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Custom dashboards + alerting</td>
+            <td class="no">&mdash;</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+
+          <!-- Team & Access -->
+          <tr class="cat-row"><td colspan="4">Team & Access Control</td></tr>
+          <tr>
+            <td>SSO (Google, Azure AD, Okta)</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Namespaces + multi-tenancy</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Resource quotas + chargeback</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>RBAC fine-grained permissions</td>
+            <td class="no">&mdash;</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+
+          <!-- Operations -->
+          <tr class="cat-row"><td colspan="4">Operations</td></tr>
+          <tr>
+            <td>Cloud burst (RunPod / Lambda)</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Fine-tuning orchestration</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Federation (multi-cluster)</td>
+            <td class="no">&mdash;</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Air-gapped deployment</td>
+            <td class="no">&mdash;</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+
+          <!-- Compliance & Support -->
+          <tr class="cat-row"><td colspan="4">Compliance & Support</td></tr>
+          <tr>
+            <td>Community Discord</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Priority email support</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Dedicated support engineer</td>
+            <td class="no">&mdash;</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Custom SLA (99.9%+)</td>
+            <td class="no">&mdash;</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>SOC2 / HIPAA compliance</td>
+            <td class="no">&mdash;</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>On-site training</td>
+            <td class="no">&mdash;</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+          <tr>
+            <td>Volume discounts</td>
+            <td class="no">&mdash;</td>
+            <td class="no">&mdash;</td>
+            <td class="yes">&#10003;</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="faq-section" id="faq">
+    <h2>Frequently asked questions</h2>
+
+    <div class="faq-item open">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Is the Community tier really free forever?
+        <svg class="arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="faq-a">
+        <div class="faq-a-inner">
+          <strong>Yes, absolutely.</strong> TentaCLAW OS is open-source (AGPLv3). The Community tier includes the full orchestration engine with unlimited nodes, all 6 inference backends, the complete CLI, web dashboard, and marketplace access. We will never artificially limit the free tier to push upgrades. The core value of TentaCLAW &mdash; turning scattered GPUs into one brain &mdash; is free forever.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        What counts as a "node" for billing?
+        <svg class="arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="faq-a">
+        <div class="faq-a-inner">
+          A node is any physical or virtual machine running the TentaCLAW agent. A single server with 8 GPUs counts as <strong>one node</strong>, not eight. This keeps pricing predictable regardless of GPU density. Ephemeral cloud-burst nodes (RunPod, Lambda) are billed pro-rata by the hour when active.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Can I mix Community and Pro nodes in one cluster?
+        <svg class="arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="faq-a">
+        <div class="faq-a-inner">
+          No. Pro features like SSO, namespaces, and cloud burst are cluster-wide capabilities. When you upgrade, <strong>all nodes in that cluster gain Pro features</strong>. You only pay for the nodes that exist in your cluster. You can, however, run separate Community and Pro clusters independently.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        How does this compare to per-token API pricing?
+        <svg class="arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="faq-a">
+        <div class="faq-a-inner">
+          A single A100 node running Llama 3 70B can serve roughly <strong>2-4 million tokens per hour</strong>. At OpenAI's pricing that would cost $20-60/hour. With TentaCLAW Pro, that same node costs <strong>$0.04/hour</strong> ($29/month). Even with hardware costs included, self-hosted inference through TentaCLAW is 10-100x cheaper at scale.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Do you offer annual billing or volume discounts?
+        <svg class="arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="faq-a">
+        <div class="faq-a-inner">
+          <strong>Annual billing:</strong> Pay yearly and get 2 months free (save ~17%). <strong>Volume discounts:</strong> Enterprise tier includes volume pricing by default. For Pro, clusters with 50+ nodes qualify for custom pricing. <a href="mailto:sales@tentaclaw.io">Contact sales</a> to discuss.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        What happens if I downgrade from Pro to Community?
+        <svg class="arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="faq-a">
+        <div class="faq-a-inner">
+          Your cluster continues running without interruption. Pro-only features (SSO, namespaces, cloud burst) become read-only &mdash; existing configurations are preserved but can't be modified. <strong>No data is ever deleted.</strong> You can re-enable Pro at any time and everything comes back exactly as you left it.
+        </div>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <button class="faq-q" onclick="toggleFaq(this)">
+        Is TentaCLAW open-source? What's the license?
+        <svg class="arrow" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+      <div class="faq-a">
+        <div class="faq-a-inner">
+          The TentaCLAW OS core is <strong>AGPLv3</strong> &mdash; fully open-source. Pro and Enterprise features are delivered as a separate proprietary module that plugs into the core. The open-source engine is complete and fully functional on its own. We follow the open-core model used by GitLab, Grafana, and others.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Banner -->
+  <section class="cta-banner">
+    <div class="cta-banner-inner">
+      <h2>Ready to unify your GPUs?</h2>
+      <p class="cta-sub">Start with Community for free. Upgrade when your team needs it. No credit card, no sales call, no BS.</p>
+      <div class="cta-buttons">
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW#quick-start" class="cta-btn primary">Install Free</a>
+        <a href="mailto:sales@tentaclaw.io" class="cta-btn ghost">Talk to Sales</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">Tenta<span>CLAW</span> OS</div>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW">GitHub</a>
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW#quick-start">Docs</a>
+        <a href="/pricing">Pricing</a>
+        <a href="https://discord.gg/tentaclaw">Discord</a>
+      </div>
+      <div class="footer-copy">&copy; 2026 TentaCLAW OS. Open-source GPU orchestration.</div>
+    </div>
+  </footer>
+
+  <!-- Particles JS -->
+  <script>
+    (function(){
+      const c=document.getElementById('particles');
+      for(let i=0;i<40;i++){
+        const p=document.createElement('div');
+        p.className='particle';
+        p.style.left=Math.random()*100+'%';
+        p.style.top=(100+Math.random()*20)+'%';
+        p.style.animationDuration=(8+Math.random()*12)+'s';
+        p.style.animationDelay=Math.random()*10+'s';
+        p.style.width=p.style.height=(1+Math.random()*2)+'px';
+        c.appendChild(p);
+      }
+    })();
+
+    function toggleFaq(btn){
+      const item=btn.parentElement;
+      const wasOpen=item.classList.contains('open');
+      // Close all
+      document.querySelectorAll('.faq-item').forEach(i=>i.classList.remove('open'));
+      // Open clicked if it wasn't open
+      if(!wasOpen) item.classList.add('open');
+    }
+  </script>
+</body>
+</html>

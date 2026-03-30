@@ -1,0 +1,31 @@
+name: "@tentaclaw/multi-node-70b"
+version: "1.0.0"
+type: model
+title: "Multi-Node 70B Deployment"
+description: "Split a 70B model across 2-4 nodes with pipeline parallelism. Optimal for RTX 3090/4090 clusters."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [deployment-recipes]
+tags: [70b, multi-node, distributed, pipeline-parallel]
+model:
+  type: deployment-recipe
+  base_model: "llama3.1:70b"
+  variant: "instruct"
+  quantization: "Q4_K_M"
+  parameters:
+    distributed: true
+    pipeline_parallel: true
+    nodes_required: 2
+    vram_per_node: "24GB"
+    backend: "vllm"
+    tensor_parallel_per_node: 1
+    context_length: 8192
+  hardware:
+    minimum_vram: "48GB total across 2+ nodes"
+    recommended_vram: "96GB total across 4 nodes"
+    compatible_gpus: ["2x RTX 3090", "2x RTX 4090", "4x RTX 4070 Ti"]
+  benchmarks:
+    tokens_per_second: 15
+    hardware_tested: "2x RTX 4090 over PCIe"

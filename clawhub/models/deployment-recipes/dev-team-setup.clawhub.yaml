@@ -1,0 +1,31 @@
+name: "@tentaclaw/dev-team-setup"
+version: "1.0.0"
+type: model
+title: "Developer Team Setup"
+description: "Complete setup for a 5-10 person dev team. Code assistant + chat + embeddings with namespaces."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [deployment-recipes]
+tags: [team, development, coding, namespace, multi-user]
+model:
+  type: deployment-recipe
+  base_model: "multiple"
+  parameters:
+    models:
+      - { name: "deepseek-r1:8b", purpose: "code-chat", replicas: 2 }
+      - { name: "starcoder2:3b", purpose: "autocomplete", replicas: 2 }
+      - { name: "nomic-embed-text", purpose: "codebase-indexing", replicas: 1 }
+    namespaces:
+      - { name: "backend-team", quota_gpus: 2 }
+      - { name: "frontend-team", quota_gpus: 2 }
+      - { name: "shared", quota_gpus: 1 }
+    aliases:
+      - { from: "gpt-4", to: "deepseek-r1:8b" }
+      - { from: "gpt-3.5-turbo", to: "starcoder2:3b" }
+    continue_dev_config: true
+    api_keys_per_developer: true
+  hardware:
+    minimum_vram: "32GB"
+    recommended_vram: "48GB"

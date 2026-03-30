@@ -1,0 +1,26 @@
+name: "@tentaclaw/air-gapped-deployment"
+version: "1.0.0"
+type: model
+title: "Air-Gapped Deployment Recipe"
+description: "Deploy TentaCLAW in a fully air-gapped environment. No internet required after initial setup."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [deployment-recipes]
+tags: [air-gapped, offline, security, government, compliance]
+model:
+  type: deployment-recipe
+  base_model: "any"
+  parameters:
+    pre_download_models: ["llama3.1:8b", "nomic-embed-text", "codellama:7b"]
+    disable_telemetry: true
+    disable_update_check: true
+    disable_clawhub_remote: true
+    local_model_cache: "/opt/tentaclaw/models"
+    offline_mode: true
+    tls_mode: "self-signed"
+    audit_logging: true
+  hardware:
+    minimum_vram: "8GB"
+    recommended_vram: "24GB"
