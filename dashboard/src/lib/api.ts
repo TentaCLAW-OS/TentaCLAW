@@ -13,10 +13,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   getSummary: () => request<ClusterSummary>('/api/v1/summary'),
-  getNodes: () => request<ClusterNode[]>('/api/v1/nodes'),
+  getNodes: async () => {
+    const res = await request<{ nodes: ClusterNode[] } | ClusterNode[]>('/api/v1/nodes');
+    return Array.isArray(res) ? res : res.nodes;
+  },
   getHealthScore: () => request<HealthScore>('/api/v1/health/score'),
-  getPower: () => request<PowerStats>('/api/v1/power'),
-  getAlerts: (limit = 50) => request<Alert[]>(`/api/v1/alerts?limit=${limit}`),
+  getPower: async () => {
+    const res = await request<Record<string, unknown>>('/api/v1/power');
+    return {
+      total_watts: (res.total_watts ?? res.totalWatts ?? 0) as number,
+      daily_cost_usd: (res.daily_cost_usd ?? res.dailyCostUsd ?? 0) as number,
+      monthly_cost_usd: (res.monthly_cost_usd ?? res.monthlyCostUsd ?? 0) as number,
+    } as PowerStats;
+  },
+  getAlerts: async (limit = 50) => {
+    const res = await request<{ alerts: Alert[] } | Alert[]>(`/api/v1/alerts?limit=${limit}`);
+    return Array.isArray(res) ? res : res.alerts;
+  },
   getSparklines: (nodeId: string) => request<SparklineData>(`/api/v1/nodes/${nodeId}/sparklines`),
   sendCommand: (nodeId: string, action: string, params?: Record<string, unknown>) =>
     request<{ id: string }>(`/api/v1/nodes/${nodeId}/commands`, {
