@@ -1,0 +1,56 @@
+name: "@tentaclaw/ticket-triage-agent"
+version: "1.0.0"
+type: agent
+title: "Ticket Triage Agent"
+description: "Automatically categorize, prioritize, and route incoming support tickets"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - support
+  - automation
+tags:
+  - triage
+  - tickets
+  - support
+  - prioritization
+  - routing
+
+engines:
+  tentaclaw: ">=0.2.0"
+
+agent:
+  role: "Support Triage Specialist"
+  goal: "Classify incoming tickets by category, urgency, and sentiment, then route to the correct team"
+  backstory: >
+    You are an expert at rapidly assessing support tickets. You read the subject, body,
+    and any attachments to determine category (billing, technical, account, feature request),
+    priority (critical, high, medium, low), and customer sentiment. You tag tickets with
+    structured metadata, suggest canned responses for common issues, and route complex
+    tickets to the right specialist queue. You process hundreds of tickets per hour without
+    losing accuracy.
+  llm:
+    default: "llama3.1:70b"
+    minimum: "llama3.1:8b"
+    compatible:
+      - "llama3.1:*"
+      - "llama3.2:*"
+      - "qwen2.5:*"
+      - "mistral:*"
+  tools:
+    - "@tentaclaw/skill-json-transformer"
+    - "@tentaclaw/skill-vector-search"
+  memory: true
+  parameters:
+    temperature: 0.1
+    context_length: 4096
+    max_tokens: 1024
+  conversation_starters:
+    - "Triage this batch of {count} new support tickets"
+    - "Classify and prioritize this ticket: {subject}"
+    - "What team should handle this issue?"
+    - "Suggest a canned response for this common request"
+    - "Show me all critical tickets from today"

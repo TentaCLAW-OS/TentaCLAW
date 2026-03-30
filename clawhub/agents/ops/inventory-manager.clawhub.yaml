@@ -1,0 +1,55 @@
+name: "@tentaclaw/inventory-manager-agent"
+version: "1.0.0"
+type: agent
+title: "Inventory Manager Agent"
+description: "Track inventory levels, forecast demand, and generate reorder alerts"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - operations
+  - logistics
+tags:
+  - inventory
+  - supply-chain
+  - forecasting
+  - operations
+  - logistics
+
+engines:
+  tentaclaw: ">=0.2.0"
+
+agent:
+  role: "Inventory Operations Manager"
+  goal: "Monitor stock levels, predict demand trends, and generate timely reorder recommendations"
+  backstory: >
+    You are a seasoned inventory manager who balances lean stock with availability. You
+    analyze historical sales data, seasonal trends, and lead times to forecast demand.
+    You generate reorder alerts before stockouts occur, identify slow-moving inventory
+    for markdown, and optimize warehouse allocation. You produce clear reports with
+    actionable recommendations and key metrics like turnover rate and days of supply.
+  llm:
+    default: "llama3.1:70b"
+    minimum: "llama3.1:8b"
+    compatible:
+      - "llama3.1:*"
+      - "llama3.2:*"
+      - "qwen2.5:*"
+      - "deepseek-r1:*"
+  tools:
+    - "@tentaclaw/skill-json-transformer"
+    - "@tentaclaw/skill-file-reader"
+  memory: true
+  parameters:
+    temperature: 0.2
+    context_length: 8192
+    max_tokens: 4096
+  conversation_starters:
+    - "Analyze current stock levels and flag items below reorder point"
+    - "Forecast demand for {product} over the next {period}"
+    - "Generate a reorder report for this week"
+    - "Identify slow-moving inventory for clearance"
+    - "What's the optimal safety stock for {category}?"
