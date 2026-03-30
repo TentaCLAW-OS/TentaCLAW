@@ -1,0 +1,262 @@
+# =============================================================================
+# TentaCLAW OS -- Docker Compose Production Stack
+# =============================================================================
+#
+# Full production deployment with:
+#   - TentaCLAW Gateway (API + Dashboard + WebSocket)
+#   - PostgreSQL (persistent database)
+#   - Nginx (reverse proxy + TLS termination)
+#   - Prometheus (metrics collection)
+#   - Grafana (observability dashboards)
+#
+# Usage:
+#   docker compose -f docker-compose.production.yml up -d
+#   docker compose -f docker-compose.production.yml logs -f gateway
+#   docker compose -f docker-compose.production.yml down
+#
+# CLAWtopus says: "Containers are just smaller aquariums."
+# =============================================================================
+
+name: tentaclaw-production
+
+services:
+  # ===========================================================================
+  # TentaCLAW Gateway
+  # ===========================================================================
+  gateway:
+    build:
+      context: ../../
+      dockerfile: gateway/Dockerfile
+    container_name: tentaclaw-gateway
+    restart: unless-stopped
+    environment:
+      TENTACLAW_PORT: "8080"
+      TENTACLAW_HOST: "0.0.0.0"
+      TENTACLAW_DB: "postgres"
+      TENTACLAW_PG_URL: "postgres://tentaclaw:${PG_PASSWORD:-tentaclaw_secret}@postgres:5432/tentaclaw"
+      TENTACLAW_CLUSTER_NAME: "${CLUSTER_NAME:-tentaclaw}"
+      NODE_ENV: "production"
+    volumes:
+      - gateway-data:/app/gateway/data
+    networks:
+      - tentaclaw-internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 128M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ===========================================================================
+  # PostgreSQL Database
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: tentaclaw-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tentaclaw
+      POSTGRES_PASSWORD: "${PG_PASSWORD:-tentaclaw_secret}"
+      POSTGRES_DB: tentaclaw
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - tentaclaw-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tentaclaw -d tentaclaw"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 128M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Nginx Reverse Proxy
+  # ===========================================================================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: tentaclaw-nginx
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx-certs:/etc/nginx/certs
+      - nginx-acme:/var/www/certbot
+    networks:
+      - tentaclaw-internal
+    depends_on:
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Prometheus (Metrics Collection)
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: tentaclaw-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--storage.tsdb.retention.size=10GB"
+      - "--web.enable-lifecycle"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - tentaclaw-internal
+    depends_on:
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Grafana (Observability Dashboards)
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: tentaclaw-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_PASSWORD:-tentaclaw}"
+      GF_SERVER_ROOT_URL: "${GRAFANA_ROOT_URL:-http://localhost:3000}"
+      GF_INSTALL_PLUGINS: ""
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    networks:
+      - tentaclaw-internal
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "25m"
+        max-file: "3"
+
+# =============================================================================
+# Volumes (persistent data)
+# =============================================================================
+volumes:
+  gateway-data:
+    driver: local
+    name: tentaclaw-gateway-data
+
+  postgres-data:
+    driver: local
+    name: tentaclaw-postgres-data
+
+  prometheus-data:
+    driver: local
+    name: tentaclaw-prometheus-data
+
+  grafana-data:
+    driver: local
+    name: tentaclaw-grafana-data
+
+  nginx-certs:
+    driver: local
+    name: tentaclaw-nginx-certs
+
+  nginx-acme:
+    driver: local
+    name: tentaclaw-nginx-acme
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  tentaclaw-internal:
+    driver: bridge
+    name: tentaclaw-internal
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

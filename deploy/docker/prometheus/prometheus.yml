@@ -1,0 +1,81 @@
+# =============================================================================
+# TentaCLAW OS -- Prometheus Configuration (Production)
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+  # Attach cluster labels to all metrics
+  external_labels:
+    cluster: "tentaclaw"
+    environment: "production"
+
+# =============================================================================
+# Scrape Configs
+# =============================================================================
+
+scrape_configs:
+  # -------------------------------------------------------------------------
+  # TentaCLAW Gateway metrics
+  # -------------------------------------------------------------------------
+  - job_name: "tentaclaw-gateway"
+    static_configs:
+      - targets: ["gateway:8080"]
+        labels:
+          role: "gateway"
+    metrics_path: "/metrics"
+    scrape_interval: 10s
+
+  # -------------------------------------------------------------------------
+  # Prometheus self-monitoring
+  # -------------------------------------------------------------------------
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # -------------------------------------------------------------------------
+  # Grafana health
+  # -------------------------------------------------------------------------
+  - job_name: "grafana"
+    static_configs:
+      - targets: ["grafana:3000"]
+    metrics_path: "/metrics"
+
+  # -------------------------------------------------------------------------
+  # Worker node exporters (add your worker IPs here)
+  # -------------------------------------------------------------------------
+  # Uncomment and add your worker node IPs:
+  #
+  # - job_name: "tentaclaw-workers"
+  #   static_configs:
+  #     - targets:
+  #         - "10.0.1.20:9100"
+  #         - "10.0.1.21:9100"
+  #         - "10.0.1.22:9100"
+  #       labels:
+  #         role: "worker"
+  #
+  # - job_name: "ollama-workers"
+  #   static_configs:
+  #     - targets:
+  #         - "10.0.1.20:11434"
+  #         - "10.0.1.21:11434"
+  #         - "10.0.1.22:11434"
+  #       labels:
+  #         role: "worker"
+  #   metrics_path: "/metrics"
+
+  # -------------------------------------------------------------------------
+  # Service discovery via file (for dynamic worker management)
+  # -------------------------------------------------------------------------
+  # Place JSON or YAML target files in /etc/prometheus/targets/
+  # They will be picked up automatically.
+  #
+  # - job_name: "tentaclaw-dynamic"
+  #   file_sd_configs:
+  #     - files:
+  #         - "/etc/prometheus/targets/*.json"
+  #         - "/etc/prometheus/targets/*.yml"
+  #       refresh_interval: 30s
