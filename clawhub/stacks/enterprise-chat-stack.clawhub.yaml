@@ -1,0 +1,75 @@
+name: "@tentaclaw/enterprise-chat-stack"
+version: "1.0.0"
+type: stack
+title: "Enterprise Chat Stack"
+description: "Production-grade enterprise chat: large 70B model for quality + small model for routing/classification + embeddings. Includes model aliasing, rate limiting, and API key management."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+stack:
+  components:
+    - name: large-chat-model
+      model: "llama3.1:70b"
+      backend: auto
+      replicas: 2
+      resources: { gpuMemory: "48Gi" }
+      description: "High-quality 70B parameter model for complex queries, reasoning, and customer-facing responses."
+    - name: small-fast-model
+      model: "llama3.2:3b"
+      backend: ollama
+      replicas: 4
+      resources: { gpuMemory: "3Gi" }
+      description: "Lightweight model for intent classification, request routing, content filtering, and simple queries."
+    - name: embedding-model
+      model: "nomic-embed-text"
+      backend: ollama
+      replicas: 2
+      resources: { gpuMemory: "2Gi" }
+      description: "Embedding model for document search, knowledge base retrieval, and semantic similarity."
+
+  config:
+    model_aliases:
+      gpt-4: "llama3.1:70b"
+      gpt-4-turbo: "llama3.1:70b"
+      gpt-3.5-turbo: "llama3.2:3b"
+      text-embedding-ada-002: "nomic-embed-text"
+      text-embedding-3-small: "nomic-embed-text"
+    routing:
+      enabled: true
+      router_model: "llama3.2:3b"
+      rules:
+        - condition: "token_count < 100 AND complexity == 'low'"
+          target: "small-fast-model"
+        - condition: "complexity == 'high' OR requires_reasoning"
+          target: "large-chat-model"
+        - condition: "default"
+          target: "large-chat-model"
+    rate_limiting:
+      enabled: true
+      default_tier:
+        requests_per_minute: 60
+        tokens_per_minute: 100000
+        concurrent_requests: 10
+      premium_tier:
+        requests_per_minute: 300
+        tokens_per_minute: 500000
+        concurrent_requests: 50
+    api_keys:
+      enabled: true
+      key_prefix: "tc-"
+      key_length: 48
+      require_key: true
+      admin_endpoints_require_admin_key: true
+    load_balancing:
+      strategy: "least-connections"
+      health_check_interval_s: 30
+    logging:
+      request_logging: true
+      log_prompts: false
+      log_completions: false
+      metrics_endpoint: "/metrics"
+
+  minimum_cluster_vram: "128GB"
+  estimated_total_vram: "112GB"

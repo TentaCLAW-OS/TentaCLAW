@@ -1,0 +1,43 @@
+name: "@tentaclaw/homelab-starter-stack"
+version: "1.0.0"
+type: stack
+title: "Homelab Starter Stack"
+description: "The simplest way to start: one small, efficient model that runs on 8GB VRAM. Perfect for beginners, homelabs, and low-power hardware."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+stack:
+  components:
+    - name: chat-model
+      model: "gemma3:4b"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "4Gi" }
+      description: "Google Gemma 3 4B -- small, efficient, and surprisingly capable. Great first model."
+
+  config:
+    api:
+      openai_compatible: true
+      port: 11434
+      cors_enabled: true
+    defaults:
+      temperature: 0.7
+      max_tokens: 2048
+      context_length: 8192
+    web_ui:
+      enabled: true
+      port: 3000
+    getting_started:
+      quick_test: "curl http://localhost:11434/v1/chat/completions -d '{\"model\": \"gemma3:4b\", \"messages\": [{\"role\": \"user\", \"content\": \"Hello!\"}]}'"
+      suggested_clients:
+        - "Open WebUI (web-based chat interface)"
+        - "Continue.dev (VS Code AI assistant)"
+        - "Any OpenAI-compatible client"
+    upgrade_path:
+      next_stack: "@tentaclaw/rag-stack"
+      message: "When you are ready for more, try the RAG Pipeline Stack for retrieval-augmented generation."
+
+  minimum_cluster_vram: "8GB"
+  estimated_total_vram: "4GB"

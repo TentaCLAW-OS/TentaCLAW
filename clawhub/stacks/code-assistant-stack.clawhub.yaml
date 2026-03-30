@@ -1,0 +1,53 @@
+name: "@tentaclaw/code-assistant-stack"
+version: "1.0.0"
+type: stack
+title: "Code Assistant Stack"
+description: "Full coding assistant: reasoning chat model + fast autocomplete + codebase embeddings. Ships with Continue.dev integration config."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+stack:
+  components:
+    - name: chat-model
+      model: "deepseek-r1:8b"
+      backend: auto
+      replicas: 1
+      resources: { gpuMemory: "8Gi" }
+      description: "Primary reasoning model for code generation, refactoring, and explanation."
+    - name: autocomplete-model
+      model: "starcoder2:3b"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "3Gi" }
+      description: "Fast, lightweight model for inline autocomplete and tab-completion."
+    - name: embedding-model
+      model: "nomic-embed-text"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "2Gi" }
+      description: "Embedding model for codebase indexing, semantic search, and retrieval."
+
+  config:
+    continue_dev:
+      enabled: true
+      chat_model: "deepseek-r1:8b"
+      autocomplete_model: "starcoder2:3b"
+      embedding_model: "nomic-embed-text"
+      context_providers:
+        - codebase
+        - open-files
+        - terminal
+    indexing:
+      languages: ["python", "javascript", "typescript", "rust", "go", "java", "c", "cpp"]
+      ignore_patterns: ["node_modules", ".git", "dist", "build", "__pycache__"]
+      chunk_size: 1024
+      chunk_overlap: 128
+    autocomplete:
+      max_tokens: 256
+      temperature: 0.1
+      debounce_ms: 300
+
+  minimum_cluster_vram: "16GB"
+  estimated_total_vram: "13GB"

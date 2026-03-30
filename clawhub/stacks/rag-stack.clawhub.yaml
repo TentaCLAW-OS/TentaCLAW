@@ -1,0 +1,36 @@
+name: "@tentaclaw/rag-stack"
+version: "1.0.0"
+type: stack
+title: "RAG Pipeline Stack"
+description: "Complete RAG pipeline: embedding model + chat model + vector search. One-click deploy."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+stack:
+  components:
+    - name: embedding-model
+      model: "nomic-embed-text"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "2Gi" }
+    - name: chat-model
+      model: "llama3.1:8b"
+      backend: auto
+      replicas: 2
+      resources: { gpuMemory: "8Gi" }
+    - name: reranker
+      model: "bge-reranker-v2-m3"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "2Gi" }
+
+  config:
+    chunk_size: 512
+    chunk_overlap: 50
+    top_k: 5
+    rerank_top_k: 3
+
+  minimum_cluster_vram: "24GB"
+  estimated_total_vram: "20GB"

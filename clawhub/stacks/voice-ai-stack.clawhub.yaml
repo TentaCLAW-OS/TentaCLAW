@@ -1,0 +1,56 @@
+name: "@tentaclaw/voice-ai-stack"
+version: "1.0.0"
+type: stack
+title: "Voice AI Stack"
+description: "Full voice pipeline: speech-to-text (Whisper) + chat model + text-to-speech (Kokoro). Real-time conversational AI with voice I/O."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+stack:
+  components:
+    - name: stt-model
+      model: "whisper-large-v3"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "4Gi" }
+      description: "OpenAI Whisper large-v3 for high-accuracy speech-to-text transcription."
+    - name: chat-model
+      model: "llama3.1:8b"
+      backend: auto
+      replicas: 1
+      resources: { gpuMemory: "8Gi" }
+      description: "Conversational LLM for generating intelligent responses from transcribed speech."
+    - name: tts-model
+      model: "kokoro-v1"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "2Gi" }
+      description: "Kokoro TTS engine for natural, expressive text-to-speech synthesis."
+
+  config:
+    voice_pipeline:
+      mode: "full-duplex"
+      stt:
+        language: "auto"
+        sample_rate: 16000
+        vad_enabled: true
+        vad_threshold: 0.5
+        silence_timeout_ms: 1500
+      tts:
+        voice: "default"
+        speed: 1.0
+        format: "pcm_16000"
+        streaming: true
+      chat:
+        system_prompt: "You are a helpful voice assistant. Keep responses concise and conversational."
+        max_tokens: 256
+        temperature: 0.7
+    latency_targets:
+      stt_ms: 500
+      chat_ms: 1000
+      tts_first_byte_ms: 200
+
+  minimum_cluster_vram: "16GB"
+  estimated_total_vram: "14GB"

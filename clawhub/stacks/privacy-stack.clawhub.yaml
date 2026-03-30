@@ -1,0 +1,101 @@
+name: "@tentaclaw/privacy-stack"
+version: "1.0.0"
+type: stack
+title: "Privacy Stack"
+description: "Maximum privacy and compliance: air-gapped configuration, zero telemetry, local-only models, encrypted storage, and HIPAA-ready settings. For regulated industries and privacy-conscious deployments."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+stack:
+  components:
+    - name: chat-model
+      model: "llama3.1:8b"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "8Gi" }
+      description: "Fully local chat model. No external API calls. All inference runs on your hardware."
+    - name: embedding-model
+      model: "nomic-embed-text"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "2Gi" }
+      description: "Local embedding model for document search and retrieval. No data leaves the network."
+    - name: code-model
+      model: "codellama:7b"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "6Gi" }
+      description: "Local code model for secure development environments where source code must not leave the premises."
+
+  config:
+    air_gap:
+      enabled: true
+      block_outbound_connections: true
+      allowed_hosts: []
+      dns_resolution: "local-only"
+      model_download_mode: "offline"
+      model_source: "/opt/tentaclaw/models/offline-cache"
+      notes: "All models must be pre-downloaded and placed in the offline cache directory before deployment."
+    telemetry:
+      enabled: false
+      crash_reports: false
+      usage_analytics: false
+      model_metrics: false
+      health_checks_external: false
+    encryption:
+      storage:
+        enabled: true
+        algorithm: "AES-256-GCM"
+        key_management: "local"
+        key_store: "/opt/tentaclaw/keys"
+        encrypt_model_cache: true
+        encrypt_conversation_logs: true
+        encrypt_embeddings: true
+      transport:
+        tls_enabled: true
+        tls_min_version: "1.3"
+        mutual_tls: true
+        cert_path: "/opt/tentaclaw/certs"
+    compliance:
+      hipaa:
+        enabled: true
+        audit_logging: true
+        access_controls: true
+        phi_detection: true
+        auto_redact_phi: false
+        data_retention_days: 365
+        baa_required: true
+      soc2:
+        audit_trail: true
+        access_logging: true
+      gdpr:
+        data_subject_requests: true
+        right_to_deletion: true
+        data_export_format: "json"
+    access_control:
+      authentication: "required"
+      auth_methods: ["ldap", "saml", "local"]
+      session_timeout_minutes: 30
+      max_failed_attempts: 5
+      lockout_duration_minutes: 15
+      role_based_access: true
+      roles:
+        - name: "admin"
+          permissions: ["*"]
+        - name: "user"
+          permissions: ["chat", "search", "embed"]
+        - name: "auditor"
+          permissions: ["read-logs", "read-metrics"]
+    logging:
+      request_logging: true
+      log_prompts: true
+      log_completions: true
+      log_storage: "encrypted-local"
+      log_retention_days: 365
+      tamper_proof: true
+      syslog_forwarding: false
+
+  minimum_cluster_vram: "16GB"
+  estimated_total_vram: "16GB"

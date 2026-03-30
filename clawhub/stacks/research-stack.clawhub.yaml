@@ -1,0 +1,64 @@
+name: "@tentaclaw/research-stack"
+version: "1.0.0"
+type: stack
+title: "Research Stack"
+description: "Deep research and reasoning: large reasoning model + web search skill + research agent + citation tracking. Built for academics, analysts, and knowledge workers."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+stack:
+  components:
+    - name: reasoning-model
+      model: "deepseek-r1:70b"
+      backend: auto
+      replicas: 1
+      resources: { gpuMemory: "48Gi" }
+      description: "DeepSeek R1 70B -- state-of-the-art reasoning model for complex analysis, logic, and multi-step problem solving."
+    - name: embedding-model
+      model: "nomic-embed-text"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "2Gi" }
+      description: "Embedding model for indexing research papers, notes, and retrieved web content."
+    - name: summarizer-model
+      model: "llama3.2:3b"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "3Gi" }
+      description: "Fast small model for summarizing search results and preprocessing retrieved documents."
+
+  config:
+    research_agent:
+      enabled: true
+      max_search_depth: 5
+      max_sources_per_query: 20
+      parallel_searches: 3
+      agent_loop_limit: 15
+    web_search:
+      enabled: true
+      engines:
+        - name: "searxng"
+          type: "meta-search"
+          self_hosted: true
+          url: "http://localhost:8888"
+        - name: "duckduckgo"
+          type: "fallback"
+      safe_search: false
+      result_count: 10
+    citation_tracking:
+      enabled: true
+      format: "apa7"
+      supported_formats: ["apa7", "mla9", "chicago", "ieee", "bibtex"]
+      auto_extract_metadata: true
+      store_full_text: true
+      deduplication: true
+    output:
+      formats: ["markdown", "pdf", "latex", "html"]
+      include_sources: true
+      include_confidence_scores: true
+      chain_of_thought: true
+
+  minimum_cluster_vram: "64GB"
+  estimated_total_vram: "53GB"

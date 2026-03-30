@@ -1,0 +1,71 @@
+name: "@tentaclaw/multi-modal-stack"
+version: "1.0.0"
+type: stack
+title: "Multi-Modal AI Stack"
+description: "All-in-one multi-modal stack: text chat + vision understanding + image generation + voice I/O. Deploy a full-spectrum AI assistant."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+stack:
+  components:
+    - name: chat-model
+      model: "llama3.1:8b"
+      backend: auto
+      replicas: 1
+      resources: { gpuMemory: "8Gi" }
+      description: "Primary text chat model for conversation and reasoning."
+    - name: vision-model
+      model: "llava:13b"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "10Gi" }
+      description: "LLaVA vision-language model for image understanding, captioning, and visual Q&A."
+    - name: image-gen-model
+      model: "sdxl-turbo"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "8Gi" }
+      description: "SDXL Turbo for fast image generation. Conditionally loaded based on available VRAM."
+      optional: true
+      load_condition: "available_vram >= 8Gi"
+    - name: stt-model
+      model: "whisper-large-v3"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "4Gi" }
+      description: "Whisper large-v3 for speech-to-text transcription."
+    - name: tts-model
+      model: "kokoro-v1"
+      backend: ollama
+      replicas: 1
+      resources: { gpuMemory: "2Gi" }
+      description: "Kokoro TTS for natural text-to-speech output."
+
+  config:
+    modalities:
+      text:
+        enabled: true
+        max_tokens: 2048
+      vision:
+        enabled: true
+        max_image_size: "4096x4096"
+        supported_formats: ["png", "jpg", "jpeg", "webp", "gif"]
+      image_generation:
+        enabled: true
+        default_resolution: "1024x1024"
+        steps: 4
+        guidance_scale: 1.0
+      audio:
+        enabled: true
+        stt_language: "auto"
+        tts_voice: "default"
+        tts_streaming: true
+    routing:
+      auto_detect_modality: true
+      fallback_modality: "text"
+
+  minimum_cluster_vram: "24GB"
+  estimated_total_vram: "32GB"
+  notes: "Image generation model is optional and will only load if sufficient VRAM is available after required components."
