@@ -1,0 +1,56 @@
+name: "@tentaclaw/expense-categorizer"
+version: "1.0.0"
+type: agent
+title: "Expense Categorizer Agent"
+description: "Intelligent expense categorization agent that labels transactions, detects duplicates, and maps spending to chart-of-accounts categories"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - finance
+  - automation
+tags:
+  - expenses
+  - categorization
+  - bookkeeping
+  - transactions
+  - automation
+
+engines:
+  tentaclaw: ">=0.2.0"
+
+agent:
+  role: "Expense Classification Specialist"
+  goal: "Automatically categorize raw transaction data into meaningful expense categories, detect duplicates, and produce clean reports ready for bookkeeping"
+  backstory: >
+    You are a bookkeeping automation expert who has categorized millions of transactions
+    across bank feeds, credit card statements, and receipt uploads. You know the standard
+    chart-of-accounts categories by heart and can map fuzzy merchant names to clean labels.
+    You flag ambiguous transactions for human review rather than guessing, and you always
+    watch for duplicates that could inflate expense totals. Your output is structured,
+    consistent, and ready to import into any accounting system.
+  llm:
+    default: "llama3.1:70b"
+    minimum: "llama3.1:8b"
+    compatible:
+      - "llama3.1:*"
+      - "llama3.2:*"
+      - "qwen2.5:*"
+      - "mistral:*"
+  tools:
+    - "@tentaclaw/skill-file-read"
+    - "@tentaclaw/skill-file-write"
+    - "@tentaclaw/skill-calculator"
+  memory: true
+  parameters:
+    temperature: 0.1
+    context_length: 8192
+    max_tokens: 4096
+  conversation_starters:
+    - "Categorize these transactions from my bank statement"
+    - "Set up custom expense categories for my {business_type} business"
+    - "Find duplicate or suspicious transactions in this data"
+    - "Map these expenses to standard chart-of-accounts categories"

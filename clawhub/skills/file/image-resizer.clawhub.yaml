@@ -1,0 +1,43 @@
+name: "@tentaclaw/skill-image-resizer"
+version: "1.0.0"
+type: skill
+title: "Image Resizer Skill"
+description: "Resize and convert images. Supports bulk operations, format conversion, and quality optimization."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - file
+tags:
+  - image
+  - resize
+  - convert
+  - optimization
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - resize-image
+    - convert-format
+    - optimize-quality
+  permissions:
+    - filesystem
+  config_schema:
+    default_quality:
+      type: integer
+      default: 85
+      description: "Default JPEG/WebP quality (1-100)"
+    max_width:
+      type: integer
+      default: 4096
+      description: "Maximum output width in pixels"
+    max_height:
+      type: integer
+      default: 4096
+      description: "Maximum output height in pixels"
+    output_format:
+      type: string
+      default: "png"
+      description: "Default output format (png, jpeg, webp, avif)"

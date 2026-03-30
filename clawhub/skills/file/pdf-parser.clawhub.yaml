@@ -1,0 +1,39 @@
+name: "@tentaclaw/skill-pdf-parser"
+version: "1.0.0"
+type: skill
+title: "PDF Parser Skill"
+description: "Extract text from PDFs. Supports page-level extraction, metadata reading, and table detection."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - file
+tags:
+  - pdf
+  - parser
+  - text-extraction
+  - document
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - extract-text
+    - read-metadata
+    - detect-tables
+  permissions:
+    - filesystem
+  config_schema:
+    ocr_enabled:
+      type: boolean
+      default: false
+      description: "Enable OCR for scanned PDFs (requires Tesseract)"
+    max_pages:
+      type: integer
+      default: 100
+      description: "Maximum number of pages to process per document"
+    output_format:
+      type: string
+      default: "text"
+      description: "Output format (text, json, markdown)"

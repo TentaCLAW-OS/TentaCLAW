@@ -1,0 +1,39 @@
+name: "@tentaclaw/skill-excel-handler"
+version: "1.0.0"
+type: skill
+title: "Excel Handler Skill"
+description: "Read/write Excel files. Supports .xlsx and .csv formats, sheet manipulation, and formula evaluation."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - file
+tags:
+  - excel
+  - spreadsheet
+  - csv
+  - data
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - read-spreadsheet
+    - write-spreadsheet
+    - convert-csv
+  permissions:
+    - filesystem
+  config_schema:
+    default_sheet:
+      type: string
+      default: "Sheet1"
+      description: "Default sheet name to read from or write to"
+    header_row:
+      type: boolean
+      default: true
+      description: "Treat the first row as column headers"
+    date_format:
+      type: string
+      default: "YYYY-MM-DD"
+      description: "Format for date values in output"

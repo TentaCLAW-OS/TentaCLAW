@@ -1,0 +1,39 @@
+name: "@tentaclaw/skill-discord-messenger"
+version: "1.0.0"
+type: skill
+title: "Discord Messenger Skill"
+description: "Send messages to Discord webhooks. Supports embeds, attachments, and rich message formatting."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - communication
+tags:
+  - discord
+  - webhook
+  - messaging
+  - notification
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - send-message
+    - send-embed
+    - send-attachment
+  permissions:
+    - network
+  config_schema:
+    webhook_url:
+      type: string
+      default: ""
+      description: "Discord webhook URL for posting messages"
+    username_override:
+      type: string
+      default: "TentaCLAW"
+      description: "Override the webhook display name"
+    avatar_url:
+      type: string
+      default: ""
+      description: "Override the webhook avatar image URL"

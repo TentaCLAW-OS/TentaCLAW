@@ -1,0 +1,40 @@
+name: "@tentaclaw/skill-process-monitor"
+version: "1.0.0"
+type: skill
+title: "Process Monitor Skill"
+description: "Monitor and manage system processes. Track CPU, memory, and uptime with alerts on threshold violations."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - system
+tags:
+  - process
+  - monitor
+  - cpu
+  - memory
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - list-processes
+    - monitor-process
+    - kill-process
+  permissions:
+    - process
+    - network
+  config_schema:
+    poll_interval:
+      type: integer
+      default: 5000
+      description: "Polling interval in milliseconds for process monitoring"
+    cpu_threshold:
+      type: integer
+      default: 90
+      description: "CPU usage percentage threshold for alerts"
+    memory_threshold:
+      type: integer
+      default: 85
+      description: "Memory usage percentage threshold for alerts"

@@ -1,0 +1,40 @@
+name: "@tentaclaw/skill-disk-monitor"
+version: "1.0.0"
+type: skill
+title: "Disk Monitor Skill"
+description: "Monitor disk usage and health. Track free space, SMART status, and alert on low storage conditions."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - system
+tags:
+  - disk
+  - storage
+  - monitor
+  - health
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - check-usage
+    - smart-status
+    - list-volumes
+  permissions:
+    - filesystem
+    - process
+  config_schema:
+    usage_threshold:
+      type: integer
+      default: 90
+      description: "Disk usage percentage threshold for alerts"
+    poll_interval:
+      type: integer
+      default: 60000
+      description: "Polling interval in milliseconds for usage monitoring"
+    include_mounts:
+      type: string
+      default: "all"
+      description: "Mount points to monitor (all, or comma-separated paths)"

@@ -1,0 +1,39 @@
+name: "@tentaclaw/skill-slack-poster"
+version: "1.0.0"
+type: skill
+title: "Slack Poster Skill"
+description: "Post messages to Slack channels. Supports rich formatting, threads, and reactions via the Slack API."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - communication
+tags:
+  - slack
+  - messaging
+  - notification
+  - chat
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - post-message
+    - thread-reply
+    - add-reaction
+  permissions:
+    - network
+  config_schema:
+    default_channel:
+      type: string
+      default: "#general"
+      description: "Default Slack channel to post messages to"
+    bot_name:
+      type: string
+      default: "TentaCLAW"
+      description: "Display name for the bot in Slack"
+    unfurl_links:
+      type: boolean
+      default: true
+      description: "Enable automatic link previews in messages"

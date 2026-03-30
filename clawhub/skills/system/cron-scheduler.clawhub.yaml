@@ -1,0 +1,40 @@
+name: "@tentaclaw/skill-cron-scheduler"
+version: "1.0.0"
+type: skill
+title: "Cron Scheduler Skill"
+description: "Schedule recurring tasks. Supports cron expressions, one-time delays, and persistent job management."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - system
+tags:
+  - cron
+  - scheduler
+  - automation
+  - tasks
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - schedule-task
+    - list-jobs
+    - cancel-job
+  permissions:
+    - filesystem
+    - process
+  config_schema:
+    timezone:
+      type: string
+      default: "UTC"
+      description: "Timezone for cron schedule evaluation"
+    max_concurrent:
+      type: integer
+      default: 5
+      description: "Maximum number of concurrently running scheduled jobs"
+    persist_jobs:
+      type: boolean
+      default: true
+      description: "Persist scheduled jobs across restarts"

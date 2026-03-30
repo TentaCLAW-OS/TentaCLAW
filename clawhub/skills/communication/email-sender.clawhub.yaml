@@ -1,0 +1,38 @@
+name: "@tentaclaw/skill-email-sender"
+version: "1.0.0"
+type: skill
+title: "Email Sender Skill"
+description: "Send emails via SMTP. Supports plain text and HTML bodies, attachments, and multiple recipients."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - communication
+tags:
+  - email
+  - smtp
+  - notification
+  - messaging
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - send-email
+    - email-attachments
+  permissions:
+    - network
+  config_schema:
+    smtp_host:
+      type: string
+      default: "smtp.gmail.com"
+      description: "SMTP server hostname"
+    smtp_port:
+      type: integer
+      default: 587
+      description: "SMTP server port"
+    use_tls:
+      type: boolean
+      default: true
+      description: "Enable TLS encryption for SMTP connection"
