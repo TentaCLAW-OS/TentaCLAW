@@ -1,0 +1,44 @@
+name: "@tentaclaw/skill-network-ping"
+version: "1.0.0"
+type: skill
+title: "Network Ping Skill"
+description: "Check network connectivity, measure latency, and perform basic host diagnostics."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - system
+tags:
+  - network
+  - ping
+  - connectivity
+  - latency
+  - diagnostics
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - ping
+    - port-check
+    - dns-resolve
+  permissions:
+    - network
+  config_schema:
+    count:
+      type: integer
+      default: 4
+      description: "Number of ping packets to send"
+    timeout:
+      type: integer
+      default: 5000
+      description: "Timeout per ping in milliseconds"
+    protocol:
+      type: string
+      default: "icmp"
+      description: "Protocol (icmp, tcp)"
+    port:
+      type: integer
+      default: 443
+      description: "Port for TCP connectivity check"

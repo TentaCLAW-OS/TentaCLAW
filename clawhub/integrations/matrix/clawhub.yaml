@@ -1,0 +1,34 @@
+name: "@tentaclaw/matrix-bot"
+version: "1.0.0"
+type: integration
+title: "Matrix Chat Integration"
+description: "Connect TentaCLAW to Matrix/Element rooms for decentralized AI chat and automation."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - communication
+tags:
+  - matrix
+  - element
+  - chat
+  - decentralized
+  - self-hosted
+integration:
+  protocol: rest
+  service: matrix
+  entry: ./src/bot.ts
+  transport: websocket
+  tools:
+    - name: chat
+      description: "Chat with a cluster model in Matrix rooms"
+    - name: models
+      description: "List available models"
+    - name: rooms
+      description: "Manage bot room memberships"
+    - name: status
+      description: "Show cluster status and health"
+  auth:
+    type: bearer-token
+    config_key: MATRIX_ACCESS_TOKEN

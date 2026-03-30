@@ -1,0 +1,46 @@
+name: "@tentaclaw/codestral-flight"
+version: "1.0.0"
+type: model
+title: "Mistral Codestral — Code Generation Deployment"
+description: "Flight sheet for Mistral Codestral code-specialized model on mid-range GPUs (16GB+)"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - flight-sheets
+tags:
+  - codestral
+  - mistral
+  - code-generation
+  - programming
+  - developer
+
+model:
+  type: flight-sheet
+  base_model: "codestral"
+  variant: "instruct"
+  quantization: "Q4_K_M"
+  format: gguf
+  hardware:
+    minimum_vram: "16GB"
+    recommended_vram: "24GB"
+    compatible_gpus:
+      - "RTX 4070 Ti 16GB"
+      - "RTX 4080 16GB"
+      - "RTX 4090 24GB"
+      - "RTX 5070 Ti 16GB"
+      - "RX 7900 XTX 24GB"
+  parameters:
+    context_length: 32768
+    batch_size: 512
+    gpu_layers: 48
+    threads: 8
+    mlock: true
+    mmap: true
+  benchmarks:
+    tokens_per_second: 30
+    time_to_first_token: 0.5
+    hardware_tested: "RTX 4090 24GB"

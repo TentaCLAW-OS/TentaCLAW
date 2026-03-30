@@ -1,0 +1,34 @@
+name: "@tentaclaw/linear-integration"
+version: "1.0.0"
+type: integration
+title: "Linear Issue AI"
+description: "AI assistant for Linear. Draft issues, triage bugs, and generate cycle reports."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - project-management
+tags:
+  - linear
+  - issues
+  - bug-tracking
+  - cycles
+  - project-management
+integration:
+  protocol: graphql
+  service: linear
+  entry: ./src/index.ts
+  transport: http
+  tools:
+    - name: create-issue
+      description: "Draft a Linear issue from a natural language description"
+    - name: triage
+      description: "Auto-triage and label incoming issues"
+    - name: cycle-report
+      description: "Generate a cycle progress summary"
+    - name: search
+      description: "Natural language search across Linear issues"
+  auth:
+    type: bearer-token
+    config_key: LINEAR_API_KEY

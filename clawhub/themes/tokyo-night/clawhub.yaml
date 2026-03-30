@@ -1,0 +1,27 @@
+name: "@tentaclaw/tokyo-night"
+version: "1.0.0"
+type: theme
+title: "Tokyo Night — Neon City Lights"
+description: "Inspired by Tokyo's nightlife. Blue and purple on deep blue."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [full-themes]
+tags: [dark, tokyo, night, neon, blue]
+theme:
+  type: full-theme
+  framework: static
+  entry: ./css/tokyo-night.css
+  preview: ./preview.png
+  variables:
+    background: { type: color, default: "#1a1b26" }
+    surface: { type: color, default: "#24283b" }
+    panel: { type: color, default: "#292e42" }
+    primary: { type: color, default: "#7aa2f7" }
+    secondary: { type: color, default: "#bb9af7" }
+    text: { type: color, default: "#c0caf5" }
+    dim: { type: color, default: "#565f89" }
+    success: { type: color, default: "#9ece6a" }
+    warning: { type: color, default: "#e0af68" }
+    danger: { type: color, default: "#f7768e" }

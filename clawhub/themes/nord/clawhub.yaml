@@ -1,0 +1,27 @@
+name: "@tentaclaw/nord"
+version: "1.0.0"
+type: theme
+title: "Nord — Arctic Frost"
+description: "Cool blues and muted tones. Clean, calm, professional."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [full-themes]
+tags: [dark, nord, blue, arctic, professional]
+theme:
+  type: full-theme
+  framework: static
+  entry: ./css/nord.css
+  preview: ./preview.png
+  variables:
+    background: { type: color, default: "#2e3440" }
+    surface: { type: color, default: "#3b4252" }
+    panel: { type: color, default: "#434c5e" }
+    primary: { type: color, default: "#88c0d0" }
+    secondary: { type: color, default: "#81a1c1" }
+    text: { type: color, default: "#eceff4" }
+    dim: { type: color, default: "#4c566a" }
+    success: { type: color, default: "#a3be8c" }
+    warning: { type: color, default: "#ebcb8b" }
+    danger: { type: color, default: "#bf616a" }

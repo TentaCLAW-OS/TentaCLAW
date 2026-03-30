@@ -1,0 +1,39 @@
+name: "@tentaclaw/skill-rss-reader"
+version: "1.0.0"
+type: skill
+title: "RSS Reader Skill"
+description: "Parse and fetch RSS/Atom feeds. Returns structured feed items with titles, links, and summaries."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - web
+tags:
+  - rss
+  - atom
+  - feeds
+  - news
+  - syndication
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - rss-parse
+    - atom-parse
+  permissions:
+    - network
+  config_schema:
+    max_items:
+      type: integer
+      default: 20
+      description: "Maximum feed items to return"
+    include_content:
+      type: boolean
+      default: false
+      description: "Include full article content if available"
+    timeout:
+      type: integer
+      default: 10000
+      description: "Request timeout in milliseconds"

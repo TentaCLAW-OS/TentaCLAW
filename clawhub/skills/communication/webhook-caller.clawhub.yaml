@@ -1,0 +1,43 @@
+name: "@tentaclaw/skill-webhook-caller"
+version: "1.0.0"
+type: skill
+title: "Webhook Caller Skill"
+description: "Send HTTP webhook requests with custom payloads, headers, and retry logic."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - communication
+tags:
+  - webhook
+  - http
+  - api
+  - notifications
+  - automation
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - webhook-send
+    - http-request
+  permissions:
+    - network
+  config_schema:
+    method:
+      type: string
+      default: "POST"
+      description: "HTTP method (GET, POST, PUT, PATCH, DELETE)"
+    timeout:
+      type: integer
+      default: 30000
+      description: "Request timeout in milliseconds"
+    max_retries:
+      type: integer
+      default: 3
+      description: "Maximum retry attempts on failure"
+    retry_delay:
+      type: integer
+      default: 1000
+      description: "Delay between retries in milliseconds"

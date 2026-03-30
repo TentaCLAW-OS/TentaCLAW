@@ -1,0 +1,34 @@
+name: "@tentaclaw/gitlab-integration"
+version: "1.0.0"
+type: integration
+title: "GitLab CI Integration"
+description: "AI-powered GitLab assistant. Review MRs, analyze CI failures, and generate pipeline configs."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - devops
+tags:
+  - gitlab
+  - ci-cd
+  - merge-request
+  - pipeline
+  - code-review
+integration:
+  protocol: rest
+  service: gitlab
+  entry: ./src/index.ts
+  transport: webhook
+  tools:
+    - name: review-mr
+      description: "AI code review on merge requests"
+    - name: analyze-failure
+      description: "Diagnose CI pipeline failures"
+    - name: generate-pipeline
+      description: "Generate .gitlab-ci.yml configurations"
+    - name: summarize-mr
+      description: "Summarize merge request changes"
+  auth:
+    type: bearer-token
+    config_key: GITLAB_ACCESS_TOKEN

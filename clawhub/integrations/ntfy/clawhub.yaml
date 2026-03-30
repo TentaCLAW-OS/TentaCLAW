@@ -1,0 +1,34 @@
+name: "@tentaclaw/ntfy-integration"
+version: "1.0.0"
+type: integration
+title: "ntfy Push Notifications"
+description: "Send push notifications from TentaCLAW via ntfy. Alert on inference, errors, and events."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - communication
+tags:
+  - ntfy
+  - push-notifications
+  - alerts
+  - self-hosted
+  - mobile
+integration:
+  protocol: rest
+  service: ntfy
+  entry: ./src/index.ts
+  transport: http
+  tools:
+    - name: notify
+      description: "Send a push notification to a topic"
+    - name: subscribe
+      description: "Subscribe to cluster event notifications"
+    - name: topics
+      description: "List configured notification topics"
+    - name: history
+      description: "View recent notification history"
+  auth:
+    type: bearer-token
+    config_key: NTFY_ACCESS_TOKEN

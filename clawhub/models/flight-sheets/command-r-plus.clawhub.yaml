@@ -1,0 +1,46 @@
+name: "@tentaclaw/command-r-plus-flight"
+version: "1.0.0"
+type: model
+title: "Cohere Command R+ — RAG-Optimized Deployment"
+description: "Flight sheet for Cohere Command R+ optimized for retrieval-augmented generation (24GB+)"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - flight-sheets
+tags:
+  - cohere
+  - command-r
+  - rag
+  - retrieval
+  - enterprise
+
+model:
+  type: flight-sheet
+  base_model: "command-r-plus"
+  variant: "instruct"
+  quantization: "Q4_K_M"
+  format: gguf
+  hardware:
+    minimum_vram: "24GB"
+    recommended_vram: "48GB"
+    compatible_gpus:
+      - "RTX 4090 24GB"
+      - "RTX 5090 32GB"
+      - "A6000 48GB"
+      - "A100 80GB"
+      - "RX 7900 XTX 24GB"
+  parameters:
+    context_length: 131072
+    batch_size: 1024
+    gpu_layers: 56
+    threads: 12
+    mlock: true
+    mmap: true
+  benchmarks:
+    tokens_per_second: 18
+    time_to_first_token: 0.9
+    hardware_tested: "RTX 4090 24GB"

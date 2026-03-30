@@ -1,0 +1,34 @@
+name: "@tentaclaw/notion-integration"
+version: "1.0.0"
+type: integration
+title: "Notion Integration"
+description: "AI-powered Notion assistant. Summarize pages, generate content, and query databases."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - productivity
+tags:
+  - notion
+  - wiki
+  - knowledge-base
+  - documentation
+  - productivity
+integration:
+  protocol: rest
+  service: notion
+  entry: ./src/index.ts
+  transport: http
+  tools:
+    - name: summarize
+      description: "Summarize a Notion page or database"
+    - name: generate
+      description: "Generate content and insert into a page"
+    - name: query
+      description: "Query a Notion database with natural language"
+    - name: search
+      description: "Semantic search across Notion workspace"
+  auth:
+    type: bearer-token
+    config_key: NOTION_API_TOKEN

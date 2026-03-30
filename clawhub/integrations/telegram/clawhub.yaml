@@ -1,0 +1,34 @@
+name: "@tentaclaw/telegram-bot"
+version: "1.0.0"
+type: integration
+title: "Telegram Bot Integration"
+description: "Run AI inference from Telegram. Chat with your cluster models in any group or DM."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - communication
+tags:
+  - telegram
+  - bot
+  - chat
+  - inference
+  - messaging
+integration:
+  protocol: rest
+  service: telegram
+  entry: ./src/bot.ts
+  transport: webhook
+  tools:
+    - name: chat
+      description: "Chat with a cluster model from Telegram"
+    - name: models
+      description: "List available models"
+    - name: image
+      description: "Generate or analyze images"
+    - name: voice
+      description: "Transcribe voice messages"
+  auth:
+    type: bearer-token
+    config_key: TELEGRAM_BOT_TOKEN

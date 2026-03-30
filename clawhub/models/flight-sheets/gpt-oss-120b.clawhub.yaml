@@ -1,0 +1,46 @@
+name: "@tentaclaw/gpt-oss-120b-flight"
+version: "1.0.0"
+type: model
+title: "OpenAI GPT-OSS 120B — High-Performance Deployment"
+description: "Flight sheet for OpenAI GPT-OSS 120B on multi-GPU or datacenter hardware (48GB+)"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - flight-sheets
+tags:
+  - gpt
+  - openai
+  - 120b
+  - open-source
+  - high-performance
+
+model:
+  type: flight-sheet
+  base_model: "gpt-oss"
+  variant: "120b-instruct"
+  quantization: "Q4_K_M"
+  format: gguf
+  hardware:
+    minimum_vram: "48GB"
+    recommended_vram: "80GB"
+    compatible_gpus:
+      - "2x RTX 4090 24GB"
+      - "A6000 48GB"
+      - "A100 80GB"
+      - "H100 80GB"
+      - "2x RTX 5090 32GB"
+  parameters:
+    context_length: 32768
+    batch_size: 1024
+    gpu_layers: 80
+    threads: 16
+    mlock: true
+    mmap: true
+  benchmarks:
+    tokens_per_second: 12
+    time_to_first_token: 1.8
+    hardware_tested: "A100 80GB"

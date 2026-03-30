@@ -1,0 +1,47 @@
+name: "@tentaclaw/phi4-flight"
+version: "1.0.0"
+type: model
+title: "Microsoft Phi-4 — Edge Deployment"
+description: "Flight sheet for Microsoft Phi-4 small language model on consumer and edge hardware (4GB+)"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - flight-sheets
+tags:
+  - phi
+  - microsoft
+  - small-model
+  - edge
+  - efficient
+
+model:
+  type: flight-sheet
+  base_model: "phi4"
+  variant: "instruct"
+  quantization: "Q4_K_M"
+  format: gguf
+  hardware:
+    minimum_vram: "4GB"
+    recommended_vram: "6GB"
+    compatible_gpus:
+      - "RTX 3050 6GB"
+      - "RTX 3060 12GB"
+      - "RTX 4060 8GB"
+      - "GTX 1660 Super 6GB"
+      - "Intel Arc A770 16GB"
+      - "RX 6600 8GB"
+  parameters:
+    context_length: 16384
+    batch_size: 512
+    gpu_layers: 33
+    threads: 8
+    mlock: true
+    mmap: true
+  benchmarks:
+    tokens_per_second: 65
+    time_to_first_token: 0.15
+    hardware_tested: "RTX 4060 8GB"

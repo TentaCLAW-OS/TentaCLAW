@@ -1,0 +1,27 @@
+name: "@tentaclaw/rose-pine"
+version: "1.0.0"
+type: theme
+title: "Rose Pine — Soho Vibes"
+description: "Muted rose and pine tones. Elegant and understated."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [full-themes]
+tags: [dark, rose, pine, elegant, muted]
+theme:
+  type: full-theme
+  framework: static
+  entry: ./css/rose-pine.css
+  preview: ./preview.png
+  variables:
+    background: { type: color, default: "#191724" }
+    surface: { type: color, default: "#1f1d2e" }
+    panel: { type: color, default: "#26233a" }
+    primary: { type: color, default: "#c4a7e7" }
+    secondary: { type: color, default: "#ebbcba" }
+    text: { type: color, default: "#e0def4" }
+    dim: { type: color, default: "#6e6a86" }
+    success: { type: color, default: "#31748f" }
+    warning: { type: color, default: "#f6c177" }
+    danger: { type: color, default: "#eb6f92" }

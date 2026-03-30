@@ -1,0 +1,34 @@
+name: "@tentaclaw/zapier-integration"
+version: "1.0.0"
+type: integration
+title: "Zapier Automation"
+description: "Connect TentaCLAW to 6000+ apps via Zapier. Trigger Zaps from cluster events."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - automation
+tags:
+  - zapier
+  - automation
+  - workflow
+  - no-code
+  - integrations
+integration:
+  protocol: rest
+  service: zapier
+  entry: ./src/index.ts
+  transport: webhook
+  tools:
+    - name: trigger
+      description: "Trigger a Zapier webhook from cluster events"
+    - name: list-zaps
+      description: "List connected Zaps"
+    - name: test
+      description: "Send a test event to a Zap"
+    - name: logs
+      description: "View recent Zap execution logs"
+  auth:
+    type: api-key
+    config_key: ZAPIER_WEBHOOK_SECRET

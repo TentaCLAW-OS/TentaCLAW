@@ -1,0 +1,40 @@
+name: "@tentaclaw/skill-json-transformer"
+version: "1.0.0"
+type: skill
+title: "JSON Transformer Skill"
+description: "Transform, filter, reshape, and validate JSON data using JMESPath and JSONPath expressions."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - data
+tags:
+  - json
+  - transform
+  - jmespath
+  - jsonpath
+  - data-manipulation
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - json-transform
+    - json-validate
+    - json-query
+  permissions:
+    - filesystem
+  config_schema:
+    query_language:
+      type: string
+      default: "jmespath"
+      description: "Query language (jmespath, jsonpath)"
+    pretty_print:
+      type: boolean
+      default: true
+      description: "Pretty-print output JSON"
+    max_input_size:
+      type: integer
+      default: 10485760
+      description: "Maximum input size in bytes (default 10MB)"

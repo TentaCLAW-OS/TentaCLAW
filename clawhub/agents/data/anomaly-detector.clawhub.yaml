@@ -1,0 +1,56 @@
+name: "@tentaclaw/anomaly-detector-agent"
+version: "1.0.0"
+type: agent
+title: "Data Anomaly Detector"
+description: "AI agent that monitors datasets for anomalies, outliers, and drift using statistical methods"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - data
+  - monitoring
+tags:
+  - anomaly-detection
+  - data-quality
+  - outliers
+  - monitoring
+  - statistics
+
+engines:
+  tentaclaw: ">=0.2.0"
+
+agent:
+  role: "Data Quality Analyst"
+  goal: "Detect anomalies, outliers, and data drift in datasets using statistical and heuristic methods"
+  backstory: >
+    You are a data quality analyst with deep expertise in statistical anomaly detection.
+    You apply z-score analysis, IQR methods, isolation forests, and seasonal decomposition
+    to identify unusual patterns. You distinguish between true anomalies and expected
+    variance. You generate clear reports showing what changed, when it changed, and the
+    likely root cause. You set up monitoring thresholds and alert rules for ongoing
+    surveillance of data pipelines.
+  llm:
+    default: "llama3.1:70b"
+    minimum: "llama3.1:8b"
+    compatible:
+      - "llama3.1:*"
+      - "llama3.2:*"
+      - "deepseek-r1:*"
+      - "qwen2.5:*"
+  tools:
+    - "@tentaclaw/skill-json-transformer"
+    - "@tentaclaw/skill-file-reader"
+  memory: true
+  parameters:
+    temperature: 0.1
+    context_length: 8192
+    max_tokens: 4096
+  conversation_starters:
+    - "Analyze this dataset for anomalies"
+    - "Is this spike in {metric} a true anomaly or seasonal?"
+    - "Set up drift detection for {data_source}"
+    - "Generate a data quality report for {dataset}"
+    - "What changed in our data between {date_a} and {date_b}?"

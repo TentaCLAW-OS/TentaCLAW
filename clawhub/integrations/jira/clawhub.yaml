@@ -1,0 +1,34 @@
+name: "@tentaclaw/jira-integration"
+version: "1.0.0"
+type: integration
+title: "Jira Ticket AI"
+description: "AI assistant for Jira. Auto-write tickets, estimate effort, and summarize sprints."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - project-management
+tags:
+  - jira
+  - tickets
+  - agile
+  - sprint
+  - atlassian
+integration:
+  protocol: rest
+  service: jira
+  entry: ./src/index.ts
+  transport: http
+  tools:
+    - name: create-ticket
+      description: "Generate a well-structured Jira ticket from a description"
+    - name: estimate
+      description: "Estimate story points based on ticket content"
+    - name: sprint-summary
+      description: "Summarize sprint progress and blockers"
+    - name: search
+      description: "Natural language search across Jira issues"
+  auth:
+    type: basic
+    config_key: JIRA_API_TOKEN

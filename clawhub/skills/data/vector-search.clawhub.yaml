@@ -1,0 +1,44 @@
+name: "@tentaclaw/skill-vector-search"
+version: "1.0.0"
+type: skill
+title: "Vector Search Skill"
+description: "Perform semantic similarity search over embedded documents using local vector stores."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - data
+tags:
+  - vector-search
+  - embeddings
+  - semantic-search
+  - rag
+  - similarity
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - vector-search
+    - embedding
+    - index-management
+  permissions:
+    - filesystem
+  config_schema:
+    embedding_model:
+      type: string
+      default: "nomic-embed-text"
+      description: "Embedding model to use for vectorization"
+    top_k:
+      type: integer
+      default: 5
+      description: "Number of results to return"
+    similarity_threshold:
+      type: number
+      default: 0.7
+      description: "Minimum similarity score (0.0-1.0)"
+    store_backend:
+      type: string
+      default: "sqlite-vss"
+      description: "Vector store backend (sqlite-vss, faiss, hnswlib)"

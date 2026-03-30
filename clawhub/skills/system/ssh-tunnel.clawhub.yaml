@@ -1,0 +1,44 @@
+name: "@tentaclaw/skill-ssh-tunnel"
+version: "1.0.0"
+type: skill
+title: "SSH Tunnel Skill"
+description: "Create and manage SSH tunnels for secure port forwarding and remote access."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - system
+tags:
+  - ssh
+  - tunnel
+  - port-forwarding
+  - remote-access
+  - security
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - ssh-tunnel
+    - port-forward
+  permissions:
+    - network
+    - filesystem
+  config_schema:
+    ssh_key_path:
+      type: string
+      default: "~/.ssh/id_ed25519"
+      description: "Path to SSH private key"
+    default_port:
+      type: integer
+      default: 22
+      description: "Default SSH port"
+    keep_alive_interval:
+      type: integer
+      default: 60
+      description: "Keep-alive interval in seconds"
+    connection_timeout:
+      type: integer
+      default: 30
+      description: "Connection timeout in seconds"

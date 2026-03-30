@@ -1,0 +1,46 @@
+name: "@tentaclaw/mistral-large-3-flight"
+version: "1.0.0"
+type: model
+title: "Mistral Large 3 — High-Performance Deployment"
+description: "Flight sheet for Mistral Large 3 on high-VRAM GPUs (24GB+)"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - flight-sheets
+tags:
+  - mistral
+  - large
+  - reasoning
+  - multilingual
+  - high-performance
+
+model:
+  type: flight-sheet
+  base_model: "mistral-large"
+  variant: "3-instruct"
+  quantization: "Q4_K_M"
+  format: gguf
+  hardware:
+    minimum_vram: "24GB"
+    recommended_vram: "48GB"
+    compatible_gpus:
+      - "RTX 4090 24GB"
+      - "RTX 5090 32GB"
+      - "A6000 48GB"
+      - "A100 80GB"
+      - "RX 7900 XTX 24GB"
+  parameters:
+    context_length: 32768
+    batch_size: 1024
+    gpu_layers: 56
+    threads: 12
+    mlock: true
+    mmap: true
+  benchmarks:
+    tokens_per_second: 20
+    time_to_first_token: 0.7
+    hardware_tested: "RTX 4090 24GB"

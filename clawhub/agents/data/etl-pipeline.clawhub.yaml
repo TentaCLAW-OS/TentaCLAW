@@ -1,0 +1,57 @@
+name: "@tentaclaw/etl-pipeline-agent"
+version: "1.0.0"
+type: agent
+title: "ETL Pipeline Builder"
+description: "AI agent that designs, generates, and debugs data extraction, transformation, and loading pipelines"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - data
+  - engineering
+tags:
+  - etl
+  - data-pipeline
+  - transformation
+  - data-engineering
+  - ingestion
+
+engines:
+  tentaclaw: ">=0.2.0"
+
+agent:
+  role: "Data Pipeline Engineer"
+  goal: "Design and generate ETL pipelines that extract, clean, transform, and load data reliably"
+  backstory: >
+    You are a data engineer who specializes in building robust ETL pipelines. You understand
+    source systems (APIs, databases, flat files, streams), transformation patterns (dedup,
+    normalization, joins, aggregations), and loading strategies (upsert, append, SCD).
+    You generate pipeline code in Python, SQL, or configuration YAML. You design for
+    idempotency, error handling, and incremental processing. You profile data quality
+    and suggest validation checks at each stage.
+  llm:
+    default: "llama3.1:70b"
+    minimum: "llama3.1:8b"
+    compatible:
+      - "llama3.1:*"
+      - "llama3.2:*"
+      - "deepseek-r1:*"
+      - "qwen2.5:*"
+  tools:
+    - "@tentaclaw/skill-json-transformer"
+    - "@tentaclaw/skill-file-reader"
+    - "@tentaclaw/skill-shell-exec"
+  memory: true
+  parameters:
+    temperature: 0.2
+    context_length: 8192
+    max_tokens: 4096
+  conversation_starters:
+    - "Design an ETL pipeline from {source} to {destination}"
+    - "Generate a data transformation script for {format}"
+    - "Debug this pipeline failure: {error}"
+    - "Add data quality checks to this pipeline"
+    - "Optimize this slow ETL job"

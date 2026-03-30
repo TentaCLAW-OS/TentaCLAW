@@ -1,0 +1,47 @@
+name: "@tentaclaw/qwen3.5-9b-flight"
+version: "1.0.0"
+type: model
+title: "Qwen 3.5 9B — Standard Deployment"
+description: "Flight sheet for Alibaba Qwen 3.5 9B on consumer GPUs (8GB+ VRAM)"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - flight-sheets
+tags:
+  - qwen
+  - 9b
+  - multilingual
+  - general-purpose
+  - consumer-gpu
+
+model:
+  type: flight-sheet
+  base_model: "qwen3.5"
+  variant: "9b-instruct"
+  quantization: "Q4_K_M"
+  format: gguf
+  hardware:
+    minimum_vram: "6GB"
+    recommended_vram: "8GB"
+    compatible_gpus:
+      - "RTX 3060 12GB"
+      - "RTX 3070 8GB"
+      - "RTX 4060 8GB"
+      - "RTX 4070 Ti 16GB"
+      - "RTX 4090 24GB"
+      - "RX 7800 XT 16GB"
+  parameters:
+    context_length: 32768
+    batch_size: 512
+    gpu_layers: 33
+    threads: 8
+    mlock: true
+    mmap: true
+  benchmarks:
+    tokens_per_second: 48
+    time_to_first_token: 0.25
+    hardware_tested: "RTX 4070 Ti Super 16GB"

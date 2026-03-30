@@ -1,0 +1,43 @@
+name: "@tentaclaw/skill-markdown-renderer"
+version: "1.0.0"
+type: skill
+title: "Markdown Renderer Skill"
+description: "Render markdown files to HTML or PDF with syntax highlighting and custom themes."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - file
+tags:
+  - markdown
+  - html
+  - pdf
+  - rendering
+  - documentation
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - markdown-to-html
+    - markdown-to-pdf
+  permissions:
+    - filesystem
+  config_schema:
+    output_format:
+      type: string
+      default: "html"
+      description: "Output format (html, pdf)"
+    theme:
+      type: string
+      default: "github"
+      description: "CSS theme (github, dark, minimal, academic)"
+    syntax_highlighting:
+      type: boolean
+      default: true
+      description: "Enable code syntax highlighting"
+    table_of_contents:
+      type: boolean
+      default: false
+      description: "Generate table of contents from headings"

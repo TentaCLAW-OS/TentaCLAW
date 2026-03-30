@@ -1,0 +1,45 @@
+name: "@tentaclaw/skill-calendar"
+version: "1.0.0"
+type: skill
+title: "Calendar Management Skill"
+description: "Read, create, and manage calendar events via CalDAV or local ICS files."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - communication
+tags:
+  - calendar
+  - events
+  - scheduling
+  - caldav
+  - ics
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - calendar-read
+    - calendar-write
+    - event-search
+  permissions:
+    - network
+    - filesystem
+  config_schema:
+    provider:
+      type: string
+      default: "caldav"
+      description: "Calendar provider (caldav, ics-file, google, outlook)"
+    caldav_url:
+      type: string
+      default: ""
+      description: "CalDAV server URL"
+    default_duration:
+      type: integer
+      default: 30
+      description: "Default event duration in minutes"
+    timezone:
+      type: string
+      default: "UTC"
+      description: "Default timezone for new events"

@@ -1,0 +1,27 @@
+name: "@tentaclaw/catppuccin"
+version: "1.0.0"
+type: theme
+title: "Catppuccin Mocha — Warm Pastels"
+description: "Soothing pastel colors on warm dark background. Easy on the eyes."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [full-themes]
+tags: [dark, catppuccin, pastel, warm, cozy]
+theme:
+  type: full-theme
+  framework: static
+  entry: ./css/catppuccin.css
+  preview: ./preview.png
+  variables:
+    background: { type: color, default: "#1e1e2e" }
+    surface: { type: color, default: "#313244" }
+    panel: { type: color, default: "#45475a" }
+    primary: { type: color, default: "#cba6f7" }
+    secondary: { type: color, default: "#f5c2e7" }
+    text: { type: color, default: "#cdd6f4" }
+    dim: { type: color, default: "#6c7086" }
+    success: { type: color, default: "#a6e3a1" }
+    warning: { type: color, default: "#f9e2af" }
+    danger: { type: color, default: "#f38ba8" }

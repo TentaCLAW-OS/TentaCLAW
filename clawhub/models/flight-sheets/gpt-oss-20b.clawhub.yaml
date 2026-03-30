@@ -1,0 +1,46 @@
+name: "@tentaclaw/gpt-oss-20b-flight"
+version: "1.0.0"
+type: model
+title: "OpenAI GPT-OSS 20B — Standard Deployment"
+description: "Flight sheet for OpenAI GPT-OSS 20B open-weight model on consumer GPUs (12GB+)"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - flight-sheets
+tags:
+  - gpt
+  - openai
+  - 20b
+  - open-source
+  - general-purpose
+
+model:
+  type: flight-sheet
+  base_model: "gpt-oss"
+  variant: "20b-instruct"
+  quantization: "Q4_K_M"
+  format: gguf
+  hardware:
+    minimum_vram: "12GB"
+    recommended_vram: "16GB"
+    compatible_gpus:
+      - "RTX 3060 12GB"
+      - "RTX 4070 Ti 16GB"
+      - "RTX 4090 24GB"
+      - "RTX 5070 Ti 16GB"
+      - "RX 7800 XT 16GB"
+  parameters:
+    context_length: 16384
+    batch_size: 512
+    gpu_layers: 40
+    threads: 8
+    mlock: true
+    mmap: true
+  benchmarks:
+    tokens_per_second: 35
+    time_to_first_token: 0.4
+    hardware_tested: "RTX 4070 Ti Super 16GB"

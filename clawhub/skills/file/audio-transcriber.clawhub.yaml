@@ -1,0 +1,43 @@
+name: "@tentaclaw/skill-audio-transcriber"
+version: "1.0.0"
+type: skill
+title: "Audio Transcriber Skill"
+description: "Transcribe audio files to text using Whisper models. Supports mp3, wav, flac, and ogg."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - file
+tags:
+  - audio
+  - transcription
+  - whisper
+  - speech-to-text
+  - voice
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - audio-transcribe
+    - language-detect
+  permissions:
+    - filesystem
+  config_schema:
+    model:
+      type: string
+      default: "whisper-base"
+      description: "Whisper model size (tiny, base, small, medium, large)"
+    language:
+      type: string
+      default: "auto"
+      description: "Audio language (auto for detection, or ISO 639-1 code)"
+    output_format:
+      type: string
+      default: "text"
+      description: "Output format (text, srt, vtt, json)"
+    word_timestamps:
+      type: boolean
+      default: false
+      description: "Include word-level timestamps"

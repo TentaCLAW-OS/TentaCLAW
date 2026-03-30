@@ -1,0 +1,34 @@
+name: "@tentaclaw/sentry-integration"
+version: "1.0.0"
+type: integration
+title: "Sentry Error Tracking"
+description: "Send TentaCLAW errors to Sentry. AI-assisted error grouping and root cause analysis."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - monitoring
+tags:
+  - sentry
+  - error-tracking
+  - debugging
+  - observability
+  - alerts
+integration:
+  protocol: rest
+  service: sentry
+  entry: ./src/index.ts
+  transport: http
+  tools:
+    - name: report
+      description: "Send error events to Sentry"
+    - name: analyze
+      description: "AI root cause analysis on Sentry issues"
+    - name: summarize
+      description: "Summarize recent error trends"
+    - name: resolve
+      description: "Mark issues as resolved with fix notes"
+  auth:
+    type: bearer-token
+    config_key: SENTRY_AUTH_TOKEN

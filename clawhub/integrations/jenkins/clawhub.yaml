@@ -1,0 +1,34 @@
+name: "@tentaclaw/jenkins-integration"
+version: "1.0.0"
+type: integration
+title: "Jenkins Plugin Integration"
+description: "AI assistant for Jenkins. Diagnose build failures, generate Jenkinsfiles, and optimize pipelines."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - devops
+tags:
+  - jenkins
+  - ci-cd
+  - builds
+  - pipeline
+  - automation
+integration:
+  protocol: rest
+  service: jenkins
+  entry: ./src/index.ts
+  transport: http
+  tools:
+    - name: diagnose
+      description: "Analyze Jenkins build failures and suggest fixes"
+    - name: generate
+      description: "Generate Jenkinsfile pipeline definitions"
+    - name: optimize
+      description: "Suggest pipeline performance optimizations"
+    - name: status
+      description: "Show build status dashboard"
+  auth:
+    type: basic
+    config_key: JENKINS_API_TOKEN

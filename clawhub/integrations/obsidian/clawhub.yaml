@@ -1,0 +1,34 @@
+name: "@tentaclaw/obsidian-integration"
+version: "1.0.0"
+type: integration
+title: "Obsidian Vault AI"
+description: "AI assistant for Obsidian vaults. Semantic search, note generation, and link suggestions."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - productivity
+tags:
+  - obsidian
+  - notes
+  - knowledge-base
+  - markdown
+  - pkm
+integration:
+  protocol: rest
+  service: obsidian
+  entry: ./src/index.ts
+  transport: http
+  tools:
+    - name: search
+      description: "Semantic search across vault notes"
+    - name: generate
+      description: "Generate new notes from prompts"
+    - name: summarize
+      description: "Summarize a note or folder of notes"
+    - name: link-suggest
+      description: "Suggest backlinks and connections between notes"
+  auth:
+    type: api-key
+    config_key: OBSIDIAN_REST_API_KEY

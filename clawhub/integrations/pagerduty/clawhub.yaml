@@ -1,0 +1,34 @@
+name: "@tentaclaw/pagerduty-integration"
+version: "1.0.0"
+type: integration
+title: "PagerDuty Alerts"
+description: "Send TentaCLAW cluster alerts to PagerDuty. AI-assisted incident triage and escalation."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - monitoring
+tags:
+  - pagerduty
+  - alerts
+  - incident-management
+  - on-call
+  - escalation
+integration:
+  protocol: rest
+  service: pagerduty
+  entry: ./src/index.ts
+  transport: http
+  tools:
+    - name: trigger
+      description: "Trigger a PagerDuty incident from cluster alerts"
+    - name: acknowledge
+      description: "Acknowledge an incident"
+    - name: resolve
+      description: "Resolve an incident with summary"
+    - name: on-call
+      description: "Show current on-call schedule"
+  auth:
+    type: bearer-token
+    config_key: PAGERDUTY_API_KEY

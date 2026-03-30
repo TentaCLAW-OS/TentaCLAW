@@ -1,0 +1,43 @@
+name: "@tentaclaw/skill-screenshot"
+version: "1.0.0"
+type: skill
+title: "Screenshot Skill"
+description: "Capture full-page or viewport screenshots of any URL. Returns PNG images."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - web
+tags:
+  - screenshot
+  - web
+  - capture
+  - headless-browser
+  - rendering
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - screenshot
+    - page-render
+  permissions:
+    - network
+  config_schema:
+    viewport_width:
+      type: integer
+      default: 1280
+      description: "Viewport width in pixels"
+    viewport_height:
+      type: integer
+      default: 720
+      description: "Viewport height in pixels"
+    full_page:
+      type: boolean
+      default: true
+      description: "Capture full scrollable page or just viewport"
+    format:
+      type: string
+      default: "png"
+      description: "Output format (png, jpeg, webp)"

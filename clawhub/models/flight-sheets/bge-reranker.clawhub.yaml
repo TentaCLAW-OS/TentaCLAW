@@ -1,0 +1,46 @@
+name: "@tentaclaw/bge-reranker-flight"
+version: "1.0.0"
+type: model
+title: "BGE Reranker — Reranking Deployment"
+description: "Flight sheet for BAAI BGE Reranker v2 for search result reranking on any GPU (2GB+)"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - flight-sheets
+tags:
+  - bge
+  - reranker
+  - search
+  - rag
+  - cross-encoder
+
+model:
+  type: flight-sheet
+  base_model: "bge-reranker"
+  variant: "v2-m3"
+  quantization: "f16"
+  format: gguf
+  hardware:
+    minimum_vram: "2GB"
+    recommended_vram: "4GB"
+    compatible_gpus:
+      - "Any GPU with 2GB+ VRAM"
+      - "GTX 1050 Ti 4GB"
+      - "RTX 3050 6GB"
+      - "Intel Arc A380 6GB"
+      - "Apple M1 8GB (unified)"
+  parameters:
+    context_length: 8192
+    batch_size: 128
+    gpu_layers: 24
+    threads: 4
+    mlock: true
+    mmap: true
+  benchmarks:
+    tokens_per_second: 400
+    time_to_first_token: 0.03
+    hardware_tested: "RTX 3060 12GB"

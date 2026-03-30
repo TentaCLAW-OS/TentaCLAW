@@ -1,0 +1,46 @@
+name: "@tentaclaw/starcoder2-flight"
+version: "1.0.0"
+type: model
+title: "StarCoder2 — Code Completion Deployment"
+description: "Flight sheet for BigCode StarCoder2 15B code completion model on consumer GPUs (12GB+)"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - flight-sheets
+tags:
+  - starcoder
+  - code
+  - completion
+  - bigcode
+  - developer
+
+model:
+  type: flight-sheet
+  base_model: "starcoder2"
+  variant: "15b"
+  quantization: "Q4_K_M"
+  format: gguf
+  hardware:
+    minimum_vram: "10GB"
+    recommended_vram: "12GB"
+    compatible_gpus:
+      - "RTX 3060 12GB"
+      - "RTX 4070 Ti 16GB"
+      - "RTX 4090 24GB"
+      - "RTX 5070 Ti 16GB"
+      - "RX 7800 XT 16GB"
+  parameters:
+    context_length: 16384
+    batch_size: 512
+    gpu_layers: 40
+    threads: 8
+    mlock: true
+    mmap: true
+  benchmarks:
+    tokens_per_second: 38
+    time_to_first_token: 0.35
+    hardware_tested: "RTX 4070 Ti Super 16GB"

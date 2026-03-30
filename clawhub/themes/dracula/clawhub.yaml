@@ -1,0 +1,27 @@
+name: "@tentaclaw/dracula"
+version: "1.0.0"
+type: theme
+title: "Dracula — The Classic Dark Theme"
+description: "Purple accents on charcoal. The developer classic."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [full-themes]
+tags: [dark, dracula, purple, classic]
+theme:
+  type: full-theme
+  framework: static
+  entry: ./css/dracula.css
+  preview: ./preview.png
+  variables:
+    background: { type: color, default: "#282a36" }
+    surface: { type: color, default: "#44475a" }
+    panel: { type: color, default: "#383a4a" }
+    primary: { type: color, default: "#bd93f9" }
+    secondary: { type: color, default: "#ff79c6" }
+    text: { type: color, default: "#f8f8f2" }
+    dim: { type: color, default: "#6272a4" }
+    success: { type: color, default: "#50fa7b" }
+    warning: { type: color, default: "#f1fa8c" }
+    danger: { type: color, default: "#ff5555" }
