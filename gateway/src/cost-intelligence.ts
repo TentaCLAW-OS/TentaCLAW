@@ -160,13 +160,6 @@ function getMonthlyHardwareAmortization(): number {
     return totalMonthly;
 }
 
-/** Calculate monthly amortized hardware cost for a specific node. */
-function getNodeMonthlyAmortization(nodeId: string): number {
-    const entry = costConfig.hardwareCosts.find(h => h.nodeId === nodeId);
-    if (!entry) return 0;
-    return entry.purchasePrice / (entry.depreciationYears * 12);
-}
-
 /** Round a number to N decimal places. */
 function round(value: number, decimals: number = 2): number {
     const factor = Math.pow(10, decimals);
@@ -190,19 +183,6 @@ function getTokensServedThisMonth(): number {
     return row.total;
 }
 
-/** Get total tokens served in the last N hours from the inference log. */
-function getTokensServed(hours: number): number {
-    const d = getDb();
-    const since = new Date(Date.now() - hours * 3600_000).toISOString().replace('T', ' ').slice(0, 19);
-
-    const row = d.prepare(`
-        SELECT COALESCE(SUM(tokens_out), 0) as total
-        FROM inference_log
-        WHERE created_at >= ?
-    `).get(since) as { total: number };
-
-    return row.total;
-}
 
 // =============================================================================
 // 1. Power Monitoring
