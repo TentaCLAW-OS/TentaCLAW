@@ -4,11 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TentaCLAW OS — Your GPUs. One Brain. Zero Limits.</title>
-  <meta name="description" content="TentaCLAW OS turns scattered GPUs into one self-healing AI inference cluster. Zero config. Auto-everything. The octopus runs your stack.">
-  <meta name="theme-color" content="#060a10">
+  <meta name="description" content="TentaCLAW OS turns scattered GPUs into one self-healing AI inference cluster. 6 backends, 280+ endpoints, smart routing. Per-token pricing is a scam.">
+  <meta name="theme-color" content="#040810">
+  <meta property="og:title" content="TentaCLAW OS — Your GPUs. One Brain. Zero Limits.">
+  <meta property="og:description" content="Turn scattered GPUs into one self-healing AI cluster. 6 backends, auto-discovery, smart routing. The open-source GPU cloud.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.tentaclaw.io">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
       --abyss: #040810;
@@ -18,155 +22,446 @@
       --panel: #121a28;
       --border: rgba(0,212,170,0.12);
       --border-dim: rgba(255,255,255,0.06);
+      --border-hover: rgba(0,212,170,0.25);
       --teal: #00d4aa;
       --teal-glow: rgba(0,212,170,0.3);
+      --teal-dim: rgba(0,212,170,0.08);
       --purple: #8b5cf6;
       --purple-glow: rgba(139,92,246,0.2);
+      --purple-dim: rgba(139,92,246,0.08);
       --cyan: #22d3ee;
       --green: #00ff88;
+      --amber: #f59e0b;
+      --red: #ef4444;
       --text: #e8edf5;
       --dim: #5a6a82;
       --muted: #3a4a5f;
     }
+
     * { margin:0; padding:0; box-sizing:border-box; }
     html { scroll-behavior: smooth; }
-    body { font-family:'Inter',sans-serif; background:var(--abyss); color:var(--text); overflow-x:hidden; }
-    h1,h2,h3,h4 { font-family:'Space Grotesk',sans-serif; }
+    body { font-family:'Inter',sans-serif; background:var(--abyss); color:var(--text); overflow-x:hidden; -webkit-font-smoothing:antialiased; }
+    h1,h2,h3,h4,h5 { font-family:'Space Grotesk',sans-serif; }
     ::selection { background:var(--purple); color:#fff; }
-    a { color:var(--teal); text-decoration:none; }
+    a { color:var(--teal); text-decoration:none; transition:color 0.2s; }
     a:hover { color:#fff; }
 
-    /* Particles background */
+    /* ===== PARTICLES ===== */
     .particles { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none; }
     .particle { position:absolute; width:2px; height:2px; background:var(--teal); border-radius:50%; opacity:0; animation:drift linear infinite; }
     @keyframes drift {
       0% { opacity:0; transform:translateY(0) translateX(0); }
-      10% { opacity:0.6; }
-      90% { opacity:0.3; }
-      100% { opacity:0; transform:translateY(-100vh) translateX(50px); }
+      10% { opacity:0.5; }
+      90% { opacity:0.2; }
+      100% { opacity:0; transform:translateY(-100vh) translateX(60px); }
     }
 
-    /* Nav */
-    nav { position:fixed; top:0; left:0; right:0; z-index:100; padding:16px 0; background:rgba(4,8,16,0.85); backdrop-filter:blur(20px); border-bottom:1px solid var(--border-dim); }
-    .nav-inner { max-width:1200px; margin:0 auto; padding:0 24px; display:flex; align-items:center; justify-content:space-between; }
+    /* ===== GRID OVERLAY ===== */
+    .grid-overlay {
+      position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none;
+      background-image:
+        linear-gradient(rgba(0,212,170,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,170,0.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 70% 50% at 50% 30%, black 0%, transparent 70%);
+      -webkit-mask-image: radial-gradient(ellipse 70% 50% at 50% 30%, black 0%, transparent 70%);
+    }
+
+    /* ===== NAV ===== */
+    nav {
+      position:fixed; top:0; left:0; right:0; z-index:100; padding:14px 0;
+      background:rgba(4,8,16,0.8); backdrop-filter:blur(24px) saturate(1.2);
+      border-bottom:1px solid var(--border-dim);
+    }
+    .nav-inner { max-width:1280px; margin:0 auto; padding:0 32px; display:flex; align-items:center; justify-content:space-between; }
     .nav-logo { display:flex; align-items:center; gap:10px; font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:700; color:var(--text); text-decoration:none; }
     .nav-logo span { color:var(--teal); }
     .nav-links { display:flex; gap:28px; list-style:none; }
     .nav-links a { color:var(--dim); font-size:14px; font-weight:500; transition:color 0.2s; }
     .nav-links a:hover { color:var(--text); }
-    .nav-cta { background:var(--teal); color:#000; padding:8px 20px; border-radius:8px; font-weight:600; font-size:14px; border:none; cursor:pointer; transition:all 0.2s; }
+    .nav-right { display:flex; align-items:center; gap:16px; }
+    .nav-star {
+      display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600;
+      color:var(--dim); padding:6px 12px; border:1px solid var(--border-dim); border-radius:8px;
+      transition:all 0.2s;
+    }
+    .nav-star:hover { border-color:var(--border-hover); color:var(--amber); }
+    .nav-star svg { width:14px; height:14px; }
+    .nav-cta {
+      background:var(--teal); color:#000; padding:8px 20px; border-radius:8px;
+      font-weight:600; font-size:14px; border:none; cursor:pointer; transition:all 0.2s;
+    }
     .nav-cta:hover { transform:translateY(-1px); box-shadow:0 4px 20px var(--teal-glow); color:#000; }
 
-    /* Hero */
-    .hero { min-height:100vh; display:flex; align-items:center; justify-content:center; text-align:center; padding:120px 24px 80px; position:relative; }
-    .hero::before { content:''; position:absolute; top:0; left:0; right:0; bottom:0; background:radial-gradient(ellipse 80% 60% at 50% 40%, rgba(0,212,170,0.05) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 30% 70%, rgba(139,92,246,0.04) 0%, transparent 50%); }
-    .hero-content { position:relative; z-index:1; max-width:900px; }
-    .hero-badge { display:inline-flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:100px; padding:6px 16px 6px 8px; font-size:13px; color:var(--dim); margin-bottom:32px; }
+    /* ===== HERO ===== */
+    .hero {
+      min-height:100vh; display:flex; align-items:center; justify-content:center;
+      text-align:center; padding:140px 24px 80px; position:relative;
+    }
+    .hero::before {
+      content:''; position:absolute; top:0; left:0; right:0; bottom:0;
+      background:
+        radial-gradient(ellipse 80% 50% at 50% 20%, rgba(0,212,170,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 70% 60%, rgba(139,92,246,0.04) 0%, transparent 50%),
+        radial-gradient(ellipse 40% 30% at 20% 80%, rgba(0,212,170,0.03) 0%, transparent 50%);
+    }
+    .hero-content { position:relative; z-index:1; max-width:960px; }
+
+    .hero-badge {
+      display:inline-flex; align-items:center; gap:8px;
+      background:var(--surface); border:1px solid var(--border); border-radius:100px;
+      padding:6px 16px 6px 8px; font-size:13px; color:var(--dim); margin-bottom:32px;
+      animation:fadeInDown 0.6s ease-out;
+    }
     .hero-badge .dot { width:8px; height:8px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-    .hero-badge span { color:var(--teal); font-weight:500; }
-    h1 { font-size:clamp(3rem,7vw,5.5rem); font-weight:800; line-height:1.05; margin-bottom:24px; letter-spacing:-2px; }
-    h1 .glow { color:var(--teal); text-shadow:0 0 60px var(--teal-glow), 0 0 120px rgba(0,212,170,0.1); }
-    .hero-sub { font-size:1.25rem; color:var(--dim); max-width:600px; margin:0 auto 40px; line-height:1.6; }
-    .hero-sub strong { color:var(--text); }
+    @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,255,136,0.4)} 50%{opacity:0.6;box-shadow:0 0 0 6px rgba(0,255,136,0)} }
+    .hero-badge span { color:var(--teal); font-weight:600; }
 
-    /* Install box */
-    .install-wrap { display:flex; justify-content:center; margin-bottom:32px; }
-    .install-box { background:var(--ocean); border:1px solid var(--border); border-radius:14px; padding:14px 24px; display:flex; align-items:center; gap:16px; font-family:'JetBrains Mono',monospace; font-size:15px; }
-    .install-box .prompt { color:var(--muted); }
-    .install-box code { color:var(--teal); }
-    .install-box button { background:rgba(0,212,170,0.15); color:var(--teal); border:1px solid var(--border); padding:6px 14px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.2s; font-family:'JetBrains Mono',monospace; }
-    .install-box button:hover { background:var(--teal); color:#000; }
+    @keyframes fadeInDown { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes fadeInUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 
-    /* CTA buttons */
-    .cta-row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-bottom:48px; }
-    .btn { padding:12px 28px; border-radius:10px; font-weight:600; font-size:15px; transition:all 0.2s; display:inline-flex; align-items:center; gap:8px; }
-    .btn-primary { background:var(--teal); color:#000; }
-    .btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 30px var(--teal-glow); color:#000; }
-    .btn-ghost { background:transparent; color:var(--text); border:1px solid var(--border-dim); }
-    .btn-ghost:hover { border-color:var(--teal); transform:translateY(-2px); color:var(--text); }
+    h1 {
+      font-size:clamp(3rem,7vw,5.5rem); font-weight:800; line-height:1.05;
+      margin-bottom:24px; letter-spacing:-2.5px;
+      animation:fadeInUp 0.8s ease-out 0.1s both;
+    }
+    h1 .glow {
+      color:var(--teal);
+      text-shadow:0 0 60px var(--teal-glow), 0 0 120px rgba(0,212,170,0.1);
+    }
+    .hero-sub {
+      font-size:1.25rem; color:var(--dim); max-width:640px; margin:0 auto 16px;
+      line-height:1.7; animation:fadeInUp 0.8s ease-out 0.2s both;
+    }
+    .hero-sub strong { color:var(--text); font-weight:600; }
+    .hero-scam {
+      font-family:'Space Grotesk',sans-serif; font-size:1.1rem; font-weight:700;
+      color:var(--purple); margin-bottom:40px; letter-spacing:-0.3px;
+      animation:fadeInUp 0.8s ease-out 0.25s both;
+    }
+    .hero-scam span {
+      background:linear-gradient(135deg, var(--purple), var(--teal));
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      background-clip:text;
+    }
 
-    /* Stats */
-    .hero-stats { display:flex; gap:48px; justify-content:center; flex-wrap:wrap; }
-    .hero-stat { text-align:center; }
-    .hero-stat .num { font-family:'Space Grotesk',sans-serif; font-size:2.8rem; font-weight:800; color:var(--teal); text-shadow:0 0 40px var(--teal-glow); }
-    .hero-stat .label { font-size:13px; color:var(--muted); margin-top:4px; text-transform:uppercase; letter-spacing:2px; }
+    /* ===== LIVE BADGES ===== */
+    .live-badges {
+      display:flex; gap:12px; justify-content:center; flex-wrap:wrap;
+      margin-bottom:36px; animation:fadeInUp 0.8s ease-out 0.3s both;
+    }
+    .live-badge {
+      display:inline-flex; align-items:center; gap:8px;
+      background:var(--surface); border:1px solid var(--border-dim);
+      border-radius:100px; padding:6px 16px; font-size:13px; font-weight:500;
+    }
+    .live-badge .badge-num {
+      font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;
+    }
+    .live-badge.teal .badge-num { color:var(--teal); }
+    .live-badge.purple .badge-num { color:var(--purple); }
+    .live-badge.green .badge-num { color:var(--green); }
+    .live-badge .badge-label { color:var(--dim); }
 
-    /* Sections */
-    .section { padding:100px 24px; max-width:1200px; margin:0 auto; position:relative; z-index:1; }
-    .section-title { font-size:clamp(2rem,4vw,3rem); text-align:center; margin-bottom:16px; letter-spacing:-1px; }
-    .section-sub { text-align:center; color:var(--dim); font-size:1.1rem; max-width:600px; margin:0 auto 60px; }
-
-    /* Feature grid */
-    .feature-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:20px; }
-    .feature-card { background:var(--surface); border:1px solid var(--border-dim); border-radius:16px; padding:32px; transition:all 0.3s; position:relative; overflow:hidden; }
-    .feature-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent,var(--teal),transparent); opacity:0; transition:opacity 0.3s; }
-    .feature-card:hover { border-color:var(--border); transform:translateY(-4px); }
-    .feature-card:hover::before { opacity:1; }
-    .feature-icon { width:48px; height:48px; border-radius:12px; background:rgba(0,212,170,0.1); display:flex; align-items:center; justify-content:center; margin-bottom:20px; color:var(--teal); font-size:24px; }
-    .feature-card h3 { font-size:1.2rem; margin-bottom:10px; }
-    .feature-card p { color:var(--dim); line-height:1.7; font-size:0.95rem; }
-
-    /* Terminal demo */
-    .terminal-demo { background:var(--ocean); border:1px solid var(--border-dim); border-radius:16px; overflow:hidden; max-width:700px; margin:60px auto 0; }
-    .terminal-bar { display:flex; align-items:center; gap:8px; padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--border-dim); }
+    /* ===== HERO TERMINAL ===== */
+    .hero-terminal {
+      max-width:640px; margin:0 auto 40px; text-align:left;
+      animation:fadeInUp 0.8s ease-out 0.35s both;
+    }
+    .terminal {
+      background:var(--ocean); border:1px solid var(--border-dim);
+      border-radius:14px; overflow:hidden;
+      box-shadow:0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.03);
+    }
+    .terminal-bar {
+      display:flex; align-items:center; gap:8px; padding:12px 16px;
+      background:var(--surface); border-bottom:1px solid var(--border-dim);
+    }
     .terminal-dot { width:12px; height:12px; border-radius:50%; }
     .terminal-dot.r { background:#ff5f57; }
     .terminal-dot.y { background:#ffbd2e; }
     .terminal-dot.g { background:#28c840; }
     .terminal-title { font-size:12px; color:var(--muted); margin-left:auto; font-family:'JetBrains Mono',monospace; }
-    .terminal-body { padding:20px; font-family:'JetBrains Mono',monospace; font-size:13px; line-height:1.8; }
+    .terminal-body {
+      padding:20px 20px 24px; font-family:'JetBrains Mono',monospace; font-size:13px;
+      line-height:1.9; min-height:220px;
+    }
     .terminal-body .prompt { color:var(--muted); }
     .terminal-body .cmd { color:var(--teal); }
     .terminal-body .output { color:var(--dim); }
     .terminal-body .highlight { color:var(--green); }
     .terminal-body .accent { color:var(--purple); }
+    .terminal-body .warn { color:var(--amber); }
+    .terminal-body .info { color:var(--cyan); }
 
-    /* Comparison */
-    .compare-table { width:100%; border-collapse:collapse; margin-top:40px; }
-    .compare-table th { text-align:left; padding:14px 16px; border-bottom:1px solid var(--border-dim); color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:2px; font-weight:600; }
-    .compare-table td { padding:14px 16px; border-bottom:1px solid rgba(255,255,255,0.03); font-size:15px; }
+    /* Typewriter cursor */
+    .typewriter-cursor {
+      display:inline-block; width:8px; height:16px; background:var(--teal);
+      margin-left:2px; vertical-align:middle;
+      animation:blink 1s step-end infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .type-line { overflow:hidden; white-space:nowrap; display:block; }
+    .type-line.hidden { display:none; }
+
+    /* ===== CTA BUTTONS ===== */
+    .cta-row {
+      display:flex; gap:14px; justify-content:center; flex-wrap:wrap;
+      margin-bottom:48px; animation:fadeInUp 0.8s ease-out 0.4s both;
+    }
+    .btn {
+      padding:14px 32px; border-radius:12px; font-weight:600; font-size:15px;
+      transition:all 0.25s; display:inline-flex; align-items:center; gap:10px;
+      position:relative; overflow:hidden;
+    }
+    .btn-primary {
+      background:linear-gradient(135deg, var(--teal), #00b894);
+      color:#000; box-shadow:0 4px 20px rgba(0,212,170,0.2);
+    }
+    .btn-primary::before {
+      content:''; position:absolute; top:0; left:-100%; width:100%; height:100%;
+      background:linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition:left 0.5s;
+    }
+    .btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 40px var(--teal-glow); color:#000; }
+    .btn-primary:hover::before { left:100%; }
+    .btn-secondary {
+      background:transparent; color:var(--text);
+      border:1px solid rgba(139,92,246,0.3); box-shadow:0 0 20px rgba(139,92,246,0.05);
+    }
+    .btn-secondary:hover {
+      border-color:var(--purple); transform:translateY(-2px); color:var(--text);
+      box-shadow:0 0 30px rgba(139,92,246,0.15);
+    }
+    .btn-ghost { background:transparent; color:var(--text); border:1px solid var(--border-dim); }
+    .btn-ghost:hover { border-color:var(--teal); transform:translateY(-2px); color:var(--text); }
+
+    /* ===== HERO STATS ===== */
+    .hero-stats {
+      display:flex; gap:48px; justify-content:center; flex-wrap:wrap;
+      animation:fadeInUp 0.8s ease-out 0.45s both;
+    }
+    .hero-stat { text-align:center; }
+    .hero-stat .num {
+      font-family:'Space Grotesk',sans-serif; font-size:2.8rem; font-weight:800;
+      background:linear-gradient(135deg, var(--teal), var(--cyan));
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+    }
+    .hero-stat .label { font-size:12px; color:var(--muted); margin-top:4px; text-transform:uppercase; letter-spacing:2px; }
+
+    /* ===== GLOW LINE ===== */
+    .glow-line { height:1px; background:linear-gradient(90deg,transparent,var(--teal),transparent); opacity:0.3; margin:0 auto; max-width:600px; }
+
+    /* ===== SECTIONS ===== */
+    .section { padding:100px 24px; max-width:1280px; margin:0 auto; position:relative; z-index:1; }
+    .section-label {
+      text-align:center; font-family:'JetBrains Mono',monospace; font-size:13px;
+      color:var(--teal); text-transform:uppercase; letter-spacing:3px; margin-bottom:16px;
+      font-weight:500;
+    }
+    .section-title { font-size:clamp(2rem,4vw,3rem); text-align:center; margin-bottom:16px; letter-spacing:-1.5px; font-weight:800; }
+    .section-sub { text-align:center; color:var(--dim); font-size:1.1rem; max-width:620px; margin:0 auto 64px; line-height:1.7; }
+
+    /* ===== HOW IT WORKS ===== */
+    .steps-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; max-width:1000px; margin:0 auto; }
+    .step-card {
+      background:var(--surface); border:1px solid var(--border-dim); border-radius:20px;
+      padding:36px 28px; text-align:center; position:relative; transition:all 0.3s;
+    }
+    .step-card:hover { border-color:var(--border-hover); transform:translateY(-4px); }
+    .step-number {
+      width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+      margin:0 auto 20px; font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:800;
+      background:linear-gradient(135deg, var(--teal-dim), var(--purple-dim));
+      border:1px solid var(--border); color:var(--teal);
+    }
+    .step-card h3 { font-size:1.15rem; margin-bottom:10px; font-weight:700; }
+    .step-card p { color:var(--dim); font-size:0.9rem; line-height:1.7; }
+    .step-code {
+      display:inline-block; font-family:'JetBrains Mono',monospace; font-size:12px;
+      background:var(--ocean); color:var(--teal); padding:4px 10px; border-radius:6px;
+      margin-top:12px; border:1px solid var(--border-dim);
+    }
+    .step-connector { display:none; }
+
+    /* ===== FEATURE GRID ===== */
+    .feature-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+    .feature-card {
+      background:var(--surface); border:1px solid var(--border-dim); border-radius:16px;
+      padding:28px 24px; transition:all 0.3s; position:relative; overflow:hidden;
+    }
+    .feature-card::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg,var(--teal),var(--purple)); opacity:0; transition:opacity 0.3s;
+    }
+    .feature-card:hover { border-color:var(--border-hover); transform:translateY(-4px); }
+    .feature-card:hover::before { opacity:1; }
+    .feature-icon {
+      width:44px; height:44px; border-radius:12px;
+      display:flex; align-items:center; justify-content:center;
+      margin-bottom:16px; font-size:22px;
+    }
+    .feature-icon.teal-bg { background:var(--teal-dim); }
+    .feature-icon.purple-bg { background:var(--purple-dim); }
+    .feature-card h3 { font-size:1.05rem; margin-bottom:8px; font-weight:700; }
+    .feature-card p { color:var(--dim); line-height:1.65; font-size:0.88rem; }
+    .feature-tag {
+      display:inline-block; font-size:11px; font-weight:600; padding:3px 8px;
+      border-radius:4px; margin-top:10px; text-transform:uppercase; letter-spacing:0.5px;
+    }
+    .feature-tag.new { background:rgba(0,212,170,0.1); color:var(--teal); }
+    .feature-tag.hot { background:rgba(139,92,246,0.1); color:var(--purple); }
+
+    /* ===== COMPARISON TABLE ===== */
+    .compare-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .compare-table { width:100%; border-collapse:collapse; min-width:700px; }
+    .compare-table th {
+      text-align:center; padding:16px 14px; border-bottom:2px solid var(--border-dim);
+      color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:2px; font-weight:600;
+    }
+    .compare-table th:first-child { text-align:left; }
+    .compare-table th.us-header {
+      color:var(--teal); border-bottom-color:var(--teal);
+      font-size:12px; letter-spacing:1px;
+    }
+    .compare-table td {
+      padding:14px; border-bottom:1px solid rgba(255,255,255,0.03);
+      font-size:14px; text-align:center;
+    }
+    .compare-table td:first-child { text-align:left; font-weight:600; color:var(--text); font-size:13px; }
     .compare-table tr:hover td { background:rgba(0,212,170,0.02); }
-    .compare-table td:first-child { font-weight:600; color:var(--text); }
-    .compare-table .yes { color:var(--teal); font-weight:600; }
-    .compare-table .no { color:var(--muted); }
-    .compare-table .us { background:rgba(0,212,170,0.05); }
+    .compare-table .us-col { background:rgba(0,212,170,0.04); }
+    .compare-table .yes { color:var(--teal); font-weight:700; font-size:16px; }
+    .compare-table .no { color:var(--muted); font-size:14px; }
+    .compare-table .partial { color:var(--amber); font-size:13px; }
 
-    /* CTA section */
+    /* ===== CLAWHUB SECTION ===== */
+    .clawhub-section {
+      background:linear-gradient(135deg, rgba(139,92,246,0.05), rgba(0,212,170,0.05));
+      border:1px solid var(--border-dim); border-radius:24px; padding:64px 40px;
+      text-align:center; max-width:900px; margin:0 auto; position:relative; overflow:hidden;
+    }
+    .clawhub-section::before {
+      content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%;
+      background:radial-gradient(circle at 50% 50%, rgba(139,92,246,0.08) 0%, transparent 50%);
+      animation:rotateGlow 20s linear infinite;
+    }
+    @keyframes rotateGlow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+    .clawhub-content { position:relative; z-index:1; }
+    .clawhub-number {
+      font-family:'Space Grotesk',sans-serif; font-size:clamp(3rem,6vw,5rem); font-weight:800;
+      background:linear-gradient(135deg, var(--purple), var(--teal));
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+      margin-bottom:8px;
+    }
+    .clawhub-title { font-size:clamp(1.3rem,3vw,1.8rem); margin-bottom:16px; font-weight:700; }
+    .clawhub-sub { color:var(--dim); font-size:1rem; max-width:500px; margin:0 auto 28px; line-height:1.7; }
+    .clawhub-tags { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+    .clawhub-tag {
+      padding:6px 14px; border-radius:100px; font-size:13px; font-weight:500;
+      border:1px solid var(--border-dim); color:var(--dim);
+      transition:all 0.2s;
+    }
+    .clawhub-tag:hover { border-color:var(--purple); color:var(--purple); }
+
+    /* ===== INTEGRATIONS ===== */
+    .integrations-grid {
+      display:flex; gap:20px; justify-content:center; flex-wrap:wrap; max-width:800px; margin:0 auto;
+    }
+    .integration-card {
+      background:var(--surface); border:1px solid var(--border-dim); border-radius:14px;
+      padding:20px 28px; display:flex; align-items:center; gap:12px;
+      transition:all 0.3s; font-weight:600; font-size:15px; color:var(--dim);
+    }
+    .integration-card:hover { border-color:var(--border-hover); transform:translateY(-3px); color:var(--text); }
+    .integration-card .int-icon { font-size:22px; width:32px; text-align:center; }
+
+    /* ===== BOTTOM TERMINAL ===== */
+    .bottom-terminal { max-width:700px; margin:0 auto; }
+
+    /* ===== CTA SECTION ===== */
     .cta-section { padding:120px 24px; text-align:center; position:relative; z-index:1; }
-    .cta-section h2 { font-size:clamp(2.5rem,5vw,4rem); margin-bottom:20px; letter-spacing:-1px; }
-    .cta-section p { color:var(--dim); font-size:1.2rem; margin-bottom:40px; max-width:500px; margin-left:auto; margin-right:auto; }
-
-    /* Footer */
-    footer { border-top:1px solid var(--border-dim); padding:40px 24px; position:relative; z-index:1; }
-    .footer-inner { max-width:1200px; margin:0 auto; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:20px; }
-    .footer-brand { font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:16px; }
-    .footer-brand span { color:var(--teal); }
-    .footer-links { display:flex; gap:24px; }
-    .footer-links a { color:var(--muted); font-size:14px; }
-    .footer-links a:hover { color:var(--teal); }
-    .footer-copy { color:var(--muted); font-size:13px; }
-
-    /* Responsive */
-    @media(max-width:768px) {
-      .nav-links { display:none; }
-      .install-box { flex-direction:column; font-size:13px; }
-      .hero-stats { gap:24px; }
-      .feature-grid { grid-template-columns:1fr; }
-      .compare-table { font-size:13px; }
-      .footer-inner { flex-direction:column; text-align:center; }
+    .cta-section::before {
+      content:''; position:absolute; top:0; left:0; right:0; bottom:0;
+      background:radial-gradient(ellipse 60% 50% at 50% 50%, rgba(0,212,170,0.04) 0%, transparent 60%);
+    }
+    .cta-section h2 {
+      font-size:clamp(2.5rem,5vw,4rem); margin-bottom:20px; letter-spacing:-1.5px;
+      font-weight:800; position:relative; z-index:1;
+    }
+    .cta-section p {
+      color:var(--dim); font-size:1.2rem; margin-bottom:40px; max-width:500px;
+      margin-left:auto; margin-right:auto; position:relative; z-index:1; line-height:1.7;
     }
 
-    /* Glow line decoration */
-    .glow-line { height:1px; background:linear-gradient(90deg,transparent,var(--teal),transparent); opacity:0.3; margin:0 auto; max-width:600px; }
+    /* ===== FOOTER ===== */
+    footer {
+      border-top:1px solid var(--border-dim); padding:48px 24px; position:relative; z-index:1;
+    }
+    .footer-inner {
+      max-width:1280px; margin:0 auto; display:flex; justify-content:space-between;
+      align-items:center; flex-wrap:wrap; gap:24px;
+    }
+    .footer-left { display:flex; flex-direction:column; gap:6px; }
+    .footer-brand { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; }
+    .footer-brand span { color:var(--teal); }
+    .footer-tagline { font-size:13px; color:var(--muted); font-style:italic; }
+    .footer-center { display:flex; gap:24px; }
+    .footer-center a {
+      color:var(--dim); font-size:14px; font-weight:500; display:flex; align-items:center; gap:6px;
+    }
+    .footer-center a:hover { color:var(--teal); }
+    .footer-center svg { width:16px; height:16px; }
+    .footer-right { display:flex; align-items:center; gap:12px; }
+    .footer-badge {
+      display:inline-flex; align-items:center; gap:6px; padding:6px 12px;
+      background:var(--surface); border:1px solid var(--border-dim); border-radius:8px;
+      font-size:12px; color:var(--dim); font-weight:500; transition:all 0.2s;
+    }
+    .footer-badge:hover { border-color:var(--border-hover); color:var(--teal); }
+    .footer-badge svg { width:14px; height:14px; }
+
+    /* ===== RESPONSIVE ===== */
+    @media(max-width:1024px) {
+      .feature-grid { grid-template-columns:repeat(2,1fr); }
+    }
+    @media(max-width:768px) {
+      .nav-links { display:none; }
+      .nav-star { display:none; }
+      .hero { padding:120px 20px 60px; }
+      h1 { letter-spacing:-1.5px; }
+      .live-badges { gap:8px; }
+      .steps-grid { grid-template-columns:1fr; max-width:400px; }
+      .feature-grid { grid-template-columns:1fr; }
+      .compare-table { font-size:13px; }
+      .clawhub-section { padding:40px 24px; }
+      .integrations-grid { gap:12px; }
+      .integration-card { padding:14px 20px; font-size:13px; }
+      .footer-inner { flex-direction:column; text-align:center; }
+      .footer-center { justify-content:center; }
+      .footer-right { justify-content:center; }
+      .cta-row { flex-direction:column; align-items:center; }
+      .btn { width:100%; max-width:300px; justify-content:center; }
+    }
+
+    /* ===== SCROLL REVEAL ===== */
+    .reveal {
+      opacity:0; transform:translateY(30px); transition:opacity 0.7s ease, transform 0.7s ease;
+    }
+    .reveal.visible { opacity:1; transform:translateY(0); }
+
+    /* ===== COUNT-UP ===== */
+    .count-up { display:inline-block; }
   </style>
 </head>
 <body>
 
   <!-- Floating particles -->
   <div class="particles" id="particles"></div>
+  <div class="grid-overlay"></div>
 
-  <!-- Nav -->
+  <!-- ==================== NAV ==================== -->
   <nav>
     <div class="nav-inner">
       <a href="/" class="nav-logo">
@@ -174,188 +469,589 @@
         Tenta<span>CLAW</span>
       </a>
       <ul class="nav-links">
+        <li><a href="#how-it-works">How It Works</a></li>
         <li><a href="#features">Features</a></li>
         <li><a href="#compare">Compare</a></li>
-        <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW">GitHub</a></li>
+        <li><a href="#clawhub">CLAWHub</a></li>
         <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW#quick-start">Docs</a></li>
       </ul>
-      <a href="https://github.com/TentaCLAW-OS/TentaCLAW" class="nav-cta">Get Started</a>
+      <div class="nav-right">
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW" class="nav-star" title="Star on GitHub">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/></svg>
+          Star
+        </a>
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW" class="nav-cta">Get Started</a>
+      </div>
     </div>
   </nav>
 
-  <!-- Hero -->
+  <!-- ==================== HERO ==================== -->
   <section class="hero">
     <div class="hero-content">
       <div class="hero-badge">
         <div class="dot"></div>
-        <span>v0.2.0</span> — 200+ API endpoints, real GPU inference
+        <span>v0.2.0</span> &mdash; 6 backends, real GPU inference, auto-everything
       </div>
-      <h1>Your GPUs.<br><span class="glow">One Brain.</span><br>Zero Limits.</h1>
-      <p class="hero-sub">TentaCLAW OS turns scattered hardware into <strong>one self-healing AI cluster</strong>. Auto-discovery. Smart routing. The octopus handles everything.</p>
 
-      <div class="install-wrap">
-        <div class="install-box">
-          <span class="prompt">$</span>
-          <code>curl -fsSL tentaclaw.io/install | bash</code>
-          <button onclick="navigator.clipboard.writeText('curl -fsSL tentaclaw.io/install | bash');this.textContent='copied!'">copy</button>
+      <h1>Your GPUs.<br><span class="glow">One Brain.</span><br>Zero Limits.</h1>
+
+      <p class="hero-sub">
+        TentaCLAW OS turns scattered hardware into <strong>one self-healing AI cluster</strong>.
+        Auto-discovery. Smart routing. Six backends. The octopus handles everything.
+      </p>
+
+      <div class="hero-scam">
+        <span>Per-token pricing is a scam.</span> Run your own cloud.
+      </div>
+
+      <!-- Live counter badges -->
+      <div class="live-badges">
+        <div class="live-badge teal">
+          <span class="badge-num" data-count="401">0</span>
+          <span class="badge-label">tests passing</span>
+        </div>
+        <div class="live-badge purple">
+          <span class="badge-num" data-count="280">0</span>
+          <span class="badge-label">API endpoints</span>
+        </div>
+        <div class="live-badge green">
+          <span class="badge-num" data-count="6">0</span>
+          <span class="badge-label">backends</span>
         </div>
       </div>
 
+      <!-- Animated terminal demo -->
+      <div class="hero-terminal">
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dot r"></div>
+            <div class="terminal-dot y"></div>
+            <div class="terminal-dot g"></div>
+            <div class="terminal-title">clawtopus</div>
+          </div>
+          <div class="terminal-body" id="hero-term">
+            <span class="typewriter-cursor" id="hero-cursor"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTAs -->
       <div class="cta-row">
         <a href="https://github.com/TentaCLAW-OS/TentaCLAW" class="btn btn-primary">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          View on GitHub
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          Get Started Free
         </a>
-        <a href="#features" class="btn btn-ghost">See Features</a>
+        <a href="#demo" class="btn btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          View Dashboard Demo
+        </a>
       </div>
 
+      <!-- Stats row -->
       <div class="hero-stats">
-        <div class="hero-stat"><div class="num">200+</div><div class="label">API Endpoints</div></div>
-        <div class="hero-stat"><div class="num">129+</div><div class="label">Tests Passing</div></div>
+        <div class="hero-stat"><div class="num"><span class="count-up" data-count="280" data-suffix="+">0</span></div><div class="label">API Endpoints</div></div>
+        <div class="hero-stat"><div class="num"><span class="count-up" data-count="401">0</span></div><div class="label">Tests Passing</div></div>
         <div class="hero-stat"><div class="num">0</div><div class="label">Config Files</div></div>
-        <div class="hero-stat"><div class="num">3</div><div class="label">GPU Vendors</div></div>
+        <div class="hero-stat"><div class="num"><span class="count-up" data-count="135" data-suffix="K">0</span></div><div class="label">Models Available</div></div>
       </div>
     </div>
   </section>
 
   <div class="glow-line"></div>
 
-  <!-- Terminal demo -->
-  <div class="section">
-    <div class="terminal-demo">
-      <div class="terminal-bar">
-        <div class="terminal-dot r"></div>
-        <div class="terminal-dot y"></div>
-        <div class="terminal-dot g"></div>
-        <div class="terminal-title">clawtopus</div>
+  <!-- ==================== HOW IT WORKS ==================== -->
+  <section class="section reveal" id="how-it-works">
+    <div class="section-label">How It Works</div>
+    <h2 class="section-title">Three steps to <span style="color:var(--teal)">your own AI cloud.</span></h2>
+    <p class="section-sub">No Kubernetes. No Docker compose files. No YAML hell. Just hardware and an octopus.</p>
+
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-number">1</div>
+        <h3>Boot It</h3>
+        <p>Flash USB or run the one-liner. TentaCLAW auto-detects your GPUs, CPU capabilities, and available VRAM.</p>
+        <div class="step-code">curl -fsSL tentaclaw.io/install | bash</div>
       </div>
-      <div class="terminal-body">
-        <div><span class="prompt">$</span> <span class="cmd">clawtopus vibe</span></div>
-        <div><span class="accent">&#x1F419;</span> <span class="highlight">everything's running smooth</span> <span class="output">&#x1F60E;</span></div>
-        <div><span class="output">&nbsp;&nbsp; 4 nodes | 9 GPUs | 100/100</span></div>
-        <br>
-        <div><span class="prompt">$</span> <span class="cmd">clawtopus deploy llama3.1:8b</span></div>
-        <div><span class="accent">&#x1F419;</span> <span class="output">Deploying to pve-gpu (16GB free)</span></div>
-        <div><span class="highlight">&nbsp;&nbsp; &#x2714; Queued. Model downloading.</span></div>
-        <br>
-        <div><span class="prompt">$</span> <span class="cmd">clawtopus deploy bitnet-b1.58 --cpu</span></div>
-        <div><span class="accent">&#x1F419;</span> <span class="output">BitNet on CPU node (no GPU needed)</span></div>
-        <div><span class="highlight">&nbsp;&nbsp; &#x2714; 1-bit inference. 2-6x faster. 70% less energy.</span></div>
-        <br>
-        <div><span class="prompt">$</span> <span class="cmd">clawtopus fix</span></div>
-        <div><span class="accent">&#x1F419;</span> <span class="highlight">Everything's clean. Nothing to fix.</span></div>
-        <div><span class="output">&nbsp;&nbsp; you're welcome &#x1F60E;</span></div>
+      <div class="step-card">
+        <div class="step-number">2</div>
+        <h3>Nodes Find Each Other</h3>
+        <p>mDNS auto-discovery on LAN. New machines join the cluster in seconds. No IPs. No config. No ports.</p>
+        <div class="step-code">tentaclaw: 3 nodes discovered</div>
+      </div>
+      <div class="step-card">
+        <div class="step-number">3</div>
+        <h3>Deploy and Route</h3>
+        <p>Deploy models, CLAWtopus routes everything. VRAM-aware scheduling. Smart load balancing. It just works.</p>
+        <div class="step-code">clawtopus deploy llama3.1:70b</div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- Features -->
-  <section class="section" id="features">
-    <h2 class="section-title">Eight arms. <span style="color:var(--teal)">One mind.</span></h2>
-    <p class="section-sub">CLAWtopus manages your entire AI cluster so you don't have to. Zero config. Zero babysitting.</p>
+  <div class="glow-line"></div>
+
+  <!-- ==================== FEATURES ==================== -->
+  <section class="section reveal" id="features">
+    <div class="section-label">Capabilities</div>
+    <h2 class="section-title">Eight arms. <span style="color:var(--teal)">Infinite power.</span></h2>
+    <p class="section-sub">Every feature you need to run AI at scale on your own hardware. No compromises.</p>
+
     <div class="feature-grid">
       <div class="feature-card">
-        <div class="feature-icon">&#x26A1;</div>
+        <div class="feature-icon teal-bg">&#x26A1;</div>
         <h3>Zero Config</h3>
-        <p>Boot a machine. It finds the gateway, detects GPUs, and starts serving. No config files. No IPs. No ports. Nothing.</p>
+        <p>Boot a machine. It finds the gateway, detects GPUs, and starts serving. No config files. No IPs. Nothing.</p>
       </div>
       <div class="feature-card">
-        <div class="feature-icon">&#x1F9E0;</div>
+        <div class="feature-icon purple-bg">&#x1F9EC;</div>
+        <h3>6 Backends</h3>
+        <p>Ollama, vLLM, SGLang, llama.cpp, BitNet, MLX. One unified API. CLAWtopus picks the optimal backend per request.</p>
+        <span class="feature-tag hot">6 engines</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon teal-bg">&#x1F9E0;</div>
         <h3>Smart Routing</h3>
-        <p>VRAM-aware load balancing with circuit breaker and auto-retry. Requests hit the right node every time. Fallback chains if anything fails.</p>
+        <p>VRAM-aware, latency-based load balancing. 5 strategies: round-robin, least-load, VRAM-fit, latency-optimal, and affinity.</p>
       </div>
       <div class="feature-card">
-        <div class="feature-icon">&#x1F527;</div>
-        <h3>Self-Healing</h3>
-        <p>5-level watchdog: restart service, kill process, reset GPU, reboot. Something breaks at 3am? CLAWtopus already fixed it.</p>
+        <div class="feature-icon purple-bg">&#x1F517;</div>
+        <h3>Distributed Inference</h3>
+        <p>Split 70B+ models across multiple nodes. Tensor parallelism over LAN. Run models bigger than any single GPU.</p>
+        <span class="feature-tag new">new</span>
       </div>
       <div class="feature-card">
-        <div class="feature-icon">&#x1F4AC;</div>
-        <h3>OpenAI Drop-In</h3>
-        <p>Function calling. JSON mode. Streaming. Embeddings with batching. Point any OpenAI client at your cluster. Model aliases: "gpt-4" just works.</p>
+        <div class="feature-icon teal-bg">&#x1F4BB;</div>
+        <h3>BitNet CPU</h3>
+        <p>No GPU? No problem. 1-bit models on any CPU. 2-6x faster inference, 70% less energy. The great equalizer.</p>
       </div>
       <div class="feature-card">
-        <div class="feature-icon">&#x1F4E6;</div>
-        <h3>Model Package Manager</h3>
-        <p>Search HuggingFace + Ollama. Check VRAM fit before downloading. One command deploys to the best node. Auto mode decides everything.</p>
+        <div class="feature-icon purple-bg">&#x1F4C8;</div>
+        <h3>Auto-Scale</h3>
+        <p>Scale-to-zero when idle. Cold start on demand. Your cluster breathes with your workload. Zero waste.</p>
       </div>
       <div class="feature-card">
-        <div class="feature-icon">&#x1F9EC;</div>
-        <h3>BitNet CPU Inference</h3>
-        <p>No GPU? No problem. BitNet 1-bit models run on any CPU at 2-6x speed with 70% less energy. CLAWtopus routes to the right backend automatically.</p>
+        <div class="feature-icon teal-bg">&#x1F917;</div>
+        <h3>HuggingFace Catalog</h3>
+        <p>135K+ models searchable. VRAM fit check before download. One command deploys to the best available node.</p>
+        <span class="feature-tag hot">135K models</span>
       </div>
       <div class="feature-card">
-        <div class="feature-icon">&#x1F4CA;</div>
-        <h3>Real-Time Dashboard</h3>
-        <p>GPU temps, VRAM bars, inference flow, node health. Trading terminal aesthetic. Big numbers, live data. Prometheus metrics for Grafana.</p>
+        <div class="feature-icon purple-bg">&#x1F310;</div>
+        <h3>OpenAI + Anthropic</h3>
+        <p>Both APIs compatible. Function calling, JSON mode, streaming. Point any client at your cluster. Model aliases just work.</p>
       </div>
     </div>
   </section>
 
   <div class="glow-line"></div>
 
-  <!-- Comparison -->
-  <section class="section" id="compare">
-    <h2 class="section-title">Why TentaCLAW?</h2>
-    <p class="section-sub">Everyone does single-machine. Nobody does multi-node right.</p>
-    <table class="compare-table">
-      <thead><tr><th>Feature</th><th class="us">TentaCLAW</th><th>Ollama</th><th>vLLM</th><th>LM Studio</th></tr></thead>
-      <tbody>
-        <tr><td>Multi-node cluster</td><td class="yes us">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-        <tr><td>Web dashboard</td><td class="yes us">Yes</td><td class="no">No</td><td class="no">No</td><td class="yes">Yes</td></tr>
-        <tr><td>Auto-discovery</td><td class="yes us">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-        <tr><td>Self-healing watchdog</td><td class="yes us">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-        <tr><td>Smart load balancing</td><td class="yes us">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-        <tr><td>Model aliases (gpt-4)</td><td class="yes us">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-        <tr><td>OpenAI API</td><td class="yes us">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-        <tr><td>AMD + NVIDIA</td><td class="yes us">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td></tr>
-        <tr><td>Zero config</td><td class="yes us">Yes</td><td class="yes">Yes</td><td class="no">No</td><td class="yes">Yes</td></tr>
-        <tr><td>Prompt caching</td><td class="yes us">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-        <tr><td>CPU inference (BitNet)</td><td class="yes us">Yes</td><td class="no">No</td><td class="no">No</td><td class="no">No</td></tr>
-      </tbody>
-    </table>
+  <!-- ==================== COMPARISON ==================== -->
+  <section class="section reveal" id="compare">
+    <div class="section-label">Comparison</div>
+    <h2 class="section-title">Why <span style="color:var(--teal)">TentaCLAW</span>?</h2>
+    <p class="section-sub">Everyone does single-machine. Nobody does multi-node right. Until now.</p>
+
+    <div class="compare-wrap">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th class="us-header us-col">TentaCLAW</th>
+            <th>GPUStack</th>
+            <th>Ollama</th>
+            <th>vLLM</th>
+            <th>EXO</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Multi-node cluster</td><td class="yes us-col">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td></tr>
+          <tr><td>Auto-discovery (mDNS)</td><td class="yes us-col">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="yes">&#10003;</td></tr>
+          <tr><td>Web dashboard</td><td class="yes us-col">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+          <tr><td>Self-healing watchdog</td><td class="yes us-col">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+          <tr><td>Smart routing (5 strategies)</td><td class="yes us-col">&#10003;</td><td class="partial">basic</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+          <tr><td>BitNet CPU inference</td><td class="yes us-col">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+          <tr><td>Bootable ISO</td><td class="yes us-col">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+          <tr><td>Model aliases (gpt-4 &rarr; local)</td><td class="yes us-col">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+          <tr><td>CLI personality</td><td class="yes us-col">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+          <tr><td>Scale-to-zero</td><td class="yes us-col">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+          <tr><td>HuggingFace catalog</td><td class="yes us-col">&#10003;</td><td class="yes">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+          <tr><td>Anthropic API compatible</td><td class="yes us-col">&#10003;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td><td class="no">&mdash;</td></tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <div class="glow-line"></div>
 
-  <!-- CTA -->
-  <section class="cta-section">
+  <!-- ==================== CLAWHUB ==================== -->
+  <section class="section reveal" id="clawhub">
+    <div class="clawhub-section">
+      <div class="clawhub-content">
+        <div class="clawhub-number">54+</div>
+        <h2 class="clawhub-title">CLAWHub Marketplace</h2>
+        <p class="clawhub-sub">
+          Agents, skills, flight sheets, integrations, themes.
+          The npm for GPU clusters. Install anything in one command.
+        </p>
+        <div class="clawhub-tags">
+          <span class="clawhub-tag">Agents</span>
+          <span class="clawhub-tag">Skills</span>
+          <span class="clawhub-tag">Flight Sheets</span>
+          <span class="clawhub-tag">Integrations</span>
+          <span class="clawhub-tag">Themes</span>
+          <span class="clawhub-tag">Model Configs</span>
+          <span class="clawhub-tag">Workflows</span>
+          <span class="clawhub-tag">Monitoring</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="glow-line"></div>
+
+  <!-- ==================== INTEGRATIONS ==================== -->
+  <section class="section reveal" id="integrations">
+    <div class="section-label">Ecosystem</div>
+    <h2 class="section-title">Works with <span style="color:var(--teal)">everything.</span></h2>
+    <p class="section-sub">Drop TentaCLAW into your existing stack. OpenAI-compatible means universal compatibility.</p>
+
+    <div class="integrations-grid">
+      <div class="integration-card"><div class="int-icon">&#x1F916;</div> Dify</div>
+      <div class="integration-card"><div class="int-icon">&#x26A1;</div> n8n</div>
+      <div class="integration-card"><div class="int-icon">&#x1F3E0;</div> Home Assistant</div>
+      <div class="integration-card"><div class="int-icon">&#x1F4DD;</div> Continue.dev</div>
+      <div class="integration-card"><div class="int-icon">&#x1F40D;</div> LangChain</div>
+      <div class="integration-card"><div class="int-icon">&#x1F4E6;</div> OpenClaw</div>
+      <div class="integration-card"><div class="int-icon">&#x1F9D1;&#x200D;&#x1F680;</div> CrewAI</div>
+      <div class="integration-card"><div class="int-icon">&#x1F4CA;</div> Grafana</div>
+    </div>
+  </section>
+
+  <div class="glow-line"></div>
+
+  <!-- ==================== BOTTOM TERMINAL ==================== -->
+  <section class="section reveal" id="demo">
+    <div class="section-label">See It In Action</div>
+    <h2 class="section-title">The octopus <span style="color:var(--teal)">runs everything.</span></h2>
+    <p class="section-sub">Real commands. Real output. This is what managing your cluster feels like.</p>
+
+    <div class="bottom-terminal">
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="terminal-dot r"></div>
+          <div class="terminal-dot y"></div>
+          <div class="terminal-dot g"></div>
+          <div class="terminal-title">clawtopus -- full demo</div>
+        </div>
+        <div class="terminal-body" id="bottom-term">
+          <span class="typewriter-cursor" id="bottom-cursor"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="glow-line"></div>
+
+  <!-- ==================== FINAL CTA ==================== -->
+  <section class="cta-section reveal">
     <h2>Run your own <span style="color:var(--teal)">AI cloud.</span></h2>
-    <p>Your hardware. Your models. Your data. No per-token fees. Ever.</p>
-    <div class="cta-row">
-      <a href="https://github.com/TentaCLAW-OS/TentaCLAW" class="btn btn-primary">Get Started Free</a>
+    <p>Your hardware. Your models. Your data. No per-token fees. No vendor lock-in. Ever.</p>
+    <div class="cta-row" style="position:relative;z-index:1">
+      <a href="https://github.com/TentaCLAW-OS/TentaCLAW" class="btn btn-primary">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        Get Started Free
+      </a>
       <a href="https://github.com/TentaCLAW-OS/TentaCLAW#quick-start" class="btn btn-ghost">Read the Docs</a>
     </div>
   </section>
 
-  <!-- Footer -->
+  <!-- ==================== FOOTER ==================== -->
   <footer>
     <div class="footer-inner">
-      <div class="footer-brand">Tenta<span>CLAW</span> OS</div>
-      <div class="footer-links">
-        <a href="https://github.com/TentaCLAW-OS/TentaCLAW">GitHub</a>
-        <a href="https://github.com/TentaCLAW-OS/TentaCLAW#quick-start">Docs</a>
-        <a href="https://www.tentaclaw.io">tentaclaw.io</a>
+      <div class="footer-left">
+        <div class="footer-brand">Tenta<span>CLAW</span> OS</div>
+        <div class="footer-tagline">Built with eight arms.</div>
       </div>
-      <div class="footer-copy">Eight arms. One mind. Zero compromises.</div>
+      <div class="footer-center">
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          GitHub
+        </a>
+        <a href="https://discord.gg/tentaclaw">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>
+          Discord
+        </a>
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW#quick-start">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Docs
+        </a>
+      </div>
+      <div class="footer-right">
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW" class="footer-badge">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/></svg>
+          Star on GitHub
+        </a>
+      </div>
     </div>
   </footer>
 
+  <!-- ==================== SCRIPTS ==================== -->
   <script>
-    // Generate floating particles
-    const container = document.getElementById('particles');
-    for (let i = 0; i < 40; i++) {
-      const p = document.createElement('div');
-      p.className = 'particle';
-      p.style.left = Math.random() * 100 + '%';
-      p.style.top = (100 + Math.random() * 20) + '%';
-      p.style.animationDuration = (8 + Math.random() * 15) + 's';
-      p.style.animationDelay = Math.random() * 10 + 's';
-      p.style.width = (1 + Math.random() * 2) + 'px';
-      p.style.height = p.style.width;
-      if (Math.random() > 0.7) p.style.background = '#8b5cf6';
-      container.appendChild(p);
-    }
+    // ===== PARTICLES =====
+    (function() {
+      const container = document.getElementById('particles');
+      for (let i = 0; i < 50; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        p.style.left = Math.random() * 100 + '%';
+        p.style.top = (100 + Math.random() * 20) + '%';
+        p.style.animationDuration = (8 + Math.random() * 18) + 's';
+        p.style.animationDelay = Math.random() * 12 + 's';
+        const size = (1 + Math.random() * 2.5) + 'px';
+        p.style.width = size;
+        p.style.height = size;
+        if (Math.random() > 0.6) p.style.background = '#8b5cf6';
+        if (Math.random() > 0.9) p.style.background = '#22d3ee';
+        container.appendChild(p);
+      }
+    })();
+
+    // ===== SCROLL REVEAL =====
+    (function() {
+      const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+      document.querySelectorAll('.reveal').forEach(function(el) { observer.observe(el); });
+    })();
+
+    // ===== COUNT-UP ANIMATION =====
+    (function() {
+      function animateCount(el) {
+        const target = parseInt(el.getAttribute('data-count'));
+        const suffix = el.getAttribute('data-suffix') || '';
+        const duration = 2000;
+        const start = performance.now();
+        function update(now) {
+          const elapsed = now - start;
+          const progress = Math.min(elapsed / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          el.textContent = Math.floor(target * eased) + (progress >= 1 ? suffix : '');
+          if (progress < 1) requestAnimationFrame(update);
+          else el.textContent = target + suffix;
+        }
+        requestAnimationFrame(update);
+      }
+      const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting && !entry.target.dataset.animated) {
+            entry.target.dataset.animated = '1';
+            animateCount(entry.target);
+          }
+        });
+      }, { threshold: 0.5 });
+      document.querySelectorAll('.count-up').forEach(function(el) { observer.observe(el); });
+
+      // Also animate the live badges
+      const badgeObserver = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting && !entry.target.dataset.animated) {
+            entry.target.dataset.animated = '1';
+            const el = entry.target;
+            const target = parseInt(el.getAttribute('data-count'));
+            const duration = 1800;
+            const start = performance.now();
+            function update(now) {
+              const elapsed = now - start;
+              const progress = Math.min(elapsed / duration, 1);
+              const eased = 1 - Math.pow(1 - progress, 3);
+              el.textContent = Math.floor(target * eased);
+              if (progress < 1) requestAnimationFrame(update);
+              else el.textContent = target;
+            }
+            requestAnimationFrame(update);
+          }
+        });
+      }, { threshold: 0.5 });
+      document.querySelectorAll('.live-badge .badge-num').forEach(function(el) { badgeObserver.observe(el); });
+    })();
+
+    // ===== TYPEWRITER TERMINAL =====
+    (function() {
+      function typewriter(containerId, cursorId, sequences, options) {
+        var opts = options || {};
+        var charDelay = opts.charDelay || 35;
+        var lineDelay = opts.lineDelay || 100;
+        var cmdDelay = opts.cmdDelay || 800;
+        var loopPause = opts.loopPause || 3000;
+        var container = document.getElementById(containerId);
+        var cursor = document.getElementById(cursorId);
+
+        function sleep(ms) {
+          return new Promise(function(resolve) { setTimeout(resolve, ms); });
+        }
+
+        async function typeText(span, text, delay) {
+          for (var i = 0; i < text.length; i++) {
+            span.textContent += text[i];
+            await sleep(delay);
+          }
+        }
+
+        async function run() {
+          while (true) {
+            // Clear previous content
+            container.innerHTML = '';
+            container.appendChild(cursor);
+
+            for (var s = 0; s < sequences.length; s++) {
+              var seq = sequences[s];
+
+              // Type the command
+              var cmdLine = document.createElement('div');
+              var promptSpan = document.createElement('span');
+              promptSpan.className = 'prompt';
+              promptSpan.textContent = '$ ';
+              cmdLine.appendChild(promptSpan);
+              var cmdSpan = document.createElement('span');
+              cmdSpan.className = 'cmd';
+              cmdLine.appendChild(cmdSpan);
+              container.insertBefore(cmdLine, cursor);
+
+              await typeText(cmdSpan, seq.cmd, charDelay);
+              await sleep(cmdDelay);
+
+              // Print output lines
+              for (var l = 0; l < seq.output.length; l++) {
+                var outLine = document.createElement('div');
+                outLine.innerHTML = seq.output[l];
+                container.insertBefore(outLine, cursor);
+                await sleep(lineDelay);
+              }
+
+              // Add blank line between commands
+              if (s < sequences.length - 1) {
+                var br = document.createElement('br');
+                container.insertBefore(br, cursor);
+                await sleep(300);
+              }
+            }
+
+            await sleep(loopPause);
+          }
+        }
+
+        // Start when visible
+        var observer = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+              observer.disconnect();
+              run();
+            }
+          });
+        }, { threshold: 0.3 });
+        observer.observe(container);
+      }
+
+      // Hero terminal sequences
+      typewriter('hero-term', 'hero-cursor', [
+        {
+          cmd: 'curl -fsSL tentaclaw.io/install | bash',
+          output: [
+            '<span class="accent">[tentaclaw]</span> <span class="output">Detecting hardware...</span>',
+            '<span class="highlight">  &#10003; NVIDIA RTX 4090 (24GB VRAM)</span>',
+            '<span class="highlight">  &#10003; NVIDIA RTX 3090 (24GB VRAM)</span>',
+            '<span class="highlight">  &#10003; AMD Ryzen 9 (32 cores, BitNet ready)</span>',
+            '<span class="accent">[tentaclaw]</span> <span class="highlight">Installed. Gateway running on :3000</span>'
+          ]
+        },
+        {
+          cmd: 'clawtopus status',
+          output: [
+            '<span class="accent">&#x1F419;</span> <span class="highlight">cluster is vibing</span> <span class="output">&#x1F60E;</span>',
+            '<span class="output">  nodes: </span><span class="info">4</span><span class="output"> | gpus: </span><span class="info">9</span><span class="output"> | vram: </span><span class="info">148GB</span><span class="output"> | health: </span><span class="highlight">100/100</span>'
+          ]
+        },
+        {
+          cmd: 'clawtopus deploy llama3.1:70b',
+          output: [
+            '<span class="accent">&#x1F419;</span> <span class="output">Splitting across pve-gpu + nuc-01 (48GB combined)</span>',
+            '<span class="highlight">  &#10003; Model deployed. Tensor parallel active.</span>',
+            '<span class="output">  endpoint: </span><span class="info">http://cluster:3000/v1/chat/completions</span>'
+          ]
+        },
+        {
+          cmd: 'clawtopus vibe',
+          output: [
+            '<span class="accent">&#x1F419;</span> <span class="highlight">everything\'s running smooth</span> <span class="output">&#x1F60E;</span>',
+            '<span class="output">  4 models loaded | 280 endpoints ready | 0 errors</span>',
+            '<span class="output">  </span><span class="accent">you\'re welcome</span>'
+          ]
+        }
+      ], { charDelay: 30, lineDelay: 80, cmdDelay: 600, loopPause: 4000 });
+
+      // Bottom terminal sequences
+      typewriter('bottom-term', 'bottom-cursor', [
+        {
+          cmd: 'clawtopus deploy bitnet-b1.58 --cpu',
+          output: [
+            '<span class="accent">&#x1F419;</span> <span class="output">BitNet on CPU node (no GPU needed)</span>',
+            '<span class="highlight">  &#10003; 1-bit inference active. 2-6x faster. 70% less energy.</span>',
+            '<span class="output">  backend: </span><span class="info">bitnet</span><span class="output"> | latency: </span><span class="info">45ms/tok</span>'
+          ]
+        },
+        {
+          cmd: 'clawtopus search "code generation" --vram-check',
+          output: [
+            '<span class="accent">&#x1F419;</span> <span class="output">Searching HuggingFace (135K models)...</span>',
+            '<span class="highlight">  1.</span><span class="output"> deepseek-coder-v2 (16B)  </span><span class="info">fits on pve-gpu</span>',
+            '<span class="highlight">  2.</span><span class="output"> codellama:34b            </span><span class="warn">needs 2 nodes</span>',
+            '<span class="highlight">  3.</span><span class="output"> starcoder2:15b           </span><span class="info">fits on nuc-01</span>'
+          ]
+        },
+        {
+          cmd: 'clawtopus fix',
+          output: [
+            '<span class="accent">&#x1F419;</span> <span class="output">Scanning cluster health...</span>',
+            '<span class="output">  watchdog: </span><span class="highlight">all clear</span>',
+            '<span class="output">  orphaned processes: </span><span class="highlight">0</span>',
+            '<span class="output">  gpu resets needed: </span><span class="highlight">0</span>',
+            '<span class="accent">&#x1F419;</span> <span class="highlight">Everything\'s clean. Nothing to fix.</span>',
+            '<span class="output">  </span><span class="accent">you\'re welcome &#x1F60E;</span>'
+          ]
+        },
+        {
+          cmd: 'clawtopus scale llama3.1:8b --replicas auto',
+          output: [
+            '<span class="accent">&#x1F419;</span> <span class="output">Auto-scaling llama3.1:8b...</span>',
+            '<span class="output">  current load: </span><span class="warn">87%</span><span class="output"> | scaling </span><span class="info">1 &#8594; 3 replicas</span>',
+            '<span class="highlight">  &#10003; Scaled. Load balanced across 3 nodes.</span>',
+            '<span class="output">  will scale-to-zero after 15m idle</span>'
+          ]
+        }
+      ], { charDelay: 25, lineDelay: 70, cmdDelay: 500, loopPause: 5000 });
+    })();
+
+    // ===== SMOOTH NAV SHADOW ON SCROLL =====
+    (function() {
+      var nav = document.querySelector('nav');
+      var ticking = false;
+      window.addEventListener('scroll', function() {
+        if (!ticking) {
+          requestAnimationFrame(function() {
+            if (window.scrollY > 50) {
+              nav.style.boxShadow = '0 4px 30px rgba(0,0,0,0.3)';
+            } else {
+              nav.style.boxShadow = 'none';
+            }
+            ticking = false;
+          });
+          ticking = true;
+        }
+      });
+    })();
   </script>
 </body>
 </html>

@@ -1,0 +1,18 @@
+{
+  "name": "tentaclaw-benchmarks",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Benchmark suite for TentaCLAW Gateway",
+  "scripts": {
+    "bench": "npx tsx run-benchmarks.ts",
+    "bench:health": "npx tsx run-benchmarks.ts --benchmark health_throughput",
+    "bench:register": "npx tsx run-benchmarks.ts --benchmark registration_burst",
+    "bench:stats": "npx tsx run-benchmarks.ts --benchmark stats_ingestion",
+    "bench:search": "npx tsx run-benchmarks.ts --benchmark model_search",
+    "bench:dashboard": "npx tsx run-benchmarks.ts --benchmark dashboard_bundle",
+    "bench:chat": "npx tsx run-benchmarks.ts --benchmark concurrent_chat",
+    "bench:sse": "npx tsx run-benchmarks.ts --benchmark sse_connections",
+    "bench:cold": "npx tsx run-benchmarks.ts --benchmark cold_start",
+    "bench:json": "npx tsx run-benchmarks.ts --json"
+  }
+}

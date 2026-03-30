@@ -1,0 +1,351 @@
+#cloud-config
+# =============================================================================
+# TentaCLAW OS -- Cloud-Init for Gateway Node
+# =============================================================================
+#
+# This cloud-init config runs on first boot of the gateway server.
+# It installs all dependencies, configures PostgreSQL, sets up Nginx
+# with optional TLS, deploys the TentaCLAW gateway, and starts
+# Prometheus + Grafana for observability.
+#
+# Template variables (injected by Terraform):
+#   ${cluster_name}   -- Cluster name prefix
+#   ${gateway_domain} -- Domain for TLS (empty = skip TLS)
+#   ${pg_password}    -- PostgreSQL password (empty = auto-generate)
+#   ${acme_email}     -- Email for Let's Encrypt
+#   ${worker_count}   -- Expected number of worker nodes
+# =============================================================================
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - wget
+  - git
+  - jq
+  - unzip
+  - htop
+  - ufw
+  - fail2ban
+  - nginx
+  - certbot
+  - python3-certbot-nginx
+  - postgresql
+  - postgresql-contrib
+  - prometheus
+  - grafana-enterprise
+
+# Add Node.js 22.x repository and Grafana repository
+runcmd:
+  # -------------------------------------------------------------------------
+  # System setup
+  # -------------------------------------------------------------------------
+  - echo "=== TentaCLAW Gateway cloud-init starting ==="
+
+  # Set hostname
+  - hostnamectl set-hostname ${cluster_name}-gateway
+
+  # Configure fail2ban
+  - systemctl enable fail2ban
+  - systemctl start fail2ban
+
+  # -------------------------------------------------------------------------
+  # Node.js 22.x
+  # -------------------------------------------------------------------------
+  - curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  - apt-get install -y nodejs
+
+  # -------------------------------------------------------------------------
+  # PostgreSQL setup
+  # -------------------------------------------------------------------------
+  - |
+    PG_PASS="${pg_password}"
+    if [ -z "$PG_PASS" ]; then
+      PG_PASS=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9' | head -c 32)
+    fi
+
+    sudo -u postgres psql -c "CREATE USER tentaclaw WITH PASSWORD '$PG_PASS';"
+    sudo -u postgres psql -c "CREATE DATABASE tentaclaw OWNER tentaclaw;"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE tentaclaw TO tentaclaw;"
+
+    # Store password for the gateway service
+    mkdir -p /etc/tentaclaw
+    echo "TENTACLAW_DB=postgres" > /etc/tentaclaw/gateway.env
+    echo "TENTACLAW_PG_URL=postgres://tentaclaw:$PG_PASS@127.0.0.1:5432/tentaclaw" >> /etc/tentaclaw/gateway.env
+    echo "TENTACLAW_PORT=8080" >> /etc/tentaclaw/gateway.env
+    echo "TENTACLAW_HOST=0.0.0.0" >> /etc/tentaclaw/gateway.env
+    echo "TENTACLAW_CLUSTER_NAME=${cluster_name}" >> /etc/tentaclaw/gateway.env
+    chmod 600 /etc/tentaclaw/gateway.env
+
+  # Allow PostgreSQL local connections
+  - |
+    echo "host tentaclaw tentaclaw 127.0.0.1/32 md5" >> /etc/postgresql/*/main/pg_hba.conf
+    systemctl restart postgresql
+
+  # -------------------------------------------------------------------------
+  # Clone and build TentaCLAW
+  # -------------------------------------------------------------------------
+  - |
+    cd /opt
+    git clone https://github.com/TentaCLAW-OS/tentaclaw-os.git
+    cd tentaclaw-os
+
+    # Build gateway
+    cd gateway
+    npm ci --omit=dev
+    npm run build
+    cd ..
+
+  # -------------------------------------------------------------------------
+  # Systemd service for gateway
+  # -------------------------------------------------------------------------
+  - |
+    cat > /etc/systemd/system/tentaclaw-gateway.service << 'UNIT'
+    [Unit]
+    Description=TentaCLAW Gateway - AI Inference Cluster Coordinator
+    Documentation=https://github.com/TentaCLAW-OS/tentaclaw-os
+    After=network-online.target postgresql.service
+    Wants=network-online.target
+    Requires=postgresql.service
+
+    [Service]
+    Type=simple
+    User=root
+    WorkingDirectory=/opt/tentaclaw-os/gateway
+    EnvironmentFile=/etc/tentaclaw/gateway.env
+    ExecStart=/usr/bin/node dist/index.js
+    Restart=always
+    RestartSec=5
+    StandardOutput=journal
+    StandardError=journal
+    SyslogIdentifier=tentaclaw-gateway
+
+    # Hardening
+    NoNewPrivileges=true
+    ProtectSystem=strict
+    ReadWritePaths=/opt/tentaclaw-os/gateway/data /var/log
+    ProtectHome=true
+    PrivateTmp=true
+
+    [Install]
+    WantedBy=multi-user.target
+    UNIT
+
+    systemctl daemon-reload
+    systemctl enable tentaclaw-gateway
+    systemctl start tentaclaw-gateway
+
+  # -------------------------------------------------------------------------
+  # Nginx reverse proxy
+  # -------------------------------------------------------------------------
+  - |
+    cat > /etc/nginx/sites-available/tentaclaw << 'NGINX'
+    upstream gateway {
+        server 127.0.0.1:8080;
+    }
+
+    server {
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
+
+        # Health check endpoint
+        location /health {
+            proxy_pass http://gateway/health;
+            proxy_http_version 1.1;
+        }
+
+        # API and Dashboard
+        location / {
+            proxy_pass http://gateway;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 86400;
+            proxy_send_timeout 86400;
+
+            # WebSocket support for live dashboard
+            proxy_cache_bypass $http_upgrade;
+        }
+    }
+    NGINX
+
+    ln -sf /etc/nginx/sites-available/tentaclaw /etc/nginx/sites-enabled/tentaclaw
+    rm -f /etc/nginx/sites-enabled/default
+    nginx -t && systemctl reload nginx
+
+  # -------------------------------------------------------------------------
+  # TLS via Let's Encrypt (if domain is provided)
+  # -------------------------------------------------------------------------
+  - |
+    DOMAIN="${gateway_domain}"
+    EMAIL="${acme_email}"
+    if [ -n "$DOMAIN" ] && [ -n "$EMAIL" ]; then
+      # Update Nginx server_name
+      sed -i "s/server_name _;/server_name $DOMAIN;/" /etc/nginx/sites-available/tentaclaw
+      nginx -t && systemctl reload nginx
+
+      # Obtain certificate
+      certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$EMAIL" --redirect
+
+      # Auto-renewal cron
+      echo "0 0,12 * * * root certbot renew --quiet --deploy-hook 'systemctl reload nginx'" > /etc/cron.d/certbot-renew
+    fi
+
+  # -------------------------------------------------------------------------
+  # Prometheus configuration
+  # -------------------------------------------------------------------------
+  - |
+    cat > /etc/prometheus/tentaclaw.yml << 'PROM'
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      - job_name: 'tentaclaw-gateway'
+        static_configs:
+          - targets: ['localhost:8080']
+        metrics_path: '/metrics'
+
+      - job_name: 'node-exporter-gateway'
+        static_configs:
+          - targets: ['localhost:9100']
+
+      - job_name: 'tentaclaw-workers'
+        static_configs:
+          - targets:
+    %{ for i in range(worker_count) ~}
+              - '10.0.1.${20 + i}:9100'
+    %{ endfor ~}
+
+      - job_name: 'ollama-workers'
+        static_configs:
+          - targets:
+    %{ for i in range(worker_count) ~}
+              - '10.0.1.${20 + i}:11434'
+    %{ endfor ~}
+        metrics_path: '/metrics'
+    PROM
+
+    cp /etc/prometheus/tentaclaw.yml /etc/prometheus/prometheus.yml
+    systemctl enable prometheus
+    systemctl restart prometheus
+
+  # -------------------------------------------------------------------------
+  # Grafana setup
+  # -------------------------------------------------------------------------
+  - |
+    # Add Grafana APT repository
+    wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key
+    echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" > /etc/apt/sources.list.d/grafana.list
+    apt-get update
+    apt-get install -y grafana
+
+    # Configure Grafana with Prometheus data source
+    mkdir -p /etc/grafana/provisioning/datasources
+    cat > /etc/grafana/provisioning/datasources/prometheus.yml << 'GRAF'
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://localhost:9090
+        isDefault: true
+        editable: false
+    GRAF
+
+    systemctl enable grafana-server
+    systemctl start grafana-server
+
+  # -------------------------------------------------------------------------
+  # Node exporter (self-monitoring)
+  # -------------------------------------------------------------------------
+  - |
+    useradd --no-create-home --shell /bin/false node_exporter || true
+    wget -q https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz -O /tmp/node_exporter.tar.gz
+    tar xzf /tmp/node_exporter.tar.gz -C /tmp
+    cp /tmp/node_exporter-1.7.0.linux-amd64/node_exporter /usr/local/bin/
+    rm -rf /tmp/node_exporter*
+
+    cat > /etc/systemd/system/node_exporter.service << 'NE'
+    [Unit]
+    Description=Prometheus Node Exporter
+    After=network-online.target
+
+    [Service]
+    User=node_exporter
+    ExecStart=/usr/local/bin/node_exporter
+    Restart=always
+
+    [Install]
+    WantedBy=multi-user.target
+    NE
+
+    systemctl daemon-reload
+    systemctl enable node_exporter
+    systemctl start node_exporter
+
+  # -------------------------------------------------------------------------
+  # Gateway data directory on persistent volume
+  # -------------------------------------------------------------------------
+  - |
+    mkdir -p /opt/tentaclaw-os/gateway/data
+    # If a Hetzner volume is attached, symlink data dir
+    if [ -d /mnt/HC_Volume_* ]; then
+      VOLPATH=$(ls -d /mnt/HC_Volume_* | head -1)
+      mkdir -p "$VOLPATH/tentaclaw-data"
+      rm -rf /opt/tentaclaw-os/gateway/data
+      ln -sf "$VOLPATH/tentaclaw-data" /opt/tentaclaw-os/gateway/data
+    fi
+
+  # -------------------------------------------------------------------------
+  # Logrotate for TentaCLAW
+  # -------------------------------------------------------------------------
+  - |
+    cat > /etc/logrotate.d/tentaclaw << 'LR'
+    /var/log/tentaclaw-*.log {
+        daily
+        rotate 14
+        compress
+        delaycompress
+        missingok
+        notifempty
+        create 0640 root root
+    }
+    LR
+
+  - echo "=== TentaCLAW Gateway cloud-init complete ==="
+
+# Write TentaCLAW marker file
+write_files:
+  - path: /etc/tentaclaw/cluster.conf
+    permissions: '0644'
+    content: |
+      # TentaCLAW Cluster Configuration
+      # Auto-generated by Terraform cloud-init
+      CLUSTER_NAME=${cluster_name}
+      ROLE=gateway
+      GATEWAY_IP=10.0.1.10
+      EXPECTED_WORKERS=${worker_count}
+
+  - path: /etc/motd
+    permissions: '0644'
+    content: |
+      ============================================================
+        TentaCLAW OS -- Gateway Node
+        Cluster: ${cluster_name}
+
+        Dashboard:  http://localhost:8080/dashboard
+        API:        http://localhost:8080/v1
+        Grafana:    http://localhost:3000
+        Prometheus: http://localhost:9090
+
+        Logs: journalctl -u tentaclaw-gateway -f
+      ============================================================
+
+final_message: "TentaCLAW Gateway ready in $UPTIME seconds"
