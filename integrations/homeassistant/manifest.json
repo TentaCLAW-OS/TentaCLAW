@@ -1,0 +1,12 @@
+{
+  "domain": "tentaclaw",
+  "name": "TentaCLAW OS",
+  "codeowners": ["@TentaCLAW-OS"],
+  "config_flow": true,
+  "documentation": "https://github.com/TentaCLAW-OS/TentaCLAW",
+  "integration_type": "hub",
+  "iot_class": "local_polling",
+  "requirements": [],
+  "version": "1.0.0",
+  "after_dependencies": ["http"]
+}

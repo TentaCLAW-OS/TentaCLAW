@@ -1,0 +1,31 @@
+provider: tentaclaw
+label:
+  en_US: TentaCLAW OS
+  zh_Hans: TentaCLAW OS
+description:
+  en_US: GPU inference cluster. Your models, your hardware, zero per-token fees.
+icon_small: icon_s.svg
+icon_large: icon_l.svg
+supported_model_types:
+  - llm
+configurate_methods:
+  - customizable-model
+provider_credential_schema:
+  credential_form_schemas:
+    - variable: gateway_url
+      label:
+        en_US: Gateway URL
+        zh_Hans: Gateway URL
+      type: text-input
+      required: true
+      default: http://localhost:8080
+      placeholder:
+        en_US: Enter TentaCLAW gateway URL
+    - variable: api_key
+      label:
+        en_US: API Key
+        zh_Hans: API Key
+      type: secret-input
+      required: false
+      placeholder:
+        en_US: Enter API key (optional)

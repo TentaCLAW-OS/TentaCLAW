@@ -1,0 +1,39 @@
+{
+  "$schema": "https://continue.dev/config.schema.json",
+  "models": [
+    {
+      "title": "TentaCLAW Cluster (Best Available)",
+      "provider": "openai",
+      "model": "llama3.1:8b",
+      "apiBase": "http://localhost:8080/v1",
+      "apiKey": "optional-tentaclaw-api-key"
+    },
+    {
+      "title": "TentaCLAW DeepSeek R1 (Reasoning)",
+      "provider": "openai",
+      "model": "deepseek-r1:70b",
+      "apiBase": "http://localhost:8080/v1",
+      "apiKey": "optional-tentaclaw-api-key"
+    },
+    {
+      "title": "TentaCLAW CodeLlama (Code)",
+      "provider": "openai",
+      "model": "codellama:7b",
+      "apiBase": "http://localhost:8080/v1",
+      "apiKey": "optional-tentaclaw-api-key"
+    }
+  ],
+  "tabAutocompleteModel": {
+    "title": "TentaCLAW Autocomplete",
+    "provider": "openai",
+    "model": "codellama:7b",
+    "apiBase": "http://localhost:8080/v1",
+    "apiKey": "optional-tentaclaw-api-key"
+  },
+  "embeddingsProvider": {
+    "provider": "openai",
+    "model": "nomic-embed-text",
+    "apiBase": "http://localhost:8080/v1",
+    "apiKey": "optional-tentaclaw-api-key"
+  }
+}
