@@ -635,4 +635,114 @@ describe('Savings Report Edge Cases', () => {
         expect(Object.keys(stats.requestsByProvider)).toEqual([]);
         expect(Object.keys(stats.costByProvider)).toEqual([]);
     });
+
+    it('getCloudSavingsReport summary contains cost info for active period', () => {
+        mockInferenceAnalytics.mockReturnValue({
+            total_requests: 500,
+            successful: 480,
+            failed: 20,
+            avg_latency_ms: 60,
+            p50_latency_ms: 50,
+            p95_latency_ms: 150,
+            p99_latency_ms: 300,
+            total_tokens_in: 250000,
+            total_tokens_out: 250000,
+            requests_per_minute: 5,
+            by_model: [],
+            by_node: [],
+        });
+
+        const report = getCloudSavingsReport(30);
+        expect(report.localRequests).toBe(500);
+        expect(report.cloudRequests).toBe(0);
+        expect(report.localPct).toBe(100);
+        expect(report.cloudPct).toBe(0);
+        expect(report.summary).toContain('100% local');
+    });
+
+    it('getCloudSavingsReport defaults to 30 days', () => {
+        mockInferenceAnalytics.mockReturnValue({
+            total_requests: 100,
+            successful: 100,
+            failed: 0,
+            avg_latency_ms: 50,
+            p50_latency_ms: 40,
+            p95_latency_ms: 100,
+            p99_latency_ms: 200,
+            total_tokens_in: 50000,
+            total_tokens_out: 50000,
+            requests_per_minute: 1,
+            by_model: [],
+            by_node: [],
+        });
+
+        const report = getCloudSavingsReport();
+        expect(report.periodDays).toBe(30);
+    });
+});
+
+// =============================================================================
+// Burst Decision Edge Cases
+// =============================================================================
+
+describe('Burst Decision Edge Cases', () => {
+    beforeEach(() => {
+        resetState();
+        vi.clearAllMocks();
+    });
+
+    it('shouldBurst returns no trigger reason when conditions not met', () => {
+        addCloudProvider(makeProvider({ name: 'idle-provider', models: [] }));
+        setBurstPolicy({
+            enabled: true,
+            triggerConditions: { queueDepth: 100 },
+        });
+
+        // Mock nodes with low queue depth — no trigger
+        mockAllNodes.mockReturnValue([
+            {
+                id: 'node-1',
+                status: 'online',
+                latest_stats: {
+                    gpu_count: 1,
+                    gpus: [{ utilizationPct: 10, vramTotalMb: 24576, vramUsedMb: 2000, powerDrawW: 100 }],
+                    inference: { in_flight_requests: 1 },
+                },
+            },
+        ]);
+
+        mockInferenceAnalytics.mockReturnValue({
+            total_requests: 10,
+            successful: 10,
+            failed: 0,
+            avg_latency_ms: 20,
+            p50_latency_ms: 15,
+            p95_latency_ms: 50,
+            p99_latency_ms: 80,
+            total_tokens_in: 5000,
+            total_tokens_out: 5000,
+            requests_per_minute: 1,
+            by_model: [],
+            by_node: [],
+        });
+
+        const decision = shouldBurst();
+        expect(decision.burst).toBe(false);
+        expect(decision.reason).toContain('No trigger conditions met');
+    });
+
+    it('shouldBurst without model parameter still works', () => {
+        setBurstPolicy({ enabled: false });
+
+        const decision = shouldBurst();
+        expect(decision.burst).toBe(false);
+    });
+
+    it('estimateCloudCost with zero tokens returns zero cost', () => {
+        addCloudProvider(makeProvider({ name: 'zero-test', models: [] }));
+
+        const estimates = estimateCloudCost('test', 0);
+        expect(estimates.length).toBe(1);
+        expect(estimates[0].cost).toBe(0);
+    });
 });
