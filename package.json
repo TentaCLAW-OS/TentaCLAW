@@ -17,7 +17,7 @@
         "dashboard"
     ],
     "scripts": {
-        "lint": "eslint . --ext .ts",
+        "lint": "eslint .",
         "format": "prettier --write \"**/*.ts\""
     },
     "author": "TentaCLAW Project",
