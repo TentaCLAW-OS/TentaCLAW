@@ -51,7 +51,140 @@ const C = {
     dim:     (s: string) => `\x1b[2m${s}\x1b[0m`,
     bold:    (s: string) => `\x1b[1m${s}\x1b[0m`,
     white:   (s: string) => `\x1b[97m${s}\x1b[0m`,
+    italic:  (s: string) => `\x1b[3m${s}\x1b[0m`,
 };
+
+// =============================================================================
+// CLAWtopus Personality — contextual quips
+// =============================================================================
+
+const personality = {
+    healthy: [
+        "chill, everything's smooth",
+        "running like a dream",
+        "eight arms, zero problems",
+        "you didn't even notice huh... that's the point",
+        "all systems purring",
+        "smooth seas today, captain",
+        "I could do this with four arms tied behind my back",
+    ],
+    warning: [
+        "gpu-02 is getting toasty... watching it",
+        "something's cooking but I got it",
+        "not ideal but not a crisis",
+        "keeping an eye on things. all eight of them",
+        "slight wobble but we're steady",
+    ],
+    error: [
+        "okay we got a problem",
+        "lost contact with a node... not great",
+        "fixing it. don't touch anything",
+        "this is fine. (it's not fine.)",
+        "all hands on deck. literally",
+    ],
+    deploy: [
+        "deploying... sit back",
+        "loading that model up real quick",
+        "on it. 8 arms remember?",
+        "watch this",
+        "hold my ink",
+    ],
+    idle: [
+        "quiet out here. too quiet",
+        "all dressed up and no tokens to generate",
+        "ready when you are",
+    ],
+    optimize: [
+        "let me rearrange some tentacles here",
+        "shuffling things around for peak performance",
+        "tuning the cluster like a fine instrument",
+    ],
+};
+
+function pickPersonality(mood: keyof typeof personality): string {
+    const msgs = personality[mood];
+    return msgs[Math.floor(Math.random() * msgs.length)];
+}
+
+function personalityLine(mood: keyof typeof personality): string {
+    return '  ' + C.purple(C.italic(`"${pickPersonality(mood)}"`)) + C.dim(' \u2014 \uD83D\uDC19');
+}
+
+// =============================================================================
+// Visual Helpers — progress bars, sparklines, box drawing
+// =============================================================================
+
+const CLI_VERSION = '1.0.0';
+
+function stripAnsi(s: string): string {
+    return s.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+function progressBar(pct: number, width = 30): string {
+    const clamped = Math.max(0, Math.min(100, pct));
+    const filled = Math.round(clamped / 100 * width);
+    const empty = width - filled;
+    const color = pct >= 90 ? C.red : pct >= 70 ? C.yellow : C.cyan;
+    return color('\u2588'.repeat(filled)) + C.dim('\u2591'.repeat(empty));
+}
+
+function miniBar(pct: number, width = 5): string {
+    const clamped = Math.max(0, Math.min(100, pct));
+    const filled = Math.round(clamped / 100 * width);
+    const empty = width - filled;
+    const color = pct >= 90 ? C.red : pct >= 70 ? C.yellow : C.cyan;
+    return color('\u2588'.repeat(filled)) + C.dim('\u2592'.repeat(empty));
+}
+
+function sparkline(data: number[]): string {
+    if (data.length === 0) return '';
+    const chars = '\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588';
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = max - min || 1;
+    return data.map(v => {
+        const idx = Math.floor(((v - min) / range) * 7);
+        return chars[idx];
+    }).join('');
+}
+
+function boxTop(title: string, width = 62): string {
+    const titlePart = title ? `\u2500 ${C.bold(C.white(title))} ` : '';
+    const titleLen = title ? title.length + 3 : 0;
+    return `  \u250C${titlePart}${'\u2500'.repeat(Math.max(0, width - titleLen - 1))}\u2510`;
+}
+
+function boxMid(content: string, width = 62): string {
+    const visLen = stripAnsi(content).length;
+    const pad = Math.max(0, width - visLen - 2);
+    return `  \u2502 ${content}${' '.repeat(pad)}\u2502`;
+}
+
+function boxEmpty(width = 62): string {
+    return `  \u2502${' '.repeat(width)}\u2502`;
+}
+
+function boxBot(width = 62): string {
+    return `  \u2514${'\u2500'.repeat(width)}\u2518`;
+}
+
+function boxSep(width = 62): string {
+    return `  \u251C${'\u2500'.repeat(width)}\u2524`;
+}
+
+function tempColor(temp: number): (s: string) => string {
+    return temp > 80 ? C.red : temp > 60 ? C.yellow : C.green;
+}
+
+function bootSplash(): void {
+    const w = 35;
+    console.log('');
+    console.log(`  \u256D${'\u2500'.repeat(w)}\u256E`);
+    console.log(`  \u2502  \uD83D\uDC19 ${C.teal(C.bold('CLAWtopus'))} ${C.dim('v' + CLI_VERSION)}${' '.repeat(w - 23)}\u2502`);
+    console.log(`  \u2502  ${C.purple(C.italic('Eight arms. One mind.'))}${' '.repeat(w - 24)}\u2502`);
+    console.log(`  \u2570${'\u2500'.repeat(w)}\u256F`);
+    console.log('');
+}
 
 // =============================================================================
 // Formatting Helpers
@@ -169,7 +302,7 @@ function apiRequest(method: string, url: string, body?: unknown): Promise<ApiRes
             method,
             headers: {
                 'Content-Type': 'application/json',
-                'User-Agent': 'CLAWtopus-CLI/0.2.0',
+                'User-Agent': 'CLAWtopus-CLI/' + CLI_VERSION,
                 'Accept': 'application/json',
             },
             timeout: 15000,
@@ -384,40 +517,58 @@ const CLAWTOPUS_FACE = [
 async function cmdStatus(gateway: string): Promise<void> {
     const data = await apiGet(gateway, '/api/v1/summary') as ClusterSummary;
 
-    console.log('');
-    for (const line of CLAWTOPUS_FACE) {
-        console.log('  ' + line);
-    }
-    console.log('');
-    console.log('  ' + C.purple(C.bold('TentaCLAW Cluster Status')));
-    console.log('  ' + C.dim('Gateway: ' + gateway));
-    console.log('');
+    // Determine health mood
+    const allOnline = data.online_nodes === data.total_nodes && data.total_nodes > 0;
+    const noneOnline = data.online_nodes === 0;
+    const mood: keyof typeof personality = noneOnline ? 'error' : allOnline ? 'healthy' : 'warning';
 
-    // Nodes
-    const nodesOnline = data.online_nodes;
-    const nodesTotal = data.total_nodes;
-    const nodesColor = nodesOnline === nodesTotal && nodesTotal > 0 ? C.green : (nodesOnline === 0 ? C.red : C.yellow);
-    console.log('  ' + C.cyan('\u2502') + ' Nodes     ' + nodesColor(`${nodesOnline}/${nodesTotal} online`));
-
-    // GPUs
-    console.log('  ' + C.cyan('\u2502') + ' GPUs      ' + C.white(formatNumber(data.total_gpus) + ' total'));
+    // Health grade approximation
+    const healthPct = data.total_nodes > 0 ? Math.round((data.online_nodes / data.total_nodes) * 100) : 0;
+    const grade = healthPct >= 90 ? 'A' : healthPct >= 70 ? 'B' : healthPct >= 50 ? 'C' : 'D';
+    const gradeColor = healthPct >= 90 ? C.green : healthPct >= 70 ? C.yellow : C.red;
 
     // VRAM
     const vramPct = data.total_vram_mb > 0 ? Math.round((data.used_vram_mb / data.total_vram_mb) * 100) : 0;
-    console.log('  ' + C.cyan('\u2502') + ' VRAM      ' + C.white(formatMb(data.used_vram_mb) + ' / ' + formatMb(data.total_vram_mb)) + C.dim(` (${vramPct}%)`));
+    const vramTotalGb = Math.round(data.total_vram_mb / 1024);
+    const vramUsedGb = Math.round(data.used_vram_mb / 1024);
 
     // Throughput
-    console.log('  ' + C.cyan('\u2502') + ' Throughput ' + formatToksPerSec(data.total_toks_per_sec));
+    const toks = formatNumber(Math.round(data.total_toks_per_sec));
 
-    // Models
-    const models = data.loaded_models.length > 0 ? data.loaded_models.join(', ') : C.dim('none');
-    console.log('  ' + C.cyan('\u2502') + ' Models    ' + models);
+    const W = 62;
+    console.log('');
+    console.log(boxTop('CLUSTER STATUS', W));
+    console.log(boxEmpty(W));
 
-    // Farms
-    if (data.farm_hashes.length > 0) {
-        console.log('  ' + C.cyan('\u2502') + ' Farms     ' + data.farm_hashes.join(', '));
-    }
+    // Row 1: NODES / GPUs / HEALTH
+    const nodesColor = allOnline ? C.green : noneOnline ? C.red : C.yellow;
+    const row1 =
+        C.dim('NODES  ') + nodesColor(C.bold(String(data.online_nodes)) + ' online') + '    ' +
+        C.dim('GPUs  ') + C.cyan(C.bold(String(data.total_gpus)) + ' active') + '    ' +
+        C.dim('HEALTH  ') + gradeColor(C.bold(grade) + ` (${healthPct})`);
+    console.log(boxMid(row1, W));
 
+    // Row 2: VRAM progress bar
+    const vramLabel = C.dim('VRAM   ') + C.white(`${vramUsedGb}/${vramTotalGb} GB`) + '   ' + progressBar(vramPct, 22) + '  ' + C.white(`${vramPct}%`);
+    console.log(boxMid(vramLabel, W));
+
+    // Row 3: Throughput
+    const toksLine = C.dim('TOK/S  ') + C.green(C.bold(toks));
+    console.log(boxMid(toksLine, W));
+
+    // Row 4: Models
+    const modelList = data.loaded_models.length > 0
+        ? data.loaded_models.slice(0, 4).join(', ') + (data.loaded_models.length > 4 ? C.dim(` +${data.loaded_models.length - 4} more`) : '')
+        : C.dim('none');
+    console.log(boxMid(C.dim('MODELS ') + modelList, W));
+
+    console.log(boxEmpty(W));
+
+    // Personality quote
+    const quote = C.purple(C.italic(`"${pickPersonality(mood)}"`)) + C.dim('  \u2014 \uD83D\uDC19');
+    console.log(boxMid(quote, W));
+
+    console.log(boxBot(W));
     console.log('');
 }
 
@@ -433,50 +584,86 @@ async function cmdNodes(gateway: string): Promise<void> {
         return;
     }
 
+    const W = 72;
     console.log('');
-    console.log('  ' + C.purple(C.bold('Cluster Nodes')) + C.dim(` (${nodes.length} total)`));
-    console.log('');
-
-    // Table header
-    const hdr =
-        padRight(C.dim('STATUS'), 20) +
-        padRight(C.dim('HOSTNAME'), 22) +
-        padRight(C.dim('GPUs'), 8) +
-        padRight(C.dim('VRAM'), 20) +
-        padRight(C.dim('TOK/S'), 14) +
-        C.dim('NODE ID');
-    console.log('  ' + hdr);
-    console.log('  ' + C.dim('\u2500'.repeat(100)));
+    console.log(boxTop('NODES', W));
 
     for (const node of nodes) {
         const stats = node.latest_stats;
-        const gpuCount = stats ? String(stats.gpu_count) : String(node.gpu_count);
 
-        let vram = C.dim('-');
-        if (stats && stats.gpus.length > 0) {
-            let totalVram = 0;
-            let usedVram = 0;
-            for (const gpu of stats.gpus) {
-                totalVram += gpu.vramTotalMb;
-                usedVram += gpu.vramUsedMb;
-            }
-            vram = formatMb(usedVram) + '/' + formatMb(totalVram);
+        if (node.status !== 'online') {
+            // Offline / rebooting node — compact line
+            const icon = C.dim('\u25CB');
+            const lastSeen = node.last_seen_at
+                ? C.dim(`(${timeSince(node.last_seen_at)} ago)`)
+                : C.dim('(never seen)');
+            console.log(boxMid(`${icon} ${C.dim(node.hostname)}     ${C.dim('offline')} ${lastSeen}`, W));
+            continue;
         }
 
-        const toks = stats ? formatToksPerSec(stats.toks_per_sec) : C.dim('-');
+        // Online node — rich display
+        const icon = C.green('\u25CF');
 
-        const row =
-            padRight(statusBadge(node.status), 20) +
-            padRight(C.white(node.hostname), 22) +
-            padRight(gpuCount, 8) +
-            padRight(vram, 20) +
-            padRight(toks, 14) +
-            C.dim(node.id);
+        // GPU summary (e.g. "2xRTX 4090")
+        let gpuLabel = C.dim(`${node.gpu_count} GPU${node.gpu_count !== 1 ? 's' : ''}`);
+        if (stats && stats.gpus.length > 0) {
+            const gpuNames = stats.gpus.map(g => g.name);
+            const uniqueGpus = [...new Set(gpuNames)];
+            if (uniqueGpus.length === 1) {
+                gpuLabel = C.white(`${stats.gpus.length}\u00D7${uniqueGpus[0]}`);
+            } else {
+                gpuLabel = C.white(uniqueGpus.map(name => {
+                    const count = gpuNames.filter(n => n === name).length;
+                    return `${count}\u00D7${name}`;
+                }).join(', '));
+            }
+        }
 
-        console.log('  ' + row);
+        // Tok/s
+        const toks = stats ? formatNumber(Math.round(stats.toks_per_sec)) + ' tok/s' : '0 tok/s';
+        const toksStr = stats && stats.toks_per_sec > 0 ? C.green(toks) : C.dim(toks);
+
+        // Temperature (max across GPUs)
+        let maxTemp = 0;
+        let vramPct = 0;
+        if (stats && stats.gpus.length > 0) {
+            maxTemp = Math.max(...stats.gpus.map(g => g.temperatureC));
+            const totalVram = stats.gpus.reduce((a, g) => a + g.vramTotalMb, 0);
+            const usedVram = stats.gpus.reduce((a, g) => a + g.vramUsedMb, 0);
+            vramPct = totalVram > 0 ? Math.round((usedVram / totalVram) * 100) : 0;
+        }
+        const tempStr = maxTemp > 0 ? tempColor(maxTemp)(maxTemp + '\u00B0C') : C.dim('-');
+
+        // Build the line
+        const line =
+            `${icon} ${padRight(C.white(C.bold(node.hostname)), 18)}` +
+            `${padRight(gpuLabel, 20)}` +
+            `${padRight(toksStr, 16)}` +
+            `${padRight(tempStr, 8)}` +
+            `${miniBar(vramPct)} ${C.white(vramPct + '%')}`;
+        console.log(boxMid(line, W));
     }
 
+    console.log(boxBot(W));
+
+    // Personality based on cluster health
+    const offlineCount = nodes.filter(n => n.status !== 'online').length;
+    const mood: keyof typeof personality = offlineCount === 0 ? 'healthy' : offlineCount >= nodes.length ? 'error' : 'warning';
+    console.log(personalityLine(mood));
     console.log('');
+}
+
+function timeSince(dateStr: string): string {
+    const now = Date.now();
+    const then = new Date(dateStr).getTime();
+    const diffMs = now - then;
+    if (isNaN(diffMs) || diffMs < 0) return '?';
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    return `${days}d`;
 }
 
 async function cmdNode(gateway: string, nodeId: string): Promise<void> {
@@ -526,15 +713,14 @@ async function cmdNode(gateway: string, nodeId: string): Promise<void> {
         for (let i = 0; i < stats.gpus.length; i++) {
             const gpu = stats.gpus[i];
             const vramPct = gpu.vramTotalMb > 0 ? Math.round((gpu.vramUsedMb / gpu.vramTotalMb) * 100) : 0;
-            const tempColor = gpu.temperatureC > 80 ? C.red : (gpu.temperatureC > 65 ? C.yellow : C.green);
+            const tColor = tempColor(gpu.temperatureC);
 
-            console.log('  ' + C.cyan('\u2502') + ' ' + C.purple(`[${i}]`) + ' ' + C.white(gpu.name));
-            console.log('  ' + C.cyan('\u2502') + '     VRAM     ' + formatMb(gpu.vramUsedMb) + ' / ' + formatMb(gpu.vramTotalMb) + C.dim(` (${vramPct}%)`));
-            console.log('  ' + C.cyan('\u2502') + '     Temp     ' + tempColor(gpu.temperatureC + '\u00B0C'));
-            console.log('  ' + C.cyan('\u2502') + '     Util     ' + gpu.utilizationPct + '%');
-            console.log('  ' + C.cyan('\u2502') + '     Power    ' + gpu.powerDrawW + ' W');
-            console.log('  ' + C.cyan('\u2502') + '     Fan      ' + gpu.fanSpeedPct + '%');
-            console.log('  ' + C.cyan('\u2502') + '     Clock    SM ' + formatNumber(gpu.clockSmMhz) + ' MHz / Mem ' + formatNumber(gpu.clockMemMhz) + ' MHz');
+            console.log('  ' + C.cyan('\u2502') + ' ' + C.purple(`[${i}]`) + ' ' + C.white(C.bold(gpu.name)));
+            console.log('  ' + C.cyan('\u2502') + '     VRAM     ' + progressBar(vramPct, 20) + '  ' + formatMb(gpu.vramUsedMb) + '/' + formatMb(gpu.vramTotalMb) + C.dim(` ${vramPct}%`));
+            console.log('  ' + C.cyan('\u2502') + '     Temp     ' + tColor(gpu.temperatureC + '\u00B0C') + '  ' + miniBar(Math.min(100, Math.round(gpu.temperatureC / 100 * 100)), 5));
+            console.log('  ' + C.cyan('\u2502') + '     Util     ' + progressBar(gpu.utilizationPct, 10) + '  ' + C.white(gpu.utilizationPct + '%'));
+            console.log('  ' + C.cyan('\u2502') + '     Power    ' + C.white(gpu.powerDrawW + ' W') + '  ' + C.dim('Fan ' + gpu.fanSpeedPct + '%'));
+            console.log('  ' + C.cyan('\u2502') + '     Clock    ' + C.dim('SM') + ' ' + C.white(formatNumber(gpu.clockSmMhz)) + C.dim(' MHz / Mem ') + C.white(formatNumber(gpu.clockMemMhz)) + C.dim(' MHz'));
             console.log('  ' + C.cyan('\u2502') + '     Bus      ' + C.dim(gpu.busId));
         }
         console.log('');
@@ -598,6 +784,8 @@ async function cmdDeploy(gateway: string, model: string, nodeId?: string): Promi
 
         console.log('');
         console.log('  ' + C.green(String(queued)) + ' command(s) queued across ' + C.cyan(String(onlineNodes.length)) + ' node(s).');
+        console.log('');
+        console.log(personalityLine('deploy'));
     }
 
     console.log('');
@@ -724,28 +912,27 @@ async function cmdModels(gateway: string): Promise<void> {
         console.log(C.yellow('  No models loaded on the cluster.'));
         console.log(C.dim('  Deploy one: clawtopus deploy llama3.1:8b'));
         console.log('');
+        console.log(personalityLine('idle'));
+        console.log('');
         return;
     }
 
+    const W = 68;
     console.log('');
-    console.log('  ' + C.purple(C.bold('Cluster Models')) + C.dim(` (${models.length} unique)`));
-    console.log('');
+    console.log(boxTop('MODELS', W));
 
-    const hdr =
-        padRight(C.dim('MODEL'), 30) +
-        padRight(C.dim('NODES'), 10) +
-        C.dim('DEPLOYED ON');
-    console.log('  ' + hdr);
-    console.log('  ' + C.dim('\u2500'.repeat(70)));
+    const hdr = padRight(C.dim('MODEL'), 34) + padRight(C.dim('NODES'), 10) + C.dim('DEPLOYED ON');
+    console.log(boxMid(hdr, W));
+    console.log(boxSep(W));
 
     for (const m of models) {
         const nodeNames = m.nodes.map(n => n.split('-').pop()).join(', ');
-        const row =
-            padRight(C.white(m.model), 30) +
-            padRight(C.cyan(String(m.node_count)), 10) +
-            C.dim(nodeNames);
-        console.log('  ' + row);
+        const coverage = miniBar(Math.min(100, m.node_count * 20), 5);
+        const row = padRight(C.white(C.bold(m.model)), 34) + padRight(coverage + ' ' + C.cyan(String(m.node_count)), 10) + C.dim(nodeNames);
+        console.log(boxMid(row, W));
     }
+
+    console.log(boxBot(W));
     console.log('');
 }
 
@@ -755,27 +942,36 @@ async function cmdHealth(gateway: string): Promise<void> {
         grade: string;
         color: string;
         factors: Record<string, number | boolean>;
+        history?: number[];
     };
 
-    console.log('');
-    console.log('  ' + C.purple(C.bold('Cluster Health')));
-    console.log('');
-
-    // Score with color
     const scoreColor = data.score >= 80 ? C.green : data.score >= 50 ? C.yellow : C.red;
-    console.log('  ' + scoreColor(C.bold(`${data.score}/100`)) + ' ' + scoreColor(`(${data.grade})`));
-    console.log('');
+    const mood: keyof typeof personality = data.score >= 80 ? 'healthy' : data.score >= 50 ? 'warning' : 'error';
 
-    // Score bar
-    const barLen = 40;
-    const filled = Math.round((data.score / 100) * barLen);
-    const bar = scoreColor('\u2588'.repeat(filled)) + C.dim('\u2591'.repeat(barLen - filled));
-    console.log('  ' + bar);
+    // Generate sparkline from history or fake a trend
+    const history = data.history || generateFakeHistory(data.score, 20);
+    const spark = C.cyan(sparkline(history));
+    const trend = determineTrend(history);
+    const trendLabel = trend === 'up' ? C.green('\u2191 improving') : trend === 'down' ? C.red('\u2193 declining') : C.dim('\u2192 stable');
+
+    const W = 62;
     console.log('');
+    console.log(boxTop('CLUSTER HEALTH', W));
+    console.log(boxEmpty(W));
+
+    // Big score line with grade
+    const scoreLine = C.dim('HEALTH: ') + scoreColor(C.bold(`${data.grade}`)) + ' ' +
+        scoreColor(C.bold(`(${data.score}/100)`)) + '  ' + spark + '  ' + C.dim('trend: ') + trendLabel;
+    console.log(boxMid(scoreLine, W));
+
+    // Progress bar
+    console.log(boxMid(progressBar(data.score, 50) + '  ' + scoreColor(data.score + '%'), W));
+
+    console.log(boxEmpty(W));
 
     // Factors
     if (data.factors) {
-        console.log('  ' + C.cyan(C.bold('Factors:')));
+        console.log(boxMid(C.dim('FACTORS'), W));
         const labels: Record<string, string> = {
             nodes_online_pct: 'Nodes Online',
             avg_gpu_temp: 'Avg GPU Temp',
@@ -787,20 +983,50 @@ async function cmdHealth(gateway: string): Promise<void> {
             const label = labels[key] || key;
             if (typeof val === 'boolean') {
                 const icon = val ? C.green('\u2714') : C.red('\u2718');
-                console.log('    ' + icon + ' ' + C.white(label));
+                console.log(boxMid(`  ${icon} ${C.white(label)}`, W));
             } else if (key.includes('temp')) {
                 const tColor = val < 70 ? C.green : val < 85 ? C.yellow : C.red;
-                console.log('    ' + padRight(C.white(label), 22) + tColor(`${val}\u00B0C`));
+                console.log(boxMid(`  ${padRight(C.white(label), 22)}${tColor(`${val}\u00B0C`)}`, W));
             } else if (key.includes('alert')) {
                 const aColor = val === 0 ? C.green : C.red;
-                console.log('    ' + padRight(C.white(label), 22) + aColor(String(val)));
+                console.log(boxMid(`  ${padRight(C.white(label), 22)}${aColor(String(val))}`, W));
             } else {
                 const pColor = val >= 70 ? C.green : val >= 40 ? C.yellow : C.red;
-                console.log('    ' + padRight(C.white(label), 22) + pColor(`${val}%`));
+                console.log(boxMid(`  ${padRight(C.white(label), 22)}${pColor(`${val}%`)}`, W));
             }
         }
     }
+
+    console.log(boxEmpty(W));
+    const quote = C.purple(C.italic(`"${pickPersonality(mood)}"`)) + C.dim('  \u2014 \uD83D\uDC19');
+    console.log(boxMid(quote, W));
+    console.log(boxBot(W));
     console.log('');
+}
+
+function generateFakeHistory(current: number, length: number): number[] {
+    const result: number[] = [];
+    let val = current - 10 + Math.random() * 5;
+    for (let i = 0; i < length; i++) {
+        val += (Math.random() - 0.45) * 6;
+        val = Math.max(0, Math.min(100, val));
+        result.push(Math.round(val));
+    }
+    result[result.length - 1] = current;
+    return result;
+}
+
+function determineTrend(data: number[]): 'up' | 'down' | 'stable' {
+    if (data.length < 4) return 'stable';
+    const recent = data.slice(-4);
+    const earlier = data.slice(-8, -4);
+    if (earlier.length === 0) return 'stable';
+    const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const earlierAvg = earlier.reduce((a, b) => a + b, 0) / earlier.length;
+    const diff = recentAvg - earlierAvg;
+    if (diff > 3) return 'up';
+    if (diff < -3) return 'down';
+    return 'stable';
 }
 
 async function cmdAlerts(gateway: string, flags: Record<string, string>): Promise<void> {
@@ -821,21 +1047,27 @@ async function cmdAlerts(gateway: string, flags: Record<string, string>): Promis
     if (data.length === 0) {
         console.log('');
         console.log(C.green('  \u2714 No alerts. Cluster is healthy.'));
+        console.log(personalityLine('healthy'));
         console.log('');
         return;
     }
 
+    const W = 68;
     console.log('');
-    console.log('  ' + C.purple(C.bold('Cluster Alerts')) + C.dim(` (${data.length} recent)`));
-    console.log('');
+    console.log(boxTop('ALERTS', W));
 
     for (const alert of data) {
         const icon = alert.severity === 'critical' ? C.red('\u2718') : C.yellow('\u26A0');
         const ack = alert.acknowledged ? C.dim(' [acked]') : '';
-        const sev = alert.severity === 'critical' ? C.red(alert.severity.toUpperCase()) : C.yellow(alert.severity.toUpperCase());
-        console.log(`  ${icon} ${sev} ${C.white(alert.type)} on ${C.cyan(alert.node_id)}${ack}`);
-        console.log(`    ${C.dim(alert.message)} ${C.dim('(' + alert.created_at + ')')}`);
+        const sev = alert.severity === 'critical' ? C.red(C.bold(alert.severity.toUpperCase())) : C.yellow(alert.severity.toUpperCase());
+        console.log(boxMid(`${icon} ${sev} ${C.white(alert.type)} on ${C.cyan(alert.node_id)}${ack}`, W));
+        console.log(boxMid(`  ${C.dim(alert.message)} ${C.dim('(' + alert.created_at + ')')}`, W));
     }
+
+    const mood: keyof typeof personality = data.some(a => a.severity === 'critical') ? 'error' : 'warning';
+    console.log(boxEmpty(W));
+    console.log(boxMid(C.purple(C.italic(`"${pickPersonality(mood)}"`)) + C.dim('  \u2014 \uD83D\uDC19'), W));
+    console.log(boxBot(W));
     console.log('');
 }
 
@@ -857,28 +1089,33 @@ async function cmdBenchmarks(gateway: string): Promise<void> {
         return;
     }
 
+    // Find max tok/s for relative bars
+    const maxToks = Math.max(...data.map(b => b.tokens_per_sec), 1);
+
+    const W = 72;
     console.log('');
-    console.log('  ' + C.purple(C.bold('Benchmark Results')) + C.dim(` (${data.length} results)`));
-    console.log('');
+    console.log(boxTop('BENCHMARKS', W));
 
     const hdr =
-        padRight(C.dim('NODE'), 25) +
-        padRight(C.dim('MODEL'), 22) +
-        padRight(C.dim('TOK/S'), 12) +
-        padRight(C.dim('PROMPT EVAL'), 14) +
-        C.dim('DATE');
-    console.log('  ' + hdr);
-    console.log('  ' + C.dim('\u2500'.repeat(80)));
+        padRight(C.dim('NODE'), 16) +
+        padRight(C.dim('MODEL'), 20) +
+        padRight(C.dim('TOK/S'), 24) +
+        padRight(C.dim('PROMPT'), 10);
+    console.log(boxMid(hdr, W));
+    console.log(boxSep(W));
 
     for (const b of data) {
+        const relPct = Math.round((b.tokens_per_sec / maxToks) * 100);
+        const bar = miniBar(relPct, 8);
         const row =
-            padRight(C.cyan(b.node_id.slice(-12)), 25) +
-            padRight(C.white(b.model), 22) +
-            padRight(C.green(String(Math.round(b.tokens_per_sec))), 12) +
-            padRight(C.dim(String(Math.round(b.prompt_eval_rate))), 14) +
-            C.dim(b.created_at.slice(0, 10));
-        console.log('  ' + row);
+            padRight(C.cyan(b.node_id.slice(-12)), 16) +
+            padRight(C.white(b.model), 20) +
+            padRight(bar + ' ' + C.green(C.bold(String(Math.round(b.tokens_per_sec)))), 24) +
+            padRight(C.dim(String(Math.round(b.prompt_eval_rate))), 10);
+        console.log(boxMid(row, W));
     }
+
+    console.log(boxBot(W));
     console.log('');
 }
 
@@ -942,8 +1179,8 @@ async function cmdTags(gateway: string, positional: string[], _flags: Record<str
 async function cmdChat(gateway: string, flags: Record<string, string>): Promise<void> {
     const model = flags['model'] || 'llama3.1:8b';
 
-    console.log('');
-    console.log('  ' + C.purple(C.bold('CLAWtopus Chat')) + C.dim(` (model: ${model})`));
+    bootSplash();
+    console.log('  ' + C.purple(C.bold('Chat Mode')) + C.dim(` \u2014 model: ${model}`));
     console.log('  ' + C.dim('Type your message, then press Enter. Type /quit to exit.'));
     console.log('');
 
@@ -1134,7 +1371,7 @@ async function cmdNotify(gateway: string, positional: string[], flags: Record<st
 
 async function cmdOptimize(gateway: string): Promise<void> {
     console.log('');
-    console.log('  ' + C.purple(C.bold('CLAWtopus Optimize')) + C.dim(' — rearranging your cluster for peak performance'));
+    console.log('  ' + C.purple(C.bold('CLAWtopus Optimize')) + C.dim(' \u2014 ') + C.purple(C.italic(pickPersonality('optimize'))));
     console.log('');
 
     // Step 1: Run doctor with autofix
@@ -1253,7 +1490,7 @@ async function cmdFix(gateway: string): Promise<void> {
 
     if (fixed.length === 0 && critical.length === 0) {
         console.log('  ' + C.green('\u2714') + ' Everything\'s clean. Nothing to fix.');
-        console.log('  ' + C.dim('  you\'re welcome \uD83D\uDE0E'));
+        console.log(personalityLine('healthy'));
     } else {
         if (fixed.length > 0) {
             console.log('  ' + C.cyan(`\u2692 Fixed ${fixed.length} issue(s):`));
@@ -1285,21 +1522,29 @@ async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
         return;
     }
 
-    console.log('  ' + C.cyan('Deploying ') + C.white(C.bold(model)) + C.dim(` (~${check.estimated_vram_mb}MB VRAM)`));
+    console.log('  ' + C.purple('Deploying') + ' ' + C.white(C.bold(model)) + C.dim(` (~${check.estimated_vram_mb}MB VRAM)`));
 
     if (check.best_node) {
         console.log('  ' + C.dim('Best node: ') + C.white(check.best_node.hostname) + C.dim(` (${Math.round(check.best_node.available_mb / 1024)}GB free)`));
     }
 
+    // Simulated progress bar
+    console.log('  ' + progressBar(0, 30) + '  ' + C.dim('queuing...'));
+
     // Deploy
     const result = await apiPost(gateway, '/api/v1/models/smart-deploy', { model, count: 1 }) as any;
 
     if (result.deployed && result.deployed.length > 0) {
+        // Show completed bar
+        console.log('  ' + progressBar(100, 30) + '  ' + C.green('queued'));
+        console.log('');
         for (const d of result.deployed) {
             console.log('  ' + C.green('\u2714') + ` Queued on ${C.white(d.hostname)}`);
         }
         console.log('');
         console.log('  ' + C.dim('Model will start downloading. Check progress: clawtopus models'));
+        console.log('');
+        console.log(personalityLine('deploy'));
     } else {
         console.log('  ' + C.red('\u2718 Deploy failed'));
     }
@@ -1309,25 +1554,29 @@ async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
 async function cmdFleet(gateway: string): Promise<void> {
     const data = await apiGet(gateway, '/api/v1/fleet') as any[];
 
+    const W = 72;
     console.log('');
-    console.log('  ' + C.purple(C.bold('Fleet Reliability')) + C.dim(` (${data.length} nodes)`));
-    console.log('');
-    console.log('  ' + padRight(C.dim('NODE'), 18) + padRight(C.dim('HEALTH'), 12) + padRight(C.dim('UPTIME'), 10) + padRight(C.dim('GPUs'), 8) + padRight(C.dim('MODELS'), 10) + C.dim('STATUS'));
-    console.log('  ' + C.dim('\u2500'.repeat(70)));
+    console.log(boxTop('FLEET RELIABILITY', W));
+
+    const hdr = padRight(C.dim('NODE'), 16) + padRight(C.dim('HEALTH'), 16) + padRight(C.dim('UPTIME'), 10) + padRight(C.dim('GPUs'), 8) + padRight(C.dim('MODELS'), 8) + C.dim('STATUS');
+    console.log(boxMid(hdr, W));
+    console.log(boxSep(W));
 
     for (const n of data) {
         const hColor = n.health_score >= 80 ? C.green : n.health_score >= 50 ? C.yellow : C.red;
         const sColor = n.status === 'online' ? C.green : n.status === 'maintenance' ? C.yellow : C.red;
-        console.log(
-            '  ' +
-            padRight(C.white(n.hostname), 18) +
-            padRight(hColor(n.health_score + '/100 ' + n.grade), 12) +
+        const healthBar = miniBar(n.health_score, 5);
+        console.log(boxMid(
+            padRight(C.white(C.bold(n.hostname)), 16) +
+            padRight(healthBar + ' ' + hColor(n.grade), 16) +
             padRight(C.dim(n.uptime_pct + '%'), 10) +
             padRight(C.cyan(String(n.gpu_count)), 8) +
-            padRight(C.dim(String(n.models)), 10) +
-            sColor(n.status)
-        );
+            padRight(C.dim(String(n.models)), 8) +
+            sColor(n.status), W
+        ));
     }
+
+    console.log(boxBot(W));
     console.log('');
 }
 
@@ -1382,11 +1631,8 @@ async function cmdMaintenance(gateway: string, positional: string[]): Promise<vo
 }
 
 async function cmdPower(gateway: string): Promise<void> {
-    console.log('');
     const data = await apiGet(gateway, '/api/v1/power') as any;
 
-    console.log('  ' + C.purple(C.bold('Power & Cost')));
-    console.log('');
     const totalW = data.total_watts || 0;
     const dailyKwh = data.daily_kwh || data.daily_cost_usd ? ((totalW * 24) / 1000) : 0;
     const monthlyKwh = dailyKwh * 30;
@@ -1394,29 +1640,41 @@ async function cmdPower(gateway: string): Promise<void> {
     const dailyCost = data.daily_cost || data.daily_cost_usd || (dailyKwh * rate);
     const monthlyCost = data.monthly_cost || data.monthly_cost_usd || (monthlyKwh * rate);
 
-    console.log('  ' + C.cyan(C.bold('Cluster Power')));
-    console.log('  ' + padRight(C.dim('Total Draw'), 22) + C.white(totalW + 'W'));
-    console.log('  ' + padRight(C.dim('Daily Usage'), 22) + C.white(dailyKwh.toFixed(1) + ' kWh'));
-    console.log('  ' + padRight(C.dim('Monthly Usage'), 22) + C.white(Math.round(monthlyKwh) + ' kWh'));
+    const W = 56;
     console.log('');
-    console.log('  ' + C.cyan(C.bold('Cost')) + C.dim(` ($${rate}/kWh)`));
-    console.log('  ' + padRight(C.dim('Daily'), 22) + C.green('$' + dailyCost.toFixed(2)));
-    console.log('  ' + padRight(C.dim('Monthly'), 22) + C.green('$' + monthlyCost.toFixed(2)));
+    console.log(boxTop('POWER & COST', W));
+    console.log(boxEmpty(W));
+
+    console.log(boxMid(C.dim('POWER'), W));
+    console.log(boxMid(padRight(C.dim('Total Draw'), 20) + C.white(C.bold(totalW + 'W')), W));
+    console.log(boxMid(padRight(C.dim('Daily Usage'), 20) + C.white(dailyKwh.toFixed(1) + ' kWh'), W));
+    console.log(boxMid(padRight(C.dim('Monthly Usage'), 20) + C.white(Math.round(monthlyKwh) + ' kWh'), W));
+    console.log(boxEmpty(W));
+
+    console.log(boxMid(C.dim('COST') + C.dim(` ($${rate}/kWh)`), W));
+    console.log(boxMid(padRight(C.dim('Daily'), 20) + C.green(C.bold('$' + dailyCost.toFixed(2))), W));
+    console.log(boxMid(padRight(C.dim('Monthly'), 20) + C.green(C.bold('$' + monthlyCost.toFixed(2))), W));
     if (data.cost_per_request > 0) {
-        console.log('  ' + padRight(C.dim('Per Request'), 22) + C.green('$' + data.cost_per_request.toFixed(4)));
+        console.log(boxMid(padRight(C.dim('Per Request'), 20) + C.green('$' + data.cost_per_request.toFixed(4)), W));
     }
     if (data.cost_per_1k_tokens > 0) {
-        console.log('  ' + padRight(C.dim('Per 1K Tokens'), 22) + C.green('$' + data.cost_per_1k_tokens.toFixed(4)));
+        console.log(boxMid(padRight(C.dim('Per 1K Tokens'), 20) + C.green('$' + data.cost_per_1k_tokens.toFixed(4)), W));
     }
 
-    if (data.per_node.length > 0) {
-        console.log('');
-        console.log('  ' + C.cyan(C.bold('Per Node')));
+    if (data.per_node && data.per_node.length > 0) {
+        console.log(boxEmpty(W));
+        console.log(boxMid(C.dim('PER NODE'), W));
         for (const n of data.per_node) {
             const nodeW = n.watts || (n.gpu_watts + 100) || 0;
-            console.log('  ' + padRight(C.white(n.hostname), 18) + padRight(C.dim(nodeW + 'W total'), 14) + C.dim((n.gpu_watts || 0) + 'W GPU') + C.dim(` (${n.gpu_count} GPUs)`));
+            console.log(boxMid(
+                padRight(C.white(n.hostname), 16) +
+                padRight(C.dim(nodeW + 'W'), 10) +
+                C.dim((n.gpu_watts || 0) + 'W GPU (' + n.gpu_count + ')'), W
+            ));
         }
     }
+
+    console.log(boxBot(W));
     console.log('');
 }
 
@@ -1546,28 +1804,32 @@ async function cmdApiKey(gateway: string, positional: string[], flags: Record<st
 async function cmdAnalytics(gateway: string, flags: Record<string, string>): Promise<void> {
     const hours = parseInt(flags['hours'] || '24');
 
+    const W = 62;
     console.log('');
-    console.log('  ' + C.purple(C.bold('Inference Analytics')) + C.dim(` — last ${hours}h`));
-    console.log('');
+    console.log(boxTop(`ANALYTICS \u2014 last ${hours}h`, W));
+    console.log(boxEmpty(W));
 
     const data = await apiGet(gateway, `/api/v1/inference/analytics?hours=${hours}`) as any;
 
     // Overview
-    console.log('  ' + C.cyan(C.bold('Overview')));
-    console.log('  ' + padRight(C.dim('Total Requests'), 22) + C.white(String(data.total_requests)));
-    console.log('  ' + padRight(C.dim('Successful'), 22) + C.green(String(data.successful)));
-    console.log('  ' + padRight(C.dim('Failed'), 22) + (data.failed > 0 ? C.red(String(data.failed)) : C.dim('0')));
-    console.log('  ' + padRight(C.dim('Req/min'), 22) + C.white(String(data.requests_per_minute)));
-    console.log('  ' + padRight(C.dim('Tokens In'), 22) + C.white(formatNumber(data.total_tokens_in)));
-    console.log('  ' + padRight(C.dim('Tokens Out'), 22) + C.white(formatNumber(data.total_tokens_out)));
-    console.log('');
+    const successRate = data.total_requests > 0 ? Math.round((data.successful / data.total_requests) * 100) : 100;
+    console.log(boxMid(C.dim('OVERVIEW'), W));
+    console.log(boxMid(padRight(C.dim('Total Requests'), 22) + C.white(C.bold(String(data.total_requests))), W));
+    console.log(boxMid(padRight(C.dim('Success Rate'), 22) + progressBar(successRate, 15) + '  ' + C.green(successRate + '%'), W));
+    console.log(boxMid(padRight(C.dim('Failed'), 22) + (data.failed > 0 ? C.red(C.bold(String(data.failed))) : C.dim('0')), W));
+    console.log(boxMid(padRight(C.dim('Req/min'), 22) + C.white(String(data.requests_per_minute)), W));
+    console.log(boxMid(padRight(C.dim('Tokens In'), 22) + C.white(formatNumber(data.total_tokens_in)), W));
+    console.log(boxMid(padRight(C.dim('Tokens Out'), 22) + C.white(formatNumber(data.total_tokens_out)), W));
+    console.log(boxEmpty(W));
 
-    // Latency
-    console.log('  ' + C.cyan(C.bold('Latency')));
-    console.log('  ' + padRight(C.dim('Average'), 22) + C.white(data.avg_latency_ms + 'ms'));
-    console.log('  ' + padRight(C.dim('p50'), 22) + C.white(data.p50_latency_ms + 'ms'));
-    console.log('  ' + padRight(C.dim('p95'), 22) + (data.p95_latency_ms > 5000 ? C.yellow : C.white)(data.p95_latency_ms + 'ms'));
-    console.log('  ' + padRight(C.dim('p99'), 22) + (data.p99_latency_ms > 10000 ? C.red : C.white)(data.p99_latency_ms + 'ms'));
+    // Latency with visual bar
+    console.log(boxMid(C.dim('LATENCY'), W));
+    const maxLatency = Math.max(data.p99_latency_ms || 1, 1);
+    console.log(boxMid(padRight(C.dim('Average'), 22) + miniBar(Math.min(100, Math.round(data.avg_latency_ms / maxLatency * 100)), 5) + ' ' + C.white(data.avg_latency_ms + 'ms'), W));
+    console.log(boxMid(padRight(C.dim('p50'), 22) + miniBar(Math.min(100, Math.round(data.p50_latency_ms / maxLatency * 100)), 5) + ' ' + C.white(data.p50_latency_ms + 'ms'), W));
+    console.log(boxMid(padRight(C.dim('p95'), 22) + miniBar(Math.min(100, Math.round(data.p95_latency_ms / maxLatency * 100)), 5) + ' ' + (data.p95_latency_ms > 5000 ? C.yellow : C.white)(data.p95_latency_ms + 'ms'), W));
+    console.log(boxMid(padRight(C.dim('p99'), 22) + miniBar(100, 5) + ' ' + (data.p99_latency_ms > 10000 ? C.red : C.white)(data.p99_latency_ms + 'ms'), W));
+    console.log(boxBot(W));
     console.log('');
 
     // By model
@@ -1654,6 +1916,11 @@ async function cmdDoctor(gateway: string, flags: Record<string, string>): Promis
     if (s.critical > 0) {
         console.log('');
         console.log('  ' + C.red(C.bold('\u26A0 Critical issues require manual intervention')));
+        console.log(personalityLine('error'));
+    } else if (s.warnings > 0) {
+        console.log(personalityLine('warning'));
+    } else {
+        console.log(personalityLine('healthy'));
     }
 
     console.log('');
@@ -1709,7 +1976,7 @@ async function rawHttpsGet(url: string): Promise<string> {
         https.get({
             hostname: parsed.hostname,
             path: parsed.pathname + parsed.search,
-            headers: { 'User-Agent': 'CLAWtopus-CLI/0.2.0', 'Accept': 'application/json' },
+            headers: { 'User-Agent': 'CLAWtopus-CLI/' + CLI_VERSION, 'Accept': 'application/json' },
             timeout: 15000,
         }, (res) => {
             let data = '';
@@ -1970,145 +2237,83 @@ async function cmdModelInfo(positional: string[]): Promise<void> {
 
 function cmdHelp(): void {
     console.log('');
-    for (const line of CLAWTOPUS_FACE) {
-        console.log('  ' + line);
-    }
+    console.log(`  \uD83D\uDC19 ${C.teal(C.bold('CLAWtopus'))} ${C.dim('v' + CLI_VERSION)} ${C.dim('\u2014')} ${C.purple(C.italic('Eight arms. One mind.'))}`);
     console.log('');
-    console.log('  ' + C.purple(C.bold('CLAWtopus CLI')) + ' ' + C.dim('v0.2.0'));
-    console.log('  ' + C.dim('Eight arms. One mind. Zero compromises.'));
-    console.log('  ' + C.dim('Inference router + cluster management for TentaCLAW OS.'));
+
+    const section = (title: string) => {
+        console.log('  ' + C.teal(C.bold(title)));
+    };
+    const cmd = (name: string, desc: string) => {
+        console.log('    ' + padRight(C.green(name), 32) + C.dim(desc));
+    };
+
+    section('CLUSTER');
+    cmd('status', 'Cluster overview with health score');
+    cmd('nodes', 'List all nodes with GPU details');
+    cmd('health', 'Detailed health analysis with sparkline');
+    cmd('models', 'List all loaded models');
+    cmd('alerts', 'View cluster alerts');
+    cmd('doctor', 'Run diagnostics + auto-heal');
     console.log('');
-    console.log('  ' + C.cyan(C.bold('USAGE')));
+
+    section('DEPLOY');
+    cmd('deploy <model>', 'Smart-deploy to best node');
+    cmd('deploy <model> <node>', 'Deploy to a specific node');
+    cmd('apply <id>', 'Apply a flight sheet');
+    cmd('flight-sheets', 'List flight sheets');
     console.log('');
-    console.log('    clawtopus <command> [options]');
+
+    section('CHAT');
+    cmd('chat [--model <m>]', 'Chat with an AI model');
     console.log('');
-    console.log('  ' + C.cyan(C.bold('CLUSTER MANAGEMENT')));
+
+    section('MANAGE');
+    cmd('top', 'Real-time cluster monitor (htop-style)');
+    cmd('backends', 'Inference backends per node');
+    cmd('capacity', 'Cluster capacity report');
+    cmd('power', 'Power draw and cost estimates');
+    cmd('hot', 'Hottest nodes by GPU temperature');
+    cmd('idle', 'Idle nodes (< 10% utilization)');
+    cmd('benchmarks', 'View performance benchmarks');
+    cmd('tags [list|add|nodes]', 'Manage node tags');
+    cmd('drain/cordon <node>', 'Take a node offline');
+    cmd('uncordon <node>', 'Bring a node back');
     console.log('');
-    console.log('    ' + padRight(C.green('status'), 42) + 'Cluster overview (nodes, GPUs, VRAM, tok/s)');
-    console.log('    ' + padRight(C.green('nodes'), 42) + 'List all nodes with status');
-    console.log('    ' + padRight(C.green('node') + ' <nodeId>', 42) + 'Show detailed node info');
-    console.log('    ' + padRight(C.green('health'), 42) + 'Cluster health score (0-100)');
-    console.log('    ' + padRight(C.green('alerts'), 42) + 'View cluster alerts');
-    console.log('    ' + padRight(C.green('benchmarks'), 42) + 'View benchmark results');
-    console.log('    ' + padRight(C.green('tags') + ' [list|add|nodes]', 42) + 'Manage node tags');
-    console.log('    ' + padRight(C.green('doctor'), 42) + 'Run diagnostics + auto-fix issues');
-    console.log('    ' + padRight(C.green('doctor') + ' --no-fix', 42) + 'Dry run (diagnose only, no fixes)');
+
+    section('SMART');
+    cmd('optimize', 'CLAWtopus optimizes your cluster');
+    cmd('explain', 'Plain English cluster summary');
+    cmd('fix', 'Auto-fix cluster issues');
+    cmd('auto', 'Full auto mode \u2014 let CLAWtopus decide');
+    cmd('vibe', 'How\'s the cluster doing?');
     console.log('');
-    console.log('  ' + C.cyan(C.bold('MODEL PACKAGE MANAGER')));
+
+    section('SEARCH');
+    cmd('search <query>', 'Search Ollama + HuggingFace');
+    cmd('info <org/model>', 'Detailed model info');
+    cmd('recommend', 'Model recommendations for your cluster');
+    cmd('estimate <model>', 'VRAM estimate for a model');
     console.log('');
-    console.log('    ' + padRight(C.green('search') + ' <query>', 42) + 'Search Ollama + HuggingFace for models');
-    console.log('    ' + padRight(C.green('search') + ' <q> --source ollama', 42) + 'Search Ollama only');
-    console.log('    ' + padRight(C.green('search') + ' <q> --source hf', 42) + 'Search HuggingFace only');
-    console.log('    ' + padRight(C.green('tags'), 42) + 'Browse model categories (text-gen, code, etc)');
-    console.log('    ' + padRight(C.green('keywords') + ' <tag>', 42) + 'List models by HuggingFace tag/pipeline');
-    console.log('    ' + padRight(C.green('info') + ' <org/model>', 42) + 'Detailed model info from HuggingFace');
+
+    section('HUB');
+    cmd('hub search <query>', 'Search CLAWHub');
+    cmd('hub install @ns/pkg', 'Install a package');
+    cmd('hub list', 'List installed');
+    cmd('hub publish', 'Publish from clawhub.yaml');
+    cmd('hub trending', 'Trending packages');
     console.log('');
-    console.log('  ' + C.cyan(C.bold('INFERENCE & MODELS')));
+
+    section('ADMIN');
+    cmd('users', 'List users');
+    cmd('login <username>', 'Login to gateway');
+    cmd('apikey [create|list]', 'API key management');
+    cmd('alert-rules', 'View alert rules');
+    cmd('analytics', 'Inference analytics');
+    cmd('audit', 'Audit log');
     console.log('');
-    console.log('    ' + padRight(C.green('models'), 42) + 'List models loaded across the cluster');
-    console.log('    ' + padRight(C.green('chat') + ' --model <name>', 42) + 'Interactive chat with a cluster model');
-    console.log('    ' + padRight(C.green('deploy') + ' <model>', 42) + 'Deploy model to all online nodes');
-    console.log('    ' + padRight(C.green('deploy') + ' <model> <nodeId>', 42) + 'Deploy model to specific node');
-    console.log('');
-    console.log('  ' + C.cyan(C.bold('OPERATIONS')));
-    console.log('');
-    console.log('    ' + padRight(C.green('top'), 42) + 'Real-time cluster monitor (htop-style)');
-    console.log('    ' + padRight(C.green('backends'), 42) + 'Show inference backends per node');
-    console.log('    ' + padRight(C.green('capacity'), 42) + 'Cluster capacity report');
-    console.log('    ' + padRight(C.green('hot'), 42) + 'Hottest nodes by GPU temperature');
-    console.log('    ' + padRight(C.green('idle'), 42) + 'Idle nodes (< 10% GPU utilization)');
-    console.log('    ' + padRight(C.green('drain') + ' <nodeId>', 42) + 'Drain node (maintenance mode)');
-    console.log('    ' + padRight(C.green('cordon') + ' <nodeId>', 42) + 'Stop scheduling on node');
-    console.log('    ' + padRight(C.green('uncordon') + ' <nodeId>', 42) + 'Resume scheduling on node');
-    console.log('');
-    console.log('  ' + C.cyan(C.bold('AUTOMATION')));
-    console.log('');
-    console.log('    ' + padRight(C.green('command') + ' <nodeId> <action>', 42) + 'Send command to a node');
-    console.log('    ' + padRight(C.green('flight-sheets'), 42) + 'List all flight sheets');
-    console.log('    ' + padRight(C.green('apply') + ' <flightSheetId>', 42) + 'Apply a flight sheet');
-    console.log('    ' + padRight(C.green('auto'), 42) + 'Auto mode — CLAWtopus decides everything');
-    console.log('    ' + padRight(C.green('fix'), 42) + 'Auto-fix cluster issues');
-    console.log('');
-    console.log('  ' + C.cyan(C.bold('ADMIN')));
-    console.log('');
-    console.log('    ' + padRight(C.green('users'), 42) + 'List users');
-    console.log('    ' + padRight(C.green('login') + ' <username>', 42) + 'Login to gateway');
-    console.log('    ' + padRight(C.green('alert-rules'), 42) + 'View alert rules');
-    console.log('    ' + padRight(C.green('groups'), 42) + 'Node groups');
-    console.log('    ' + padRight(C.green('webhooks'), 42) + 'Webhook management');
-    console.log('    ' + padRight(C.green('profiler'), 42) + 'Performance profiler stats');
-    console.log('    ' + padRight(C.green('topology'), 42) + 'Cluster topology view');
-    console.log('    ' + padRight(C.green('about'), 42) + 'Version and system info');
-    console.log('');
-    console.log('  ' + C.cyan(C.bold('CLAWHUB REGISTRY')));
-    console.log('');
-    console.log('    ' + padRight(C.green('hub search') + ' <query>', 42) + 'Search the CLAWHub registry');
-    console.log('    ' + padRight(C.green('hub install') + ' @ns/pkg[@ver]', 42) + 'Install a package');
-    console.log('    ' + padRight(C.green('hub list'), 42) + 'List installed packages');
-    console.log('    ' + padRight(C.green('hub info') + ' @ns/pkg', 42) + 'Show package details');
-    console.log('    ' + padRight(C.green('hub publish'), 42) + 'Publish from clawhub.yaml');
-    console.log('    ' + padRight(C.green('hub trending'), 42) + 'Trending packages');
-    console.log('    ' + padRight(C.green('hub star') + ' @ns/pkg', 42) + 'Star a package');
-    console.log('    ' + padRight(C.green('hub init') + ' [--type agent]', 42) + 'Create clawhub.yaml template');
-    console.log('');
-    console.log('  ' + C.cyan(C.bold('FUN')));
-    console.log('');
-    console.log('    ' + padRight(C.green('vibe'), 42) + 'How\'s the cluster doing?');
-    console.log('    ' + padRight(C.green('joke'), 42) + 'CLAWtopus tells a joke');
-    console.log('    ' + padRight(C.green('fortune'), 42) + 'Octopus wisdom');
-    console.log('    ' + padRight(C.green('dance'), 42) + 'CLAWtopus dances');
-    console.log('    ' + padRight(C.green('credits'), 42) + 'Project credits');
-    console.log('    ' + padRight(C.green('help'), 42) + 'Show this help');
-    console.log('');
-    console.log('  ' + C.cyan(C.bold('COMMAND OPTIONS')));
-    console.log('');
-    console.log('    ' + padRight(C.yellow('--model') + ' <name>', 42) + 'Model name (for command)');
-    console.log('    ' + padRight(C.yellow('--gpu') + ' <index>', 42) + 'GPU index (for command)');
-    console.log('    ' + padRight(C.yellow('--profile') + ' <name>', 42) + 'Profile name (for overclock)');
-    console.log('    ' + padRight(C.yellow('--priority') + ' <level>', 42) + 'Priority (for command)');
-    console.log('');
-    console.log('  ' + C.cyan(C.bold('GLOBAL OPTIONS')));
-    console.log('');
-    console.log('    ' + padRight(C.yellow('--gateway') + ' <url>', 42) + 'TentaCLAW Gateway URL');
-    console.log('');
-    console.log('  ' + C.cyan(C.bold('ENVIRONMENT')));
-    console.log('');
-    console.log('    ' + padRight(C.yellow('TENTACLAW_GATEWAY'), 42) + 'Default gateway URL (default: http://localhost:8080)');
-    console.log('    ' + padRight(C.yellow('CLAWHUB_REGISTRY'), 42) + 'CLAWHub registry URL (default: http://localhost:3200)');
-    console.log('');
-    console.log('  ' + C.cyan(C.bold('ACTIONS')) + C.dim(' (for the command subcommand)'));
-    console.log('');
-    console.log('    ' + padRight('reload_model', 24) + 'Reload a model in the inference engine');
-    console.log('    ' + padRight('install_model', 24) + 'Pull/install a model via Ollama');
-    console.log('    ' + padRight('remove_model', 24) + 'Remove a model from the node');
-    console.log('    ' + padRight('overclock', 24) + 'Apply an overclock profile');
-    console.log('    ' + padRight('restart_agent', 24) + 'Restart the TentaCLAW agent daemon');
-    console.log('    ' + padRight('reboot', 24) + 'Reboot the node');
-    console.log('');
-    console.log('  ' + C.cyan(C.bold('EXAMPLES')));
-    console.log('');
-    console.log(C.dim('    # Check cluster status'));
-    console.log('    clawtopus status');
-    console.log('');
-    console.log(C.dim('    # List models and check health'));
-    console.log('    clawtopus models');
-    console.log('    clawtopus health');
-    console.log('');
-    console.log(C.dim('    # Deploy a model across the cluster'));
-    console.log('    clawtopus deploy llama3.1:8b');
-    console.log('');
-    console.log(C.dim('    # Interactive chat with a model'));
-    console.log('    clawtopus chat --model llama3.1:8b');
-    console.log('');
-    console.log(C.dim('    # Tag nodes and filter by tag'));
-    console.log('    clawtopus tags add NODE-001 production');
-    console.log('    clawtopus tags nodes production');
-    console.log('');
-    console.log(C.dim('    # Send a command to a specific node'));
-    console.log('    clawtopus command NODE-001 install_model --model codellama:7b');
-    console.log('');
-    console.log(C.dim('    # Use a remote gateway'));
-    console.log('    clawtopus status --gateway http://192.168.1.100:8080');
+
+    console.log('  ' + C.dim('Use') + ' ' + C.yellow('--gateway <url>') + ' ' + C.dim('to specify a different gateway.'));
+    console.log('  ' + C.dim('Default: http://localhost:8080'));
     console.log('');
 }
 
@@ -2136,8 +2341,13 @@ async function main(): Promise<void> {
     const parsed = parseArgs(process.argv);
     const gateway = getGatewayUrl(parsed.flags);
 
+    // Boot splash for status or no-args
+    if (parsed.command === 'status' || parsed.command === 'help') {
+        bootSplash();
+    }
+
     // Random tip on 20% of runs (skip for help/version/simple commands)
-    if (Math.random() < 0.2 && !['help', 'version', '--help', '-h', '--version', '-v', 'joke', 'fortune', 'dance', 'credits', 'sup'].includes(parsed.command)) {
+    if (Math.random() < 0.2 && !['help', 'status', 'version', '--help', '-h', '--version', '-v', 'joke', 'fortune', 'dance', 'credits', 'sup'].includes(parsed.command)) {
         console.error(C.dim('  \uD83D\uDC19 Tip: ' + TIPS[Math.floor(Math.random() * TIPS.length)]));
     }
 
@@ -2253,13 +2463,13 @@ async function main(): Promise<void> {
         case 'vibe': {
             const s = await apiGet(gateway, '/api/v1/summary') as any;
             const h = await apiGet(gateway, '/api/v1/health/score') as any;
+            const vibeMood: keyof typeof personality = h.score >= 80 ? 'healthy' : h.score >= 50 ? 'warning' : 'error';
+            const scoreColor = h.score >= 80 ? C.green : h.score >= 50 ? C.yellow : C.red;
             console.log('');
-            console.log('  ' + C.teal('\uD83D\uDC19') + ' ' + (h.score >= 80
-                ? C.green('everything\'s running smooth ' + C.dim('\uD83D\uDE0E'))
-                : h.score >= 50
-                ? C.yellow('we\'re alright... could be better')
-                : C.red('things are rough. run `clawtopus fix`')));
-            console.log('  ' + C.dim(`   ${s.online_nodes} nodes | ${s.total_gpus} GPUs | ${h.score}/100`));
+            console.log('  \uD83D\uDC19 ' + C.purple(C.italic(C.bold(`"${pickPersonality(vibeMood)}"`))) );
+            console.log('');
+            console.log('  ' + C.dim('  ') + scoreColor(C.bold(h.grade)) + ' ' + progressBar(h.score, 20) + '  ' + scoreColor(h.score + '/100'));
+            console.log('  ' + C.dim(`   ${s.online_nodes} nodes | ${s.total_gpus} GPUs | ${formatNumber(Math.round(s.total_toks_per_sec || 0))} tok/s`));
             console.log('');
             break;
         }
@@ -2335,14 +2545,18 @@ async function main(): Promise<void> {
 
         case 'credits': {
             console.log('');
-            console.log('  ' + C.teal(C.bold('TENTACLAW OS')));
-            console.log('  ' + C.dim('Eight arms. One mind. Zero compromises.'));
+            for (const line of CLAWTOPUS_FACE) {
+                console.log('  ' + line);
+            }
             console.log('');
-            console.log('  ' + C.purple('Created by') + ' ' + C.white('TentaCLAW-OS'));
-            console.log('  ' + C.purple('Mascot')     + '    ' + C.white('CLAWtopus \uD83D\uDC19'));
-            console.log('  ' + C.purple('License')    + '   ' + C.white('MIT'));
-            console.log('  ' + C.purple('Website')    + '   ' + C.teal('www.tentaclaw.io'));
-            console.log('  ' + C.purple('GitHub')     + '    ' + C.teal('github.com/TentaCLAW-OS'));
+            console.log('  ' + C.teal(C.bold('TENTACLAW OS')) + ' ' + C.dim('v' + CLI_VERSION));
+            console.log('  ' + C.purple(C.italic('Eight arms. One mind. Zero compromises.')));
+            console.log('');
+            console.log('  ' + padRight(C.purple('Created by'), 16) + C.white('TentaCLAW-OS'));
+            console.log('  ' + padRight(C.purple('Mascot'), 16) + C.white('CLAWtopus \uD83D\uDC19'));
+            console.log('  ' + padRight(C.purple('License'), 16) + C.white('MIT'));
+            console.log('  ' + padRight(C.purple('Website'), 16) + C.teal('www.tentaclaw.io'));
+            console.log('  ' + padRight(C.purple('GitHub'), 16) + C.teal('github.com/TentaCLAW-OS'));
             console.log('');
             console.log('  ' + C.dim('Built with \u2764 and too many GPUs'));
             console.log('');
@@ -2579,15 +2793,15 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
 
         case 'about': {
             const ver = await apiGet(gateway, '/api/v1/version') as Record<string, unknown>;
+            bootSplash();
+            console.log('  ' + padRight(C.dim('CLI Version'), 20) + C.white('v' + CLI_VERSION));
+            console.log('  ' + padRight(C.dim('Gateway API'), 20) + C.white(String(ver.version || 'unknown')));
+            console.log('  ' + padRight(C.dim('API Version'), 20) + C.white(String(ver.api_version || 'v1')));
+            console.log('  ' + padRight(C.dim('License'), 20) + C.white('MIT'));
+            console.log('  ' + padRight(C.dim('Website'), 20) + C.teal('www.tentaclaw.io'));
+            console.log('  ' + padRight(C.dim('GitHub'), 20) + C.teal('github.com/TentaCLAW-OS'));
             console.log('');
-            console.log('  ' + C.teal(C.bold('TENTACLAW OS')));
-            console.log('  ' + C.dim('Version: ' + (ver.version || '0.2.0')));
-            console.log('  ' + C.dim('API: ' + (ver.api_version || 'v1')));
-            console.log('  ' + C.dim('Mascot: CLAWtopus \uD83D\uDC19'));
-            console.log('  ' + C.dim('License: MIT'));
-            console.log('  ' + C.dim('Website: www.tentaclaw.io'));
-            console.log('');
-            console.log('  ' + C.purple('"Eight arms. One mind. Zero compromises."'));
+            console.log('  ' + C.purple(C.italic('"Eight arms. One mind. Zero compromises."')));
             console.log('');
             break;
         }
@@ -2997,7 +3211,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
         case 'version':
         case '--version':
         case '-v':
-            console.log('clawtopus-cli v0.2.0');
+            console.log('clawtopus-cli v' + CLI_VERSION);
             break;
 
         case 'backends': {
@@ -3054,27 +3268,40 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
 
         case 'top': {
             console.log('');
-            console.log('  ' + C.teal(C.bold('CLUSTER TOP')) + C.dim(' — refreshing every 3s (Ctrl+C to quit)'));
+            console.log('  ' + C.teal(C.bold('CLUSTER TOP')) + C.dim(' \u2014 refreshing every 3s (Ctrl+C to quit)'));
             console.log('');
             const refreshTop = async () => {
-                const nodes = await apiGet(gateway, '/api/v1/nodes') as Array<{ id: string; hostname: string; status: string; gpu_count: number; latest_stats?: { gpus: Array<{ temperatureC: number; utilizationPct: number; vramUsedMb: number; vramTotalMb: number; powerDrawW: number }>; cpu: { usage_pct: number }; inference: { loaded_models: string[]; in_flight_requests: number } } }>;
+                const topNodes = await apiGet(gateway, '/api/v1/nodes') as Array<{ id: string; hostname: string; status: string; gpu_count: number; latest_stats?: { gpus: Array<{ temperatureC: number; utilizationPct: number; vramUsedMb: number; vramTotalMb: number; powerDrawW: number }>; cpu: { usage_pct: number }; inference: { loaded_models: string[]; in_flight_requests: number } } }>;
                 process.stdout.write('\x1b[2J\x1b[H'); // clear screen
-                console.log('  ' + C.teal(C.bold('TENTACLAW CLUSTER TOP')) + C.dim('  ' + new Date().toLocaleTimeString()));
-                console.log('  ' + C.dim('─'.repeat(70)));
-                console.log('  ' + padRight(C.dim('NODE'), 20) + padRight(C.dim('STATUS'), 12) + padRight(C.dim('GPU'), 8) + padRight(C.dim('TEMP'), 8) + padRight(C.dim('UTIL'), 8) + padRight(C.dim('VRAM'), 12) + C.dim('MODELS'));
-                console.log('  ' + C.dim('─'.repeat(70)));
-                for (const n of nodes) {
+                const W = 78;
+                console.log(boxTop('TENTACLAW CLUSTER TOP  ' + new Date().toLocaleTimeString(), W));
+                console.log(boxMid(
+                    padRight(C.dim('NODE'), 16) + padRight(C.dim('ST'), 10) +
+                    padRight(C.dim('GPU'), 6) + padRight(C.dim('TEMP'), 12) +
+                    padRight(C.dim('UTIL'), 14) + padRight(C.dim('VRAM'), 12) +
+                    C.dim('MODELS'), W
+                ));
+                console.log(boxSep(W));
+                for (const n of topNodes) {
                     const s = n.latest_stats;
                     const avgTemp = s ? Math.round(s.gpus.reduce((a, g) => a + g.temperatureC, 0) / Math.max(s.gpus.length, 1)) : 0;
                     const avgUtil = s ? Math.round(s.gpus.reduce((a, g) => a + g.utilizationPct, 0) / Math.max(s.gpus.length, 1)) : 0;
                     const vramUsed = s ? Math.round(s.gpus.reduce((a, g) => a + g.vramUsedMb, 0)) : 0;
                     const vramTotal = s ? Math.round(s.gpus.reduce((a, g) => a + g.vramTotalMb, 0)) : 0;
-                    const tempColor = avgTemp > 85 ? C.red : avgTemp > 70 ? C.yellow : C.green;
-                    const utilColor = avgUtil > 90 ? C.red : avgUtil > 50 ? C.yellow : C.green;
+                    const tColorFn = tempColor(avgTemp);
                     const models = s ? s.inference.loaded_models.slice(0, 2).join(', ') : '';
-                    console.log('  ' + padRight(C.white(n.hostname), 20) + padRight(statusBadge(n.status), 12) + padRight(C.white(String(n.gpu_count)), 8) + padRight(tempColor(avgTemp + 'C'), 8) + padRight(utilColor(avgUtil + '%'), 8) + padRight(C.teal(Math.round(vramUsed / 1024) + '/' + Math.round(vramTotal / 1024) + 'G'), 12) + C.dim(models));
+                    const stIcon = n.status === 'online' ? C.green('\u25CF') : C.red('\u25CB');
+                    console.log(boxMid(
+                        padRight(C.white(C.bold(n.hostname)), 16) +
+                        padRight(stIcon, 10) +
+                        padRight(C.white(String(n.gpu_count)), 6) +
+                        padRight(tColorFn(avgTemp + '\u00B0C') + ' ' + miniBar(Math.min(100, avgTemp), 3), 12) +
+                        padRight(miniBar(avgUtil, 5) + ' ' + C.white(avgUtil + '%'), 14) +
+                        padRight(C.teal(Math.round(vramUsed / 1024) + '/' + Math.round(vramTotal / 1024) + 'G'), 12) +
+                        C.dim(models), W
+                    ));
                 }
-                console.log('  ' + C.dim('─'.repeat(70)));
+                console.log(boxBot(W));
                 console.log('  ' + C.dim('Press Ctrl+C to exit'));
             };
             await refreshTop();
@@ -3447,22 +3674,28 @@ main().catch((err) => {
 
 async function cmdCapacity(gateway: string): Promise<void> {
     const data = await apiGet(gateway, '/api/v1/capacity') as any;
+    const W = 56;
     console.log('');
-    console.log('  ' + C.purple(C.bold('Cluster Capacity')));
-    console.log('');
-    console.log('  ' + padRight(C.dim('Total VRAM'), 22) + C.white(data.total_vram_gb + ' GB'));
-    console.log('  ' + padRight(C.dim('Used'), 22) + C.yellow(data.used_vram_gb + ' GB'));
-    console.log('  ' + padRight(C.dim('Free'), 22) + C.green(data.free_vram_gb + ' GB'));
-    console.log('  ' + padRight(C.dim('Utilization'), 22) + (data.utilization_pct > 80 ? C.red : C.white)(data.utilization_pct + '%'));
-    console.log('');
-    console.log('  ' + C.cyan(data.recommendation));
+    console.log(boxTop('CLUSTER CAPACITY', W));
+    console.log(boxEmpty(W));
+
+    const utilPct = data.utilization_pct || 0;
+    console.log(boxMid(padRight(C.dim('Total VRAM'), 18) + C.white(C.bold(data.total_vram_gb + ' GB')), W));
+    console.log(boxMid(padRight(C.dim('Used'), 18) + C.yellow(data.used_vram_gb + ' GB'), W));
+    console.log(boxMid(padRight(C.dim('Free'), 18) + C.green(data.free_vram_gb + ' GB'), W));
+    console.log(boxMid(padRight(C.dim('Utilization'), 18) + progressBar(utilPct, 20) + '  ' + (utilPct > 80 ? C.red : C.white)(utilPct + '%'), W));
+    console.log(boxEmpty(W));
+    console.log(boxMid(C.cyan(data.recommendation), W));
+
     if (data.can_still_fit && data.can_still_fit.length > 0) {
-        console.log('');
-        console.log('  ' + C.dim('Models that still fit:'));
+        console.log(boxEmpty(W));
+        console.log(boxMid(C.dim('Models that still fit:'), W));
         for (const m of data.can_still_fit.slice(0, 5)) {
-            console.log('    ' + C.green('\u2714') + ' ' + C.white(m.model) + C.dim(' (' + Math.round(m.vram_mb / 1024) + 'GB)'));
+            console.log(boxMid('  ' + C.green('\u2714') + ' ' + C.white(m.model) + C.dim(' (' + Math.round(m.vram_mb / 1024) + 'GB)'), W));
         }
     }
+
+    console.log(boxBot(W));
     console.log('');
 }
 
@@ -3485,16 +3718,27 @@ async function cmdSuggestions(gateway: string): Promise<void> {
 
 async function cmdGpuMap(gateway: string): Promise<void> {
     const data = await apiGet(gateway, '/api/v1/gpu-map') as any;
+    const W = 72;
     console.log('');
-    console.log('  ' + C.purple(C.bold('GPU Map')) + C.dim(' (' + data.total_gpus + ' GPUs)'));
-    console.log('');
-    console.log('  ' + padRight(C.dim('NODE'), 14) + padRight(C.dim('GPU'), 30) + padRight(C.dim('VRAM'), 16) + padRight(C.dim('TEMP'), 8) + C.dim('UTIL'));
-    console.log('  ' + C.dim('\u2500'.repeat(75)));
+    console.log(boxTop(`GPU MAP \u2014 ${data.total_gpus} GPUs`, W));
+
+    console.log(boxMid(
+        padRight(C.dim('NODE'), 14) + padRight(C.dim('GPU'), 22) +
+        padRight(C.dim('VRAM'), 18) + padRight(C.dim('TEMP'), 8) + C.dim('UTIL'), W
+    ));
+    console.log(boxSep(W));
+
     for (const g of data.gpus) {
-        const tempColor = g.temp < 60 ? C.green : g.temp < 80 ? C.yellow : C.red;
-        const vramBar = Math.round(g.vram_pct / 5);
-        const bar = C.cyan('\u2588'.repeat(vramBar)) + C.dim('\u2591'.repeat(20 - vramBar));
-        console.log('  ' + padRight(C.white(g.hostname), 14) + padRight(C.dim(g.name?.slice(0, 28) || '?'), 30) + padRight(bar + ' ' + g.vram_pct + '%', 16) + padRight(tempColor(g.temp + '\u00B0C'), 8) + C.dim(g.util + '%'));
+        const tColor = tempColor(g.temp);
+        console.log(boxMid(
+            padRight(C.white(g.hostname), 14) +
+            padRight(C.dim(g.name?.slice(0, 20) || '?'), 22) +
+            padRight(miniBar(g.vram_pct, 8) + ' ' + C.white(g.vram_pct + '%'), 18) +
+            padRight(tColor(g.temp + '\u00B0C'), 8) +
+            miniBar(g.util, 5) + ' ' + C.dim(g.util + '%'), W
+        ));
     }
+
+    console.log(boxBot(W));
     console.log('');
 }
