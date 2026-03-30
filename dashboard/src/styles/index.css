@@ -117,3 +117,240 @@
   outline: 2px solid var(--cyan);
   outline-offset: 2px;
 }
+
+/* ── Login Page ───────────────────────────────────────────────── */
+
+@keyframes loginFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes loginCardIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes loginGradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.login-page {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-base);
+  z-index: 100;
+}
+
+.login-scanline {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,255,255,0.1), transparent);
+  pointer-events: none;
+  z-index: 101;
+  animation: scanline 8s linear infinite;
+}
+
+.login-grid {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,255,0.015) 1px, transparent 1px);
+  background-size: 50px 50px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.login-radials {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 15% 0%, rgba(0,255,255,0.035), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 85% 100%, rgba(140,0,200,0.03), transparent 55%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.login-card {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 420px;
+  padding: 48px 40px 36px;
+  background: rgba(14,18,28,0.55);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  box-shadow:
+    0 0 60px rgba(0,0,0,0.4),
+    0 0 1px rgba(0,255,255,0.1),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+  animation: loginCardIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.login-logo-area {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.login-logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  font-size: 24px;
+  background: linear-gradient(135deg, var(--purple), var(--cyan));
+  box-shadow: 0 0 24px rgba(140,0,200,0.3), 0 0 48px rgba(0,255,255,0.1);
+  margin-bottom: 16px;
+  animation: loginFloat 4s ease-in-out infinite;
+}
+
+.login-brand {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.login-brand-name {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  background: linear-gradient(90deg, var(--cyan), var(--purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.login-brand-os {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+}
+
+.login-tagline {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.5px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.login-field {
+  position: relative;
+}
+
+.login-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+  box-sizing: border-box;
+}
+
+.login-input::placeholder {
+  color: var(--text-dim);
+}
+
+.login-input:focus {
+  border-color: rgba(0,255,255,0.3);
+  box-shadow: 0 0 0 3px rgba(0,255,255,0.06), 0 0 20px rgba(0,255,255,0.05);
+  background: rgba(255,255,255,0.06);
+}
+
+.login-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-error {
+  font-size: 12px;
+  color: var(--red);
+  text-align: center;
+  padding: 6px 0;
+  animation: fadeIn 0.2s ease-out both;
+}
+
+.login-button {
+  width: 100%;
+  padding: 13px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--cyan), var(--purple));
+  background-size: 200% 200%;
+  animation: loginGradientShift 6s ease infinite;
+  box-shadow: 0 0 20px rgba(0,255,255,0.15), 0 0 40px rgba(140,0,200,0.1);
+  transition: box-shadow 0.3s ease, transform 0.15s ease, opacity 0.3s ease;
+  margin-top: 4px;
+}
+
+.login-button:hover:not(:disabled) {
+  box-shadow: 0 0 30px rgba(0,255,255,0.25), 0 0 60px rgba(140,0,200,0.15);
+  transform: translateY(-1px);
+}
+
+.login-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.login-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-button-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.login-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.login-version {
+  text-align: center;
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--text-dim);
+  margin-top: 24px;
+  letter-spacing: 1px;
+}

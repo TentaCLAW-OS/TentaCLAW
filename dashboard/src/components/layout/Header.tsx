@@ -1,11 +1,32 @@
+import { useState, useRef, useEffect } from 'react';
 import { useClusterStore } from '@/stores/cluster';
+import { useAuthStore } from '@/stores/auth';
 
 export function Header() {
   const nodes = useClusterStore((s) => s.nodes);
   const connected = useClusterStore((s) => s.connected);
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const totalNodes = nodes.filter((n) => n.status === 'online').length;
   const totalGpus = nodes.reduce((sum, n) => sum + n.gpu_count, 0);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!showDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDropdown]);
+
+  const displayName = user?.username ?? 'user';
+  const initial = displayName[0].toUpperCase();
 
   return (
     <header
@@ -99,17 +120,65 @@ export function Header() {
           &#x2699;
         </span>
 
-        {/* User avatar */}
-        <div className="flex items-center gap-1.5">
+        {/* User avatar + dropdown */}
+        <div className="relative" ref={dropdownRef}>
           <div
-            className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-            style={{
-              background: 'linear-gradient(135deg, var(--purple), var(--cyan))',
-            }}
+            className="flex items-center gap-1.5 cursor-pointer"
+            onClick={() => setShowDropdown(!showDropdown)}
           >
-            A
+            <div
+              className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+              style={{
+                background: 'linear-gradient(135deg, var(--purple), var(--cyan))',
+              }}
+            >
+              {initial}
+            </div>
+            <span className="text-[9px] text-[var(--text-muted)] font-mono">{displayName}</span>
+            <svg
+              className="w-2.5 h-2.5 text-[var(--text-dim)]"
+              style={{
+                transform: showDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease',
+              }}
+              viewBox="0 0 10 6"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </div>
-          <span className="text-[9px] text-[var(--text-muted)] font-mono">admin</span>
+
+          {/* Dropdown */}
+          {showDropdown && (
+            <div
+              className="absolute right-0 top-full mt-1.5 w-40 rounded-lg border overflow-hidden z-50"
+              style={{
+                background: 'rgba(14,18,28,0.95)',
+                backdropFilter: 'blur(20px)',
+                borderColor: 'var(--border)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                animation: 'fadeIn 0.15s ease-out both',
+              }}
+            >
+              <div
+                className="px-3 py-2 border-b"
+                style={{ borderColor: 'var(--border)' }}
+              >
+                <div className="text-[10px] font-mono text-[var(--text-secondary)]">{displayName}</div>
+                <div className="text-[9px] font-mono text-[var(--text-dim)]">{user?.role ?? 'user'}</div>
+              </div>
+              <button
+                onClick={async () => {
+                  setShowDropdown(false);
+                  await logout();
+                }}
+                className="w-full text-left px-3 py-2 text-[10px] font-mono text-[var(--red)] hover:bg-[rgba(255,70,70,0.08)] transition-colors cursor-pointer"
+              >
+                Logout
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </header>

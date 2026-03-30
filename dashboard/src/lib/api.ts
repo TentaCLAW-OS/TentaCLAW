@@ -2,10 +2,15 @@ import type { ClusterSummary, ClusterNode, HealthScore, PowerStats, Alert, Spark
 
 const BASE = '';
 
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('tentaclaw_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(), ...init?.headers },
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
   return res.json();
