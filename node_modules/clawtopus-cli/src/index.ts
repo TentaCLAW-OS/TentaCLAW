@@ -2861,6 +2861,133 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
             break;
         }
 
+        case 'cost': {
+            const dashboard = await apiGet(gateway, '/api/v1/cost/dashboard').catch(() => null) as Record<string, unknown> | null;
+            console.log('');
+            console.log('  ' + C.teal(C.bold('COST INTELLIGENCE')));
+            console.log('');
+            if (!dashboard) {
+                console.log('  ' + C.dim('Cost tracking not available. Configure: clawtopus cost config'));
+            } else {
+                const d = dashboard as any;
+                console.log('  ' + padRight(C.dim('Power draw'), 25) + C.white((d.current_power_watts || 0) + 'W'));
+                console.log('  ' + padRight(C.dim('Monthly electricity'), 25) + C.teal('$' + (d.monthly_electricity_cost || 0).toFixed(2)));
+                console.log('  ' + padRight(C.dim('Cost per M tokens'), 25) + C.white('$' + (d.cost_per_million_tokens || 0).toFixed(4)));
+                if (d.cloud_savings) {
+                    console.log('');
+                    console.log('  ' + C.green(C.bold('SAVINGS vs CLOUD')));
+                    console.log('  ' + padRight(C.dim('vs OpenAI'), 25) + C.green('$' + (d.cloud_savings.vs_openai || 0).toLocaleString()));
+                    console.log('  ' + padRight(C.dim('vs Anthropic'), 25) + C.green('$' + (d.cloud_savings.vs_anthropic || 0).toLocaleString()));
+                    console.log('  ' + padRight(C.dim('vs Together'), 25) + C.green('$' + (d.cloud_savings.vs_together || 0).toLocaleString()));
+                }
+                if (d.hardware_roi) {
+                    console.log('');
+                    console.log('  ' + C.dim('"Per-token pricing is a scam. Here\'s the proof." \u2014 CLAWtopus'));
+                }
+            }
+            console.log('');
+            break;
+        }
+
+        case 'burst': {
+            const sub = parsed.positional[0];
+            switch (sub) {
+                case 'status': {
+                    const stats = await apiGet(gateway, '/api/v1/burst/stats').catch(() => null) as Record<string, unknown> | null;
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('CLOUD BURST STATUS')));
+                    console.log('');
+                    if (!stats) {
+                        console.log('  ' + C.dim('Cloud burst not configured. Add providers: clawtopus burst add-provider'));
+                    } else {
+                        const s = stats as any;
+                        console.log('  ' + padRight(C.dim('Total burst requests'), 25) + C.white(String(s.total_requests || 0)));
+                        console.log('  ' + padRight(C.dim('Cost today'), 25) + C.yellow('$' + (s.cost_today || 0).toFixed(2)));
+                        console.log('  ' + padRight(C.dim('Cost this month'), 25) + C.yellow('$' + (s.cost_total || 0).toFixed(2)));
+                    }
+                    console.log('');
+                    break;
+                }
+                case 'savings': {
+                    const report = await apiGet(gateway, '/api/v1/burst/savings').catch(() => null) as Record<string, unknown> | null;
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('CLOUD SAVINGS REPORT')));
+                    console.log('');
+                    if (report) {
+                        const r = report as any;
+                        console.log('  ' + C.dim('Local: ') + C.green((r.local_pct || 95) + '%') + C.dim(' ($' + (r.local_cost || 0).toFixed(2) + ')'));
+                        console.log('  ' + C.dim('Cloud: ') + C.yellow((r.cloud_pct || 5) + '%') + C.dim(' ($' + (r.cloud_cost || 0).toFixed(2) + ')'));
+                        console.log('  ' + C.dim('If 100% cloud: ') + C.red('$' + (r.full_cloud_cost || 0).toFixed(2)));
+                        console.log('  ' + C.green(C.bold('Saved: $' + (r.savings || 0).toFixed(2))));
+                    }
+                    console.log('');
+                    break;
+                }
+                default:
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('CLOUD BURST COMMANDS')));
+                    console.log('  ' + C.green('  burst status') + '   — Current burst stats');
+                    console.log('  ' + C.green('  burst savings') + '  — Cost savings report');
+                    console.log('');
+            }
+            break;
+        }
+
+        case 'traces': {
+            const traces = await apiGet(gateway, '/api/v1/traces?limit=20').catch(() => []) as Array<{ traceId: string; model: string; timing: { total_ms: number }; tokens: { total: number }; timestamp: string }>;
+            console.log('');
+            console.log('  ' + C.teal(C.bold('INFERENCE TRACES')) + C.dim(' (last 20)'));
+            console.log('');
+            for (const t of traces) {
+                console.log('  ' + C.dim(t.timestamp.slice(11, 19)) + '  ' + padRight(C.white(t.model), 20) + padRight(C.teal(t.timing.total_ms + 'ms'), 10) + C.dim(t.tokens.total + ' tok'));
+            }
+            if (traces.length === 0) console.log('  ' + C.dim('No traces yet. Run some inference first.'));
+            console.log('');
+            break;
+        }
+
+        case 'topo':
+        case 'topology-gpu': {
+            console.log('');
+            console.log('  ' + C.teal(C.bold('GPU TOPOLOGY')));
+            console.log('');
+            const nodes = await apiGet(gateway, '/api/v1/nodes') as Array<{ hostname: string; latest_stats?: { gpus: Array<{ name: string }> } }>;
+            for (const n of nodes) {
+                const gpus = n.latest_stats?.gpus || [];
+                console.log('  ' + C.white(n.hostname));
+                for (let i = 0; i < gpus.length; i++) {
+                    const connector = i === gpus.length - 1 ? '\u2514' : '\u251C';
+                    console.log('    ' + C.dim(connector + '\u2500') + ' GPU ' + i + ': ' + C.teal(gpus[i].name));
+                }
+                if (gpus.length === 0) console.log('    ' + C.dim('\u2514\u2500 CPU only (BitNet)'));
+            }
+            console.log('');
+            break;
+        }
+
+        case 'stacks': {
+            console.log('');
+            console.log('  ' + C.teal(C.bold('CLAWHUB STACKS')) + C.dim(' — One-click deployment bundles'));
+            console.log('');
+            const stacks = [
+                { name: 'rag-stack', desc: 'RAG Pipeline (embed + chat + reranker)', vram: '24GB' },
+                { name: 'code-assistant-stack', desc: 'Code Assistant (DeepSeek + autocomplete + indexing)', vram: '16GB' },
+                { name: 'voice-ai-stack', desc: 'Voice AI (Whisper + LLM + Kokoro TTS)', vram: '16GB' },
+                { name: 'multi-modal-stack', desc: 'Multi-Modal (chat + vision + image + audio)', vram: '24GB' },
+                { name: 'enterprise-chat-stack', desc: 'Enterprise Chat (70B + routing + rate limits)', vram: '128GB' },
+                { name: 'homelab-starter-stack', desc: 'Homelab Starter (Gemma 4B, works on 8GB)', vram: '8GB' },
+                { name: 'research-stack', desc: 'Research (DeepSeek R1 70B + web search + citations)', vram: '64GB' },
+                { name: 'privacy-stack', desc: 'Privacy/HIPAA (air-gapped, encrypted, compliant)', vram: '16GB' },
+            ];
+            for (const s of stacks) {
+                console.log('  ' + padRight(C.green('@tentaclaw/' + s.name), 40) + padRight(C.teal(s.vram), 8) + C.dim(s.desc));
+            }
+            console.log('');
+            console.log('  Install: ' + C.white('clawtopus hub install @tentaclaw/<stack-name>'));
+            console.log('');
+            break;
+        }
+
         case 'help':
         case '--help':
         case '-h':
