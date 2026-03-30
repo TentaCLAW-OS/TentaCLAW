@@ -13,7 +13,8 @@
         "agent",
         "cli",
         "shared",
-        "mcp"
+        "mcp",
+        "dashboard"
     ],
     "scripts": {
         "lint": "eslint . --ext .ts",

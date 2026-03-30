@@ -25,6 +25,9 @@ docs/EASTER_EGGS.md
 docs/RELEASE.md
 .tentaclaw-private/
 
+# === Node Modules ===
+node_modules/
+
 # === Build Artifacts ===
 iso/
 pxe/
@@ -63,6 +66,7 @@ modules.order
 .vs/
 .idea/
 .claude/
+.superpowers/
 *.swp
 *.swo
 *~
