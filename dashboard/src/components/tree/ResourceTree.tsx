@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useClusterStore } from '@/stores/cluster';
 import { useUIStore } from '@/stores/ui';
+import { useDragStore } from '@/hooks/useDragDrop';
+import { api } from '@/lib/api';
 import { StatusDot } from '@/components/ui/StatusDot';
 
 export function ResourceTree() {
@@ -9,7 +11,10 @@ export function ResourceTree() {
   const selectedResource = useUIStore((s) => s.selectedResource);
   const selectResource = useUIStore((s) => s.selectResource);
 
+  const { dragging, dragData, dropTarget, setDropTarget, endDrag } = useDragStore();
+
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [deploySuccess, setDeploySuccess] = useState<string | null>(null);
 
   const toggle = useCallback((id: string) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -26,8 +31,37 @@ export function ResourceTree() {
     F: 'var(--red)',
   };
 
+  const handleDrop = async (nodeId: string) => {
+    if (!dragData) return;
+    endDrag();
+    try {
+      await api.sendCommand(nodeId, 'install_model', { model: dragData.model });
+      setDeploySuccess(nodeId);
+      setTimeout(() => setDeploySuccess(null), 1200);
+    } catch {
+      // Deploy failed — the API layer already handles errors
+    }
+  };
+
   return (
     <div className="flex flex-col text-[11px] select-none">
+      {/* Drag hint */}
+      {dragging && (
+        <div
+          style={{
+            padding: '4px 12px',
+            fontSize: 9,
+            color: 'var(--cyan)',
+            background: 'rgba(0,255,255,0.04)',
+            borderBottom: '1px solid rgba(0,255,255,0.1)',
+            textAlign: 'center',
+            fontFamily: "'JetBrains Mono', monospace",
+          }}
+        >
+          Drop on a node to deploy
+        </div>
+      )}
+
       {/* Cluster root */}
       <div
         className="flex items-center gap-2 py-1.5 cursor-pointer transition-colors"
@@ -63,19 +97,71 @@ export function ResourceTree() {
         const gpus = node.latest_stats?.gpus ?? [];
         const models = node.latest_stats?.inference?.loaded_models ?? [];
 
+        const isDropTarget = dragging && dropTarget === node.id && isOnline;
+        const isValidTarget = dragging && isOnline;
+        const isSuccessFlash = deploySuccess === node.id;
+
         return (
           <div key={node.id}>
-            {/* Node row */}
+            {/* Node row — drop target */}
             <div
-              className="flex items-center gap-2 py-1.5 cursor-pointer transition-colors group"
+              className="flex items-center gap-2 py-1.5 cursor-pointer transition-all group"
               style={{
                 paddingLeft: 28,
-                borderLeft: isActive('node', node.id) ? '2px solid var(--cyan)' : '2px solid transparent',
+                borderLeft: isSuccessFlash
+                  ? '2px solid var(--green)'
+                  : isDropTarget
+                    ? '2px solid var(--cyan)'
+                    : isActive('node', node.id)
+                      ? '2px solid var(--cyan)'
+                      : '2px solid transparent',
                 color: isActive('node', node.id) ? 'var(--cyan)' : isOnline ? 'var(--text-primary)' : 'var(--text-muted)',
-                background: isActive('node', node.id) ? 'rgba(0,255,255,0.05)' : 'transparent',
+                background: isSuccessFlash
+                  ? 'rgba(0,255,136,0.08)'
+                  : isDropTarget
+                    ? 'rgba(0,255,255,0.04)'
+                    : isActive('node', node.id)
+                      ? 'rgba(0,255,255,0.05)'
+                      : 'transparent',
                 textDecoration: !isOnline ? 'line-through' : 'none',
+                boxShadow: isSuccessFlash
+                  ? '0 0 12px rgba(0,255,136,0.15)'
+                  : isDropTarget
+                    ? '0 0 12px rgba(0,255,255,0.1)'
+                    : 'none',
+                border: isSuccessFlash
+                  ? undefined
+                  : isDropTarget
+                    ? '1px solid var(--cyan)'
+                    : undefined,
+                borderRadius: isDropTarget ? 4 : 0,
+                transition: 'all 0.15s ease-out',
               }}
               onClick={() => selectResource({ type: 'node', id: node.id })}
+              onDragOver={(e) => {
+                if (!dragging || !isOnline) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                setDropTarget(node.id);
+              }}
+              onDragEnter={(e) => {
+                if (!dragging || !isOnline) return;
+                e.preventDefault();
+                setDropTarget(node.id);
+              }}
+              onDragLeave={(e) => {
+                // Only clear if we're leaving the node row entirely
+                const related = e.relatedTarget as HTMLElement | null;
+                if (!e.currentTarget.contains(related)) {
+                  if (dropTarget === node.id) setDropTarget(null);
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (isOnline && dragData) {
+                  handleDrop(node.id);
+                }
+              }}
             >
               {/* Expand chevron */}
               {hasStats ? (
@@ -110,6 +196,26 @@ export function ResourceTree() {
                   style={{ color: 'var(--red)', border: '1px solid rgba(255,70,70,0.2)' }}
                 >
                   off
+                </span>
+              )}
+              {isValidTarget && !isDropTarget && (
+                <span
+                  className="text-[8px] font-mono shrink-0"
+                  style={{
+                    color: 'var(--cyan)',
+                    opacity: 0.5,
+                    animation: 'pulse 1.5s ease-in-out infinite',
+                  }}
+                >
+                  +
+                </span>
+              )}
+              {isSuccessFlash && (
+                <span
+                  className="text-[8px] font-mono shrink-0"
+                  style={{ color: 'var(--green)' }}
+                >
+                  deployed
                 </span>
               )}
             </div>
@@ -177,6 +283,16 @@ export function ResourceTree() {
           </div>
         );
       })}
+
+      {/* Pulse animation for drop target hints */}
+      {dragging && (
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+          }
+        `}</style>
+      )}
 
       {/* Empty state */}
       {nodes.length === 0 && (

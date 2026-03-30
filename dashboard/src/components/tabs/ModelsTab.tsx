@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useClusterStore } from '@/stores/cluster';
+import { useDragStore } from '@/hooks/useDragDrop';
 import { api } from '@/lib/api';
 import type { ModelDistribution } from '@/lib/types';
 
@@ -120,15 +121,28 @@ function StatusBadge({ status }: { status: AggregatedModel['status'] }) {
 }
 
 function ModelCard({ model }: { model: AggregatedModel }) {
+  const { dragging, dragData, startDrag, endDrag } = useDragStore();
+  const isDraggingThis = dragging && dragData?.model === model.name;
+
   return (
     <div
       className="relative overflow-hidden rounded-[10px] px-4 py-3 flex flex-col gap-1.5 shrink-0"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData('text/plain', model.name);
+        startDrag(model.name);
+      }}
+      onDragEnd={() => endDrag()}
       style={{
         background: 'var(--bg-card)',
         backdropFilter: 'blur(12px)',
         border: '1px solid var(--border)',
         minWidth: 180,
         maxWidth: 240,
+        cursor: 'grab',
+        opacity: isDraggingThis ? 0.5 : 1,
+        transition: 'opacity 0.2s',
       }}
     >
       {/* Top accent line */}
@@ -168,6 +182,70 @@ function ModelCard({ model }: { model: AggregatedModel }) {
 
       <StatusBadge status={model.status} />
     </div>
+  );
+}
+
+function DraggableModelRow({ model }: { model: AggregatedModel }) {
+  const { dragging, dragData, startDrag, endDrag } = useDragStore();
+  const isDraggingThis = dragging && dragData?.model === model.name;
+
+  return (
+    <tr
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData('text/plain', model.name);
+        startDrag(model.name);
+      }}
+      onDragEnd={() => endDrag()}
+      className="hover:bg-[rgba(0,255,255,0.02)] transition-colors"
+      style={{
+        borderBottom: '1px solid rgba(255,255,255,0.03)',
+        cursor: 'grab',
+        opacity: isDraggingThis ? 0.5 : 1,
+        transition: 'opacity 0.2s',
+      }}
+    >
+      <td
+        style={{
+          padding: '10px 14px',
+          fontSize: 12,
+          fontWeight: 600,
+          fontFamily: "'JetBrains Mono', monospace",
+          color: 'var(--text-primary)',
+          maxWidth: 260,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+        title={model.name}
+      >
+        {model.name}
+      </td>
+      <td
+        style={{
+          padding: '10px 14px',
+          fontSize: 12,
+          fontFamily: "'JetBrains Mono', monospace",
+          color: 'var(--text-secondary)',
+        }}
+      >
+        {model.nodeCount}
+      </td>
+      <td
+        style={{
+          padding: '10px 14px',
+          fontSize: 12,
+          fontFamily: "'JetBrains Mono', monospace",
+          color: 'var(--text-secondary)',
+        }}
+      >
+        {model.vramEstimate}
+      </td>
+      <td style={{ padding: '10px 14px' }}>
+        <StatusBadge status={model.status} />
+      </td>
+    </tr>
   );
 }
 
@@ -345,53 +423,7 @@ export function ModelsTab() {
                 </thead>
                 <tbody>
                   {models.map((m) => (
-                    <tr
-                      key={m.name}
-                      className="hover:bg-[rgba(0,255,255,0.02)] transition-colors"
-                      style={{
-                        borderBottom: '1px solid rgba(255,255,255,0.03)',
-                      }}
-                    >
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          fontFamily: "'JetBrains Mono', monospace",
-                          color: 'var(--text-primary)',
-                          maxWidth: 260,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                        title={m.name}
-                      >
-                        {m.name}
-                      </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          fontSize: 12,
-                          fontFamily: "'JetBrains Mono', monospace",
-                          color: 'var(--text-secondary)',
-                        }}
-                      >
-                        {m.nodeCount}
-                      </td>
-                      <td
-                        style={{
-                          padding: '10px 14px',
-                          fontSize: 12,
-                          fontFamily: "'JetBrains Mono', monospace",
-                          color: 'var(--text-secondary)',
-                        }}
-                      >
-                        {m.vramEstimate}
-                      </td>
-                      <td style={{ padding: '10px 14px' }}>
-                        <StatusBadge status={m.status} />
-                      </td>
-                    </tr>
+                    <DraggableModelRow key={m.name} model={m} />
                   ))}
                 </tbody>
               </table>

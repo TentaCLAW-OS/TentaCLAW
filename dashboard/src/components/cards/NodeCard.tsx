@@ -2,6 +2,7 @@ import type { ClusterNode } from '@/lib/types';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { Sparkline } from '@/components/ui/Sparkline';
 import { GpuChip } from '@/components/cards/GpuChip';
+import { useDragStore } from '@/hooks/useDragDrop';
 import { formatToks, formatTimeAgo } from '@/lib/format';
 
 interface NodeCardProps {
@@ -32,6 +33,49 @@ function getNodeStatus(node: ClusterNode): 'online' | 'warning' | 'offline' {
   const hasHotGpu = gpus.some((g) => g.temperatureC > 75);
   if (hasHotGpu) return 'warning';
   return 'online';
+}
+
+function DraggableModelName({ model }: { model: string }) {
+  const { dragging, dragData, startDrag, endDrag } = useDragStore();
+  const isDraggingThis = dragging && dragData?.model === model;
+
+  return (
+    <span
+      draggable
+      onDragStart={(e) => {
+        e.stopPropagation();
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData('text/plain', model);
+        startDrag(model);
+      }}
+      onDragEnd={() => endDrag()}
+      className="truncate"
+      style={{
+        fontSize: 9,
+        fontFamily: "'JetBrains Mono', monospace",
+        color: 'var(--text-muted)',
+        cursor: 'grab',
+        opacity: isDraggingThis ? 0.5 : 1,
+        padding: '1px 4px',
+        borderRadius: 3,
+        border: '1px solid transparent',
+        transition: 'all 0.15s ease-out',
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(0,255,255,0.2)';
+        (e.currentTarget as HTMLElement).style.background = 'rgba(0,255,255,0.04)';
+        (e.currentTarget as HTMLElement).style.color = 'var(--cyan)';
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.borderColor = 'transparent';
+        (e.currentTarget as HTMLElement).style.background = 'transparent';
+        (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)';
+      }}
+      title={`Drag "${model}" to deploy on another node`}
+    >
+      {model}
+    </span>
+  );
 }
 
 export function NodeCard({ node, index = 0 }: NodeCardProps) {
@@ -204,18 +248,10 @@ export function NodeCard({ node, index = 0 }: NodeCardProps) {
                 {stats.backend.type}
               </span>
             )}
-            {stats.inference.loaded_models.length > 0 && (
-              <span
-                className="truncate"
-                style={{
-                  fontSize: 9,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  color: 'var(--text-muted)',
-                }}
-              >
-                {stats.inference.loaded_models.join(', ')}
-              </span>
-            )}
+            {stats.inference.loaded_models.length > 0 &&
+              stats.inference.loaded_models.map((modelName) => (
+                <DraggableModelName key={modelName} model={modelName} />
+              ))}
           </div>
         )}
       </div>
