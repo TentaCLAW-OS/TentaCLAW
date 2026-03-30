@@ -1,0 +1,228 @@
+---
+# =============================================================================
+# TentaCLAW OS -- Ansible Role: Agent (Worker Node)
+# =============================================================================
+#
+# Installs and configures a TentaCLAW agent (worker) node:
+#   - Ollama LLM inference runtime
+#   - GPU driver detection (NVIDIA / AMD)
+#   - TentaCLAW agent (clone, npm install, build)
+#   - rig.conf configuration
+#   - Systemd service
+#
+# CLAWtopus says: "Each arm thinks for itself. But the brain knows all."
+# =============================================================================
+
+# -------------------------------------------------------------------------
+# Ollama (LLM inference runtime)
+# -------------------------------------------------------------------------
+
+- name: Check if Ollama is installed
+  command: which ollama
+  register: ollama_check
+  changed_when: false
+  failed_when: false
+
+- name: Install Ollama
+  shell: curl -fsSL https://ollama.com/install.sh | sh
+  when: ollama_check.rc != 0
+  tags: [ollama]
+
+- name: Create Ollama systemd override directory
+  file:
+    path: /etc/systemd/system/ollama.service.d
+    state: directory
+    mode: "0755"
+  tags: [ollama]
+
+- name: Configure Ollama to listen on all interfaces
+  copy:
+    dest: /etc/systemd/system/ollama.service.d/override.conf
+    mode: "0644"
+    content: |
+      [Service]
+      Environment="OLLAMA_HOST={{ ollama_host | default('0.0.0.0:11434') }}"
+      Environment="OLLAMA_ORIGINS=*"
+  notify:
+    - reload systemd
+    - restart ollama
+  tags: [ollama]
+
+- name: Enable and start Ollama
+  systemd:
+    name: ollama
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [ollama]
+
+- name: Pull default model
+  command: ollama pull {{ default_model | default('qwen2.5:1.5b') }}
+  register: model_pull
+  changed_when: "'pulling' in model_pull.stdout"
+  failed_when: false
+  tags: [ollama, models]
+
+# -------------------------------------------------------------------------
+# GPU Driver Detection and Installation
+# -------------------------------------------------------------------------
+
+- name: Detect NVIDIA GPUs
+  shell: lspci | grep -qi nvidia && echo "found" || echo "none"
+  register: nvidia_detect
+  changed_when: false
+  tags: [gpu]
+
+- name: Install NVIDIA drivers
+  block:
+    - name: Install ubuntu-drivers-common
+      apt:
+        name: ubuntu-drivers-common
+        state: present
+
+    - name: Auto-install NVIDIA drivers
+      command: ubuntu-drivers autoinstall
+      register: nvidia_install
+      changed_when: "'installed' in nvidia_install.stdout"
+      failed_when: false
+  when: nvidia_detect.stdout == "found"
+  tags: [gpu, nvidia]
+
+- name: Detect AMD GPUs
+  shell: lspci | grep -qiE "amd.*(display|vga)|radeon" && echo "found" || echo "none"
+  register: amd_detect
+  changed_when: false
+  tags: [gpu]
+
+- name: Log GPU detection results
+  debug:
+    msg: "NVIDIA: {{ nvidia_detect.stdout }}, AMD: {{ amd_detect.stdout }}"
+  tags: [gpu]
+
+# -------------------------------------------------------------------------
+# Build the Agent application
+# -------------------------------------------------------------------------
+
+- name: Install agent npm dependencies
+  command: npm ci --omit=dev
+  args:
+    chdir: "{{ tentaclaw_install_dir | default('/opt/tentaclaw-os') }}/agent"
+  register: npm_install
+  changed_when: "'added' in npm_install.stdout"
+
+- name: Build agent TypeScript
+  command: npm run build
+  args:
+    chdir: "{{ tentaclaw_install_dir | default('/opt/tentaclaw-os') }}/agent"
+  register: npm_build
+  changed_when: npm_build.rc == 0
+
+# -------------------------------------------------------------------------
+# rig.conf (Agent Configuration)
+# -------------------------------------------------------------------------
+
+- name: Write rig.conf
+  copy:
+    dest: /etc/tentaclaw/rig.conf
+    mode: "0644"
+    content: |
+      # TentaCLAW Agent Configuration
+      # Managed by Ansible -- do not edit manually
+      NODE_ID={{ worker_name | default(inventory_hostname) }}
+      NODE_HOSTNAME={{ worker_name | default(inventory_hostname) }}
+      FARM_HASH={{ farm_hash | default(cluster_name | default('tentaclaw')) }}
+      GATEWAY_URL={{ gateway_url | default('http://gateway:8080') }}
+      AGENT_INTERVAL={{ agent_interval | default('10') }}
+      WATCHDOG_ENABLED=1
+      WATCHDOG_GPU_TEMP_MAX={{ watchdog_gpu_temp_max | default('85') }}
+      WATCHDOG_ACTION={{ watchdog_action | default('throttle') }}
+  notify: restart tentaclaw-agent
+
+# -------------------------------------------------------------------------
+# Systemd service
+# -------------------------------------------------------------------------
+
+- name: Install tentaclaw-agent systemd service
+  copy:
+    dest: /etc/systemd/system/tentaclaw-agent.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=TentaCLAW Agent - GPU Inference Node Daemon
+      Documentation=https://github.com/TentaCLAW-OS/tentaclaw-os
+      After=network-online.target ollama.service
+      Wants=network-online.target ollama.service
+
+      [Service]
+      Type=simple
+      User=root
+      WorkingDirectory={{ tentaclaw_install_dir | default('/opt/tentaclaw-os') }}/agent
+      ExecStart=/usr/bin/node dist/index.js
+      Restart=always
+      RestartSec=5
+      StandardOutput=journal
+      StandardError=journal
+      SyslogIdentifier=tentaclaw-agent
+
+      # Environment overrides (rig.conf takes priority for most fields)
+      Environment=TENTACLAW_GATEWAY_URL={{ gateway_url | default('http://gateway:8080') }}
+      Environment=TENTACLAW_NODE_ID={{ worker_name | default(inventory_hostname) }}
+      Environment=TENTACLAW_HOSTNAME={{ worker_name | default(inventory_hostname) }}
+      Environment=TENTACLAW_FARM_HASH={{ farm_hash | default(cluster_name | default('tentaclaw')) }}
+
+      # Hardening
+      NoNewPrivileges=true
+      ProtectHome=true
+      PrivateTmp=true
+
+      [Install]
+      WantedBy=multi-user.target
+  notify:
+    - reload systemd
+    - restart tentaclaw-agent
+
+- name: Enable and start tentaclaw-agent
+  systemd:
+    name: tentaclaw-agent
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# -------------------------------------------------------------------------
+# Verification
+# -------------------------------------------------------------------------
+
+- name: Wait for agent to start
+  wait_for:
+    timeout: 10
+  delegate_to: localhost
+  become: false
+
+- name: Check agent service status
+  command: systemctl is-active tentaclaw-agent
+  register: agent_status
+  changed_when: false
+  failed_when: false
+
+- name: Report agent status
+  debug:
+    msg: "TentaCLAW Agent status: {{ agent_status.stdout }} on {{ worker_name | default(inventory_hostname) }}"
+
+# -------------------------------------------------------------------------
+# Handlers
+# -------------------------------------------------------------------------
+
+handlers:
+  - name: reload systemd
+    systemd:
+      daemon_reload: true
+
+  - name: restart ollama
+    systemd:
+      name: ollama
+      state: restarted
+
+  - name: restart tentaclaw-agent
+    systemd:
+      name: tentaclaw-agent
+      state: restarted

@@ -1,0 +1,118 @@
+---
+# =============================================================================
+# TentaCLAW OS -- Ansible Deployment Playbook
+# =============================================================================
+#
+# Deploys a TentaCLAW AI inference cluster to any set of servers:
+#   - Gateway node: coordinator, dashboard, API, PostgreSQL
+#   - Worker nodes: TentaCLAW agent + Ollama inference runtime
+#
+# Usage:
+#   ansible-playbook -i inventory.ini playbook.yml
+#   ansible-playbook -i inventory.ini playbook.yml --tags gateway
+#   ansible-playbook -i inventory.ini playbook.yml --tags agent
+#   ansible-playbook -i inventory.ini playbook.yml --limit workers
+#
+# CLAWtopus says: "Ansible: because octopuses automate everything."
+# =============================================================================
+
+- name: Common setup for all TentaCLAW nodes
+  hosts: all
+  become: true
+  gather_facts: true
+  tags: [common]
+
+  vars:
+    node_version: "22"
+    tentaclaw_repo: "https://github.com/TentaCLAW-OS/tentaclaw-os.git"
+    tentaclaw_branch: "master"
+    tentaclaw_install_dir: "/opt/tentaclaw-os"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install common packages
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - jq
+          - htop
+          - ufw
+          - fail2ban
+          - pciutils
+          - lm-sensors
+          - unzip
+        state: present
+
+    - name: Enable and start fail2ban
+      systemd:
+        name: fail2ban
+        enabled: true
+        state: started
+
+    - name: Add NodeSource GPG key
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_{{ node_version }}.x | bash -
+      args:
+        creates: /etc/apt/sources.list.d/nodesource.list
+
+    - name: Install Node.js
+      apt:
+        name: nodejs
+        state: present
+        update_cache: true
+
+    - name: Verify Node.js version
+      command: node --version
+      register: node_ver
+      changed_when: false
+
+    - name: Show Node.js version
+      debug:
+        msg: "Node.js version: {{ node_ver.stdout }}"
+
+    - name: Create TentaCLAW config directory
+      file:
+        path: /etc/tentaclaw
+        state: directory
+        mode: "0755"
+
+    - name: Clone TentaCLAW repository
+      git:
+        repo: "{{ tentaclaw_repo }}"
+        dest: "{{ tentaclaw_install_dir }}"
+        version: "{{ tentaclaw_branch }}"
+        force: true
+
+    - name: Install node_exporter
+      include_tasks: tasks/node_exporter.yml
+      tags: [monitoring]
+
+# =============================================================================
+# Gateway Node
+# =============================================================================
+
+- name: Deploy TentaCLAW Gateway
+  hosts: gateway
+  become: true
+  gather_facts: true
+  tags: [gateway]
+  roles:
+    - gateway
+
+# =============================================================================
+# Worker Nodes (Agents)
+# =============================================================================
+
+- name: Deploy TentaCLAW Agent
+  hosts: workers
+  become: true
+  gather_facts: true
+  tags: [agent]
+  roles:
+    - agent

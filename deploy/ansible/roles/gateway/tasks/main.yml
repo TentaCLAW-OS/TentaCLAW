@@ -1,0 +1,268 @@
+---
+# =============================================================================
+# TentaCLAW OS -- Ansible Role: Gateway
+# =============================================================================
+#
+# Installs and configures the TentaCLAW Gateway node:
+#   - Node.js application (clone, npm install, build)
+#   - PostgreSQL (optional, default: SQLite)
+#   - Nginx reverse proxy
+#   - Systemd service
+#   - Prometheus + Grafana (optional)
+#
+# CLAWtopus says: "The brain of the cluster. One node to coordinate them all."
+# =============================================================================
+
+# -------------------------------------------------------------------------
+# Build the Gateway application
+# -------------------------------------------------------------------------
+
+- name: Install gateway npm dependencies
+  command: npm ci --omit=dev
+  args:
+    chdir: "{{ tentaclaw_install_dir | default('/opt/tentaclaw-os') }}/gateway"
+  register: npm_install
+  changed_when: "'added' in npm_install.stdout"
+
+- name: Build gateway TypeScript
+  command: npm run build
+  args:
+    chdir: "{{ tentaclaw_install_dir | default('/opt/tentaclaw-os') }}/gateway"
+  register: npm_build
+  changed_when: npm_build.rc == 0
+
+- name: Create gateway data directory
+  file:
+    path: "{{ tentaclaw_install_dir | default('/opt/tentaclaw-os') }}/gateway/data"
+    state: directory
+    mode: "0755"
+
+# -------------------------------------------------------------------------
+# PostgreSQL (optional)
+# -------------------------------------------------------------------------
+
+- name: Install PostgreSQL
+  apt:
+    name:
+      - postgresql
+      - postgresql-contrib
+      - python3-psycopg2
+    state: present
+  when: tentaclaw_db | default('sqlite') == 'postgres'
+  tags: [postgres]
+
+- name: Start and enable PostgreSQL
+  systemd:
+    name: postgresql
+    enabled: true
+    state: started
+  when: tentaclaw_db | default('sqlite') == 'postgres'
+  tags: [postgres]
+
+- name: Generate PostgreSQL password
+  set_fact:
+    pg_password: "{{ lookup('password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+  when:
+    - tentaclaw_db | default('sqlite') == 'postgres'
+    - tentaclaw_pg_password is not defined or tentaclaw_pg_password == ''
+  tags: [postgres]
+
+- name: Create PostgreSQL user
+  become_user: postgres
+  community.postgresql.postgresql_user:
+    name: tentaclaw
+    password: "{{ tentaclaw_pg_password | default(pg_password | default('changeme')) }}"
+    state: present
+  when: tentaclaw_db | default('sqlite') == 'postgres'
+  tags: [postgres]
+
+- name: Create PostgreSQL database
+  become_user: postgres
+  community.postgresql.postgresql_db:
+    name: tentaclaw
+    owner: tentaclaw
+    state: present
+  when: tentaclaw_db | default('sqlite') == 'postgres'
+  tags: [postgres]
+
+# -------------------------------------------------------------------------
+# Gateway environment config
+# -------------------------------------------------------------------------
+
+- name: Write gateway environment file
+  copy:
+    dest: /etc/tentaclaw/gateway.env
+    mode: "0600"
+    content: |
+      # TentaCLAW Gateway Environment
+      # Managed by Ansible -- do not edit manually
+      TENTACLAW_PORT={{ tentaclaw_port | default('8080') }}
+      TENTACLAW_HOST={{ tentaclaw_host | default('0.0.0.0') }}
+      TENTACLAW_CLUSTER_NAME={{ cluster_name | default('tentaclaw') }}
+      {% if tentaclaw_db | default('sqlite') == 'postgres' %}
+      TENTACLAW_DB=postgres
+      TENTACLAW_PG_URL={{ tentaclaw_pg_url | default('postgres://tentaclaw:' + (tentaclaw_pg_password | default(pg_password | default('changeme'))) + '@127.0.0.1:5432/tentaclaw') }}
+      {% else %}
+      TENTACLAW_DB=sqlite
+      {% endif %}
+  notify: restart tentaclaw-gateway
+
+# -------------------------------------------------------------------------
+# Systemd service
+# -------------------------------------------------------------------------
+
+- name: Install tentaclaw-gateway systemd service
+  copy:
+    dest: /etc/systemd/system/tentaclaw-gateway.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=TentaCLAW Gateway - AI Inference Cluster Coordinator
+      Documentation=https://github.com/TentaCLAW-OS/tentaclaw-os
+      After=network-online.target{% if tentaclaw_db | default('sqlite') == 'postgres' %} postgresql.service{% endif %}
+
+      Wants=network-online.target
+      {% if tentaclaw_db | default('sqlite') == 'postgres' %}
+      Requires=postgresql.service
+      {% endif %}
+
+      [Service]
+      Type=simple
+      User=root
+      WorkingDirectory={{ tentaclaw_install_dir | default('/opt/tentaclaw-os') }}/gateway
+      EnvironmentFile=/etc/tentaclaw/gateway.env
+      ExecStart=/usr/bin/node dist/index.js
+      Restart=always
+      RestartSec=5
+      StandardOutput=journal
+      StandardError=journal
+      SyslogIdentifier=tentaclaw-gateway
+
+      # Hardening
+      NoNewPrivileges=true
+      ProtectSystem=strict
+      ReadWritePaths={{ tentaclaw_install_dir | default('/opt/tentaclaw-os') }}/gateway/data /var/log
+      ProtectHome=true
+      PrivateTmp=true
+
+      [Install]
+      WantedBy=multi-user.target
+  notify:
+    - reload systemd
+    - restart tentaclaw-gateway
+
+- name: Enable and start tentaclaw-gateway
+  systemd:
+    name: tentaclaw-gateway
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# -------------------------------------------------------------------------
+# Nginx reverse proxy
+# -------------------------------------------------------------------------
+
+- name: Install Nginx
+  apt:
+    name:
+      - nginx
+      - certbot
+      - python3-certbot-nginx
+    state: present
+  tags: [nginx]
+
+- name: Configure Nginx for TentaCLAW
+  copy:
+    dest: /etc/nginx/sites-available/tentaclaw
+    mode: "0644"
+    content: |
+      upstream gateway {
+          server 127.0.0.1:{{ tentaclaw_port | default('8080') }};
+      }
+
+      server {
+          listen 80 default_server;
+          listen [::]:80 default_server;
+          server_name {{ gateway_domain | default('_') }};
+
+          # Health check
+          location /health {
+              proxy_pass http://gateway/health;
+              proxy_http_version 1.1;
+          }
+
+          # API, Dashboard, and WebSocket
+          location / {
+              proxy_pass http://gateway;
+              proxy_http_version 1.1;
+              proxy_set_header Upgrade $http_upgrade;
+              proxy_set_header Connection "upgrade";
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto $scheme;
+              proxy_read_timeout 86400;
+              proxy_send_timeout 86400;
+              proxy_cache_bypass $http_upgrade;
+          }
+      }
+  notify: reload nginx
+  tags: [nginx]
+
+- name: Enable TentaCLAW Nginx site
+  file:
+    src: /etc/nginx/sites-available/tentaclaw
+    dest: /etc/nginx/sites-enabled/tentaclaw
+    state: link
+  notify: reload nginx
+  tags: [nginx]
+
+- name: Remove default Nginx site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: reload nginx
+  tags: [nginx]
+
+- name: Start and enable Nginx
+  systemd:
+    name: nginx
+    enabled: true
+    state: started
+  tags: [nginx]
+
+# -------------------------------------------------------------------------
+# TLS (optional)
+# -------------------------------------------------------------------------
+
+- name: Obtain Let's Encrypt certificate
+  command: >
+    certbot --nginx
+    -d {{ gateway_domain }}
+    --non-interactive
+    --agree-tos
+    -m {{ acme_email }}
+    --redirect
+  when:
+    - gateway_domain is defined and gateway_domain != '' and gateway_domain != '_'
+    - acme_email is defined and acme_email != ''
+  tags: [tls]
+
+# -------------------------------------------------------------------------
+# Handlers
+# -------------------------------------------------------------------------
+
+handlers:
+  - name: reload systemd
+    systemd:
+      daemon_reload: true
+
+  - name: restart tentaclaw-gateway
+    systemd:
+      name: tentaclaw-gateway
+      state: restarted
+
+  - name: reload nginx
+    systemd:
+      name: nginx
+      state: reloaded
