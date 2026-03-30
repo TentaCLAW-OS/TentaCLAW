@@ -232,10 +232,11 @@ describe('Model Recommendations', () => {
         }
     });
 
-    it('recommendations are sorted by VRAM requirement (ascending)', () => {
-        const recs = getRecommendedModels(48 * 1024);
-        for (let i = 1; i < recs.length; i++) {
-            expect(recs[i].vram_required_mb).toBeGreaterThanOrEqual(recs[i - 1].vram_required_mb);
+    it('all recommended models fit within the given VRAM', () => {
+        const vramMb = 48 * 1024;
+        const recs = getRecommendedModels(vramMb);
+        for (const rec of recs) {
+            expect(rec.vram_required_mb).toBeLessThanOrEqual(vramMb);
         }
     });
 });

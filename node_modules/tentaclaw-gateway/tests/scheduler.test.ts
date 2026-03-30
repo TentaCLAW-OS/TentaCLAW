@@ -256,6 +256,33 @@ describe('Request Routing', () => {
         expect(decision).toBeNull();
     });
 
+    it('excludes specified nodes from routing', () => {
+        mockNodes.push(makeNode('n1', { models: ['llama3.1:8b'], inFlight: 0 }));
+        mockNodes.push(makeNode('n2', { models: ['llama3.1:8b'], inFlight: 0 }));
+        const decision = routeRequest('llama3.1:8b', { exclude_nodes: ['n1'] });
+        expect(decision).not.toBeNull();
+        expect(decision!.node_id).toBe('n2');
+    });
+
+    it('returns routing decision with all expected fields', () => {
+        mockNodes.push(makeNode('n1', { models: ['llama3.1:8b'], inFlight: 1 }));
+        const decision = routeRequest('llama3.1:8b');
+        expect(decision).not.toBeNull();
+        expect(decision).toHaveProperty('node_id');
+        expect(decision).toHaveProperty('hostname');
+        expect(decision).toHaveProperty('backend_port');
+        expect(decision).toHaveProperty('backend_type');
+        expect(decision).toHaveProperty('reason');
+        expect(decision).toHaveProperty('score');
+        expect(decision).toHaveProperty('latency_estimate_ms');
+    });
+
+    it('skips offline nodes', () => {
+        mockNodes.push(makeNode('n1', { status: 'offline', models: ['llama3.1:8b'], inFlight: 0 }));
+        const decision = routeRequest('llama3.1:8b');
+        expect(decision).toBeNull();
+    });
+
     it('respects max_latency_ms constraint', () => {
         mockNodes.push(makeNode('n1', { models: ['llama3.1:8b'], inFlight: 0 }));
         mockLatency['n1:llama3.1:8b'] = 500;
@@ -339,5 +366,32 @@ describe('Capacity Analysis', () => {
         mockNodes.push(makeNode('n1', { vramUsed: 23000, gpuUtil: 50 }));
         const cap = analyzeCapacity();
         expect(cap.bottleneck).toBe('vram');
+    });
+
+    it('counts loaded models correctly', () => {
+        mockNodes.push(makeNode('n1', { models: ['llama3.1:8b', 'phi3:mini'], vramUsed: 8000 }));
+        mockNodes.push(makeNode('n2', { models: ['llama3.1:8b'], vramUsed: 6000 }));
+        const cap = analyzeCapacity();
+        // Unique models: llama3.1:8b, phi3:mini = 2
+        expect(cap.models_loaded).toBe(2);
+    });
+
+    it('utilization percent is between 0 and 100', () => {
+        mockNodes.push(makeNode('n1', { vramUsed: 12000 }));
+        const cap = analyzeCapacity();
+        expect(cap.utilization_pct).toBeGreaterThanOrEqual(0);
+        expect(cap.utilization_pct).toBeLessThanOrEqual(100);
+    });
+
+    it('bottleneck is "none" when cluster is lightly used', () => {
+        mockNodes.push(makeNode('n1', { vramUsed: 2000, gpuUtil: 10 }));
+        const cap = analyzeCapacity();
+        expect(cap.bottleneck).toBe('none');
+    });
+
+    it('offline nodes are excluded from capacity', () => {
+        mockNodes.push(makeNode('n1', { status: 'offline', vramUsed: 8000 }));
+        const cap = analyzeCapacity();
+        expect(cap.total_vram_mb).toBe(0);
     });
 });
