@@ -1,0 +1,33 @@
+name: "@tentaclaw/skill-git"
+version: "1.0.0"
+type: skill
+title: "Git Repository Operator"
+description: "Clone, pull, commit, push, branch, diff, log. Full git operations for agents."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - devops
+tags:
+  - git
+  - version-control
+  - repository
+  - commits
+  - branches
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - git-clone
+    - git-pull
+    - git-commit
+    - git-push
+    - git-branch
+    - git-diff
+    - git-log
+  permissions:
+    - filesystem:read
+    - filesystem:write
+    - network

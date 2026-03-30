@@ -1,0 +1,37 @@
+# =============================================================================
+# TentaCLAW OS -- Terraform Variables Example
+# =============================================================================
+#
+# Copy this file and fill in your values:
+#   cp terraform.tfvars.example terraform.tfvars
+#   vim terraform.tfvars
+#
+# IMPORTANT: Never commit terraform.tfvars to version control!
+# =============================================================================
+
+# Required: Hetzner Cloud credentials
+hcloud_token  = "your-hetzner-api-token-here"
+ssh_key_name  = "your-ssh-key-name"
+
+# Cluster settings
+cluster_name  = "tentaclaw-prod"
+environment   = "production"
+worker_count  = 3
+location      = "fsn1"
+
+# Server types (see variables.tf for options)
+gateway_type  = "cx22"
+worker_type   = "ccx33"
+
+# Optional: Domain + TLS (leave empty to skip)
+gateway_domain = ""
+acme_email     = ""
+
+# Optional: PostgreSQL password (auto-generated if empty)
+pg_password = ""
+
+# Security: Restrict SSH access to your IP
+# ssh_allowed_ips = ["YOUR.IP.ADDRESS/32"]
+
+# Storage
+gateway_volume_size = 50

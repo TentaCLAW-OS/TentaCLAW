@@ -1,0 +1,40 @@
+name: "@tentaclaw/skill-shell-exec"
+version: "1.0.0"
+type: skill
+title: "Shell Command Executor"
+description: "Execute shell commands safely with timeout, output capture, and sandboxing options."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - devops
+tags:
+  - shell
+  - bash
+  - command
+  - execute
+  - terminal
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - shell-exec
+  permissions:
+    - filesystem:read
+    - filesystem:write
+    - network
+  config_schema:
+    timeout_ms:
+      type: integer
+      default: 30000
+      description: "Command timeout in milliseconds"
+    allowed_commands:
+      type: string
+      default: "*"
+      description: "Comma-separated list of allowed commands (* for all)"
+    working_directory:
+      type: string
+      default: "."
+      description: "Working directory for commands"

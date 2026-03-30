@@ -5,184 +5,216 @@
 <h3 align="center">Your GPUs. One Brain. Zero Limits.</h3>
 
 <p align="center">
-  <strong>TentaCLAW OS</strong> turns scattered GPUs into one self-healing AI inference cluster.<br>
-  Auto-discovery. Smart routing. Zero config. The octopus handles everything.
+  <strong>TentaCLAW OS turns scattered GPUs into one self-healing AI inference cluster.<br>6 backends. Auto-discovery. Zero config.</strong>
 </p>
 
 <p align="center">
-  <a href="https://www.TentaCLAW.io"><img src="https://img.shields.io/badge/Web-TentaCLAW.io-00d4aa?style=for-the-badge" alt="Website"></a>
-  <a href="https://github.com/TentaCLAW-OS/TentaCLAW"><img src="https://img.shields.io/badge/GitHub-TentaCLAW-8b5cf6?style=for-the-badge&logo=github" alt="GitHub"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-8b5cf6?style=for-the-badge" alt="License"></a>
+  <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/github/actions/workflow/status/TentaCLAW-OS/TentaCLAW/ci.yml?style=flat-square&label=build&color=00d4aa" alt="Build"></a>
+  <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/badge/tests-429%20passing-00d4aa?style=flat-square" alt="Tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b5cf6?style=flat-square" alt="License"></a>
+  <a href="https://github.com/TentaCLAW-OS/TentaCLAW/stargazers"><img src="https://img.shields.io/github/stars/TentaCLAW-OS/TentaCLAW?style=flat-square&color=ffdd00" alt="Stars"></a>
+  <a href="https://discord.gg/tentaclaw"><img src="https://img.shields.io/badge/Discord-The%20Tank-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
 </p>
 
-<p align="center"><em>Eight arms. One mind. Zero compromises.</em></p>
+<p align="center">
+  <a href="#install-in-60-seconds">Install</a> &bull;
+  <a href="#quick-start">Quick Start</a> &bull;
+  <a href="#features">Features</a> &bull;
+  <a href="#why-tentaclaw">Comparison</a> &bull;
+  <a href="https://www.tentaclaw.io">Website</a> &bull;
+  <a href="docs/API.md">API Docs</a> &bull;
+  <a href="docs/CLI.md">CLI Docs</a> &bull;
+  <a href="https://discord.gg/tentaclaw">Discord</a>
+</p>
 
 ---
 
-## Install in 60 seconds
+<!-- TODO: Add asciinema recording showing:
+  1. curl install one-liner
+  2. Gateway boots, dashboard opens
+  3. Two agents auto-discover and register
+  4. `clawtopus status` shows the cluster
+  5. `clawtopus deploy llama3.1:8b` deploys a model
+  6. `clawtopus chat` sends a prompt and streams a response
+  7. Dashboard updates in real-time with GPU stats
+-->
+
+## Install in 60 Seconds
 
 ```bash
-curl -fsSL tentaclaw.io/install | bash
+curl -fsSL https://tentaclaw.io/install | bash
 ```
 
-Or manually:
+<details>
+<summary><strong>Docker (one command)</strong></summary>
+
 ```bash
-git clone https://github.com/TentaCLAW-OS/TentaCLAW.git
-cd TentaCLAW/gateway && npm install && npm run dev
-# Open http://localhost:8080/dashboard/
+git clone https://github.com/TentaCLAW-OS/TentaCLAW.git && cd TentaCLAW
+docker compose up
+# Gateway → http://localhost:8080/dashboard
 ```
 
+</details>
+
+<details>
+<summary><strong>From source</strong></summary>
+
+```bash
+git clone https://github.com/TentaCLAW-OS/TentaCLAW.git && cd TentaCLAW
+cd gateway && npm install && npm run dev
+# Open http://localhost:8080/dashboard
+```
+
+</details>
+
 ---
 
-## What is TentaCLAW?
+## Why TentaCLAW?
 
-TentaCLAW OS is an **AI inference cluster operating system**. It manages your GPU hardware — NVIDIA, AMD, Intel — so you can run local AI models across multiple machines with zero configuration.
+> "Per-token pricing is a scam." &mdash; CLAWtopus
 
-- **Plug in a machine** — it auto-discovers the gateway and starts serving
-- **Deploy a model** — `clawtopus deploy llama3.1:8b` picks the best node
-- **Everything self-heals** — watchdog restarts crashed services automatically
-- **OpenAI-compatible API** — point any client at your cluster
+There are GPU inference tools. There are model runners. There are cluster schedulers. None of them are a complete operating system for your AI hardware.
 
-**CLAWtopus** is the mascot octopus that runs your stack.
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th align="center">TentaCLAW OS</th>
+<th align="center">GPUStack</th>
+<th align="center">Ollama</th>
+<th align="center">vLLM</th>
+<th align="center">EXO</th>
+</tr>
+</thead>
+<tbody>
+<tr><td><strong>Multi-node cluster</strong></td><td align="center">Yes</td><td align="center">Yes</td><td align="center">No</td><td align="center">No</td><td align="center">Yes</td></tr>
+<tr><td><strong>Auto-discovery (zero config)</strong></td><td align="center">UDP + mDNS</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">mDNS</td></tr>
+<tr><td><strong>Bootable ISO</strong></td><td align="center">Yes</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
+<tr><td><strong>Web dashboard</strong></td><td align="center">Built-in</td><td align="center">Built-in</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
+<tr><td><strong>CLI with 86 commands</strong></td><td align="center">Yes</td><td align="center">Basic</td><td align="center">Basic</td><td align="center">No</td><td align="center">No</td></tr>
+<tr><td><strong>Multiple backends</strong></td><td align="center">6</td><td align="center">2</td><td align="center">1 (own)</td><td align="center">1 (own)</td><td align="center">1 (own)</td></tr>
+<tr><td><strong>BitNet CPU inference</strong></td><td align="center">Yes</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
+<tr><td><strong>Self-healing watchdog</strong></td><td align="center">Yes</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
+<tr><td><strong>Flight sheets (declarative deploy)</strong></td><td align="center">Yes</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
+<tr><td><strong>OpenAI-compatible API</strong></td><td align="center">Yes</td><td align="center">Yes</td><td align="center">Yes</td><td align="center">Yes</td><td align="center">Yes</td></tr>
+<tr><td><strong>GPU overclocking</strong></td><td align="center">Yes</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
+<tr><td><strong>Package marketplace</strong></td><td align="center">CLAWHub (62 pkgs)</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
+<tr><td><strong>MCP server (AI agent access)</strong></td><td align="center">Yes</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
+<tr><td><strong>Game engine bridge (UE5/Unity)</strong></td><td align="center">SSE stream</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
+<tr><td><strong>NVIDIA + AMD + Intel + Apple Silicon + CPU</strong></td><td align="center">All</td><td align="center">NVIDIA + AMD</td><td align="center">All</td><td align="center">NVIDIA</td><td align="center">Apple + NVIDIA</td></tr>
+<tr><td><strong>Helm / Terraform / Ansible</strong></td><td align="center">All three</td><td align="center">No</td><td align="center">No</td><td align="center">Helm</td><td align="center">No</td></tr>
+<tr><td><strong>Prometheus + Grafana</strong></td><td align="center">Built-in</td><td align="center">No</td><td align="center">No</td><td align="center">Prometheus</td><td align="center">No</td></tr>
+<tr><td><strong>Mascot with personality</strong></td><td align="center">Obviously</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
+</tbody>
+</table>
+
+**TL;DR:** Ollama runs one model on one machine. vLLM serves one model really fast. EXO splits one model across devices. GPUStack manages a few nodes. TentaCLAW OS is the entire operating layer -- boot, discover, deploy, route, monitor, heal, scale -- across all your hardware.
 
 ---
-
-## What's New in v0.2.0
-
-- **CLAWtopus CLI** — Inference router + cluster management with `clawtopus chat`, `models`, `health`, `tags`, `alerts`, `benchmarks`
-- **Inference Playground** — Chat with your cluster models directly from the dashboard
-- **Node Tags** — Label nodes as `production`, `inference`, `staging` etc. Filter by tag
-- **SSH Key Management** — Push SSH keys to nodes via API, stored in DB with fingerprints
-- **Model Pull Progress** — Track download progress when deploying models to nodes
-- **Auto-Discovery** — UDP broadcast on port 41337. Agents and gateways find each other on LAN
-- **Game Engine Bridge** — SSE endpoint for real-time UE5/Unity integration
-- **Model Search** — Browse Ollama model catalog with VRAM requirements and cluster fit check
-- **BitNet CPU Inference** — 1-bit models run on any CPU at 2-6x speed, 70% less energy. No GPU required.
-- **129+ tests** — 101 gateway + 28 agent tests, strict TypeScript, all passing
 
 ## Features
 
-| | |
-|---|
-| <span style="color:#00FF88">&#10003;</span> **Zero-config GPU detection** — NVIDIA, AMD, Intel (eventually) |
-| <span style="color:#00FF88">&#10003;</span> **Farm Hash registration** — one hash identifies your entire cluster |
-| <span style="color:#00FF88">&#10003;</span> **TentaCLAW-style push model** — nodes push stats, receive commands |
-| <span style="color:#00FF88">&#10003;</span> **One-click model deployment** via flight sheets |
-| <span style="color:#00FF88">&#10003;</span> **Auto-scaling inference** across heterogeneous hardware |
-| <span style="color:#00FF88">&#10003;</span> **BitNet CPU inference** — 1-bit models on any CPU, no GPU needed |
-| <span style="color:#00FF88">&#10003;</span> **CLAWtopus ASCII art** — because your terminal deserves better |
+**Cluster Management**
+- :globe_with_meridians: **Zero-Config Auto-Discovery** -- Agents find the gateway via UDP broadcast + mDNS. Plug in a machine, it joins the cluster.
+- :shield: **Self-Healing Watchdog** -- Crashed services restart automatically. Failed GPU resets. Node goes offline, models re-route. No babysitting.
+- :zap: **Flight Sheets** -- Declarative model deployment. Define what runs where. Apply with one click or one command.
+- :bar_chart: **Real-Time Dashboard** -- Web UI with live GPU temps, VRAM, tok/s, model status, alerts, and cluster health scoring.
+
+**Inference**
+- :brain: **6 Backend Support** -- Ollama, vLLM, SGLang, llama.cpp, BitNet, MLX. Pick the best backend per workload.
+- :link: **OpenAI-Compatible API** -- Drop-in replacement. Point any client, framework, or agent at `http://your-cluster:8080/v1/`.
+- :robot: **Smart Routing** -- Requests route to the best available node based on VRAM, model availability, queue depth, and health.
+- :desktop_computer: **BitNet CPU Inference** -- 1-bit quantized models run on any CPU at 2-6x speed, 70% less energy. No GPU required.
+
+**Operations**
+- :octopus: **86-Command CLI** -- `clawtopus top`, `deploy`, `chat`, `drain`, `doctor`, `auto`, `gpu-map`, and 80 more. Full cluster control from your terminal.
+- :package: **CLAWHub Marketplace** -- 62 packages: agents, flight sheets, integrations, hardware profiles, themes. Install with one command.
+- :joystick: **Game Engine Bridge** -- SSE stream for Unreal Engine 5 / Unity. Visualize your cluster as a living neural network.
+- :satellite: **Observability Stack** -- Prometheus metrics, Grafana dashboards, structured logging, alert channels (Discord, Slack, Telegram, webhooks).
 
 ---
 
-## Per-Token Is a Scam
+## What's New in v2.0
 
-That line is the hook, not the whole product.
-
-The real point is simpler: if you already own GPUs, you should be able to run inference on them without building a tiny DevOps company around your homelab.
-
-**TentaCLAW OS** gives local AI the missing operating layer:
-- bootable node setup
-- auto-discovery on the LAN
-- cluster registration and health
-- model deployment and routing
-- one dashboard and one CLI for the whole mess
-
-Own the hardware. Own the inference. Own the failure modes too.
+- **CLAWHub Marketplace** -- 62 installable packages: agents, skills, flight sheets, integrations, themes
+- **6 inference backends** -- Ollama, vLLM, SGLang, llama.cpp, BitNet, MLX with per-node backend management
+- **86 CLI commands** -- `top`, `drain`, `cordon`, `doctor`, `auto`, `optimize`, `gpu-map`, `vibe`, `analytics`, and more
+- **280+ API endpoints** -- Full REST API, OpenAI proxy, SSE events, game engine bridge, Prometheus metrics
+- **MCP Server** -- AI agents can manage your cluster via Model Context Protocol tool calls
+- **TypeScript SDK** -- Programmatic access to every gateway feature
+- **Smart deploy** -- `clawtopus deploy llama3.1:8b` picks the best node automatically
+- **Node drain / cordon / maintenance** -- Kubernetes-style operations for your GPU fleet
+- **API key management** -- Scoped keys with rate limiting and usage tracking
+- **Model aliases** -- Map `gpt-4` to `llama3.1:70b` for seamless client compatibility
+- **Power monitoring** -- Per-node wattage, daily/monthly cost estimates
+- **Fleet reliability metrics** -- Uptime stats, MTBF, availability grades per node
+- **Notification channels** -- Discord, Slack, Telegram, email, webhook alerts
+- **Inference analytics** -- Request counts, latency p50/p95/p99, model usage breakdown
+- **Helm chart + Terraform + Ansible** -- Deploy anywhere, any way
+- **Observability stack** -- Prometheus + Grafana with pre-built dashboards
+- **429 tests passing** -- Gateway, agent, CLI, shared, integration, and e2e suites
 
 ---
 
-## Quick Start — ISO (Production)
+## Quick Start
+
+### Path 1: ISO (Production)
+
+Flash. Boot. Done.
 
 ```bash
-# 1. Download the ISO
-wget https://github.com/TentaCLAW-OS/TentaCLAW-OS/releases/latest/download/TentaCLAW-OS-0.1.0-amd64.iso
+# Download the latest ISO
+wget https://github.com/TentaCLAW-OS/TentaCLAW/releases/latest/download/tentaclaw-os-amd64.iso
 
-# 2. Flash to USB
-sudo dd if=TentaCLAW-OS-0.1.0-amd64.iso of=/dev/sdX bs=4M status=progress
+# Flash to USB
+sudo dd if=tentaclaw-os-amd64.iso of=/dev/sdX bs=4M status=progress
 
-# 3. Boot from USB
-# 4. Watch CLAWtopus do her thing
-# 5. That's it. Seriously.
+# Boot from USB — CLAWtopus handles the rest:
+#   → Detects GPUs (NVIDIA, AMD, Intel)
+#   → Connects to network (DHCP)
+#   → Discovers gateway (UDP broadcast + mDNS)
+#   → Registers with Farm Hash
+#   → Starts serving inference
 ```
 
-## Quick Start — Gateway + Dashboard (Dev)
+### Path 2: Dev Mode (Any Machine)
 
-Try the full stack on **any machine** (Windows, Mac, Linux) — no GPUs needed:
+No GPUs needed. Mock agents simulate a real cluster.
 
 ```bash
-# Install dependencies
-cd gateway && npm install
-cd ../agent && npm install
+git clone https://github.com/TentaCLAW-OS/TentaCLAW.git && cd TentaCLAW
 
-# Terminal 1 — Start the TentaCLAW Gateway
-cd gateway && npm run dev
-# → http://localhost:8080/dashboard
+# Terminal 1 — Gateway
+cd gateway && npm install && npm run dev
+# → Dashboard: http://localhost:8080/dashboard
 
-# Terminal 2 — Start a mock agent (fake GPUs)
-cd agent && npx tsx src/index.ts --mock
+# Terminal 2 — Mock agent (fake GPUs)
+cd agent && npm install && npx tsx src/index.ts --mock
 
-# Terminal 3 — Start a second mock node (optional)
+# Terminal 3 — Second node (optional)
 cd agent && npx tsx src/index.ts --mock --name gpu-rig-02 --gpus 4
+
+# Terminal 4 — CLI
+cd cli && npm install && npm run build
+npx clawtopus status
 ```
 
-The mock agent generates realistic stats for fake GPUs (RTX 3090, 4070 Ti Super, etc.) and pushes them to the gateway every 5 seconds. Open the dashboard to see your simulated cluster.
-
-## CLAWtopus CLI
-
-The inference router and cluster management tool. Eight arms on the command line.
+### Path 3: Docker
 
 ```bash
-cd cli && npm install && npm run build
-
-# Cluster overview
-npx clawtopus status
-
-# List nodes & models
-npx clawtopus nodes
-npx clawtopus models
-
-# Health score (0-100)
-npx clawtopus health
-
-# Interactive chat with a cluster model
-npx clawtopus chat --model llama3.1:8b
-
-# Deploy a model to all nodes
-npx clawtopus deploy llama3.1:8b
-
-# Tag nodes for organization
-npx clawtopus tags add NODE-001 production
-npx clawtopus tags nodes production
-
-# View alerts and benchmarks
-npx clawtopus alerts
-npx clawtopus benchmarks
-
-# Flight sheets
-npx clawtopus flight-sheets
-npx clawtopus apply <sheet-id>
-
-# Send commands
-npx clawtopus command TENTACLAW-FARM7K3P-node1 install_model --model hermes3:8b
+git clone https://github.com/TentaCLAW-OS/TentaCLAW.git && cd TentaCLAW
+docker compose up
+# Gateway + mock agent → http://localhost:8080/dashboard
 ```
 
----
+### Path 4: Kubernetes (Helm)
 
-## How It Works
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  YOU (The Human)                                                │
-│                                                                  │
-│  1. Flash ISO to USB                                            │
-│  2. Boot node                                                   │
-│  3. CLAWtopus detects GPUs, registers with Farm Hash            │
-│  4. You add Farm Hash to dashboard                              │
-│  5. One-click model deployment                                   │
-│  6. CLAWtopus keeps everything running                           │
-│                                                                  │
-│  "Eight arms. One mind."                                        │
-└─────────────────────────────────────────────────────────────────┘
+```bash
+helm repo add tentaclaw https://tentaclaw-os.github.io/charts
+helm install tentaclaw tentaclaw/tentaclaw \
+  --namespace tentaclaw --create-namespace \
+  --set gateway.replicas=1 \
+  --set agent.enabled=true
 ```
 
 ---
@@ -190,175 +222,306 @@ npx clawtopus command TENTACLAW-FARM7K3P-node1 install_model --model hermes3:8b
 ## Architecture
 
 ```
-  ┌──────────────┐      ┌───────────────────────────────────────┐
-  │ CLAWtopus    │      │      TentaCLAW Gateway (:8080)         │
-  │ CLI          │─────►│                                       │
-  │              │      │  REST API    Web Dashboard    SSE     │
-  │  clawtopus   │      │  /api/v1/*   /dashboard       Events  │
-  │  status      │      │  /v1/*       /game-bridge     UDP     │
-  └──────────────┘      └──────────────────┬────────────────────┘
-                                           │
-                    POST stats ◄───────────┼──────────► Commands
-                    every 10s              │            in response
-                                           │
-        ┌──────────────────────────────────┼────────────────────────┐
-        │                                  │                        │
-  ┌─────┴─────┐                    ┌───────┴──────┐          ┌─────┴──────┐
-  │  Node 1   │                    │   Node 2     │          │  Node 3    │
-  │  Agent    │                    │   Agent      │          │  Agent     │
-  │           │                    │              │          │            │
-  │  RTX 3090 │                    │  RTX 4090 x2 │          │  RTX 3060  │
-  │  Ollama   │                    │  Ollama      │          │  Ollama    │
-  │  Farm:7K3P│                    │  Farm:7K3P   │          │  Farm:7K3P │
-  └───────────┘                    └──────────────┘          └────────────┘
+                          ┌──────────────────────┐
+                          │     You / Client      │
+                          │  curl, Python, JS,    │
+                          │  LangChain, CrewAI    │
+                          └──────────┬───────────┘
+                                     │
+                            OpenAI-compat API
+                            POST /v1/chat/completions
+                                     │
+                                     ▼
+┌──────────┐          ┌──────────────────────────────────────────┐
+│CLAWtopus │          │        TentaCLAW Gateway (:8080)         │
+│   CLI    │─────────▶│                                          │
+│          │  86 cmds │  REST API (280+ endpoints)               │
+│ clawtopus│          │  Web Dashboard      SSE Events           │
+│ status   │          │  OpenAI Proxy       Game Engine Bridge   │
+│ deploy   │          │  Prometheus /metrics                     │
+│ chat     │          │  SQLite (11 tables)                      │
+│ top      │          └──────────┬──────────┬──────────┬─────────┘
+└──────────┘                     │          │          │
+                      ┌──────────┘          │          └──────────┐
+                      │       Push stats every 10s               │
+                      │       Receive commands in response       │
+                      ▼                     ▼                    ▼
+              ┌──────────────┐   ┌───────────────┐   ┌───────────────┐
+              │   Node 1     │   │    Node 2      │   │    Node 3     │
+              │   Agent      │   │    Agent       │   │    Agent      │
+              │              │   │                │   │               │
+              │ RTX 4090 x2  │   │ RTX 3090       │   │ CPU only      │
+              │ Ollama       │   │ vLLM           │   │ BitNet        │
+              │ Farm:7K3P    │   │ Farm:7K3P      │   │ Farm:7K3P     │
+              └──────────────┘   └────────────────┘   └───────────────┘
 ```
 
-### Components
+---
 
-| Component | Language | Description |
-|-----------|----------|-------------|
-| **Gateway** (`gateway/`) | TypeScript + Hono + SQLite | Central coordinator — 200+ REST endpoints, web dashboard, SSE, webhooks, game engine bridge, OpenAI-compat proxy, Prometheus metrics |
-| **Agent** (`agent/`) | TypeScript (zero deps) | Node daemon — NVIDIA/AMD/Intel GPU stats, BitNet CPU inference, auto-discovery (UDP+mDNS), watchdog, overclock |
-| **CLAWtopus CLI** (`cli/`) | TypeScript (zero deps) | 60+ commands — chat, deploy, top, backends, drain/cordon, doctor, auto, joke, fortune + personality |
-| **MCP Server** (`mcp/`) | TypeScript (zero deps) | Model Context Protocol server — AI agents can manage your cluster via tool calls |
-| **Builder** (`builder/`) | Bash | ISO/PXE build system — debootstrap Ubuntu 24.04, custom initrd |
-| **Shared** (`shared/`) | TypeScript | 15+ shared type definitions — agent ↔ gateway ↔ CLI ↔ MCP contract |
+## Components
+
+| Package | Path | Description |
+|---------|------|-------------|
+| **Gateway** | `gateway/` | Central coordinator -- 280+ REST endpoints, web dashboard, SSE, webhooks, OpenAI proxy, Prometheus metrics, SQLite. TypeScript + Hono. |
+| **Agent** | `agent/` | Node daemon -- GPU detection (NVIDIA/AMD/Intel), system stats, auto-discovery (UDP+mDNS), watchdog, overclock, BitNet support. Zero deps. |
+| **CLAWtopus CLI** | `cli/` | 86 commands -- chat, deploy, top, drain, doctor, auto, gpu-map, analytics, joke, fortune. Zero deps. |
+| **MCP Server** | `mcp/` | Model Context Protocol server -- AI agents manage your cluster via tool calls. Zero deps. |
+| **SDK** | `sdk/` | TypeScript SDK for programmatic gateway access. |
+| **Shared** | `shared/` | Shared type definitions -- agent/gateway/CLI/MCP contract, personality engine, ASCII art. |
+| **CLAWHub** | `clawhub/` | Package marketplace -- registry, schema validation, 62 packages across 5 categories. |
+| **Builder** | `builder/` | ISO/PXE build system -- debootstrap Ubuntu 24.04, custom initrd, GRUB BIOS+UEFI. |
+| **Observability** | `observability/` | Prometheus + Grafana stack with pre-built dashboards and alerting rules. |
+| **Deploy** | `deploy/` | Helm chart, Terraform modules, Ansible playbooks, Kubernetes manifests, Docker production compose. |
+| **Integrations** | `integrations/` | First-party integrations -- Dify, n8n, Home Assistant, Continue.dev, OpenClaw. |
+| **Website** | `website/` | Project website source (tentaclaw.io). |
 
 ---
 
-## Requirements
+## Supported Hardware
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| CPU | Any x86_64 | Modern multi-core |
-| RAM | 4GB | 16GB+ |
-| GPU | Any NVIDIA/AMD | RTX 3090 or better |
-| Storage | 20GB | 100GB+ NVMe |
-| Network | 1GbE | 10GbE (for clusters) |
-
----
-
-## Supported GPUs
-
-| Vendor | Status | Notes |
-|--------|--------|-------|
-| **NVIDIA** | Full | Pascal+, CUDA capable |
-| **AMD** | Partial | ROCm support coming |
-| **Intel** | Planned | Arc GPUs, future |
-| **CPU (BitNet)** | Full | 1-bit inference, any x86_64 CPU |
+| Vendor | GPU Status | Notes |
+|--------|------------|-------|
+| **NVIDIA** | Full support | Pascal and newer. CUDA detection via `nvidia-smi`. Overclocking supported. |
+| **AMD** | Partial support | ROCm via `rocm-smi`. Detection implemented, backend integration in progress. |
+| **Intel** | Planned | Arc GPUs. Detection stubbed, awaiting driver stabilization. |
+| **Apple Silicon** | Via MLX backend | M1/M2/M3/M4. MLX backend handles Metal acceleration. |
+| **CPU (BitNet)** | Full support | 1-bit quantized models on any x86_64 CPU. 2-6x faster, 70% less energy than FP16. |
 
 ---
 
-## Community
+## Supported Backends
 
-| |
-|---|
-| **Discord** — The Tank — CLAWtopus lives here |
-| **GitHub Discussions** — Questions, ideas, showcase |
-| **GitHub Issues** — Bugs and feature requests |
+| Backend | Type | Best For |
+|---------|------|----------|
+| **Ollama** | GPU / CPU | General purpose. Easy model management. Widest model support. |
+| **vLLM** | GPU | High-throughput production serving. PagedAttention, continuous batching. |
+| **SGLang** | GPU | Structured generation. JSON/regex constrained decoding. |
+| **llama.cpp** | GPU / CPU | Lightweight inference. GGUF models. Low overhead. |
+| **BitNet** | CPU only | 1-bit models. No GPU needed. Energy efficient. Great for CPU-only nodes. |
+| **MLX** | Apple Silicon | Native Metal acceleration on Mac. M-series optimized. |
+
+---
+
+## CLAWHub Marketplace
+
+> 62 packages. Install with one command.
+
+CLAWHub is the package registry for TentaCLAW OS. Agents, flight sheets, integrations, hardware profiles, and themes -- all declarative YAML, all versioned.
+
+| Category | Count | Examples |
+|----------|-------|---------|
+| **Agents** | 36 | `deep-researcher`, `code-reviewer`, `bug-hunter`, `blog-writer`, `threat-analyst`, `contract-reviewer`, `cluster-monitor`, `cost-optimizer` |
+| **Flight Sheets** | 9 | `llama3-8b`, `deepseek-r1-70b`, `bitnet-cpu`, `qwen3.5-72b`, `whisper-stt`, `flux2-image`, `kokoro-tts` |
+| **Integrations** | 9 | Grafana, Discord, Home Assistant, n8n, Continue.dev, LangChain, CrewAI, Dify, Open WebUI |
+| **Hardware Profiles** | 1 | `rtx-4090-inference` (more coming) |
+| **Themes** | 3 | `deep-ocean`, `terminal-green`, `cyberpunk` |
+| **Examples** | 5 | Agent, skill, model, integration, theme templates |
+
+```bash
+clawtopus hub install deep-researcher
+clawtopus hub install llama3-8b
+clawtopus hub install cyberpunk
+```
+
+---
+
+## Integrations
+
+TentaCLAW OS plays well with the tools you already use.
+
+| Integration | Description |
+|-------------|-------------|
+| **Dify** | Custom model provider. Use TentaCLAW as a backend for Dify workflows. |
+| **n8n** | Native node for n8n workflow automation. Trigger deploys, query cluster status. |
+| **Home Assistant** | Custom component. Monitor GPU temps, cluster health from your smart home dashboard. |
+| **Continue.dev** | VS Code AI coding assistant backed by your local cluster. |
+| **OpenClaw** | Multi-agent orchestration. Skills and scripts for TentaCLAW cluster management. |
+| **LangChain** | Drop-in via OpenAI-compatible API. Point `ChatOpenAI` at your gateway. |
+| **CrewAI** | Multi-agent crews powered by your local inference cluster. |
+| **Grafana** | Pre-built dashboards for GPU metrics, inference latency, cluster health. |
+| **Open WebUI** | Chat interface backed by your TentaCLAW cluster via OpenAI API. |
+
+---
+
+## API
+
+280+ endpoints. Full OpenAI compatibility. Here are the essentials:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/v1/chat/completions` | OpenAI-compatible chat (streaming supported) |
+| `GET` | `/v1/models` | OpenAI-compatible model list |
+| `GET` | `/health` | Gateway health check |
+| `POST` | `/api/v1/register` | Register a node |
+| `POST` | `/api/v1/nodes/:id/stats` | Push stats (returns pending commands) |
+| `GET` | `/api/v1/nodes` | List all nodes with latest stats |
+| `GET` | `/api/v1/summary` | Cluster summary (GPUs, VRAM, tok/s) |
+| `GET` | `/api/v1/health/score` | Cluster health score (0-100, A-F grade) |
+| `GET/POST` | `/api/v1/flight-sheets` | Manage flight sheets |
+| `POST` | `/api/v1/flight-sheets/:id/apply` | Apply flight sheet to nodes |
+| `GET` | `/api/v1/alerts` | Active alerts (temp, VRAM, disk) |
+| `GET` | `/api/v1/events` | SSE stream for real-time updates |
+| `GET` | `/api/v1/game/stream` | SSE stream for UE5/Unity integration |
+| `GET` | `/metrics` | Prometheus metrics endpoint |
+
+> Full API reference: **[docs/API.md](docs/API.md)**
+
+---
+
+## CLI
+
+86 commands. Eight arms on the command line.
+
+```bash
+# Cluster overview
+clawtopus status                          # Nodes, GPUs, VRAM, tok/s
+clawtopus health                          # Health score (0-100) with letter grade
+clawtopus top                             # Real-time monitor (refreshes every 3s)
+
+# Deploy & manage models
+clawtopus deploy llama3.1:8b              # Smart deploy — picks the best node
+clawtopus models                          # List loaded models across cluster
+clawtopus chat --model llama3.1:8b        # Interactive chat with your cluster
+
+# Operations
+clawtopus drain NODE-001                  # Maintenance mode — no new requests
+clawtopus doctor                          # Diagnose + auto-fix cluster issues
+clawtopus auto                            # Let CLAWtopus optimize everything
+
+# Explore
+clawtopus gpu-map                         # Visual GPU map of the cluster
+clawtopus backends                        # List backends per node (Ollama, vLLM, BitNet...)
+clawtopus analytics --hours 24            # Inference analytics and latency breakdown
+```
+
+> Full CLI reference: **[docs/CLI.md](docs/CLI.md)**
 
 ---
 
 ## CLAWtopus
 
-The mascot of TentaCLAW OS. An octopus who lives in your terminal and coordinates your AI inference cluster with eight arms.
+The octopus that runs your cluster. Eight arms, each with a job.
 
 ```
-        ,---.
-       / o o \
-       | \___/ |
-        \_____/
-         |||||
-        /|||||\
-       ( @@@@@ )
-        @@@@@
+            ___
+           /   \
+          | o o |
+          | \___/ |     "I'm gonna make you an inference
+           \_____/        you can't refuse."
+       .-~|||||||~-.
+      /  |||||||||| \         — CLAWtopus
+     {  /|\ /|\ /|\  }
+      \ |||_|||_||| /     Arm 1: Route      Arm 5: Benchmark
+       '-.______.-'       Arm 2: Balance     Arm 6: Overclock
+        |   |   |         Arm 3: Monitor     Arm 7: Heal
+        |   |   |         Arm 4: Deploy      Arm 8: Scale
 ```
 
 **CLAWtopus says:**
-- *"Eight arms. One mind."*
-- *"Per-token is a scam."*
-- *"AI inference cluster OS. Finally."*
-- *"I've got arms for days."*
+- *"Say hello to my little GPU."*
+- *"Leave the gun. Take the model weights."*
+- *"Per-token pricing is a scam."*
+- *"Eight arms. One mind. Zero compromises."*
+- *"I've got arms for days and VRAM for weeks."*
+- *"You come to me, on this day of model deployment, asking for VRAM?"*
 
 ---
 
-## Gateway API
+## Deploy Anywhere
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Health check |
-| `POST` | `/api/v1/register` | Register a node |
-| `POST` | `/api/v1/nodes/:id/stats` | Push stats (returns pending commands) |
-| `GET` | `/api/v1/nodes` | List all nodes with latest stats |
-| `GET` | `/api/v1/nodes/:id` | Get single node detail |
-| `POST` | `/api/v1/nodes/:id/commands` | Queue a command for a node |
-| `GET` | `/api/v1/summary` | Cluster summary (GPUs, VRAM, tok/s) |
-| `GET` | `/api/v1/health/score` | Cluster health score (0-100, A-F grading) |
-| `GET/POST` | `/api/v1/flight-sheets` | List/create flight sheets |
-| `POST` | `/api/v1/flight-sheets/:id/apply` | Apply flight sheet to nodes |
-| `GET` | `/api/v1/alerts` | Recent alerts (temp, VRAM, disk) |
-| `GET/POST` | `/api/v1/benchmarks` | Benchmark results |
-| `GET/POST` | `/api/v1/nodes/:id/ssh-keys` | SSH key management |
-| `GET/POST` | `/api/v1/nodes/:id/tags` | Node tagging system |
-| `GET` | `/api/v1/tags` | List all tags with counts |
-| `GET` | `/api/v1/nodes/:id/pulls` | Active model pull progress |
-| `GET` | `/api/v1/model-search` | Search Ollama model catalog |
-| `POST` | `/v1/chat/completions` | OpenAI-compatible inference proxy |
-| `GET` | `/v1/models` | OpenAI-compatible model list |
-| `GET` | `/api/v1/events` | SSE stream for real-time dashboard |
-| `GET` | `/api/v1/game/stream` | SSE stream for game engine integration |
+| Method | Command |
+|--------|---------|
+| **ISO** | `dd if=tentaclaw-os.iso of=/dev/sdX bs=4M` |
+| **Docker** | `docker compose up` |
+| **Docker (Production)** | `docker compose -f deploy/docker/docker-compose.production.yml up` |
+| **Kubernetes** | `kubectl apply -f deploy/kubernetes/` |
+| **Helm** | `helm install tentaclaw deploy/helm/tentaclaw/` |
+| **Terraform** | `cd deploy/terraform && terraform apply` |
+| **Ansible** | `ansible-playbook -i inventory deploy/ansible/playbook.yml` |
+| **Proxmox** | See [docs/PROXMOX.md](docs/PROXMOX.md) |
 
-## Project Structure
-
-```
-tentaclaw-os/
-├── agent/               # Node daemon (TypeScript, zero deps)
-│   ├── src/index.ts     # Agent with --mock mode, auto-discovery, overclock
-│   ├── src/spawner.ts   # Multi-node mock spawner (16 presets)
-│   └── tests/           # 10 tests
-├── gateway/             # TentaCLAW Gateway (Hono + SQLite)
-│   ├── src/index.ts     # 200+ REST API endpoints, SSE, OpenAI proxy, game engine bridge
-│   ├── src/db.ts        # Database layer (11 tables)
-│   ├── public/          # TentaCLAW-style web dashboard (HTML/CSS/JS)
-│   └── tests/           # 42 tests (unit + integration)
-├── cli/                 # CLAWtopus CLI (inference router + cluster management)
-│   └── src/index.ts     # chat, models, health, tags, deploy, alerts, benchmarks
-├── shared/              # Shared TypeScript types
-│   └── types.ts         # Agent ↔ Gateway ↔ CLI contract
-├── builder/             # ISO/PXE build system
-│   ├── build-iso.sh     # Bootable ISO builder
-│   ├── scripts/
-│   │   ├── init-bottom/ # Boot scripts (GPU detect, network, registration)
-│   │   └── init-top/    # Post-boot (agent start, Ollama, model loading)
-│   └── config/          # OS rootfs configuration
-├── docker-compose.yml   # One-command gateway deployment
-├── Makefile             # Build/dev/test targets
-└── .github/workflows/   # CI: test → build → release
-```
+---
 
 ## Documentation
 
 | Doc | Description |
 |-----|-------------|
-| [BUILD.md](BUILD.md) | Detailed build specification |
-| [BRAND.md](BRAND.md) | Brand guidelines and visual identity |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
-| [docs/QUICKSTART.md](docs/QUICKSTART.md) | Quick start guide |
+| **[Getting Started](docs/GETTING-STARTED.md)** | First-time setup guide |
+| **[Quick Start](docs/QUICKSTART.md)** | 5-minute overview |
+| **[API Reference](docs/API.md)** | Full REST API documentation |
+| **[CLI Reference](docs/CLI.md)** | All 86 CLAWtopus commands |
+| **[BitNet Guide](docs/BITNET.md)** | CPU-only inference with 1-bit models |
+| **[AMD Support](docs/AMD.md)** | ROCm setup and GPU detection |
+| **[Security](docs/SECURITY.md)** | API keys, SSH, hardening |
+| **[Docker](docs/DOCKER.md)** | Container deployment guide |
+| **[Proxmox](docs/PROXMOX.md)** | VM/LXC deployment on Proxmox VE |
+| **[Networking](docs/NETWORKING.md)** | Auto-discovery, UDP broadcast, mDNS |
+| **[Performance](docs/PERFORMANCE.md)** | Tuning and benchmarking |
+| **[Themes](docs/THEMES.md)** | Dashboard theming and customization |
+| **[Troubleshooting](docs/TROUBLESHOOTING.md)** | Common issues and fixes |
+| **[FAQ](docs/FAQ.md)** | Frequently asked questions |
+| **[Roadmap](docs/ROADMAP-v1.0.md)** | What's coming next |
+| **[Build Spec](BUILD.md)** | ISO build system internals |
+| **[Brand Guide](BRAND.md)** | Visual identity and design system |
+
+---
+
+## Project Stats
+
+| Metric | Count |
+|--------|-------|
+| Tests passing | **429** |
+| Lines of code | **41,000+** |
+| Modules | **38** |
+| API endpoints | **280+** |
+| CLI commands | **86** |
+| CLAWHub packages | **62** |
+| Inference backends | **6** |
+| Deploy methods | **8** |
+
+---
 
 ## Contributing
 
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for guidelines.
 
-Issues labeled `CLAWtopus-wanted` are good first contributions.
+Issues labeled **`clawtopus-wanted`** are good first contributions. We accept code, docs, CLAWHub packages, integrations, themes, and ASCII art.
+
+```bash
+# Run the full test suite
+npm test
+
+# Run gateway tests only
+cd gateway && npm test
+
+# Run with coverage
+npm run test:coverage
+```
+
+---
+
+## Community
+
+| Channel | Link |
+|---------|------|
+| **Discord** | [The Tank](https://discord.gg/tentaclaw) -- CLAWtopus lives here |
+| **GitHub Discussions** | [Questions, ideas, showcase](https://github.com/TentaCLAW-OS/TentaCLAW/discussions) |
+| **GitHub Issues** | [Bugs and feature requests](https://github.com/TentaCLAW-OS/TentaCLAW/issues) |
+| **Website** | [tentaclaw.io](https://www.tentaclaw.io) |
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+MIT -- see [LICENSE](LICENSE) for details.
+
+Use it. Fork it. Run it. Own your inference.
 
 ---
 
-**TentaCLAW OS** — Eight arms. One mind. Zero compromises.
-
-Built with sassy by [TentaCLAW-OS](https://github.com/TentaCLAW-OS)
+<p align="center">
+  <strong>TentaCLAW OS</strong><br>
+  <em>Eight arms. One mind. Zero compromises.</em><br><br>
+  Built with eight arms by <a href="https://github.com/TentaCLAW-OS">TentaCLAW-OS</a><br><br>
+  <sub>Per-token pricing is a scam.</sub>
+</p>

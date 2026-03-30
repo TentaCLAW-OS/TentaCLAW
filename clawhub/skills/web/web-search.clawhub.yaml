@@ -1,0 +1,35 @@
+name: "@tentaclaw/skill-web-search"
+version: "1.0.0"
+type: skill
+title: "Web Search Skill"
+description: "Search the web via multiple providers. Returns structured results with snippets."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - web
+tags:
+  - search
+  - web
+  - google
+  - bing
+  - duckduckgo
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - web-search
+    - url-fetch
+  permissions:
+    - network
+  config_schema:
+    provider:
+      type: string
+      default: "duckduckgo"
+      description: "Search provider (duckduckgo, google, bing)"
+    max_results:
+      type: integer
+      default: 10
+      description: "Maximum results per query"

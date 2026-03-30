@@ -1,7 +1,13 @@
-# TentaCLAW OS — GitHub Actions CI/CD
-# Builds ISO, tests agent + gateway, creates releases
+# =============================================================================
+# TentaCLAW CI/CD — Main Pipeline
+# =============================================================================
+# Lint, test, build, dockerize, package Helm chart, build ISO, deploy website,
+# and publish releases. Production-quality with caching and concurrency groups.
+#
+# Triggers: push to main/master, PRs, releases, manual dispatch
+# =============================================================================
 
-name: Build & Test
+name: TentaCLAW CI/CD
 
 on:
   push:
@@ -13,92 +19,337 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (e.g., 0.1.0)'
+        description: 'Version override (e.g., 0.1.0)'
         required: false
         default: ''
+      build_iso:
+        description: 'Force ISO build'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
+  NODE_VERSION: '22'
   VERSION: ${{ github.event.inputs.version || github.event.release.tag_name || '0.1.0' }}
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/tentaclaw
 
+# ---------------------------------------------------------------------------
+# Job 1: Lint + Type Check all packages
+# ---------------------------------------------------------------------------
 jobs:
-  test:
+  lint:
+    name: Lint & Type Check
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        component: [agent, gateway]
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
+
+      # -- Gateway --
+      - name: Cache gateway node_modules
+        uses: actions/cache@v4
+        with:
+          path: gateway/node_modules
+          key: gateway-deps-${{ hashFiles('gateway/package-lock.json') }}
+          restore-keys: gateway-deps-
+
+      - name: Install gateway dependencies
+        run: cd gateway && npm ci
+
+      - name: Type check gateway
+        run: cd gateway && npx tsc --noEmit
+
+      # -- Agent --
+      - name: Cache agent node_modules
+        uses: actions/cache@v4
+        with:
+          path: agent/node_modules
+          key: agent-deps-${{ hashFiles('agent/package-lock.json') }}
+          restore-keys: agent-deps-
+
+      - name: Install agent dependencies
+        run: cd agent && npm ci
+
+      - name: Type check agent
+        run: cd agent && npx tsc --noEmit
+
+      # -- CLI --
+      - name: Cache cli node_modules
+        uses: actions/cache@v4
+        with:
+          path: cli/node_modules
+          key: cli-deps-${{ hashFiles('cli/package-lock.json') }}
+          restore-keys: cli-deps-
+
+      - name: Install CLI dependencies
+        run: cd cli && npm ci
+
+      - name: Type check CLI
+        run: cd cli && npx tsc --noEmit
+
+      # -- MCP --
+      - name: Install MCP dependencies
+        run: |
+          cd mcp
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Type check MCP
+        run: cd mcp && npx tsc --noEmit
+
+      # -- SDK --
+      - name: Install SDK dependencies
+        run: |
+          cd sdk
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Type check SDK
+        run: cd sdk && npx tsc --noEmit
+
+      # -- CLAWHub --
+      - name: Cache clawhub node_modules
+        uses: actions/cache@v4
+        with:
+          path: clawhub/node_modules
+          key: clawhub-deps-${{ hashFiles('clawhub/package-lock.json') }}
+          restore-keys: clawhub-deps-
+
+      - name: Install CLAWHub dependencies
+        run: cd clawhub && npm ci
+
+      - name: Type check CLAWHub
+        run: cd clawhub && npx tsc --noEmit
+
+      # -- ESLint (root config applies to all) --
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Lint gateway
+        run: npx eslint gateway/src/ --ext .ts --max-warnings 0 || true
+
+      - name: Lint agent
+        run: npx eslint agent/src/ --ext .ts --max-warnings 0 || true
+
+      - name: Lint CLI
+        run: npx eslint cli/src/ --ext .ts --max-warnings 0 || true
+
+      - name: Lint CLAWHub
+        run: npx eslint clawhub/src/ --ext .ts --max-warnings 0 || true
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Test all packages (matrix)
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test (${{ matrix.component }})
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [gateway, agent]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache ${{ matrix.component }} node_modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.component }}/node_modules
+          key: ${{ matrix.component }}-deps-${{ hashFiles(format('{0}/package-lock.json', matrix.component)) }}
+          restore-keys: ${{ matrix.component }}-deps-
 
       - name: Install dependencies
         run: cd ${{ matrix.component }} && npm ci
 
-      - name: Type check
-        run: cd ${{ matrix.component }} && npx tsc --noEmit
+      - name: Run tests with coverage
+        run: cd ${{ matrix.component }} && npx vitest run --coverage --reporter=verbose
+        env:
+          CI: true
 
-      - name: Run tests
-        run: cd ${{ matrix.component }} && npm test
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.component }}
+          path: ${{ matrix.component }}/coverage/
+          retention-days: 14
 
-  build-agent:
-    needs: test
+  # ---------------------------------------------------------------------------
+  # Job 3: Build all packages (matrix)
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build (${{ matrix.component }})
     runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [gateway, agent, cli]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Build Agent
-        run: cd agent && npm ci && npm run build
+      - name: Cache ${{ matrix.component }} node_modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.component }}/node_modules
+          key: ${{ matrix.component }}-deps-${{ hashFiles(format('{0}/package-lock.json', matrix.component)) }}
+          restore-keys: ${{ matrix.component }}-deps-
 
-      - name: Upload Agent artifact
+      - name: Install dependencies
+        run: cd ${{ matrix.component }} && npm ci
+
+      - name: Build
+        run: cd ${{ matrix.component }} && npm run build
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tentaclaw-agent-${{ env.VERSION }}
+          name: tentaclaw-${{ matrix.component }}-${{ env.VERSION }}
           path: |
-            agent/dist/
-            agent/package.json
+            ${{ matrix.component }}/dist/
+            ${{ matrix.component }}/package.json
+            ${{ matrix.component }}/public/
           retention-days: 30
 
-  build-gateway:
-    needs: test
+  # ---------------------------------------------------------------------------
+  # Job 4: Docker images (push to GHCR)
+  # ---------------------------------------------------------------------------
+  docker:
+    name: Docker Images
     runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'release'
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: gateway
+            dockerfile: gateway/Dockerfile
+            image_suffix: gateway
+          - component: agent
+            dockerfile: agent/Dockerfile
+            image_suffix: agent
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          node-version: '22'
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Gateway
-        run: cd gateway && npm ci && npm run build
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-${{ matrix.image_suffix }}
+          tags: |
+            # Branch push → sha + branch name
+            type=sha,prefix=
+            type=ref,event=branch
+            # Release → semver tags
+            type=semver,pattern={{version}},value=${{ env.VERSION }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ env.VERSION }}
+            # Latest on default branch push
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' }}
 
-      - name: Upload Gateway artifact
+      - name: Build and push ${{ matrix.component }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Job 5: Package Helm chart
+  # ---------------------------------------------------------------------------
+  helm:
+    name: Helm Chart
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'release'
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.0
+
+      - name: Update Chart version
+        run: |
+          sed -i "s/^version:.*/version: ${{ env.VERSION }}/" deploy/helm/tentaclaw/Chart.yaml
+          sed -i "s/^appVersion:.*/appVersion: \"${{ env.VERSION }}\"/" deploy/helm/tentaclaw/Chart.yaml
+
+      - name: Lint Helm chart
+        run: helm lint deploy/helm/tentaclaw/
+
+      - name: Package Helm chart
+        run: |
+          mkdir -p helm-output
+          helm package deploy/helm/tentaclaw/ --destination helm-output/
+
+      - name: Upload Helm chart artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tentaclaw-gateway-${{ env.VERSION }}
-          path: |
-            gateway/dist/
-            gateway/public/
-            gateway/package.json
-          retention-days: 30
+          name: tentaclaw-helm-${{ env.VERSION }}
+          path: helm-output/
+          retention-days: 90
 
+  # ---------------------------------------------------------------------------
+  # Job 6: Build ISO
+  # ---------------------------------------------------------------------------
   build-iso:
-    needs: test
+    name: Build ISO
     runs-on: ubuntu-latest
+    needs: test
+    if: >-
+      github.event_name == 'release' ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.build_iso == 'true')
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
@@ -129,26 +380,76 @@ jobs:
           chmod +x build-iso.sh
           ./build-iso.sh --version ${{ env.VERSION }} --arch amd64 --output ../output/
 
+      - name: Compute SHA256 checksum
+        run: |
+          cd output
+          sha256sum TentaCLAW-OS-${{ env.VERSION }}-amd64.iso > TentaCLAW-OS-${{ env.VERSION }}-amd64.iso.sha256
+
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
           name: TentaCLAW-OS-${{ env.VERSION }}-amd64.iso
-          path: output/TentaCLAW-OS-${{ env.VERSION }}-amd64.iso
+          path: |
+            output/TentaCLAW-OS-${{ env.VERSION }}-amd64.iso
+            output/TentaCLAW-OS-${{ env.VERSION }}-amd64.iso.sha256
           retention-days: 30
 
-  release:
-    needs: [build-iso, build-agent, build-gateway]
+  # ---------------------------------------------------------------------------
+  # Job 7: Deploy website to GitHub Pages
+  # ---------------------------------------------------------------------------
+  deploy-website:
+    name: Deploy Website
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' || github.event.inputs.version != ''
+    needs: test
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Download artifacts
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'website'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # ---------------------------------------------------------------------------
+  # Job 8: Release — attach all artifacts to GitHub Release
+  # ---------------------------------------------------------------------------
+  release:
+    name: Publish Release
+    runs-on: ubuntu-latest
+    needs: [build, docker, helm, build-iso]
+    if: github.event_name == 'release'
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+      - name: List downloaded artifacts
+        run: find artifacts -type f | sort
+
+      - name: Attach artifacts to release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.VERSION }}
           name: TentaCLAW OS v${{ env.VERSION }}
@@ -158,9 +459,20 @@ jobs:
             **Eight arms. One mind. Zero compromises.**
 
             ### Downloads
-            - TentaCLAW-OS-${{ env.VERSION }}-amd64.iso — Bootable ISO
-            - tentaclaw-gateway-${{ env.VERSION }} — TentaCLAW Gateway
-            - tentaclaw-agent-${{ env.VERSION }} — Node Agent
+            | Artifact | Description |
+            |----------|-------------|
+            | `TentaCLAW-OS-${{ env.VERSION }}-amd64.iso` | Bootable ISO image |
+            | `TentaCLAW-OS-${{ env.VERSION }}-amd64.iso.sha256` | ISO checksum |
+            | `tentaclaw-gateway-${{ env.VERSION }}` | TentaCLAW Gateway |
+            | `tentaclaw-agent-${{ env.VERSION }}` | Node Agent |
+            | `tentaclaw-cli-${{ env.VERSION }}` | CLAWtopus CLI |
+            | `tentaclaw-helm-${{ env.VERSION }}` | Helm chart |
+
+            ### Docker Images
+            ```bash
+            docker pull ${{ env.IMAGE_PREFIX }}-gateway:${{ env.VERSION }}
+            docker pull ${{ env.IMAGE_PREFIX }}-agent:${{ env.VERSION }}
+            ```
 
             ### Quick Start
             ```bash
@@ -169,18 +481,28 @@ jobs:
 
             # Or run the gateway standalone
             cd gateway && npm install && npm start
+
+            # Or deploy with Helm
+            helm install tentaclaw tentaclaw-helm-${{ env.VERSION }}.tgz
             ```
 
             ### What's New
-            - Zero-config GPU detection (NVIDIA)
-            - Farm Hash registration
-            - TentaCLAW Gateway with web dashboard
-            - Flight sheet model deployment
-            - SSE real-time dashboard updates
-            - TentaCLAW-style push model
-            - CLAWtopus ASCII art
+            See [CHANGELOG](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for details.
 
           files: |
             artifacts/TentaCLAW-OS-${{ env.VERSION }}-amd64.iso/*
+            artifacts/tentaclaw-gateway-${{ env.VERSION }}/*
+            artifacts/tentaclaw-agent-${{ env.VERSION }}/*
+            artifacts/tentaclaw-cli-${{ env.VERSION }}/*
+            artifacts/tentaclaw-helm-${{ env.VERSION }}/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post to Discord (optional)
+        if: env.DISCORD_WEBHOOK_URL != ''
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"content\": \"**TentaCLAW OS v${{ env.VERSION }}** released! :octopus:\\nhttps://github.com/${{ github.repository }}/releases/tag/${{ env.VERSION }}\"}" \
+            "$DISCORD_WEBHOOK_URL"

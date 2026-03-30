@@ -1,0 +1,41 @@
+name: "@tentaclaw/skill-sql"
+version: "1.0.0"
+type: skill
+title: "SQL Query Executor"
+description: "Execute SQL queries against PostgreSQL, MySQL, SQLite. Read-only by default."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - data
+tags:
+  - sql
+  - database
+  - postgresql
+  - mysql
+  - sqlite
+  - query
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - sql-query
+    - sql-schema
+  permissions:
+    - network
+  config_schema:
+    connection_string:
+      type: string
+      required: true
+      secret: true
+      description: "Database connection string"
+    read_only:
+      type: boolean
+      default: true
+      description: "Only allow SELECT queries"
+    max_rows:
+      type: integer
+      default: 1000
+      description: "Maximum rows returned per query"

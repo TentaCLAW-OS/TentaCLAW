@@ -1,0 +1,33 @@
+name: "@tentaclaw/skill-docker"
+version: "1.0.0"
+type: skill
+title: "Docker Container Manager"
+description: "List, start, stop, inspect Docker containers and images."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - devops
+tags:
+  - docker
+  - containers
+  - images
+  - compose
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - docker-ps
+    - docker-start
+    - docker-stop
+    - docker-inspect
+    - docker-logs
+  permissions:
+    - filesystem:read
+  config_schema:
+    docker_host:
+      type: string
+      default: "unix:///var/run/docker.sock"
+      description: "Docker daemon socket or TCP address"

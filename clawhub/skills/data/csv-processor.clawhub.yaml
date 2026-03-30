@@ -1,0 +1,38 @@
+name: "@tentaclaw/skill-csv"
+version: "1.0.0"
+type: skill
+title: "CSV Data Processor"
+description: "Read, filter, aggregate, transform CSV files. Output as table, JSON, or new CSV."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - data
+tags:
+  - csv
+  - data
+  - spreadsheet
+  - analysis
+  - transform
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - csv-read
+    - csv-filter
+    - csv-aggregate
+    - csv-transform
+  permissions:
+    - filesystem:read
+    - filesystem:write
+  config_schema:
+    delimiter:
+      type: string
+      default: ","
+      description: "Column delimiter"
+    max_rows:
+      type: integer
+      default: 100000
+      description: "Maximum rows to process"

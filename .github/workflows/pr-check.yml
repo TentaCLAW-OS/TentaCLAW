@@ -1,0 +1,362 @@
+# =============================================================================
+# TentaCLAW — Lightweight PR Check
+# =============================================================================
+# Fast feedback on pull requests: lint, type check, test, size label,
+# and post test summary as a PR comment.
+#
+# This runs INSTEAD of the full CI/CD pipeline for PRs — the main build.yml
+# concurrency group cancels its PR runs in favor of this lighter workflow.
+# =============================================================================
+
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main, master]
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: Lint + Type Check
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # -- Gateway --
+      - name: Cache gateway node_modules
+        uses: actions/cache@v4
+        with:
+          path: gateway/node_modules
+          key: gateway-deps-${{ hashFiles('gateway/package-lock.json') }}
+          restore-keys: gateway-deps-
+
+      - name: Install & type check gateway
+        run: cd gateway && npm ci && npx tsc --noEmit
+
+      # -- Agent --
+      - name: Cache agent node_modules
+        uses: actions/cache@v4
+        with:
+          path: agent/node_modules
+          key: agent-deps-${{ hashFiles('agent/package-lock.json') }}
+          restore-keys: agent-deps-
+
+      - name: Install & type check agent
+        run: cd agent && npm ci && npx tsc --noEmit
+
+      # -- CLI --
+      - name: Cache cli node_modules
+        uses: actions/cache@v4
+        with:
+          path: cli/node_modules
+          key: cli-deps-${{ hashFiles('cli/package-lock.json') }}
+          restore-keys: cli-deps-
+
+      - name: Install & type check CLI
+        run: cd cli && npm ci && npx tsc --noEmit
+
+      # -- MCP --
+      - name: Install & type check MCP
+        run: |
+          cd mcp
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npx tsc --noEmit
+
+      # -- SDK --
+      - name: Install & type check SDK
+        run: |
+          cd sdk
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          npx tsc --noEmit
+
+      # -- CLAWHub --
+      - name: Cache clawhub node_modules
+        uses: actions/cache@v4
+        with:
+          path: clawhub/node_modules
+          key: clawhub-deps-${{ hashFiles('clawhub/package-lock.json') }}
+          restore-keys: clawhub-deps-
+
+      - name: Install & type check CLAWHub
+        run: cd clawhub && npm ci && npx tsc --noEmit
+
+      # -- ESLint --
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Lint all packages
+        run: |
+          echo "::group::gateway"
+          npx eslint gateway/src/ --ext .ts --max-warnings 0 || true
+          echo "::endgroup::"
+          echo "::group::agent"
+          npx eslint agent/src/ --ext .ts --max-warnings 0 || true
+          echo "::endgroup::"
+          echo "::group::cli"
+          npx eslint cli/src/ --ext .ts --max-warnings 0 || true
+          echo "::endgroup::"
+          echo "::group::clawhub"
+          npx eslint clawhub/src/ --ext .ts --max-warnings 0 || true
+          echo "::endgroup::"
+
+  # ---------------------------------------------------------------------------
+  # Job 2: Test all testable packages
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test (${{ matrix.component }})
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [gateway, agent]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache ${{ matrix.component }} node_modules
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.component }}/node_modules
+          key: ${{ matrix.component }}-deps-${{ hashFiles(format('{0}/package-lock.json', matrix.component)) }}
+          restore-keys: ${{ matrix.component }}-deps-
+
+      - name: Install dependencies
+        run: cd ${{ matrix.component }} && npm ci
+
+      - name: Run tests
+        id: tests
+        run: |
+          cd ${{ matrix.component }}
+          npx vitest run --reporter=verbose --reporter=json --outputFile=test-results.json 2>&1 | tee test-output.txt
+        env:
+          CI: true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.component }}
+          path: |
+            ${{ matrix.component }}/test-results.json
+            ${{ matrix.component }}/test-output.txt
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Job 3: PR size label
+  # ---------------------------------------------------------------------------
+  pr-size-label:
+    name: PR Size Label
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate diff size and apply label
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+
+            let additions = 0;
+            let deletions = 0;
+            for (const file of files) {
+              additions += file.additions;
+              deletions += file.deletions;
+            }
+            const totalChanged = additions + deletions;
+
+            let sizeLabel;
+            let color;
+            if (totalChanged <= 50) {
+              sizeLabel = 'size/XS';
+              color = '3CBF00';
+            } else if (totalChanged <= 200) {
+              sizeLabel = 'size/S';
+              color = '5D9801';
+            } else if (totalChanged <= 500) {
+              sizeLabel = 'size/M';
+              color = 'FBCA04';
+            } else if (totalChanged <= 1000) {
+              sizeLabel = 'size/L';
+              color = 'E67409';
+            } else {
+              sizeLabel = 'size/XL';
+              color = 'D93F0B';
+            }
+
+            // Remove existing size labels
+            const existingLabels = context.payload.pull_request.labels || [];
+            for (const label of existingLabels) {
+              if (label.name.startsWith('size/')) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.pull_request.number,
+                  name: label.name,
+                }).catch(() => {}); // Ignore if label doesn't exist
+              }
+            }
+
+            // Create label if it doesn't exist
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: sizeLabel,
+                color: color,
+                description: `PR size: ${sizeLabel.split('/')[1]}`,
+              });
+            } catch (e) {
+              // Label already exists — that's fine
+              if (e.status !== 422) throw e;
+            }
+
+            // Apply the label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              labels: [sizeLabel],
+            });
+
+            core.info(`PR diff: +${additions} -${deletions} = ${totalChanged} lines → ${sizeLabel}`);
+
+  # ---------------------------------------------------------------------------
+  # Job 4: Comment test results on PR
+  # ---------------------------------------------------------------------------
+  comment-results:
+    name: Post Test Summary
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    if: always()
+    timeout-minutes: 5
+
+    steps:
+      - name: Download test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+        continue-on-error: true
+
+      - name: Parse test results
+        id: parse-tests
+        shell: bash
+        run: |
+          SUMMARY=""
+          for comp in gateway agent; do
+            JSON_FILE="artifacts/test-results-${comp}/test-results.json"
+            if [ -f "$JSON_FILE" ]; then
+              SUITES=$(jq -r '.numTotalTestSuites // (.testResults | length) // "?"' "$JSON_FILE" 2>/dev/null || echo "?")
+              TESTS=$(jq -r '.numTotalTests // "?"' "$JSON_FILE" 2>/dev/null || echo "?")
+              PASSED=$(jq -r '.numPassedTests // "?"' "$JSON_FILE" 2>/dev/null || echo "?")
+              FAILED=$(jq -r '.numFailedTests // 0' "$JSON_FILE" 2>/dev/null || echo "0")
+              SUMMARY="${SUMMARY}### ${comp}\n- Suites: **${SUITES}** | Tests: **${TESTS}** | Passed: **${PASSED}** | Failed: **${FAILED}**\n\n"
+            else
+              SUMMARY="${SUMMARY}### ${comp}\n- _No test results found_\n\n"
+            fi
+          done
+          # Write to output using heredoc to handle multiline
+          {
+            echo "test_summary<<ENDOFSUMMARY"
+            echo -e "$SUMMARY"
+            echo "ENDOFSUMMARY"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and post PR comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const lintStatus = '${{ needs.lint.result }}';
+            const testStatus = '${{ needs.test.result }}';
+            const testSummary = `${{ steps.parse-tests.outputs.test_summary }}`;
+
+            const statusEmoji = (s) => s === 'success' ? '✅' : s === 'failure' ? '❌' : s === 'skipped' ? '⏭️' : '⚠️';
+
+            let body = `## 🐙 TentaCLAW PR Check Results\n\n`;
+            body += `| Check | Status |\n`;
+            body += `|-------|--------|\n`;
+            body += `| **Lint & Type Check** | ${statusEmoji(lintStatus)} ${lintStatus} |\n`;
+            body += `| **Tests** | ${statusEmoji(testStatus)} ${testStatus} |\n`;
+            body += `\n`;
+
+            if (testSummary.trim()) {
+              body += testSummary + `\n`;
+            }
+
+            const overallStatus = (lintStatus === 'success' && testStatus === 'success')
+              ? '**All checks passed** — ready for review.'
+              : '**Some checks failed** — please review the errors above.';
+
+            body += `---\n${overallStatus}\n`;
+
+            // Find existing bot comment to update (avoid spam)
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+
+            const marker = '## 🐙 TentaCLAW PR Check Results';
+            const existing = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: body,
+              });
+              core.info(`Updated existing comment ${existing.id}`);
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: body,
+              });
+              core.info('Created new PR comment');
+            }

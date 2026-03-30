@@ -1,0 +1,35 @@
+name: "@tentaclaw/skill-url-fetch"
+version: "1.0.0"
+type: skill
+title: "URL Fetch & Parse Skill"
+description: "Fetch web pages, extract text content, parse HTML. Respects robots.txt."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - web
+tags:
+  - fetch
+  - scrape
+  - html
+  - parse
+  - extract
+skill:
+  entry: ./src/index.ts
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - url-fetch
+    - html-parse
+  permissions:
+    - network
+  config_schema:
+    timeout_ms:
+      type: integer
+      default: 10000
+      description: "Request timeout in milliseconds"
+    respect_robots:
+      type: boolean
+      default: true
+      description: "Respect robots.txt directives"
