@@ -1,0 +1,35 @@
+name: "@tentaclaw/whisper-stt-flight"
+version: "1.0.0"
+type: model
+title: "Whisper Large v3 — Speech-to-Text"
+description: "Real-time transcription with GPU acceleration. Multi-language, speaker detection."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - flight-sheets
+tags:
+  - whisper
+  - speech-to-text
+  - audio
+  - transcription
+  - multi-language
+model:
+  type: flight-sheet
+  base_model: "whisper"
+  variant: "large-v3"
+  quantization: "FP16"
+  format: safetensors
+  hardware:
+    minimum_vram: "4GB"
+    recommended_vram: "8GB"
+    compatible_gpus:
+      - "Any GPU with 4GB+ VRAM"
+  parameters:
+    language: "auto"
+    beam_size: 5
+    word_timestamps: true
+  benchmarks:
+    realtime_factor: 0.1
+    hardware_tested: "RTX 3060 12GB"

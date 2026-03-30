@@ -1,0 +1,101 @@
+{{/*
+=============================================================================
+Prometheus ServiceMonitor & Alerting Rules
+Requires: prometheus-operator / kube-prometheus-stack in the cluster.
+=============================================================================
+*/}}
+{{- if and .Values.monitoring.enabled .Values.monitoring.serviceMonitor }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "tentaclaw.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tentaclaw.gateway.labels" . | nindent 4 }}
+    {{- /* Match the Prometheus Operator serviceMonitorSelector */}}
+    release: {{ .Values.monitoring.prometheusRelease }}
+spec:
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      {{- include "tentaclaw.gateway.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.monitoring.interval }}
+      scrapeTimeout: {{ .Values.monitoring.scrapeTimeout }}
+      honorLabels: true
+{{- end }}
+
+{{- /* ---- PrometheusRule (alerting) ---- */}}
+{{- if and .Values.monitoring.enabled .Values.monitoring.alerts.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "tentaclaw.fullname" . }}-gateway-alerts
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tentaclaw.gateway.labels" . | nindent 4 }}
+    release: {{ .Values.monitoring.prometheusRelease }}
+spec:
+  groups:
+    - name: tentaclaw-gateway
+      rules:
+        # Gateway instance unreachable
+        - alert: TentaCLAWGatewayDown
+          expr: up{job="{{ include "tentaclaw.fullname" . }}-gateway"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "TentaCLAW Gateway is down"
+            description: >-
+              The TentaCLAW Gateway instance {{ "{{ $labels.instance }}" }}
+              has been unreachable for more than 2 minutes.
+
+        # p99 latency exceeded threshold
+        - alert: TentaCLAWGatewayHighLatency
+          expr: >-
+            histogram_quantile(0.99,
+              rate(http_request_duration_seconds_bucket{job="{{ include "tentaclaw.fullname" . }}-gateway"}[5m])
+            ) > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "TentaCLAW Gateway p99 latency above 2s"
+            description: >-
+              The 99th percentile request latency for {{ "{{ $labels.instance }}" }}
+              has exceeded 2 seconds for 5 minutes.
+
+        # Elevated 5xx error rate
+        - alert: TentaCLAWGatewayHighErrorRate
+          expr: >-
+            rate(http_requests_total{job="{{ include "tentaclaw.fullname" . }}-gateway",status=~"5.."}[5m])
+            /
+            rate(http_requests_total{job="{{ include "tentaclaw.fullname" . }}-gateway"}[5m])
+            > 0.05
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "TentaCLAW Gateway error rate above 5%"
+            description: >-
+              More than 5% of requests to {{ "{{ $labels.instance }}" }}
+              are returning 5xx errors.
+
+        # No GPU agents reporting
+        - alert: TentaCLAWNoGPUNodes
+          expr: count(up{job="{{ include "tentaclaw.fullname" . }}-agent"}) == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "No GPU agent nodes reporting"
+            description: >-
+              No TentaCLAW agent nodes have reported in for 5 minutes.
+              The cluster has no available GPU capacity.
+{{- end }}

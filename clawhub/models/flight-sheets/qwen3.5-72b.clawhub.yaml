@@ -1,0 +1,39 @@
+name: "@tentaclaw/qwen3.5-72b-flight"
+version: "1.0.0"
+type: model
+title: "Qwen 3.5 72B — Frontier Open Model"
+description: "Beats GPT-5.2 on benchmarks. The best open model in 2026. Multi-GPU deployment."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - flight-sheets
+tags:
+  - qwen
+  - 72b
+  - frontier
+  - multi-gpu
+  - moe
+model:
+  type: flight-sheet
+  base_model: "qwen3.5"
+  variant: "72b-instruct"
+  quantization: "Q4_K_M"
+  format: gguf
+  hardware:
+    minimum_vram: "40GB"
+    recommended_vram: "48GB"
+    compatible_gpus:
+      - "2x RTX 4090 24GB"
+      - "2x RTX 3090 24GB"
+      - "1x A100 80GB"
+  parameters:
+    context_length: 32768
+    batch_size: 256
+    gpu_layers: 80
+    flash_attention: true
+  benchmarks:
+    tokens_per_second: 22
+    time_to_first_token: 1.0
+    hardware_tested: "2x RTX 4090"

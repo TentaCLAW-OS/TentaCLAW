@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tentaclaw-gateway
+  namespace: tentaclaw
+  labels:
+    app.kubernetes.io/name: tentaclaw-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: tentaclaw
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: tentaclaw-gateway
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+---
+# LoadBalancer variant — use this if you need external access without an Ingress controller.
+# On cloud providers this provisions a cloud load balancer.
+# On bare metal, requires MetalLB or similar.
+apiVersion: v1
+kind: Service
+metadata:
+  name: tentaclaw-gateway-lb
+  namespace: tentaclaw
+  labels:
+    app.kubernetes.io/name: tentaclaw-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: tentaclaw
+  annotations:
+    # Cloud-specific annotations (uncomment as needed):
+    # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    # service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    # cloud.google.com/load-balancer-type: "Internal"
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: tentaclaw-gateway
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+  # externalTrafficPolicy: Local # Uncomment to preserve client IP

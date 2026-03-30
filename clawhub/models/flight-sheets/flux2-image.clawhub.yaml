@@ -1,0 +1,38 @@
+name: "@tentaclaw/flux2-image-flight"
+version: "1.0.0"
+type: model
+title: "FLUX.2 — Image Generation"
+description: "Frontier open-source image generation. Better prompt obedience than SDXL."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - flight-sheets
+tags:
+  - flux
+  - image-generation
+  - diffusion
+  - creative
+  - art
+model:
+  type: flight-sheet
+  base_model: "flux"
+  variant: "2-dev"
+  quantization: "FP8"
+  format: safetensors
+  hardware:
+    minimum_vram: "12GB"
+    recommended_vram: "24GB"
+    compatible_gpus:
+      - "RTX 3060 12GB (slow)"
+      - "RTX 4070 Ti 16GB"
+      - "RTX 4090 24GB (fast)"
+  parameters:
+    steps: 30
+    guidance_scale: 7.5
+    width: 1024
+    height: 1024
+  benchmarks:
+    seconds_per_image: 8
+    hardware_tested: "RTX 4090 24GB"

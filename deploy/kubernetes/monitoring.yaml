@@ -1,0 +1,79 @@
+# ServiceMonitor for Prometheus Operator
+# Requires: prometheus-operator / kube-prometheus-stack installed in the cluster.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tentaclaw-gateway
+  namespace: tentaclaw
+  labels:
+    app.kubernetes.io/name: tentaclaw-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: tentaclaw
+    # Match the Prometheus Operator's serviceMonitorSelector if it uses a label filter.
+    # Adjust this label to match your Prometheus Operator configuration.
+    release: kube-prometheus-stack
+spec:
+  namespaceSelector:
+    matchNames:
+      - tentaclaw
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tentaclaw-gateway
+      app.kubernetes.io/component: gateway
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: true
+---
+# PrometheusRule for alerting (optional but recommended)
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: tentaclaw-gateway-alerts
+  namespace: tentaclaw
+  labels:
+    app.kubernetes.io/name: tentaclaw-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: tentaclaw
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: tentaclaw-gateway
+      rules:
+        - alert: TentaCLAWGatewayDown
+          expr: up{job="tentaclaw-gateway"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "TentaCLAW Gateway is down"
+            description: "The TentaCLAW Gateway instance {{ $labels.instance }} has been unreachable for more than 2 minutes."
+
+        - alert: TentaCLAWGatewayHighLatency
+          expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job="tentaclaw-gateway"}[5m])) > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "TentaCLAW Gateway p99 latency above 2s"
+            description: "The 99th percentile request latency for {{ $labels.instance }} has exceeded 2 seconds for 5 minutes."
+
+        - alert: TentaCLAWGatewayHighErrorRate
+          expr: rate(http_requests_total{job="tentaclaw-gateway",status=~"5.."}[5m]) / rate(http_requests_total{job="tentaclaw-gateway"}[5m]) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "TentaCLAW Gateway error rate above 5%"
+            description: "More than 5% of requests to {{ $labels.instance }} are returning 5xx errors."
+
+        - alert: TentaCLAWNoGPUNodes
+          expr: count(up{job="tentaclaw-agent"}) == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "No GPU agent nodes reporting"
+            description: "No TentaCLAW agent nodes have reported in for 5 minutes. The cluster has no available GPU capacity."

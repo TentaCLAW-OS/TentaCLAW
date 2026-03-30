@@ -1,0 +1,67 @@
+{{/*
+=============================================================================
+ConfigMaps
+Non-secret configuration for the gateway and agent components.
+=============================================================================
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tentaclaw.fullname" . }}-gateway-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tentaclaw.gateway.labels" . | nindent 4 }}
+data:
+  # Server
+  TENTACLAW_PORT: {{ .Values.gateway.port | quote }}
+  TENTACLAW_HOST: "0.0.0.0"
+
+  # Logging
+  TENTACLAW_LOG_LEVEL: "info"
+
+  # Rate limiting
+  TENTACLAW_RATE_LIMIT_WINDOW_MS: "60000"
+  TENTACLAW_RATE_LIMIT_MAX_REQUESTS: "100"
+
+  # Cluster coordination
+  TENTACLAW_NODE_TIMEOUT_MS: "30000"
+  TENTACLAW_HEARTBEAT_INTERVAL_MS: "10000"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tentaclaw.fullname" . }}-agent-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tentaclaw.agent.labels" . | nindent 4 }}
+data:
+  # Agent reporting interval (ms)
+  TENTACLAW_REPORT_INTERVAL_MS: "5000"
+
+  # Mock mode — set to "false" in production with real GPUs
+  TENTACLAW_MOCK: "false"
+
+  # GPU polling interval (ms)
+  TENTACLAW_GPU_POLL_INTERVAL_MS: "3000"
+
+{{- /* ---- Secrets ---- */}}
+{{- if .Values.secrets.create }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "tentaclaw.secretName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tentaclaw.labels" . | nindent 4 }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+type: Opaque
+stringData:
+  # IMPORTANT: Override these values in production.
+  # Use --set secrets.clusterSecret=... or a sealed-secrets / external-secrets workflow.
+  TENTACLAW_CLUSTER_SECRET: {{ .Values.secrets.clusterSecret | quote }}
+  TENTACLAW_API_KEY: {{ .Values.secrets.apiKey | quote }}
+  DATABASE_URL: {{ .Values.secrets.databaseUrl | quote }}
+{{- end }}

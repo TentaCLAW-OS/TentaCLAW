@@ -1,0 +1,134 @@
+{{/*
+=============================================================================
+Agent DaemonSet
+Deploys the TentaCLAW agent on every GPU-enabled node in the cluster.
+The agent reports GPU telemetry and manages inference workloads.
+=============================================================================
+*/}}
+{{- if .Values.agent.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "tentaclaw.fullname" . }}-agent
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tentaclaw.agent.labels" . | nindent 4 }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "tentaclaw.agent.selectorLabels" . | nindent 6 }}
+  {{- with .Values.agent.updateStrategy }}
+  updateStrategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "tentaclaw.agent.labels" . | nindent 8 }}
+      annotations:
+        # Force rolling restart when ConfigMap changes
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.agent.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "tentaclaw.agent.serviceAccountName" . }}
+      {{- if .Values.agent.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      {{- end }}
+      terminationGracePeriodSeconds: 15
+      {{- include "tentaclaw.imagePullSecrets" . | nindent 6 }}
+
+      {{- /* Schedule only on GPU-labeled nodes */}}
+      {{- with .Values.agent.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- /* Tolerate GPU taints */}}
+      {{- with .Values.agent.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.agent.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      containers:
+        - name: agent
+          image: {{ .Values.agent.image }}
+          imagePullPolicy: {{ .Values.agent.imagePullPolicy }}
+
+          # ---- Environment ----
+          envFrom:
+            - configMapRef:
+                name: {{ include "tentaclaw.fullname" . }}-agent-config
+          env:
+            - name: TENTACLAW_GATEWAY_URL
+              value: {{ include "tentaclaw.gateway.internalUrl" . | quote }}
+            - name: TENTACLAW_CLUSTER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tentaclaw.secretName" . }}
+                  key: TENTACLAW_CLUSTER_SECRET
+            - name: TENTACLAW_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: TENTACLAW_NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+
+          # ---- Resources ----
+          resources:
+            requests:
+              cpu: {{ .Values.agent.resources.requests.cpu }}
+              memory: {{ .Values.agent.resources.requests.memory }}
+              {{- if .Values.agent.gpu.enabled }}
+              nvidia.com/gpu: {{ .Values.agent.gpu.count | quote }}
+              {{- end }}
+            limits:
+              cpu: {{ .Values.agent.resources.limits.cpu }}
+              memory: {{ .Values.agent.resources.limits.memory }}
+              {{- if .Values.agent.gpu.enabled }}
+              nvidia.com/gpu: {{ .Values.agent.gpu.count | quote }}
+              {{- end }}
+
+          {{- with .Values.agent.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+          # ---- Health Check ----
+          {{- with .Values.agent.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+
+      # NVIDIA device plugin manages GPU device exposure via the device
+      # plugin framework — no explicit volume mounts required.
+      volumes: []
+
+{{- /* ---- ServiceAccount ---- */}}
+{{- if .Values.agent.serviceAccount.create }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "tentaclaw.agent.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tentaclaw.agent.labels" . | nindent 4 }}
+  {{- with .Values.agent.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

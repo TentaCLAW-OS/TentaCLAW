@@ -1,0 +1,35 @@
+name: "@tentaclaw/kokoro-tts-flight"
+version: "1.0.0"
+type: model
+title: "Kokoro TTS — Text-to-Speech"
+description: "82M param open TTS. Production quality. 320x real-time speed on GPU."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - flight-sheets
+tags:
+  - kokoro
+  - tts
+  - text-to-speech
+  - voice
+  - audio
+model:
+  type: flight-sheet
+  base_model: "kokoro"
+  variant: "82m"
+  quantization: "FP16"
+  format: safetensors
+  hardware:
+    minimum_vram: "1GB"
+    recommended_vram: "2GB"
+    compatible_gpus:
+      - "Any GPU (82M params, tiny)"
+      - "Also runs on CPU"
+  parameters:
+    sample_rate: 24000
+    voice: "default"
+  benchmarks:
+    realtime_factor: 320
+    hardware_tested: "RTX 4090"

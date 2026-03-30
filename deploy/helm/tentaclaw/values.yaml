@@ -1,0 +1,252 @@
+# =============================================================================
+# TentaCLAW OS — Helm Chart Values
+# =============================================================================
+# Override these values via --set flags or a custom values file:
+#   helm install tentaclaw ./deploy/helm/tentaclaw -f my-values.yaml
+# =============================================================================
+
+# -- Global settings applied across all components
+global:
+  # -- Namespace to deploy into (also configurable via helm install -n)
+  namespace: tentaclaw
+  # -- Image pull secrets for private registries
+  imagePullSecrets: []
+  # -- Common labels applied to all resources
+  labels: {}
+
+# =============================================================================
+# Gateway — Central API server and cluster orchestrator
+# =============================================================================
+gateway:
+  # -- Number of gateway replicas
+  replicas: 1
+  # -- Gateway container image
+  image: tentaclaw/gateway:latest
+  # -- Image pull policy (Always, IfNotPresent, Never)
+  imagePullPolicy: IfNotPresent
+  # -- Gateway HTTP port
+  port: 8080
+
+  # -- Resource requests and limits
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+  # -- Persistent volume for SQLite data
+  persistence:
+    enabled: true
+    # -- Storage size for the PVC
+    size: 10Gi
+    # -- Storage class name (leave empty for cluster default)
+    storageClass: ""
+    # -- Access modes for the PVC
+    accessModes:
+      - ReadWriteOnce
+
+  # -- Pod-level security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+
+  # -- Container-level security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false
+    capabilities:
+      drop:
+        - ALL
+
+  # -- Environment variables injected into the gateway container
+  env:
+    TENTACLAW_LOG_FORMAT: json
+
+  # -- Liveness probe configuration
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 15
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # -- Readiness probe configuration
+  readinessProbe:
+    httpGet:
+      path: /api/v1/readyz
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 2
+
+  # -- Startup probe configuration
+  startupProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    failureThreshold: 12
+
+  # -- Rolling update strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  # -- Pod anti-affinity weight (0 to disable)
+  antiAffinityWeight: 100
+
+  # -- Service account configuration
+  serviceAccount:
+    # -- Create a service account for the gateway
+    create: true
+    # -- Annotations to add to the service account
+    annotations: {}
+
+  # -- Additional pod annotations
+  podAnnotations: {}
+
+  # -- Node selector for gateway pods
+  nodeSelector: {}
+
+  # -- Tolerations for gateway pods
+  tolerations: []
+
+# =============================================================================
+# Agent — GPU node daemon (runs on every GPU-enabled node)
+# =============================================================================
+agent:
+  # -- Enable agent DaemonSet deployment
+  enabled: true
+  # -- Agent container image
+  image: tentaclaw/agent:latest
+  # -- Image pull policy
+  imagePullPolicy: IfNotPresent
+
+  # -- Resource requests and limits (excluding GPU)
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  # -- GPU configuration
+  gpu:
+    # -- Request nvidia.com/gpu resources
+    enabled: true
+    # -- Number of GPUs to request per agent pod
+    count: 1
+
+  # -- Pod-level security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+
+  # -- Container-level security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+
+  # -- Use host network for direct GPU node communication
+  hostNetwork: true
+
+  # -- Node selector for agent pods (schedule only on GPU-labeled nodes)
+  nodeSelector:
+    tentaclaw.io/gpu-node: "true"
+
+  # -- Tolerations for GPU taints
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+    - key: tentaclaw.io/gpu-only
+      operator: Exists
+      effect: NoSchedule
+
+  # -- DaemonSet update strategy
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+
+  # -- Liveness probe for the agent daemon process
+  livenessProbe:
+    exec:
+      command:
+        - /bin/sh
+        - -c
+        - "pgrep -f 'node dist/index.js' > /dev/null"
+    initialDelaySeconds: 10
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # -- Service account configuration
+  serviceAccount:
+    create: true
+    annotations: {}
+
+  # -- Additional pod annotations
+  podAnnotations: {}
+
+# =============================================================================
+# Monitoring — Prometheus ServiceMonitor and alerting rules
+# =============================================================================
+monitoring:
+  # -- Enable Prometheus monitoring resources
+  enabled: true
+  # -- Create a ServiceMonitor for prometheus-operator
+  serviceMonitor: true
+  # -- Scrape interval for Prometheus
+  interval: 30s
+  # -- Scrape timeout
+  scrapeTimeout: 10s
+  # -- Prometheus release label (must match your kube-prometheus-stack selector)
+  prometheusRelease: kube-prometheus-stack
+  # -- Enable PrometheusRule alerting rules
+  alerts:
+    enabled: true
+
+# =============================================================================
+# Ingress — Optional external access
+# =============================================================================
+ingress:
+  # -- Enable Ingress resource
+  enabled: false
+  # -- Ingress class name (e.g., nginx, traefik, alb)
+  className: ""
+  # -- Hostname for the Ingress rule
+  hostname: tentaclaw.local
+  # -- Enable TLS termination
+  tls: false
+  # -- TLS secret name (auto-generated if empty and tls is true)
+  tlsSecretName: ""
+  # -- Additional Ingress annotations
+  annotations: {}
+
+# =============================================================================
+# Secrets — Cluster credentials (override in production)
+# =============================================================================
+secrets:
+  # -- Create a Kubernetes Secret with these values
+  create: true
+  # -- Shared cluster authentication token
+  clusterSecret: "CHANGE-ME-generate-with-openssl-rand-hex-32"
+  # -- API key for external gateway clients
+  apiKey: "CHANGE-ME-generate-with-openssl-rand-hex-32"
+  # -- PostgreSQL connection string (leave empty to use SQLite)
+  databaseUrl: ""

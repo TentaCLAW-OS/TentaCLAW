@@ -1,0 +1,25 @@
+{{/*
+=============================================================================
+Gateway Service
+Exposes the TentaCLAW gateway as a ClusterIP service within the cluster.
+=============================================================================
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tentaclaw.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tentaclaw.gateway.labels" . | nindent 4 }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "tentaclaw.gateway.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.gateway.port }}
+      targetPort: http
+      protocol: TCP

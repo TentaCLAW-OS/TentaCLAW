@@ -1,0 +1,12 @@
+apiVersion: v2
+name: tentaclaw
+description: TentaCLAW OS — GPU inference cluster operating system
+type: application
+version: 0.1.0
+appVersion: "2.0.0"
+keywords: [gpu, inference, ai, cluster, llm]
+home: https://www.tentaclaw.io
+sources: [https://github.com/TentaCLAW-OS/TentaCLAW]
+maintainers:
+  - name: TentaCLAW OS
+    url: https://github.com/TentaCLAW-OS

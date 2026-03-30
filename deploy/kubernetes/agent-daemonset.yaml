@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: tentaclaw-agent
+  namespace: tentaclaw
+  labels:
+    app.kubernetes.io/name: tentaclaw-agent
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: tentaclaw
+    app.kubernetes.io/version: "0.1.0"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tentaclaw-agent
+      app.kubernetes.io/component: agent
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tentaclaw-agent
+        app.kubernetes.io/component: agent
+        app.kubernetes.io/part-of: tentaclaw
+        app.kubernetes.io/version: "0.1.0"
+    spec:
+      serviceAccountName: tentaclaw-agent
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 15
+
+      # Only schedule on GPU nodes
+      nodeSelector:
+        tentaclaw.io/gpu-node: "true"
+
+      # Tolerate GPU taints so we land on dedicated GPU nodes
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+        - key: tentaclaw.io/gpu-only
+          operator: Exists
+          effect: NoSchedule
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+
+      containers:
+        - name: agent
+          image: ghcr.io/tentaclaw-os/agent:0.1.0
+          imagePullPolicy: IfNotPresent
+
+          envFrom:
+            - configMapRef:
+                name: tentaclaw-agent-config
+          env:
+            - name: TENTACLAW_GATEWAY_URL
+              value: "http://tentaclaw-gateway.tentaclaw.svc.cluster.local:8080"
+            - name: TENTACLAW_CLUSTER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tentaclaw-secrets
+                  key: TENTACLAW_CLUSTER_SECRET
+            - name: TENTACLAW_HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: TENTACLAW_NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: 500m
+              memory: 512Mi
+              nvidia.com/gpu: "1"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+          # The agent is a long-running daemon with no HTTP server,
+          # so we use an exec-based liveness probe.
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "pgrep -f 'node dist/index.js' > /dev/null"
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      # NVIDIA device plugin requires the device directory to be mounted
+      # so the container can discover and access GPUs.
+      volumes: []
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tentaclaw-agent
+  namespace: tentaclaw
+  labels:
+    app.kubernetes.io/name: tentaclaw-agent
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: tentaclaw

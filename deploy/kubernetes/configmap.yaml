@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tentaclaw-gateway-config
+  namespace: tentaclaw
+  labels:
+    app.kubernetes.io/name: tentaclaw-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: tentaclaw
+data:
+  # Server
+  TENTACLAW_PORT: "8080"
+  TENTACLAW_HOST: "0.0.0.0"
+
+  # Logging
+  TENTACLAW_LOG_FORMAT: "json"
+  TENTACLAW_LOG_LEVEL: "info"
+
+  # Rate limiting
+  TENTACLAW_RATE_LIMIT_WINDOW_MS: "60000"
+  TENTACLAW_RATE_LIMIT_MAX_REQUESTS: "100"
+
+  # Cluster
+  TENTACLAW_NODE_TIMEOUT_MS: "30000"
+  TENTACLAW_HEARTBEAT_INTERVAL_MS: "10000"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tentaclaw-agent-config
+  namespace: tentaclaw
+  labels:
+    app.kubernetes.io/name: tentaclaw-agent
+    app.kubernetes.io/component: agent
+    app.kubernetes.io/part-of: tentaclaw
+data:
+  # Agent reporting interval (ms)
+  TENTACLAW_REPORT_INTERVAL_MS: "5000"
+
+  # Mock mode — set to "false" in production with real GPUs
+  TENTACLAW_MOCK: "false"
+
+  # GPU polling interval (ms)
+  TENTACLAW_GPU_POLL_INTERVAL_MS: "3000"

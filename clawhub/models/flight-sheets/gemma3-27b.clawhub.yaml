@@ -1,0 +1,38 @@
+name: "@tentaclaw/gemma3-27b-flight"
+version: "1.0.0"
+type: model
+title: "Gemma 3 27B — Google's Efficient Model"
+description: "Runs on a single RTX 3090. QAT checkpoints available. Great all-rounder."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - flight-sheets
+tags:
+  - gemma
+  - google
+  - 27b
+  - efficient
+  - single-gpu
+model:
+  type: flight-sheet
+  base_model: "gemma3"
+  variant: "27b-it"
+  quantization: "Q4_K_M"
+  format: gguf
+  hardware:
+    minimum_vram: "16GB"
+    recommended_vram: "24GB"
+    compatible_gpus:
+      - "RTX 3090 24GB"
+      - "RTX 4090 24GB"
+      - "RTX 4070 Ti 16GB"
+  parameters:
+    context_length: 8192
+    batch_size: 512
+    gpu_layers: 40
+  benchmarks:
+    tokens_per_second: 35
+    time_to_first_token: 0.4
+    hardware_tested: "RTX 3090 24GB"

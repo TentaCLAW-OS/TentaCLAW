@@ -1,0 +1,53 @@
+{{/*
+=============================================================================
+Ingress (optional)
+Provides external HTTP(S) access to the TentaCLAW gateway.
+Enable via: ingress.enabled=true
+=============================================================================
+*/}}
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "tentaclaw.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tentaclaw.gateway.labels" . | nindent 4 }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+    {{- if .Values.ingress.tls }}
+    # Redirect HTTP to HTTPS when TLS is enabled
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- end }}
+
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.hostname | quote }}
+      {{- if .Values.ingress.tlsSecretName }}
+      secretName: {{ .Values.ingress.tlsSecretName | quote }}
+      {{- else }}
+      secretName: {{ include "tentaclaw.fullname" . }}-gateway-tls
+      {{- end }}
+  {{- end }}
+
+  rules:
+    - host: {{ .Values.ingress.hostname | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "tentaclaw.fullname" . }}-gateway
+                port:
+                  name: http
+{{- end }}
