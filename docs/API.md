@@ -2,13 +2,56 @@
 
 > **Base URL:** `http://localhost:8080`
 >
-> **Version:** 0.2.0 | **Protocol:** REST + SSE | **Format:** JSON
+> **Version:** 0.2.0 | **Protocol:** REST + SSE + WebSocket | **Format:** JSON
+
+---
+
+## Table of Contents
+
+- [Authentication](#authentication)
+- [Rate Limiting](#rate-limiting)
+- [Health & System](#health--system)
+- [Nodes](#nodes)
+- [Stats](#stats)
+- [Commands](#commands)
+- [Models](#models)
+- [Inference (OpenAI-Compatible)](#inference-openai-compatible)
+- [Inference (Anthropic-Compatible)](#inference-anthropic-compatible)
+- [Multi-Modal](#multi-modal)
+- [Alerts](#alerts)
+- [Alert Rules](#alert-rules)
+- [Flight Sheets](#flight-sheets)
+- [Benchmarks](#benchmarks)
+- [Schedules](#schedules)
+- [Tags](#tags)
+- [SSH Keys](#ssh-keys)
+- [Model Pull Progress](#model-pull-progress)
+- [Model Search](#model-search)
+- [Model Aliases](#model-aliases)
+- [API Keys](#api-keys)
+- [Auth & Users](#auth--users)
+- [Namespaces & Multi-Tenancy](#namespaces--multi-tenancy)
+- [Power & Cost](#power--cost)
+- [Overclock Profiles](#overclock-profiles)
+- [Watchdog](#watchdog)
+- [Notifications](#notifications)
+- [Doctor & Diagnostics](#doctor--diagnostics)
+- [Bulk Operations](#bulk-operations)
+- [Node Groups & Placement](#node-groups--placement)
+- [Webhooks](#webhooks)
+- [Monitoring & Observability](#monitoring--observability)
+- [Topology & Visualization](#topology--visualization)
+- [Cluster Operations](#cluster-operations)
+- [Playground](#playground)
+- [Profiler](#profiler)
+- [WebSocket & Real-Time](#websocket--real-time)
+- [Additional Endpoints](#additional-endpoints)
 
 ---
 
 ## Authentication
 
-Authentication is **optional**. To enable it, set the `TENTACLAW_API_KEY` environment variable on the gateway.
+Authentication is **optional by default**. To enable it, set the `TENTACLAW_API_KEY` environment variable on the gateway.
 
 When enabled, all `/api/*` and `/v1/*` routes require a Bearer token:
 
@@ -19,21 +62,47 @@ curl http://localhost:8080/api/v1/nodes \
 
 You can also pass the key as a query parameter on `/api/*` routes: `?api_key=your-key`.
 
-### Rate Limiting
+API keys support scoped permissions (`read`, `write`, `admin`) and per-key rate limits. Keys are validated for expiration and permission level based on the HTTP method (GET = `read`, POST/PUT/DELETE = `write`).
 
-Set `TENTACLAW_RATE_LIMIT` to a number (requests per minute) to enable rate limiting on `/v1/*` inference endpoints. Rate limit headers are returned:
+Agent-to-gateway communication uses a separate **cluster secret** via the `X-Cluster-Secret` header. Set `TENTACLAW_CLUSTER_SECRET` or let the gateway auto-generate one on first boot.
 
-- `X-RateLimit-Limit` -- max requests per minute
-- `X-RateLimit-Remaining` -- requests left in window
-- `X-RateLimit-Reset` -- window reset time (Unix timestamp)
+---
+
+## Rate Limiting
+
+Set `TENTACLAW_RATE_LIMIT` to a number (requests per minute) to enable global rate limiting on `/v1/*` inference endpoints. Per-key rate limits are also supported via the `rate_limit_rpm` field on API keys.
+
+Rate limit headers are returned on every response:
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Max requests per minute |
+| `X-RateLimit-Remaining` | Requests remaining in window |
+| `X-RateLimit-Reset` | Window reset time (Unix timestamp) |
+| `Retry-After` | Seconds until retry (on 429 responses) |
 
 ---
 
 ## Health & System
 
-### `GET /health`
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/health` | No | Basic health check (always public) |
+| `GET` | `/` | No | Gateway info and endpoint directory |
+| `GET` | `/api/v1/version` | Yes | Gateway version, features, and API compatibility list |
+| `GET` | `/api/v1/health/score` | Yes | Cluster health score (0-100) with letter grade (A-F) |
+| `GET` | `/api/v1/health/detailed` | Yes | Deep health analysis: database, nodes, memory, disk, uptime |
+| `GET` | `/api/v1/healthz` | Yes | Kubernetes liveness probe |
+| `GET` | `/api/v1/readyz` | Yes | Kubernetes readiness probe (requires online nodes + models) |
+| `GET` | `/api/v1/capabilities` | Yes | List all features, backends, models, and API compatibility |
+| `GET` | `/api/v1/about` | Yes | Product info, version, website |
+| `GET` | `/api/v1/config` | Yes | Gateway configuration (features, connections, environment) |
+| `GET` | `/api/v1/discover` | Yes | Service discovery endpoint for agents |
+| `GET` | `/api/v1/gateway/uptime` | Yes | Gateway process uptime, memory, Node.js version |
+| `GET` | `/api/v1/openapi.json` | Yes | Auto-generated OpenAPI 3.0 specification |
+| `GET` | `/api/v1/badge/:type` | Yes | Shields.io-compatible status badges (health, nodes, gpus, models) |
 
-Basic health check. Always public (never requires auth).
+### Example: Health Check
 
 ```bash
 curl http://localhost:8080/health
@@ -49,90 +118,64 @@ curl http://localhost:8080/health
 }
 ```
 
-### `GET /api/v1/version`
-
-Gateway version, build info, and runtime details.
+### Example: Detailed Health
 
 ```bash
-curl http://localhost:8080/api/v1/version
-```
-
-### `GET /api/v1/health/score`
-
-Cluster health score from 0-100, with letter grade (A-F).
-
-```bash
-curl http://localhost:8080/api/v1/health/score
+curl http://localhost:8080/api/v1/health/detailed
 ```
 
 ```json
 {
-  "score": 87,
-  "grade": "B",
-  "issues": [],
-  "recommendations": ["Consider adding more nodes for redundancy"]
+  "status": "healthy",
+  "checks": {
+    "database": { "status": "ok", "latency_ms": 0.42 },
+    "nodes": { "total": 4, "online": 4, "status": "ok" },
+    "memory": { "status": "ok", "rss_mb": 85.3, "heap_mb": 42.1 },
+    "uptime_seconds": 86400
+  },
+  "version": "0.2.0"
 }
 ```
 
-### `GET /api/v1/health/detailed`
-
-Deep health analysis with per-node breakdown, issue detection, and recommendations.
-
-### `GET /api/v1/healthz`
-
-Kubernetes-style liveness probe. Returns `200` if the gateway process is alive.
-
-### `GET /api/v1/readyz`
-
-Kubernetes-style readiness probe. Returns `200` if the gateway has at least one online node.
-
-### `GET /api/v1/capabilities`
-
-Lists all features and capabilities of this gateway instance.
-
 ---
 
-## Node Management
+## Nodes
 
-### `POST /api/v1/register`
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/register` | Cluster Secret | Register a new node |
+| `GET` | `/api/v1/nodes` | Yes | List all nodes (supports `?farm_hash=` filter, `?page=&limit=`) |
+| `GET` | `/api/v1/nodes/:nodeId` | Yes | Get single node details |
+| `DELETE` | `/api/v1/nodes/:nodeId` | Yes | Remove a node from the cluster |
+| `POST` | `/api/v1/nodes/:id/maintenance` | Yes | Toggle maintenance mode |
+| `GET` | `/api/v1/nodes/:nodeId/events` | Yes | Node event history (`?limit=50`) |
+| `GET` | `/api/v1/nodes/:nodeId/sparklines` | Yes | Compact history for sparkline charts (`?points=60`) |
+| `GET` | `/api/v1/nodes/:id/lifecycle` | Yes | Full node lifecycle: health, uptime, events, watchdog |
+| `GET` | `/api/v1/nodes/:id/health-score` | Yes | Per-node health score |
+| `GET` | `/api/v1/nodes/:id/uptime` | Yes | Per-node uptime stats (`?hours=24`) |
+| `GET` | `/api/v1/nodes/:nodeId/logs` | Yes | Node log buffer (`?limit=100`) |
+| `POST` | `/api/v1/nodes/:nodeId/logs` | Yes | Push log lines from agent |
+| `GET` | `/api/v1/nodes/:nodeId/models` | Yes | List models loaded on a specific node |
+| `POST` | `/api/v1/nodes/:nodeId/models/pull` | Yes | Pull (install) a model to a specific node |
+| `DELETE` | `/api/v1/nodes/:nodeId/models/:model` | Yes | Remove a model from a specific node |
+| `GET` | `/api/v1/nodes/hot` | Yes | Nodes with hottest GPUs (sorted by max temp) |
+| `GET` | `/api/v1/nodes/idle` | Yes | Idle nodes (GPU utilization < 5-10%) |
 
-Register a new node with the cluster.
+### Example: Register a Node
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/register \
   -H "Content-Type: application/json" \
+  -H "X-Cluster-Secret: your-cluster-secret" \
   -d '{
     "node_id": "TENTACLAW-FARM7K3P-node1",
     "farm_hash": "FARM7K3P",
     "hostname": "gpu-rig-01",
-    "gpu_count": 2,
-    "gpus": [{"busId": "0000:01:00.0", "name": "RTX 3090", "vramTotalMb": 24576, "vramUsedMb": 0, "temperatureC": 35, "utilizationPct": 0, "powerDrawW": 30, "fanSpeedPct": 0, "clockSmMhz": 210, "clockMemMhz": 405}]
+    "gpu_count": 2
   }'
 ```
 
-### `GET /api/v1/nodes`
-
-List all registered nodes with their latest stats. Supports pagination via `?page=1&limit=50`.
-
-```bash
-curl http://localhost:8080/api/v1/nodes
-```
-
-### `GET /api/v1/nodes/:nodeId`
-
-Get detailed info for a single node, including full GPU stats and loaded models.
-
-```bash
-curl http://localhost:8080/api/v1/nodes/TENTACLAW-FARM7K3P-node1
-```
-
-### `DELETE /api/v1/nodes/:nodeId`
-
-Remove a node from the cluster.
-
-### `POST /api/v1/nodes/:id/maintenance`
-
-Toggle maintenance mode. Cordoned nodes receive no new inference requests.
+### Example: Toggle Maintenance Mode
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/nodes/NODE-001/maintenance \
@@ -144,17 +187,25 @@ curl -X POST http://localhost:8080/api/v1/nodes/NODE-001/maintenance \
 
 ## Stats
 
-### `POST /api/v1/nodes/:nodeId/stats`
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/nodes/:nodeId/stats` | Cluster Secret | Push stats from agent; returns pending commands |
+| `GET` | `/api/v1/nodes/:nodeId/stats/history` | Yes | Historical stats (`?limit=100`) |
+| `GET` | `/api/v1/summary` | Yes | Cluster-wide summary (nodes, GPUs, VRAM, tok/s, models) |
+| `GET` | `/api/v1/inference/stats` | Yes | Inference request statistics |
+| `GET` | `/api/v1/inference/analytics` | Yes | Detailed inference analytics (`?hours=24`) |
+| `GET` | `/api/v1/inference/backends` | Yes | List inference backends per node |
 
-Push stats from an agent. Returns pending commands in the response (the push/pull heartbeat model).
+### Example: Push Stats (Agent Heartbeat)
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/nodes/NODE-001/stats \
   -H "Content-Type: application/json" \
-  -d '{ "farm_hash": "FARM7K3P", "node_id": "NODE-001", ... }'
+  -H "X-Cluster-Secret: your-secret" \
+  -d '{"farm_hash":"FARM7K3P","node_id":"NODE-001","gpu_count":2,"gpus":[...],"cpu":{"usage_pct":15},"ram":{"total_mb":32768,"used_mb":8192},"disk":{"total_gb":500,"used_gb":120},"inference":{"loaded_models":["llama3.1:8b"],"in_flight_requests":0}}'
 ```
 
-Response:
+Response includes pending commands:
 
 ```json
 {
@@ -164,25 +215,18 @@ Response:
 }
 ```
 
-### `GET /api/v1/nodes/:nodeId/stats/history`
-
-Historical stats for a node. Query params: `?hours=24&limit=100`.
-
-### `GET /api/v1/summary`
-
-Cluster-wide summary: total nodes, GPUs, VRAM, tokens/sec, loaded models.
-
-```bash
-curl http://localhost:8080/api/v1/summary
-```
-
 ---
 
 ## Commands
 
-### `POST /api/v1/nodes/:nodeId/commands`
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/nodes/:nodeId/commands` | Yes | Queue a command for a node |
+| `POST` | `/api/v1/commands/:commandId/complete` | Yes | Mark a command as completed (called by agent) |
 
-Queue a command for a node. The node picks it up on the next stats push.
+**Available actions:** `reload_model`, `install_model`, `remove_model`, `overclock`, `benchmark`, `restart_agent`, `reboot`
+
+### Example: Queue a Command
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/nodes/NODE-001/commands \
@@ -190,90 +234,42 @@ curl -X POST http://localhost:8080/api/v1/nodes/NODE-001/commands \
   -d '{"action": "install_model", "model": "llama3.1:8b"}'
 ```
 
-**Available actions:** `reload_model`, `install_model`, `remove_model`, `overclock`, `benchmark`, `restart_agent`, `reboot`
-
-### `POST /api/v1/commands/:commandId/complete`
-
-Mark a command as completed (called by the agent).
-
-### Bulk Operations
-
-```bash
-# Send a command to multiple nodes at once
-curl -X POST http://localhost:8080/api/v1/bulk/command \
-  -H "Content-Type: application/json" \
-  -d '{"node_ids": ["NODE-001", "NODE-002"], "action": "install_model", "model": "llama3.1:8b"}'
-
-# Bulk deploy
-POST /api/v1/bulk/deploy
-
-# Bulk reboot
-POST /api/v1/bulk/reboot
-
-# Bulk tag
-POST /api/v1/bulk/tags
-```
-
 ---
 
 ## Models
 
-### `GET /api/v1/models`
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/models` | Yes | List all cluster models (TentaCLAW format) |
+| `GET` | `/api/v1/models/distribution` | Yes | Which models are on which nodes |
+| `GET` | `/api/v1/models/check-fit` | Yes | Check if a model fits (`?model=&node=`) |
+| `GET` | `/api/v1/models/coverage` | Yes | Model coverage report (redundancy, VRAM estimates) |
+| `GET` | `/api/v1/models/:model/stats` | Yes | Per-model request stats (last hour, last 24h) |
+| `POST` | `/api/v1/deploy` | Yes | Deploy a model to online nodes (optional `farm_hash`, `node_ids` filter) |
+| `POST` | `/api/v1/deploy/all` | Yes | VRAM-aware deploy to all eligible nodes |
+| `POST` | `/api/v1/models/smart-deploy` | Yes | AI-assisted optimal node selection |
 
-List all models loaded across the cluster, with per-node distribution.
+### Example: Smart Deploy
 
 ```bash
-curl http://localhost:8080/api/v1/models
-```
-
-### `POST /api/v1/deploy`
-
-Deploy a model to the best available node (or a specific node).
-
-```bash
-curl -X POST http://localhost:8080/api/v1/deploy \
+curl -X POST http://localhost:8080/api/v1/models/smart-deploy \
   -H "Content-Type: application/json" \
-  -d '{"model": "llama3.1:8b"}'
+  -d '{"model": "llama3.1:8b", "count": 2}'
 ```
 
-### `POST /api/v1/models/smart-deploy`
-
-AI-assisted deployment -- finds the optimal node based on VRAM, utilization, and model requirements.
-
-### `GET /api/v1/model-search`
-
-Search the Ollama model catalog. Returns VRAM requirements and whether each model fits your cluster.
-
-```bash
-curl "http://localhost:8080/api/v1/model-search?q=llama&limit=10"
-```
-
-### `GET /api/v1/models/distribution`
-
-Which models are on which nodes.
-
-### `GET /api/v1/models/check-fit`
-
-Check if a model fits in the cluster's available VRAM.
+### Example: Check Model Fit
 
 ```bash
 curl "http://localhost:8080/api/v1/models/check-fit?model=llama3.1:70b"
 ```
 
-### Model Aliases
-
-Map friendly names to real model names (e.g., `gpt-4` -> `llama3.1:70b`).
-
-```bash
-# List aliases
-GET /api/v1/aliases
-
-# Create alias
-POST /api/v1/aliases
-{"alias": "gpt-4", "target": "llama3.1:70b", "fallbacks": ["llama3.1:8b"]}
-
-# Delete alias
-DELETE /api/v1/aliases/:alias
+```json
+{
+  "model": "llama3.1:70b",
+  "estimated_vram_mb": 40960,
+  "best_node": {"node_id": "NODE-001", "hostname": "gpu-rig-01"},
+  "fits_anywhere": true
+}
 ```
 
 ---
@@ -282,13 +278,19 @@ DELETE /api/v1/aliases/:alias
 
 These endpoints are fully compatible with OpenAI client libraries. Point any OpenAI SDK at your gateway.
 
-### `POST /v1/chat/completions`
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/v1/chat/completions` | Yes | Chat completions (streaming, function calling, JSON mode) |
+| `POST` | `/v1/completions` | Yes | Legacy completions |
+| `POST` | `/v1/embeddings` | Yes | Generate embeddings (batch support) |
+| `GET` | `/v1/models` | Yes | OpenAI-compatible model list with TentaCLAW metadata |
 
-Chat completions with streaming support, function calling, and JSON mode.
+### Example: Chat Completion
 
 ```bash
 curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
   -d '{
     "model": "llama3.1:8b",
     "messages": [{"role": "user", "content": "Hello!"}],
@@ -296,118 +298,125 @@ curl http://localhost:8080/v1/chat/completions \
   }'
 ```
 
-Supports all standard OpenAI parameters: `temperature`, `top_p`, `max_tokens`, `stop`, `seed`, `frequency_penalty`, `presence_penalty`, `tools`, `tool_choice`, `response_format`, `logprobs`.
+**Supported OpenAI parameters:** `temperature`, `top_p`, `max_tokens`, `stop`, `seed`, `frequency_penalty`, `presence_penalty`, `n`, `tools`, `tool_choice`, `functions` (legacy), `function_call` (legacy), `response_format` (JSON mode), `logprobs`, `top_logprobs`.
 
-The response includes a `_tentaclaw` field with routing metadata:
+**Response includes TentaCLAW metadata:**
 
 ```json
 {
+  "choices": [...],
   "_tentaclaw": {
     "routed_to": "NODE-001",
     "hostname": "gpu-rig-01",
     "latency_ms": 142,
     "backend": "ollama",
-    "cached": false
+    "cached": false,
+    "resolved_model": "llama3.1:8b"
   }
 }
 ```
 
-Streaming returns `text/event-stream` with `X-TentaCLAW-Node` and `X-TentaCLAW-Latency` headers.
+**Streaming** returns `text/event-stream` with `X-TentaCLAW-Node` and `X-TentaCLAW-Latency` headers.
 
-### `POST /v1/completions`
+**Features:**
+- Model alias resolution (e.g., `gpt-4` resolves to `llama3.1:70b`)
+- Fallback chains (if primary model unavailable, try fallbacks)
+- Prompt caching (non-streaming, bypass with `Cache-Control: no-cache`)
+- Auto-retry on a different node if the first fails
+- Load shedding (429 when queue is full)
 
-Legacy completions endpoint. Same routing and load-balancing.
-
-### `POST /v1/embeddings`
-
-Generate embeddings via the cluster.
+### Example: Embeddings
 
 ```bash
 curl http://localhost:8080/v1/embeddings \
   -H "Content-Type: application/json" \
-  -d '{"model": "nomic-embed-text", "input": "Hello world"}'
-```
-
-### `GET /v1/models`
-
-OpenAI-compatible model list. Returns all models currently loaded across the cluster.
-
-```bash
-curl http://localhost:8080/v1/models
+  -d '{"model": "nomic-embed-text", "input": ["Hello world", "Goodbye world"]}'
 ```
 
 ---
 
-## Tags
+## Inference (Anthropic-Compatible)
 
-Organize nodes with arbitrary string tags (`production`, `inference`, `staging`, etc.).
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/v1/messages` | Yes | Anthropic Messages API (streaming + non-streaming, tool use) |
+
+Full compatibility with Anthropic SDKs. The gateway translates between Anthropic and OpenAI formats automatically.
+
+### Example: Anthropic Messages
 
 ```bash
-# List all tags with counts
-GET /api/v1/tags
-
-# Get nodes with a specific tag
-GET /api/v1/tags/:tag/nodes
-
-# Get tags for a node
-GET /api/v1/nodes/:id/tags
-
-# Add a tag to a node
-POST /api/v1/nodes/:id/tags
-{"tag": "production"}
-
-# Remove a tag
-DELETE /api/v1/nodes/:id/tags/:tag
+curl http://localhost:8080/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your-api-key" \
+  -d '{
+    "model": "claude-3-sonnet-20240229",
+    "max_tokens": 1024,
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
 ```
+
+Supports: `system`, `temperature`, `top_p`, `top_k`, `stop_sequences`, `tools`, `tool_choice`, `stream`.
 
 ---
 
-## SSH Keys
+## Multi-Modal
 
-Manage SSH keys on nodes via the API.
-
-```bash
-# List keys for a node
-GET /api/v1/nodes/:id/ssh-keys
-
-# Add a key
-POST /api/v1/nodes/:id/ssh-keys
-{"label": "my-laptop", "public_key": "ssh-ed25519 AAAA..."}
-
-# Delete a key
-DELETE /api/v1/ssh-keys/:keyId
-```
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/v1/audio/transcriptions` | Yes | Whisper-compatible audio transcription |
+| `POST` | `/v1/audio/speech` | Yes | Text-to-speech (TTS) generation |
+| `POST` | `/v1/audio/translate` | Yes | Audio translation to English via Whisper |
+| `GET` | `/v1/audio/models` | Yes | List available audio models |
+| `POST` | `/v1/images/generations` | Yes | OpenAI-compatible image generation |
 
 ---
 
 ## Alerts
 
-Automatic alerting for GPU temperature, VRAM pressure, disk full, CPU saturation, and node offline.
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/alerts` | Yes | List recent alerts (`?limit=50`) |
+| `POST` | `/api/v1/alerts/:id/acknowledge` | Yes | Acknowledge an alert |
+
+Automatic alerting fires for GPU temperature, VRAM pressure, disk full, CPU saturation, and node offline.
+
+### Example
 
 ```bash
-# Get recent alerts
 curl http://localhost:8080/api/v1/alerts
-
-# Acknowledge an alert
 curl -X POST http://localhost:8080/api/v1/alerts/alert-123/acknowledge
 ```
 
 ---
 
-## Benchmarks
+## Alert Rules
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/alert-rules` | Yes | List all alert rules |
+| `POST` | `/api/v1/alert-rules` | Yes | Create a custom alert rule |
+| `PUT` | `/api/v1/alert-rules/:id` | Yes | Update an alert rule |
+| `DELETE` | `/api/v1/alert-rules/:id` | Yes | Delete an alert rule |
+| `POST` | `/api/v1/alert-rules/:id/toggle` | Yes | Enable/disable an alert rule |
+
+**Valid metrics:** `gpu_temp`, `gpu_util`, `vram_pct`, `cpu_usage`, `ram_pct`, `disk_pct`, `inference_latency`
+
+**Valid operators:** `gt`, `lt`, `gte`, `lte`, `eq`
+
+### Example: Create Alert Rule
 
 ```bash
-# Get all benchmarks
-GET /api/v1/benchmarks
-
-# Get benchmarks for a node
-GET /api/v1/nodes/:nodeId/benchmarks
-
-# Submit a benchmark result
-POST /api/v1/nodes/:nodeId/benchmark
-
-# Trigger a benchmark run on a node
-POST /api/v1/nodes/:nodeId/benchmark/run
+curl -X POST http://localhost:8080/api/v1/alert-rules \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "GPU Overheating",
+    "metric": "gpu_temp",
+    "operator": "gt",
+    "threshold": 85,
+    "severity": "critical",
+    "cooldown_secs": 300
+  }'
 ```
 
 ---
@@ -416,23 +425,38 @@ POST /api/v1/nodes/:nodeId/benchmark/run
 
 Declarative model deployment plans.
 
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/flight-sheets` | Yes | List all flight sheets |
+| `POST` | `/api/v1/flight-sheets` | Yes | Create a flight sheet |
+| `GET` | `/api/v1/flight-sheets/:id` | Yes | Get a specific flight sheet |
+| `DELETE` | `/api/v1/flight-sheets/:id` | Yes | Delete a flight sheet |
+| `POST` | `/api/v1/flight-sheets/:id/apply` | Yes | Apply a flight sheet (deploy all targets) |
+
+### Example: Create & Apply
+
 ```bash
-# List all flight sheets
-GET /api/v1/flight-sheets
+curl -X POST http://localhost:8080/api/v1/flight-sheets \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "production-stack",
+    "description": "Standard inference models",
+    "targets": [{"node_id": "*", "model": "llama3.1:8b"}]
+  }'
 
-# Create a flight sheet
-POST /api/v1/flight-sheets
-{"name": "production-stack", "description": "Standard inference models", "targets": [{"node_id": "*", "model": "llama3.1:8b"}]}
-
-# Get a specific flight sheet
-GET /api/v1/flight-sheets/:id
-
-# Apply a flight sheet (deploy all targets)
-POST /api/v1/flight-sheets/:id/apply
-
-# Delete a flight sheet
-DELETE /api/v1/flight-sheets/:id
+curl -X POST http://localhost:8080/api/v1/flight-sheets/fs-123/apply
 ```
+
+---
+
+## Benchmarks
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/benchmarks` | Yes | List all benchmarks (`?limit=50`) |
+| `GET` | `/api/v1/nodes/:nodeId/benchmarks` | Yes | Benchmarks for a specific node |
+| `POST` | `/api/v1/nodes/:nodeId/benchmark` | Yes | Submit a benchmark result |
+| `POST` | `/api/v1/nodes/:nodeId/benchmark/run` | Yes | Trigger a benchmark run on a node |
 
 ---
 
@@ -440,53 +464,259 @@ DELETE /api/v1/flight-sheets/:id
 
 Cron-based automation for model deployment, benchmarks, and reboots.
 
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/schedules` | Yes | List all schedules |
+| `POST` | `/api/v1/schedules` | Yes | Create a schedule |
+| `GET` | `/api/v1/schedules/:id` | Yes | Get a specific schedule |
+| `DELETE` | `/api/v1/schedules/:id` | Yes | Delete a schedule |
+| `POST` | `/api/v1/schedules/:id/toggle` | Yes | Enable/disable a schedule |
+
+**Schedule types:** `deploy`, `benchmark`, `reboot`
+
+### Example
+
 ```bash
-# List schedules
-GET /api/v1/schedules
-
-# Create a schedule
-POST /api/v1/schedules
-{"name": "nightly-benchmark", "cron": "0 2 * * *", "action": "benchmark", "target_nodes": ["*"]}
-
-# Toggle enable/disable
-POST /api/v1/schedules/:id/toggle
-
-# Delete
-DELETE /api/v1/schedules/:id
+curl -X POST http://localhost:8080/api/v1/schedules \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "nightly-benchmark",
+    "type": "benchmark",
+    "cron": "0 2 * * *",
+    "config": {"model": "llama3.1:8b"}
+  }'
 ```
 
 ---
 
-## Monitoring
+## Tags
 
-### `GET /metrics`
+Organize nodes with arbitrary string tags.
 
-Prometheus-compatible metrics endpoint. Exposes:
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/tags` | Yes | List all tags with counts |
+| `GET` | `/api/v1/tags/:tag/nodes` | Yes | Get nodes with a specific tag |
+| `GET` | `/api/v1/nodes/:id/tags` | Yes | Get tags for a node |
+| `POST` | `/api/v1/nodes/:id/tags` | Yes | Add tags to a node (`{"tags": ["production"]}`) |
+| `DELETE` | `/api/v1/nodes/:id/tags/:tag` | Yes | Remove a tag from a node |
 
-- `tentaclaw_nodes_total`, `tentaclaw_nodes_online`
-- `tentaclaw_gpus_total`, `tentaclaw_vram_total_bytes`, `tentaclaw_vram_used_bytes`
-- `tentaclaw_toks_per_sec`, `tentaclaw_requests_total`
-- `tentaclaw_health_score`, `tentaclaw_alerts_active`
-- `tentaclaw_sse_clients`, `tentaclaw_models_loaded`
-- Per-GPU metrics: `tentaclaw_gpu_temperature_celsius`, `tentaclaw_gpu_utilization_percent`, `tentaclaw_gpu_vram_used_bytes`, `tentaclaw_gpu_power_watts`
+---
+
+## SSH Keys
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/nodes/:id/ssh-keys` | Yes | List SSH keys for a node |
+| `POST` | `/api/v1/nodes/:id/ssh-keys` | Yes | Add an SSH key to a node |
+| `DELETE` | `/api/v1/ssh-keys/:keyId` | Yes | Delete an SSH key |
+
+### Example
 
 ```bash
-curl http://localhost:8080/metrics
+curl -X POST http://localhost:8080/api/v1/nodes/NODE-001/ssh-keys \
+  -H "Content-Type: application/json" \
+  -d '{"label": "my-laptop", "public_key": "ssh-ed25519 AAAA..."}'
 ```
 
-### `GET /api/v1/events`
+---
 
-Server-Sent Events (SSE) stream for real-time updates. Used by the dashboard.
+## Model Pull Progress
 
-Event types: `node_online`, `node_offline`, `stats_update`, `command_sent`, `command_completed`, `flight_sheet_applied`, `alert`, `benchmark_complete`
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/pulls` | Yes | All active model downloads across cluster |
+| `GET` | `/api/v1/nodes/:id/pulls` | Yes | Active downloads for a specific node |
+| `POST` | `/api/v1/nodes/:id/pulls` | Yes | Start a model pull on a node |
+| `PUT` | `/api/v1/nodes/:id/pulls/:model` | Yes | Update pull progress (from agent) |
+
+---
+
+## Model Search
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/model-search` | Yes | Search Ollama model catalog (`?q=llama&tag=code&limit=10`) |
+
+Returns VRAM requirements and whether each model fits the cluster.
 
 ```bash
-curl -N http://localhost:8080/api/v1/events
+curl "http://localhost:8080/api/v1/model-search?q=llama"
 ```
 
-### `GET /api/v1/game/stream`
+---
 
-SSE stream for game engine (UE5/Unity) integration. Emits topology changes, inference events, and GPU state.
+## Model Aliases
+
+Map friendly names to real model names (e.g., `gpt-4` -> `llama3.1:70b`).
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/aliases` | Yes | List all model aliases |
+| `POST` | `/api/v1/aliases` | Yes | Create/update an alias |
+| `DELETE` | `/api/v1/aliases/:alias` | Yes | Delete an alias |
+
+### Example
+
+```bash
+curl -X POST http://localhost:8080/api/v1/aliases \
+  -H "Content-Type: application/json" \
+  -d '{"alias": "gpt-4", "target": "llama3.1:70b", "fallbacks": ["llama3.1:8b"]}'
+```
+
+---
+
+## API Keys
+
+Scoped API keys with per-key rate limits, permissions, and expiry.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/apikeys` | Yes | List all API keys (secrets masked) |
+| `POST` | `/api/v1/apikeys` | Yes | Create a new API key |
+| `DELETE` | `/api/v1/apikeys/:id` | Yes | Revoke an API key |
+
+**Valid permissions:** `read`, `write`, `admin`
+
+### Example: Create API Key
+
+```bash
+curl -X POST http://localhost:8080/api/v1/apikeys \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "ci-pipeline",
+    "permissions": ["read", "write"],
+    "rate_limit_rpm": 100,
+    "expires_at": "2027-01-01T00:00:00Z"
+  }'
+```
+
+Response (key shown only once):
+
+```json
+{
+  "id": "key-abc123",
+  "key": "tc_live_abc123...",
+  "prefix": "tc_live_ab",
+  "name": "ci-pipeline",
+  "permissions": ["read", "write"],
+  "message": "Save this key -- it will not be shown again."
+}
+```
+
+---
+
+## Auth & Users
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/auth/login` | No | Authenticate and get session token |
+| `POST` | `/api/v1/auth/logout` | Session | Invalidate current session |
+| `GET` | `/api/v1/auth/me` | Session | Get current user from session |
+| `GET` | `/api/v1/users` | Admin | List all users |
+| `POST` | `/api/v1/users` | Admin | Create a user |
+| `DELETE` | `/api/v1/users/:id` | Admin | Delete a user |
+| `PUT` | `/api/v1/users/:id/role` | Admin | Change user role |
+| `GET` | `/api/v1/audit` | Admin | Audit log (`?limit=100&event_type=`) |
+| `GET` | `/api/v1/cluster/secret` | Admin | View cluster secret status |
+| `POST` | `/api/v1/cluster/secret/rotate` | Admin | Rotate cluster secret |
+
+**Valid roles:** `admin`, `operator`, `viewer`, `user`
+
+Default admin credentials are created on first boot. Brute force protection blocks IPs after repeated failures.
+
+### Example: Login
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "admin"}'
+```
+
+```json
+{
+  "token": "session-token-here",
+  "expires_at": "2026-04-30T00:00:00Z",
+  "user": {"id": "usr-001", "username": "admin", "role": "admin"}
+}
+```
+
+---
+
+## Namespaces & Multi-Tenancy
+
+Isolate resources, models, and usage by namespace for multi-team deployments.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/namespaces` | Yes | List all namespaces |
+| `POST` | `/api/v1/namespaces` | Yes | Create a namespace |
+| `GET` | `/api/v1/namespaces/:name` | Yes | Get namespace details |
+| `PUT` | `/api/v1/namespaces/:name` | Yes | Update a namespace |
+| `DELETE` | `/api/v1/namespaces/:name` | Yes | Delete a namespace |
+| `GET` | `/api/v1/namespaces/:name/quota` | Yes | Get quota usage |
+| `PUT` | `/api/v1/namespaces/:name/quota` | Yes | Set quota limits |
+| `POST` | `/api/v1/namespaces/:name/quota/check` | Yes | Check if an action would exceed quota |
+| `GET` | `/api/v1/namespaces/:name/models` | Yes | Models in a namespace |
+| `GET` | `/api/v1/namespaces/:name/nodes` | Yes | Nodes assigned to a namespace |
+| `POST` | `/api/v1/namespaces/:name/nodes` | Yes | Assign a node to a namespace |
+| `GET` | `/api/v1/api-keys/:keyId/namespace` | Yes | Get namespace for an API key |
+| `PUT` | `/api/v1/api-keys/:keyId/namespace` | Yes | Assign an API key to a namespace |
+| `POST` | `/api/v1/namespaces/:name/usage` | Yes | Record usage (for chargeback) |
+| `GET` | `/api/v1/namespaces/:name/usage` | Yes | Get usage report (`?period=`) |
+| `GET` | `/api/v1/namespaces/:name/usage/csv` | Yes | Export usage as CSV |
+| `GET` | `/api/v1/usage/all` | Yes | All namespace usage reports |
+
+### Example: Create Namespace with Quota
+
+```bash
+curl -X POST http://localhost:8080/api/v1/namespaces \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "ml-team",
+    "display_name": "ML Team",
+    "description": "Production inference workloads",
+    "quota": {"maxGpus": 8, "maxVramMb": 196608, "maxModels": 10}
+  }'
+```
+
+---
+
+## Power & Cost
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/power` | Yes | Cluster power draw, cost estimates, per-node breakdown |
+
+Set `TENTACLAW_POWER_COST` (default: `0.12` $/kWh) for accurate cost estimates.
+
+```json
+{
+  "total_watts": 2400,
+  "gpu_watts": 1800,
+  "daily_cost_usd": 6.91,
+  "monthly_cost_usd": 207.36,
+  "tokens_per_dollar": 1250000,
+  "per_node": [...]
+}
+```
+
+---
+
+## Overclock Profiles
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/nodes/:id/overclock` | Yes | Get current overclock profiles |
+| `POST` | `/api/v1/nodes/:id/overclock` | Yes | Apply overclock settings to a GPU |
+
+### Example
+
+```bash
+curl -X POST http://localhost:8080/api/v1/nodes/NODE-001/overclock \
+  -H "Content-Type: application/json" \
+  -d '{"gpu_index": 0, "core_offset_mhz": 100, "power_limit_w": 300}'
+```
 
 ---
 
@@ -494,132 +724,241 @@ SSE stream for game engine (UE5/Unity) integration. Emits topology changes, infe
 
 Self-healing event log. The watchdog monitors and auto-restarts crashed services.
 
-```bash
-# Get all watchdog events
-GET /api/v1/watchdog
-
-# Get watchdog events for a node
-GET /api/v1/nodes/:id/watchdog
-
-# Record a watchdog event
-POST /api/v1/nodes/:id/watchdog
-```
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/watchdog` | Yes | All watchdog events (`?limit=100`) |
+| `GET` | `/api/v1/nodes/:id/watchdog` | Yes | Watchdog events for a node |
+| `POST` | `/api/v1/nodes/:id/watchdog` | Yes | Record watchdog events (from agent) |
 
 ---
 
 ## Notifications
 
-Configure external notification channels for alerts.
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/notifications/channels` | Yes | List notification channels |
+| `POST` | `/api/v1/notifications/channels` | Yes | Create a channel (telegram, discord, webhook) |
+| `DELETE` | `/api/v1/notifications/channels/:id` | Yes | Delete a channel |
+| `POST` | `/api/v1/notifications/test` | Yes | Send a test notification |
+
+### Example
 
 ```bash
-# List channels
-GET /api/v1/notifications/channels
-
-# Create a channel (discord, slack, telegram, email, webhook)
-POST /api/v1/notifications/channels
-{"type": "discord", "name": "ops-channel", "config": {"webhook_url": "https://discord.com/api/webhooks/..."}}
-
-# Test a channel
-POST /api/v1/notifications/test
-{"channel_id": "ch-123", "message": "Test notification"}
-
-# Delete a channel
-DELETE /api/v1/notifications/channels/:id
-```
-
----
-
-## API Keys
-
-Scoped API keys with per-key rate limits and permissions.
-
-```bash
-# List keys
-GET /api/v1/apikeys
-
-# Create a key
-POST /api/v1/apikeys
-{"name": "ci-pipeline", "permissions": ["read", "write"], "rate_limit": 100}
-
-# Revoke a key
-DELETE /api/v1/apikeys/:id
-```
-
----
-
-## Power & Cost
-
-```bash
-# Cluster power draw + cost estimate
-GET /api/v1/power
-```
-
-Returns per-node wattage, GPU wattage, and daily/monthly cost estimates.
-
----
-
-## Overclock Profiles
-
-```bash
-# Get current profile for a node
-GET /api/v1/nodes/:id/overclock
-
-# Apply a profile (stock, gaming, mining, inference)
-POST /api/v1/nodes/:id/overclock
-{"profile": "inference"}
+curl -X POST http://localhost:8080/api/v1/notifications/channels \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "discord",
+    "name": "ops-channel",
+    "config": {"webhook_url": "https://discord.com/api/webhooks/..."}
+  }'
 ```
 
 ---
 
 ## Doctor & Diagnostics
 
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/doctor` | Yes | Run cluster-wide diagnostics (`?autofix=true`) |
+| `POST` | `/api/v1/nodes/:id/doctor` | Yes | Receive agent self-heal reports |
+| `POST` | `/api/v1/doctor/fix` | Yes | Auto-fix a specific issue |
+| `POST` | `/api/v1/auto` | Yes | Run auto-optimization mode |
+| `GET` | `/api/v1/auto/status` | Yes | Auto mode status |
+| `GET` | `/api/v1/errors` | Yes | Classified error log (`?hours=24`) |
+| `GET` | `/api/v1/suggestions` | Yes | AI-generated optimization suggestions |
+
+Doctor checks: stale nodes, orphaned stats/commands, stuck commands, stale pulls, unacked critical alerts, stats bloat, DB integrity, WAL mode, empty nodes, GPU thermal throttling.
+
+**Fix actions:** `reboot_node`, `restart_agent`, `prune_stats`, `clear_alerts`, `deploy_model`
+
+---
+
+## Bulk Operations
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/bulk/command` | Yes | Send a command to multiple nodes (by IDs or tag) |
+| `POST` | `/api/v1/bulk/tags` | Yes | Add/remove tags on multiple nodes |
+| `POST` | `/api/v1/bulk/reboot` | Yes | Reboot multiple nodes |
+| `POST` | `/api/v1/bulk/deploy` | Yes | Deploy a model to multiple nodes |
+| `POST` | `/api/v1/cluster/reboot` | Yes | Emergency cluster-wide reboot (`{"confirm": true}`) |
+
+### Example: Bulk Command
+
 ```bash
-# Run cluster-wide diagnostics
-GET /api/v1/doctor
-
-# Run diagnostics on a specific node
-POST /api/v1/nodes/:id/doctor
-
-# Auto-fix detected issues
-POST /api/v1/doctor/fix
+curl -X POST http://localhost:8080/api/v1/bulk/command \
+  -H "Content-Type: application/json" \
+  -d '{"tag": "production", "action": "install_model", "payload": {"model": "llama3.1:8b"}}'
 ```
 
 ---
 
-## Additional Endpoints
+## Node Groups & Placement
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/v1/topology` | Cluster topology with farm groupings |
-| `GET` | `/api/v1/inventory` | Full hardware inventory across all nodes |
-| `GET` | `/api/v1/timeline` | Event timeline for the cluster |
-| `GET` | `/api/v1/leaderboard` | Node leaderboard by tokens/sec |
-| `GET` | `/api/v1/leaderboard/models` | Model performance leaderboard |
-| `GET` | `/api/v1/compare` | Compare two nodes side-by-side |
-| `GET` | `/api/v1/inference/stats` | Inference request statistics |
-| `GET` | `/api/v1/inference/analytics` | Detailed inference analytics |
-| `GET` | `/api/v1/inference/backends` | List inference backends per node |
-| `GET` | `/api/v1/capacity` | Available capacity for new models |
-| `GET` | `/api/v1/gpu-map` | Visual GPU map of the cluster |
-| `GET` | `/api/v1/utilization` | Cluster utilization breakdown |
-| `GET` | `/api/v1/nodes/hot` | Hottest nodes by temperature |
-| `GET` | `/api/v1/nodes/idle` | Most idle nodes |
-| `GET` | `/api/v1/suggestions` | AI-generated optimization suggestions |
-| `GET` | `/api/v1/digest` | Daily cluster digest |
-| `GET` | `/api/v1/status-page` | Public status page data |
-| `GET` | `/api/v1/fleet` | Fleet reliability metrics |
-| `GET` | `/api/v1/uptime` | Fleet-wide uptime stats |
-| `GET` | `/api/v1/nodes/:id/uptime` | Per-node uptime |
-| `GET` | `/api/v1/nodes/:id/health-score` | Per-node health score |
-| `GET` | `/api/v1/nodes/:id/lifecycle` | Node lifecycle events |
-| `GET` | `/api/v1/nodes/:id/pulls` | Active model download progress |
-| `GET` | `/api/v1/cache/stats` | Prompt cache statistics |
-| `POST` | `/api/v1/cache/purge` | Purge the prompt cache |
-| `POST` | `/api/v1/auto` | Run auto-optimization mode |
-| `GET` | `/api/v1/config/export` | Export cluster configuration |
-| `POST` | `/api/v1/config/import` | Import cluster configuration |
-| `GET` | `/api/v1/openapi.json` | OpenAPI spec (auto-generated) |
-| `GET` | `/api/v1/about` | About this gateway instance |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/node-groups` | Yes | List node groups |
+| `POST` | `/api/v1/node-groups` | Yes | Create a node group |
+| `DELETE` | `/api/v1/node-groups/:id` | Yes | Delete a node group |
+| `POST` | `/api/v1/node-groups/:id/members` | Yes | Add a node to a group |
+| `GET` | `/api/v1/node-groups/:id/members` | Yes | List group members |
+| `GET` | `/api/v1/placement-constraints` | Yes | List placement constraints (`?model=`) |
+| `POST` | `/api/v1/placement-constraints` | Yes | Add a placement constraint |
+| `DELETE` | `/api/v1/placement-constraints/:id` | Yes | Delete a placement constraint |
+
+---
+
+## Webhooks
+
+Fire events to external URLs with optional HMAC signing.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/webhooks` | Yes | List webhooks (secrets masked) |
+| `POST` | `/api/v1/webhooks` | Yes | Create a webhook |
+| `DELETE` | `/api/v1/webhooks/:id` | Yes | Delete a webhook |
+| `POST` | `/api/v1/webhooks/:id/test` | Yes | Send a test event |
+
+### Example
+
+```bash
+curl -X POST http://localhost:8080/api/v1/webhooks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://hooks.example.com/tentaclaw",
+    "events": ["alert", "node_offline"],
+    "secret": "my-signing-secret"
+  }'
+```
+
+Webhook payloads include `X-TentaCLAW-Signature` header (SHA-256 HMAC).
+
+---
+
+## Monitoring & Observability
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/metrics` | No | Prometheus-compatible metrics endpoint |
+| `GET` | `/api/v1/cache/stats` | Yes | Prompt cache statistics |
+| `POST` | `/api/v1/cache/purge` | Yes | Purge expired cache entries |
+| `GET` | `/api/v1/queue` | Yes | Inference request queue stats |
+| `GET` | `/api/v1/config/db-stats` | Yes | Database table sizes and disk usage |
+| `GET` | `/api/v1/config/cors` | Yes | CORS configuration |
+
+**Prometheus metrics include:**
+- Cluster: `tentaclaw_cluster_nodes_total`, `tentaclaw_cluster_gpus_total`, `tentaclaw_cluster_vram_*_bytes`, `tentaclaw_cluster_models_loaded`
+- Per-GPU (DCGM-compatible): `tentaclaw_gpu_temperature_celsius`, `tentaclaw_gpu_utilization_ratio`, `tentaclaw_gpu_memory_*_bytes`, `tentaclaw_gpu_power_draw_watts`, `tentaclaw_gpu_fan_speed_ratio`, `tentaclaw_gpu_clock_*_mhz`
+- Inference: `tentaclaw_inference_requests_total`, `tentaclaw_inference_tokens_generated_total`, `tentaclaw_inference_latency_seconds` (histogram), `tentaclaw_inference_ttft_seconds`, `tentaclaw_inference_tokens_per_second`, `tentaclaw_inference_queue_depth`
+- Cache: `tentaclaw_cache_entries`, `tentaclaw_cache_hits_total`, `tentaclaw_cache_hit_ratio`
+- Backend: `tentaclaw_backend_healthy`, `tentaclaw_backend_models_loaded`
+
+---
+
+## Topology & Visualization
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/topology` | Yes | Cluster topology with farm groupings |
+| `GET` | `/api/v1/farms` | Yes | List farms with aggregate stats |
+| `GET` | `/api/v1/farms/:hash` | Yes | Nodes in a specific farm |
+| `GET` | `/api/v1/inventory` | Yes | Full hardware inventory |
+| `GET` | `/api/v1/gpu-map` | Yes | Visual GPU memory map |
+| `GET` | `/api/v1/utilization` | Yes | Per-node utilization breakdown (GPU, VRAM, CPU, RAM) |
+| `GET` | `/api/v1/capacity` | Yes | Available capacity + what models still fit |
+| `GET` | `/api/v1/compare` | Yes | Compare nodes side-by-side (`?nodes=A,B`) |
+| `GET` | `/api/v1/leaderboard` | Yes | Node leaderboard by tokens/sec |
+| `GET` | `/api/v1/leaderboard/models` | Yes | Model performance leaderboard |
+| `GET` | `/api/v1/search` | Yes | Search nodes, models, aliases, tags (`?q=`) |
+| `GET` | `/api/v1/timeline` | Yes | Cluster event timeline (`?limit=50`) |
+| `GET` | `/api/v1/fleet` | Yes | Fleet reliability metrics |
+| `GET` | `/api/v1/uptime` | Yes | Fleet-wide uptime (`?hours=24`) |
+
+---
+
+## Cluster Operations
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/dashboard` | Yes | Single-call data bundle for dashboard UI |
+| `GET` | `/api/v1/digest` | Yes | Human-readable daily cluster digest |
+| `GET` | `/api/v1/status-page` | Yes | Public status page data |
+| `GET` | `/api/v1/export` | Yes | Export cluster data (nodes, flight sheets, schedules) |
+| `POST` | `/api/v1/import` | Yes | Import cluster data |
+| `GET` | `/api/v1/config/export` | Yes | Export full cluster configuration |
+| `POST` | `/api/v1/config/import` | Yes | Import cluster configuration |
+| `GET` | `/api/v1/shells` | Yes | List nodes with remote shell available |
+
+---
+
+## Playground
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/playground/chat` | Yes | Enhanced chat for the playground UI |
+| `GET` | `/api/v1/playground/models` | Yes | Models formatted for the playground |
+| `GET` | `/api/v1/playground/history` | Yes | Recent playground requests (`?limit=50`) |
+| `POST` | `/api/v1/playground/compare` | Yes | Compare same prompt across up to 5 models |
+
+---
+
+## Profiler
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/profiler/summary` | Yes | Performance summary |
+| `GET` | `/api/v1/profiler/endpoint/:path` | Yes | Per-endpoint performance data |
+| `GET` | `/api/v1/profiler/recent` | Yes | Recent profiler entries (`?limit=`) |
+| `POST` | `/api/v1/profiler/load-test` | Yes | Generate load test configuration |
+| `DELETE` | `/api/v1/profiler` | Yes | Clear all profiler data |
+
+---
+
+## Comedy Engine
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/comedy/wait-line` | Yes | Generate wait-state comedy microcopy |
+| `POST` | `/api/v1/comedy/wait-line` | Yes | Generate comedy with full options |
+
+---
+
+## Daphney Bridge (UE5 Integration)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/daphney/stream` | Yes | SSE stream for UE5 integration |
+| `GET` | `/api/v1/daphney/config` | Yes | Daphney integration configuration |
+| `POST` | `/api/v1/daphney/event` | Yes | Receive events from UE5 |
+| `POST` | `/api/v1/daphney/chat` | Yes | Character-based chat with emotion detection |
+| `GET` | `/api/v1/daphney/characters` | Yes | List registered characters |
+| `POST` | `/api/v1/daphney/characters` | Yes | Register a character |
+| `DELETE` | `/api/v1/daphney/characters/:id` | Yes | Remove a character |
+
+---
+
+## WebSocket & Real-Time
+
+### SSE (Server-Sent Events)
+
+**`GET /api/v1/events`** -- Dashboard real-time event stream.
+
+```bash
+curl -N http://localhost:8080/api/v1/events
+```
+
+Event types: `connected`, `node_online`, `node_offline`, `stats_update`, `command_sent`, `command_completed`, `flight_sheet_applied`, `alert`, `benchmark_complete`, `smart_deploy`, `doctor_ran`, `maintenance`, `bulk_command`, `bulk_deploy`, `bulk_reboot`, `model_pull_started`, `model_pull_progress`, `shell_available`, `watchdog_event`, `daphney_event`
+
+### WebSocket: Remote Shell
+
+- **Agent connects:** `ws://gateway:8080/ws/agent-shell/:nodeId` (authenticated via cluster secret)
+- **Dashboard connects:** `ws://gateway:8080/ws/shell/:nodeId` (authenticated via session token, requires admin/operator role)
+
+The gateway pipes data bidirectionally between dashboard and agent. The agent spawns a shell process and streams stdin/stdout.
+
+### Auto-Discovery
+
+The gateway broadcasts its presence via UDP on port 41337 every 30 seconds. Agents can discover the gateway automatically on the local network.
 
 ---
 
@@ -629,4 +968,42 @@ Every response includes an `X-Request-ID` header. Pass your own via the request 
 
 ---
 
-*CLAWtopus says: "65+ endpoints. Eight arms. Do the math."*
+## Error Responses
+
+All errors follow a consistent format:
+
+```json
+{
+  "error": "Human-readable error message"
+}
+```
+
+OpenAI-compatible endpoints use the OpenAI error format:
+
+```json
+{
+  "error": {
+    "message": "Error description",
+    "type": "error_type"
+  }
+}
+```
+
+Common HTTP status codes:
+
+| Code | Meaning |
+|------|---------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad request (missing/invalid fields) |
+| 401 | Unauthorized (missing or invalid auth) |
+| 403 | Forbidden (insufficient permissions, expired key) |
+| 404 | Resource not found |
+| 409 | Conflict (duplicate, insufficient VRAM) |
+| 429 | Rate limit exceeded |
+| 502 | Backend proxy error |
+| 503 | Service unavailable (no nodes, no models) |
+
+---
+
+*200+ endpoints. Eight arms. Do the math.*
