@@ -1,0 +1,31 @@
+name: "@tentaclaw/langchain"
+version: "1.0.0"
+type: integration
+title: "LangChain Integration"
+description: "Use TentaCLAW as the LLM backend for LangChain agents, chains, and RAG pipelines"
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - ai-frameworks
+tags:
+  - langchain
+  - agents
+  - rag
+  - chains
+  - python
+integration:
+  protocol: rest
+  service: langchain
+  entry: ./examples/
+  tools:
+    - name: ChatTentaCLAW
+      description: "LangChain ChatModel pointing at TentaCLAW gateway"
+    - name: TentaCLAWEmbeddings
+      description: "Embeddings model via TentaCLAW /v1/embeddings"
+    - name: TentaCLAWCallback
+      description: "Callback handler for TentaCLAW analytics"
+  auth:
+    type: bearer-token
+    config_key: TENTACLAW_API_KEY

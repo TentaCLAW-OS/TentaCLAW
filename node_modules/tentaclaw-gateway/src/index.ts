@@ -1251,6 +1251,16 @@ app.get('/api/v1/models', (c) => {
 app.get('/v1/models', (c) => {
     const models = getClusterModels();
     const aliases = getAllModelAliases();
+
+    function classifyModelType(modelName: string): string {
+        if (/whisper/i.test(modelName)) return 'audio-transcription';
+        if (/tts|bark|piper|xtts|coqui|speecht5/i.test(modelName)) return 'audio-tts';
+        if (/stable-diffusion|sdxl|sd|comfyui|dall-e|flux|midjourney/i.test(modelName)) return 'image-generation';
+        if (/llava|bakllava|moondream|cogvlm|fuyu|obsidian/i.test(modelName)) return 'vision';
+        if (/embed|bge|gte|e5|nomic/i.test(modelName)) return 'embedding';
+        return 'text-generation';
+    }
+
     return c.json({
         object: 'list',
         data: models.map(m => ({
@@ -1265,6 +1275,7 @@ app.get('/v1/models', (c) => {
                 nodes: m.nodes,
                 aliases: aliases.filter(a => a.target === m.model).map(a => a.alias),
                 estimated_vram_mb: estimateModelVram(m.model),
+                type: classifyModelType(m.model),
             },
             parent: null,
         })),
@@ -3375,8 +3386,9 @@ app.get('/api/v1/version', (c) => {
             'notifications', 'remote-shell', 'doctor', 'power-tracking',
             'fleet-reliability', 'event-timeline', 'config-export-import',
             'maintenance-mode', 'hardware-inventory', 'model-package-manager',
+            'multi-modal', 'audio-transcription', 'audio-tts', 'image-generation', 'vision',
         ],
-        openai_compatible: ['/v1/chat/completions', '/v1/completions', '/v1/embeddings', '/v1/models'],
+        openai_compatible: ['/v1/chat/completions', '/v1/completions', '/v1/embeddings', '/v1/models', '/v1/audio/transcriptions', '/v1/audio/speech', '/v1/audio/translate', '/v1/images/generations'],
         anthropic_compatible: ['/v1/messages'],
     });
 });
@@ -3400,9 +3412,15 @@ app.get('/api/v1/capabilities', (c) => {
             prompt_caching: true,
             auto_mode: true,
             anthropic_messages_api: true,
+            multi_modal: true,
+            audio_transcription: true,
+            audio_tts: true,
+            audio_translation: true,
+            image_generation: true,
+            vision: true,
         },
         api_compatibility: {
-            openai: ['/v1/chat/completions', '/v1/completions', '/v1/embeddings', '/v1/models'],
+            openai: ['/v1/chat/completions', '/v1/completions', '/v1/embeddings', '/v1/models', '/v1/audio/transcriptions', '/v1/audio/speech', '/v1/audio/translate', '/v1/images/generations'],
             anthropic: ['/v1/messages'],
         },
     });
@@ -4747,6 +4765,106 @@ app.post('/v1/audio/speech', async (c) => {
 
 // Vision model support — images in chat completions are already supported by the main /v1/chat/completions proxy
 // The gateway passes through multimodal messages to the backend (Ollama supports llava, bakllava, etc.)
+
+// =============================================================================
+// Image Generation API (Wave 50) — OpenAI-compatible
+// =============================================================================
+
+app.post('/v1/images/generations', async (c) => {
+    let body: Record<string, unknown>;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { message: 'Invalid JSON body', type: 'invalid_request_error' } }, 400);
+    }
+
+    if (!body.prompt || typeof body.prompt !== 'string' || (body.prompt as string).trim().length === 0) {
+        return c.json({ error: { message: 'prompt is required and must be a non-empty string', type: 'invalid_request_error' } }, 400);
+    }
+
+    // Route to node with an image generation model (ComfyUI, stable-diffusion, sdxl, dall-e, etc.)
+    const target = findBestNode('stable-diffusion') || findBestNode('sdxl') || findBestNode('sd') || findBestNode('comfyui') || findBestNode('dall-e');
+    if (!target) {
+        return c.json({
+            error: {
+                message: 'No node has an image generation model loaded. Deploy stable-diffusion, sdxl, or a ComfyUI workflow first.',
+                type: 'model_not_found',
+                available_models: getClusterModels().map(m => m.model),
+            },
+        }, 503);
+    }
+
+    const backendPort = target.backend_port || 11434;
+    const url = 'http://' + (target.ip_address || target.hostname) + ':' + backendPort + '/v1/images/generations';
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: body.model || 'stable-diffusion',
+                prompt: body.prompt,
+                n: body.n || 1,
+                size: body.size || '1024x1024',
+                quality: body.quality || 'standard',
+            }),
+        });
+        return new Response(res.body, {
+            status: res.status,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-TentaCLAW-Node': target.node_id,
+            },
+        });
+    } catch (err: unknown) {
+        return c.json({ error: { message: 'Image generation proxy failed: ' + (err instanceof Error ? err.message : String(err)) } }, 502);
+    }
+});
+
+// =============================================================================
+// Audio Discovery + Translation (Wave 50)
+// =============================================================================
+
+app.get('/v1/audio/models', (c) => {
+    const models = getClusterModels();
+    const audioModels = models.filter(m =>
+        /whisper|tts|bark|piper|xtts|coqui|speecht5/i.test(m.model)
+    );
+    return c.json({
+        object: 'list',
+        data: audioModels.map(m => ({
+            id: m.model,
+            object: 'model',
+            created: Math.floor(Date.now() / 1000),
+            owned_by: 'tentaclaw-cluster',
+            type: /whisper/i.test(m.model) ? 'transcription' : 'tts',
+            _tentaclaw: {
+                node_count: m.node_count,
+                nodes: m.nodes,
+            },
+        })),
+    });
+});
+
+app.post('/v1/audio/translate', async (c) => {
+    // Whisper translation endpoint — translates audio to English
+    const target = findBestNode('whisper') || findBestNode('whisper:large') || findBestNode('whisper:base');
+    if (!target) {
+        return c.json({ error: { message: 'No node has a Whisper model loaded. Deploy whisper first.', type: 'model_not_found' } }, 503);
+    }
+    const backendPort = target.backend_port || 11434;
+    const url = 'http://' + (target.ip_address || target.hostname) + ':' + backendPort + '/v1/audio/translations';
+    try {
+        const body = await c.req.arrayBuffer();
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': c.req.header('Content-Type') || 'multipart/form-data' },
+            body,
+        });
+        return new Response(res.body, { status: res.status, headers: { 'Content-Type': 'application/json', 'X-TentaCLAW-Node': target.node_id } });
+    } catch (err: unknown) {
+        return c.json({ error: { message: 'Audio translation proxy failed: ' + (err instanceof Error ? err.message : String(err)) } }, 502);
+    }
+});
 
 // =============================================================================
 // Prometheus Metrics (Production — DCGM-compatible naming)

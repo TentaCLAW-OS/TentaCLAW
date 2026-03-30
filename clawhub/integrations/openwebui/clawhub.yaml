@@ -1,0 +1,28 @@
+name: "@tentaclaw/open-webui"
+version: "1.0.0"
+type: integration
+title: "Open WebUI Configuration"
+description: "Use TentaCLAW as the backend for Open WebUI — drop-in replacement for Ollama"
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - developer-tools
+tags:
+  - open-webui
+  - chat-ui
+  - web-interface
+  - ollama-compatible
+integration:
+  protocol: rest
+  service: open-webui
+  entry: ./config/
+  tools:
+    - name: ollama_proxy
+      description: "TentaCLAW gateway acts as Ollama API proxy — set OLLAMA_BASE_URL to gateway"
+    - name: openai_proxy
+      description: "TentaCLAW as OpenAI-compatible provider in Open WebUI"
+  auth:
+    type: bearer-token
+    config_key: TENTACLAW_API_KEY

@@ -2592,6 +2592,72 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
             break;
         }
 
+        case 'recommend': {
+            const vram = parsed.flags['vram'] ? parseInt(parsed.flags['vram']) : undefined;
+            const url = vram ? `/api/v1/models/recommend?vram_mb=${vram}` : '/api/v1/models/recommend';
+            const recs = await apiGet(gateway, url) as Array<{ model: string; quantization: string; vram_required_mb: number; use_case: string; description: string }>;
+            console.log('');
+            console.log('  ' + C.teal(C.bold('RECOMMENDED MODELS')) + (vram ? C.dim(` (for ${vram} MB VRAM)`) : C.dim(' (for your cluster)')));
+            console.log('');
+            for (const r of recs) {
+                console.log('  ' + padRight(C.white(r.model), 25) + padRight(C.dim(r.quantization), 10) + padRight(C.teal(Math.round(r.vram_required_mb / 1024) + 'GB'), 8) + C.dim(r.use_case));
+            }
+            if (recs.length === 0) console.log('  ' + C.dim('No models fit. Need more VRAM, boss.'));
+            console.log('');
+            break;
+        }
+
+        case 'estimate': {
+            const model = parsed.positional[0];
+            if (!model) { console.error(C.red('  Usage: clawtopus estimate <model> [--quantization Q4_K_M]')); process.exit(1); }
+            const quant = parsed.flags['quantization'] || parsed.flags['quant'] || 'Q4_K_M';
+            const est = await apiGet(gateway, `/api/v1/models/estimate-vram?model=${encodeURIComponent(model)}&quantization=${encodeURIComponent(quant)}`) as { model: string; quantization: string; format: string; recommended_backends: string[]; vram: { model_weights_mb: number; kv_cache_mb: number; total_mb: number } };
+            console.log('');
+            console.log('  ' + C.teal(C.bold('VRAM ESTIMATE')) + ' — ' + C.white(est.model));
+            console.log('');
+            console.log('  ' + padRight(C.dim('Quantization'), 22) + C.white(est.quantization));
+            console.log('  ' + padRight(C.dim('Format'), 22) + C.white(est.format));
+            console.log('  ' + padRight(C.dim('Model weights'), 22) + C.teal(Math.round(est.vram.model_weights_mb / 1024 * 10) / 10 + ' GB'));
+            console.log('  ' + padRight(C.dim('KV cache'), 22) + C.teal(Math.round(est.vram.kv_cache_mb / 1024 * 10) / 10 + ' GB'));
+            console.log('  ' + padRight(C.dim('Total VRAM needed'), 22) + C.white(C.bold(Math.round(est.vram.total_mb / 1024 * 10) / 10 + ' GB')));
+            console.log('  ' + padRight(C.dim('Best backends'), 22) + est.recommended_backends.map(b => C.green(b)).join(', '));
+            console.log('');
+            break;
+        }
+
+        case 'audit': {
+            const limit = parsed.flags['limit'] || '20';
+            const events = await apiGet(gateway, `/api/v1/audit?limit=${limit}`) as Array<{ event_type: string; actor: string; ip_address: string; detail: string; created_at: string }>;
+            console.log('');
+            console.log('  ' + C.teal(C.bold('AUDIT LOG')));
+            console.log('');
+            for (const e of events) {
+                const color = e.event_type.includes('fail') ? C.red : e.event_type.includes('login') ? C.green : C.dim;
+                console.log('  ' + C.dim(e.created_at.slice(0, 19)) + '  ' + color(padRight(e.event_type, 25)) + C.white(e.actor || '-') + C.dim('  ' + (e.detail || '')));
+            }
+            console.log('');
+            break;
+        }
+
+        case 'routing': {
+            const table = await apiGet(gateway, '/api/v1/routing-table').catch(() => null) as Array<{ model: string; nodes: Array<{ node_id: string; backend: string }> }> | null;
+            console.log('');
+            console.log('  ' + C.teal(C.bold('ROUTING TABLE')));
+            console.log('');
+            if (!table || !Array.isArray(table)) {
+                console.log('  ' + C.dim('Routing table not available.'));
+            } else {
+                for (const r of table) {
+                    console.log('  ' + C.white(r.model));
+                    for (const n of r.nodes) {
+                        console.log('    → ' + C.dim(n.node_id.slice(0, 16)) + ' via ' + C.green(n.backend));
+                    }
+                }
+            }
+            console.log('');
+            break;
+        }
+
         case 'help':
         case '--help':
         case '-h':

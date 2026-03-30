@@ -1,0 +1,29 @@
+name: "@tentaclaw/dify"
+version: "1.0.0"
+type: integration
+title: "Dify Model Provider"
+description: "Register TentaCLAW as a model provider in Dify. All cluster models available in Dify workflows."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - ai-frameworks
+tags:
+  - dify
+  - workflow
+  - model-provider
+  - visual-builder
+  - marketplace
+integration:
+  protocol: rest
+  service: dify
+  entry: ./provider/
+  tools:
+    - name: model_provider
+      description: "TentaCLAW as Dify custom model provider"
+    - name: tool_provider
+      description: "TentaCLAW cluster management tools for Dify workflows"
+  auth:
+    type: bearer-token
+    config_key: TENTACLAW_API_KEY

@@ -1,0 +1,29 @@
+name: "@tentaclaw/crewai"
+version: "1.0.0"
+type: integration
+title: "CrewAI Integration"
+description: "Run CrewAI agent crews powered by TentaCLAW cluster inference"
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - ai-frameworks
+tags:
+  - crewai
+  - agents
+  - crews
+  - multi-agent
+  - orchestration
+integration:
+  protocol: rest
+  service: crewai
+  entry: ./examples/
+  tools:
+    - name: crew_config
+      description: "Example crew configurations using TentaCLAW models"
+    - name: agent_templates
+      description: "Pre-built agent role templates optimized for cluster inference"
+  auth:
+    type: bearer-token
+    config_key: TENTACLAW_API_KEY
