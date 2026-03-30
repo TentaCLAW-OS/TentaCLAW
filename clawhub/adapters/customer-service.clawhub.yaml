@@ -1,0 +1,22 @@
+name: "@tentaclaw/customer-service"
+version: "1.0.0"
+type: adapter
+title: "Customer Service Agent"
+description: "Fine-tuned for empathetic, professional customer support interactions. Handles complaints, inquiries, and escalations with appropriate tone and structured resolution flows."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [business]
+tags: [customer-support, helpdesk, tone, empathy, resolution]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "1.2M customer service transcripts from e-commerce, SaaS, and telecom industries with satisfaction ratings >= 4.5/5"
+  training_tokens: 8500000
+  size_mb: 48
+  quality_vs_base: "+18% on customer satisfaction prediction, +15% on resolution accuracy"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

@@ -1,0 +1,22 @@
+name: "@tentaclaw/legal-language"
+version: "1.0.0"
+type: adapter
+title: "Legal Language Specialist"
+description: "Trained on legal corpora for contract drafting, clause analysis, and regulatory language. Produces precise legal terminology with appropriate hedging and jurisdictional awareness."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [legal]
+tags: [legal, contracts, compliance, regulatory, drafting]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "800K legal documents including contracts, briefs, regulatory filings, and case law summaries from US and UK jurisdictions"
+  training_tokens: 12000000
+  size_mb: 55
+  quality_vs_base: "+22% on legal terminology accuracy, +17% on clause completeness"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

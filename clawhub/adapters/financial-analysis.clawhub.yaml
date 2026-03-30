@@ -1,0 +1,22 @@
+name: "@tentaclaw/financial-analysis"
+version: "1.0.0"
+type: adapter
+title: "Financial Analysis & Reporting"
+description: "Generates structured financial analysis including earnings summaries, ratio analysis, risk assessments, and investment commentary. Trained on SEC filings, analyst reports, and financial modeling outputs."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [finance]
+tags: [financial-analysis, reporting, sec-filings, investment, risk-assessment]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "500K SEC filings (10-K, 10-Q), equity research reports, earnings call transcripts, and financial news articles with structured numerical reasoning examples"
+  training_tokens: 9500000
+  size_mb: 53
+  quality_vs_base: "+23% on financial NER, +18% on numerical reasoning in financial contexts"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

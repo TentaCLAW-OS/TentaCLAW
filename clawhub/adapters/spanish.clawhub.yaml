@@ -1,0 +1,22 @@
+name: "@tentaclaw/spanish"
+version: "1.0.0"
+type: adapter
+title: "Spanish Language Enhancement"
+description: "Improves Spanish language fluency, grammar accuracy, and cultural nuance across Latin American and Castilian variants. Handles formal and informal registers with proper conjugation and gender agreement."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [language]
+tags: [spanish, multilingual, translation, latin-american, castilian]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "2M Spanish language samples from news, literature, academic papers, and conversational corpora covering regional variants from Spain, Mexico, Argentina, and Colombia"
+  training_tokens: 12000000
+  size_mb: 54
+  quality_vs_base: "+30% on Spanish MMLU, +22% on grammar accuracy benchmarks"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

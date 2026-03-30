@@ -1,0 +1,22 @@
+name: "@tentaclaw/technical-docs"
+version: "1.0.0"
+type: adapter
+title: "Technical Documentation Writer"
+description: "Produces clear, structured technical documentation including API references, architecture guides, runbooks, and README files. Follows Divio documentation framework with consistent formatting."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [writing]
+tags: [documentation, technical-writing, api-docs, tutorials, runbooks]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "400K technical documents from top open-source projects (Kubernetes, React, Rust std), MDN Web Docs, and AWS/GCP documentation with quality filtering"
+  training_tokens: 7500000
+  size_mb: 49
+  quality_vs_base: "+17% on documentation clarity scores, +14% on structural completeness"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

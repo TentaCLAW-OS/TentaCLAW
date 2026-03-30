@@ -1,0 +1,22 @@
+name: "@tentaclaw/cybersecurity"
+version: "1.0.0"
+type: adapter
+title: "Cybersecurity Analyst"
+description: "Specialized for security analysis including vulnerability assessment, threat modeling, incident response language, and CVE interpretation. Produces structured security advisories and remediation guidance."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [security]
+tags: [cybersecurity, vulnerability-analysis, threat-modeling, incident-response, cve]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "250K security advisories, CVE descriptions, MITRE ATT&CK framework mappings, NIST guidelines, and penetration testing reports with structured remediation steps"
+  training_tokens: 6500000
+  size_mb: 47
+  quality_vs_base: "+20% on vulnerability classification, +16% on remediation accuracy"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

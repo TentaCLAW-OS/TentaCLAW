@@ -1,0 +1,22 @@
+name: "@tentaclaw/formal-english"
+version: "1.0.0"
+type: adapter
+title: "Formal Business Writing"
+description: "Produces polished, professional business English suitable for executive communications, proposals, and corporate correspondence. Eliminates casual language and enforces consistent tone."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [writing]
+tags: [formal, business, professional, corporate, communications]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "500K corporate communications, annual reports, executive memos, and business proposals from Fortune 500 companies (public filings)"
+  training_tokens: 6000000
+  size_mb: 45
+  quality_vs_base: "+15% on formality scoring, +12% on grammar/style benchmarks"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

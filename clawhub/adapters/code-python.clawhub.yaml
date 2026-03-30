@@ -1,0 +1,22 @@
+name: "@tentaclaw/code-python"
+version: "1.0.0"
+type: adapter
+title: "Python Code Expert"
+description: "Enhances Python code generation quality with idiomatic patterns, type hints, modern best practices (3.10+), and comprehensive error handling. Trained on high-quality open source Python projects."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [coding]
+tags: [python, code-generation, best-practices, type-hints, async]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "Top-starred Python repositories filtered for quality (mypy-clean, >90% test coverage), plus Python Enhancement Proposals and official documentation"
+  training_tokens: 10000000
+  size_mb: 52
+  quality_vs_base: "+16% on HumanEval Python, +21% on type-correctness benchmarks"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

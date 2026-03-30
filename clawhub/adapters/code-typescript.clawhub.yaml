@@ -1,0 +1,22 @@
+name: "@tentaclaw/code-typescript"
+version: "1.0.0"
+type: adapter
+title: "TypeScript Patterns"
+description: "Improves TypeScript code generation with strict type safety, generics, utility types, and modern framework patterns for React, Next.js, and Node.js ecosystems."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [coding]
+tags: [typescript, react, nextjs, generics, type-safety]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "DefinitelyTyped contributions, top TypeScript repositories with strict mode enabled, and TypeScript compiler test cases"
+  training_tokens: 9000000
+  size_mb: 51
+  quality_vs_base: "+14% on TypeScript HumanEval, +23% on type-inference accuracy"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

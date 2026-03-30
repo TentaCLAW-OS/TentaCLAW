@@ -1,0 +1,22 @@
+name: "@tentaclaw/code-rust"
+version: "1.0.0"
+type: adapter
+title: "Rust Code Specialist"
+description: "Specialized for Rust code generation with ownership-aware patterns, lifetime annotations, trait implementations, and idiomatic error handling using Result/Option types."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [coding]
+tags: [rust, systems-programming, ownership, lifetimes, traits]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "Curated Rust crates from crates.io (>100 downloads, clippy-clean), Rust RFC documents, and The Rust Book examples"
+  training_tokens: 7000000
+  size_mb: 50
+  quality_vs_base: "+20% on Rust-specific HumanEval, +28% on borrow-checker compliance"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

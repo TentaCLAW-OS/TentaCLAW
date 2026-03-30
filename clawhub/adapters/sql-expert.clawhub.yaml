@@ -1,0 +1,22 @@
+name: "@tentaclaw/sql-expert"
+version: "1.0.0"
+type: adapter
+title: "SQL Query Optimizer"
+description: "Generates optimized SQL queries with proper indexing hints, join strategies, and dialect-aware syntax. Covers PostgreSQL, MySQL, SQLite, and SQL Server with performance-first query patterns."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [coding]
+tags: [sql, database, query-optimization, postgresql, analytics]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "300K curated SQL queries from Stack Overflow (score >= 10), database textbooks, and synthetic query-optimization pairs across PostgreSQL, MySQL, and SQLite dialects"
+  training_tokens: 5000000
+  size_mb: 44
+  quality_vs_base: "+21% on Spider benchmark, +18% on query execution efficiency"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]
