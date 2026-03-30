@@ -513,6 +513,39 @@ const MIGRATIONS: Migration[] = [
             `);
         },
     },
+    {
+        version: 9,
+        name: 'add_cluster_secret_and_audit_log',
+        up: (db: Database.Database) => {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS cluster_config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TEXT DEFAULT (datetime('now'))
+                );
+
+                CREATE TABLE IF NOT EXISTS audit_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    actor TEXT,
+                    ip_address TEXT,
+                    detail TEXT,
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_audit_log_type ON audit_log(event_type, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_audit_log_time ON audit_log(created_at DESC);
+
+                CREATE TABLE IF NOT EXISTS auth_failures (
+                    ip_address TEXT NOT NULL,
+                    failure_count INTEGER DEFAULT 1,
+                    window_start TEXT DEFAULT (datetime('now')),
+                    blocked_until TEXT,
+                    PRIMARY KEY (ip_address)
+                );
+            `);
+        },
+    },
 ];
 
 /**
@@ -3335,9 +3368,166 @@ export function createDefaultAdmin(): User | null {
     const count = (d.prepare('SELECT COUNT(*) as c FROM users').get() as { c: number }).c;
     if (count > 0) return null;
 
-    console.log('[auth] No users found — creating default admin (username: admin, password: admin)');
-    console.log('[auth] ⚠ Change the default admin password immediately!');
+    const password = randomBytes(16).toString('hex');
+    console.log(`[auth] SECURITY: First boot detected. Admin credentials: admin / ${password}. CHANGE IMMEDIATELY.`);
 
-    return createUser('admin', 'admin', 'admin', undefined);
+    return createUser('admin', password, 'admin', undefined);
+}
+
+// =============================================================================
+// Cluster Secret Management
+// =============================================================================
+
+/**
+ * Get a config value from the cluster_config table.
+ */
+export function getClusterConfig(key: string): string | null {
+    const d = getDb();
+    const row = d.prepare('SELECT value FROM cluster_config WHERE key = ?').get(key) as { value: string } | undefined;
+    return row?.value ?? null;
+}
+
+/**
+ * Set (upsert) a config value in the cluster_config table.
+ */
+export function setClusterConfig(key: string, value: string): void {
+    const d = getDb();
+    d.prepare(
+        `INSERT INTO cluster_config (key, value, updated_at) VALUES (?, ?, datetime('now'))
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    ).run(key, value);
+}
+
+/**
+ * Get or generate the cluster secret.
+ * On first call, generates a new secret and stores it in DB.
+ * On subsequent calls, returns the stored secret.
+ */
+export function getOrCreateClusterSecret(): string {
+    const existing = getClusterConfig('cluster_secret');
+    if (existing) return existing;
+
+    const secret = randomBytes(32).toString('hex');
+    setClusterConfig('cluster_secret', secret);
+    console.log('[auth] Generated new cluster secret. Distribute to agents via TENTACLAW_CLUSTER_SECRET env var or /etc/tentaclaw/rig.conf');
+    return secret;
+}
+
+// =============================================================================
+// Audit Logging
+// =============================================================================
+
+export interface AuditEntry {
+    id: number;
+    event_type: string;
+    actor: string | null;
+    ip_address: string | null;
+    detail: string | null;
+    created_at: string;
+}
+
+/**
+ * Record an audit log entry.
+ */
+export function recordAuditEvent(
+    eventType: string,
+    actor?: string,
+    ipAddress?: string,
+    detail?: string,
+): void {
+    const d = getDb();
+    d.prepare(
+        'INSERT INTO audit_log (event_type, actor, ip_address, detail) VALUES (?, ?, ?, ?)',
+    ).run(eventType, actor ?? null, ipAddress ?? null, detail ?? null);
+}
+
+/**
+ * Get recent audit log entries.
+ */
+export function getAuditLog(limit: number = 100, eventType?: string): AuditEntry[] {
+    const d = getDb();
+    if (eventType) {
+        return d.prepare(
+            'SELECT * FROM audit_log WHERE event_type = ? ORDER BY created_at DESC LIMIT ?',
+        ).all(eventType, limit) as AuditEntry[];
+    }
+    return d.prepare(
+        'SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ?',
+    ).all(limit) as AuditEntry[];
+}
+
+// =============================================================================
+// Auth Failure Tracking (IP-based brute force protection)
+// =============================================================================
+
+/**
+ * Record a failed authentication attempt from an IP.
+ * Returns true if the IP is now blocked (>= 5 failures in the current window).
+ */
+export function recordAuthFailure(ipAddress: string): boolean {
+    const d = getDb();
+    const windowStart = new Date(Date.now() - 60_000).toISOString(); // 1-minute window
+
+    const row = d.prepare(
+        'SELECT * FROM auth_failures WHERE ip_address = ?',
+    ).get(ipAddress) as { ip_address: string; failure_count: number; window_start: string; blocked_until: string | null } | undefined;
+
+    if (row) {
+        // Check if currently blocked
+        if (row.blocked_until && new Date(row.blocked_until + (row.blocked_until.endsWith('Z') ? '' : 'Z')) > new Date()) {
+            return true; // Still blocked
+        }
+
+        // Check if window has expired — reset
+        if (new Date(row.window_start + (row.window_start.endsWith('Z') ? '' : 'Z')) < new Date(windowStart + (windowStart.endsWith('Z') ? '' : 'Z'))) {
+            d.prepare(
+                "UPDATE auth_failures SET failure_count = 1, window_start = datetime('now'), blocked_until = NULL WHERE ip_address = ?",
+            ).run(ipAddress);
+            return false;
+        }
+
+        // Increment failure count
+        const newCount = row.failure_count + 1;
+        if (newCount >= 5) {
+            // Block for 15 minutes
+            const blockedUntil = new Date(Date.now() + 15 * 60_000).toISOString();
+            d.prepare(
+                'UPDATE auth_failures SET failure_count = ?, blocked_until = ? WHERE ip_address = ?',
+            ).run(newCount, blockedUntil, ipAddress);
+            return true;
+        }
+
+        d.prepare(
+            'UPDATE auth_failures SET failure_count = ? WHERE ip_address = ?',
+        ).run(newCount, ipAddress);
+        return false;
+    }
+
+    // First failure from this IP
+    d.prepare(
+        "INSERT INTO auth_failures (ip_address, failure_count, window_start) VALUES (?, 1, datetime('now'))",
+    ).run(ipAddress);
+    return false;
+}
+
+/**
+ * Check if an IP is currently blocked from authentication attempts.
+ */
+export function isIpBlocked(ipAddress: string): boolean {
+    const d = getDb();
+    const row = d.prepare(
+        'SELECT blocked_until FROM auth_failures WHERE ip_address = ?',
+    ).get(ipAddress) as { blocked_until: string | null } | undefined;
+
+    if (!row || !row.blocked_until) return false;
+    return new Date(row.blocked_until + (row.blocked_until.endsWith('Z') ? '' : 'Z')) > new Date();
+}
+
+/**
+ * Clear the auth failure record for an IP (e.g., after successful login).
+ */
+export function clearAuthFailures(ipAddress: string): void {
+    const d = getDb();
+    d.prepare('DELETE FROM auth_failures WHERE ip_address = ?').run(ipAddress);
 }
 

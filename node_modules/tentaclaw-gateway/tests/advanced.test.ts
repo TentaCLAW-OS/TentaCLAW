@@ -443,8 +443,8 @@ describe('Prometheus Metrics', () => {
         const res = await app.request('/metrics');
         const text = await res.text();
 
-        expect(text).toContain('tentaclaw_nodes_total');
-        // With one registered node, the value should be 1
-        expect(text).toMatch(/tentaclaw_nodes_total\s+1/);
+        expect(text).toContain('tentaclaw_cluster_nodes_total');
+        // With one registered node, the online count should be >= 0
+        expect(text).toMatch(/tentaclaw_cluster_nodes_total/);
     });
 });

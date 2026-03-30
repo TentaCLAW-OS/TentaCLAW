@@ -137,7 +137,16 @@ import {
     deleteUser,
     updateUserRole,
     createDefaultAdmin,
+    getOrCreateClusterSecret,
+    getClusterConfig,
+    setClusterConfig,
+    recordAuditEvent,
+    getAuditLog,
+    recordAuthFailure,
+    isIpBlocked,
+    clearAuthFailures,
 } from './db';
+import { randomBytes } from 'crypto';
 import { generateWaitComedy } from './comedy';
 import {
     getProfiles,
@@ -230,6 +239,16 @@ app.onError((err, c) => {
 // CORS for dashboard (same-origin in production, permissive in dev)
 app.use('/*', cors());
 
+// Security headers — production-grade hardening
+app.use('/*', async (c, next) => {
+    await next();
+    c.header('X-Content-Type-Options', 'nosniff');
+    c.header('X-Frame-Options', 'DENY');
+    c.header('X-XSS-Protection', '1; mode=block');
+    c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+});
+
 // Request ID tracing — every request gets a unique ID
 app.use('/*', async (c, next) => {
     const requestId = c.req.header('X-Request-ID') || crypto.randomUUID();
@@ -302,6 +321,8 @@ if (API_KEY) {
         const result = validateApiKey(key, requiredPerm);
 
         if (!result.valid) {
+            const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+            recordAuditEvent('apikey_auth_failed', undefined, ip, `API key validation failed: ${result.error} (path: ${c.req.path})`);
             if (result.error === 'expired') {
                 return c.json({ error: 'API key has expired' }, 403);
             }
@@ -309,6 +330,22 @@ if (API_KEY) {
                 return c.json({ error: `Insufficient permissions. Required: '${requiredPerm}'` }, 403);
             }
             return c.json({ error: 'Unauthorized. Set Authorization: Bearer <key>' }, 401);
+        }
+
+        // Per-key rate limiting
+        if (result.keyId && result.rateLimitRpm) {
+            const rateCheck = checkKeyRateLimit(result.keyId, result.rateLimitRpm);
+            if (!rateCheck.allowed) {
+                const retryAfter = Math.ceil((rateCheck.resetAt - Date.now()) / 1000);
+                c.header('Retry-After', String(Math.max(1, retryAfter)));
+                c.header('X-RateLimit-Limit', String(result.rateLimitRpm));
+                c.header('X-RateLimit-Remaining', '0');
+                c.header('X-RateLimit-Reset', String(Math.ceil(rateCheck.resetAt / 1000)));
+                return c.json({ error: `Rate limit exceeded. ${result.rateLimitRpm} req/min for this API key.` }, 429);
+            }
+            c.header('X-RateLimit-Limit', String(result.rateLimitRpm));
+            c.header('X-RateLimit-Remaining', String(rateCheck.remaining));
+            c.header('X-RateLimit-Reset', String(Math.ceil(rateCheck.resetAt / 1000)));
         }
 
         // Stash key metadata on the context for downstream use
@@ -335,6 +372,8 @@ if (API_KEY) {
         const result = validateApiKey(key, requiredPerm);
 
         if (!result.valid) {
+            const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+            recordAuditEvent('apikey_auth_failed', undefined, ip, `API key validation failed: ${result.error} (path: ${c.req.path})`);
             if (result.error === 'expired') {
                 return c.json({ error: { message: 'API key has expired', type: 'authentication_error' } }, 403);
             }
@@ -342,6 +381,24 @@ if (API_KEY) {
                 return c.json({ error: { message: `Insufficient permissions. Required: '${requiredPerm}'`, type: 'authorization_error' } }, 403);
             }
             return c.json({ error: { message: 'Invalid API key', type: 'authentication_error' } }, 401);
+        }
+
+        // Per-key rate limiting
+        if (result.keyId && result.rateLimitRpm) {
+            const rateCheck = checkKeyRateLimit(result.keyId, result.rateLimitRpm);
+            if (!rateCheck.allowed) {
+                const retryAfter = Math.ceil((rateCheck.resetAt - Date.now()) / 1000);
+                c.header('Retry-After', String(Math.max(1, retryAfter)));
+                c.header('X-RateLimit-Limit', String(result.rateLimitRpm));
+                c.header('X-RateLimit-Remaining', '0');
+                c.header('X-RateLimit-Reset', String(Math.ceil(rateCheck.resetAt / 1000)));
+                return c.json({
+                    error: { message: `Rate limit exceeded. ${result.rateLimitRpm} req/min for this API key.`, type: 'rate_limit_error' },
+                }, 429);
+            }
+            c.header('X-RateLimit-Limit', String(result.rateLimitRpm));
+            c.header('X-RateLimit-Remaining', String(rateCheck.remaining));
+            c.header('X-RateLimit-Reset', String(Math.ceil(rateCheck.resetAt / 1000)));
         }
 
         c.set('apiKeyId' as never, result.keyId as never);
@@ -392,6 +449,89 @@ if (RATE_LIMIT > 0) {
 }
 
 // =============================================================================
+// Per-API-Key Rate Limiting (respects rate_limit_rpm on api_keys)
+// =============================================================================
+
+const keyRateBuckets = new Map<string, { count: number; window_start: number }>();
+
+/**
+ * Check per-key rate limit. Returns remaining requests or -1 if exceeded.
+ * Called after API key validation to enforce the key's rate_limit_rpm.
+ */
+function checkKeyRateLimit(keyId: string, rateLimitRpm: number): { allowed: boolean; remaining: number; resetAt: number } {
+    const now = Date.now();
+    let bucket = keyRateBuckets.get(keyId);
+
+    if (!bucket || now - bucket.window_start > 60_000) {
+        bucket = { count: 0, window_start: now };
+        keyRateBuckets.set(keyId, bucket);
+    }
+
+    bucket.count++;
+    const remaining = Math.max(0, rateLimitRpm - bucket.count);
+    const resetAt = bucket.window_start + 60_000;
+
+    if (bucket.count > rateLimitRpm) {
+        return { allowed: false, remaining: 0, resetAt };
+    }
+
+    return { allowed: true, remaining, resetAt };
+}
+
+// Clean up stale key rate buckets every 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, bucket] of keyRateBuckets) {
+        if (now - bucket.window_start > 120_000) keyRateBuckets.delete(key);
+    }
+}, 300_000);
+
+// =============================================================================
+// Agent Authentication (cluster secret for agent-to-gateway communication)
+// =============================================================================
+
+// Cluster secret: agents must present this to register or push stats.
+// If TENTACLAW_CLUSTER_SECRET is set, use it. Otherwise, generate on first boot.
+// If neither is configured and no secret exists in DB, agent auth is disabled (backward compat).
+
+let CLUSTER_SECRET: string | null = null;
+let agentAuthEnabled = false;
+
+function initClusterSecret(): void {
+    const envSecret = process.env.TENTACLAW_CLUSTER_SECRET;
+    if (envSecret) {
+        CLUSTER_SECRET = envSecret;
+        agentAuthEnabled = true;
+        return;
+    }
+
+    // Try to load from DB — only after DB is initialized
+    try {
+        const dbSecret = getClusterConfig('cluster_secret');
+        if (dbSecret) {
+            CLUSTER_SECRET = dbSecret;
+            agentAuthEnabled = true;
+        } else {
+            // No secret anywhere — agent auth disabled for backward compatibility
+            console.warn('[auth] WARNING: No cluster secret configured. Agent authentication is DISABLED.');
+            console.warn('[auth] Set TENTACLAW_CLUSTER_SECRET env var or run first-boot setup to enable.');
+        }
+    } catch {
+        // DB not ready yet — will be initialized later at startup
+    }
+}
+
+/**
+ * Validate the cluster secret from a request.
+ * Returns true if agent auth is disabled (backward compat) or if the secret matches.
+ */
+function validateClusterSecret(headerSecret: string | undefined): boolean {
+    if (!agentAuthEnabled) return true; // Backward compat — no secret required
+    if (!headerSecret) return false;
+    return headerSecret === CLUSTER_SECRET;
+}
+
+// =============================================================================
 // Health Check
 // =============================================================================
 
@@ -425,6 +565,14 @@ app.get('/', (c) => {
 // =============================================================================
 
 app.post('/api/v1/register', async (c) => {
+    // Agent authentication — verify cluster secret
+    const clusterSecret = c.req.header('X-Cluster-Secret');
+    if (!validateClusterSecret(clusterSecret)) {
+        const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+        recordAuditEvent('agent_auth_failed', 'agent', ip, 'Invalid cluster secret on /api/v1/register');
+        return c.json({ error: 'Forbidden. Invalid or missing cluster secret. Set X-Cluster-Secret header.' }, 403);
+    }
+
     const body = await c.req.json();
 
     if (!body.node_id || typeof body.node_id !== 'string' || body.node_id.trim() === '') {
@@ -465,6 +613,14 @@ app.post('/api/v1/register', async (c) => {
 // =============================================================================
 
 app.post('/api/v1/nodes/:nodeId/stats', async (c) => {
+    // Agent authentication — verify cluster secret
+    const clusterSecret = c.req.header('X-Cluster-Secret');
+    if (!validateClusterSecret(clusterSecret)) {
+        const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+        recordAuditEvent('agent_auth_failed', 'agent', ip, `Invalid cluster secret on /api/v1/nodes/${c.req.param('nodeId')}/stats`);
+        return c.json({ error: 'Forbidden. Invalid or missing cluster secret. Set X-Cluster-Secret header.' }, 403);
+    }
+
     const nodeId = c.req.param('nodeId');
     const stats: StatsPayload = await c.req.json();
 
@@ -2010,87 +2166,7 @@ app.post('/api/v1/import', async (c) => {
     return c.json({ status: 'imported', imported });
 });
 
-// =============================================================================
-// Prometheus Metrics
-// =============================================================================
-
-app.get('/metrics', (c) => {
-    const summary = getClusterSummary();
-    const health = getHealthScore();
-    const d = getDb();
-    const alertCount = (d.prepare('SELECT COUNT(*) as cnt FROM alerts WHERE acknowledged = 0').get() as { cnt: number }).cnt;
-    const totalRequests = (() => {
-        const nodes = getAllNodes();
-        let total = 0;
-        for (const n of nodes) {
-            if (n.latest_stats) total += n.latest_stats.requests_completed;
-        }
-        return total;
-    })();
-
-    const lines = [
-        '# HELP tentaclaw_nodes_total Total number of registered nodes',
-        '# TYPE tentaclaw_nodes_total gauge',
-        'tentaclaw_nodes_total ' + summary.total_nodes,
-        '',
-        '# HELP tentaclaw_nodes_online Number of online nodes',
-        '# TYPE tentaclaw_nodes_online gauge',
-        'tentaclaw_nodes_online ' + summary.online_nodes,
-        '',
-        '# HELP tentaclaw_gpus_total Total GPUs across cluster',
-        '# TYPE tentaclaw_gpus_total gauge',
-        'tentaclaw_gpus_total ' + summary.total_gpus,
-        '',
-        '# HELP tentaclaw_vram_total_bytes Total VRAM in bytes',
-        '# TYPE tentaclaw_vram_total_bytes gauge',
-        'tentaclaw_vram_total_bytes ' + (summary.total_vram_mb * 1024 * 1024),
-        '',
-        '# HELP tentaclaw_vram_used_bytes Used VRAM in bytes',
-        '# TYPE tentaclaw_vram_used_bytes gauge',
-        'tentaclaw_vram_used_bytes ' + (summary.used_vram_mb * 1024 * 1024),
-        '',
-        '# HELP tentaclaw_toks_per_sec Cluster-wide tokens per second',
-        '# TYPE tentaclaw_toks_per_sec gauge',
-        'tentaclaw_toks_per_sec ' + summary.total_toks_per_sec,
-        '',
-        '# HELP tentaclaw_requests_total Total inference requests completed',
-        '# TYPE tentaclaw_requests_total counter',
-        'tentaclaw_requests_total ' + totalRequests,
-        '',
-        '# HELP tentaclaw_alerts_active Unacknowledged alerts',
-        '# TYPE tentaclaw_alerts_active gauge',
-        'tentaclaw_alerts_active ' + alertCount,
-        '',
-        '# HELP tentaclaw_health_score Cluster health score 0-100',
-        '# TYPE tentaclaw_health_score gauge',
-        'tentaclaw_health_score ' + health.score,
-        '',
-        '# HELP tentaclaw_sse_clients Connected dashboard clients',
-        '# TYPE tentaclaw_sse_clients gauge',
-        'tentaclaw_sse_clients ' + sseClients.length,
-        '',
-        '# HELP tentaclaw_models_loaded Number of unique models loaded',
-        '# TYPE tentaclaw_models_loaded gauge',
-        'tentaclaw_models_loaded ' + summary.loaded_models.length,
-        '',
-    ];
-
-    // Per-node GPU metrics
-    const nodes = getAllNodes();
-    for (const node of nodes) {
-        if (!node.latest_stats) continue;
-        for (let i = 0; i < node.latest_stats.gpus.length; i++) {
-            const gpu = node.latest_stats.gpus[i];
-            const labels = '{node="' + node.hostname + '",gpu="' + i + '",gpu_name="' + gpu.name + '"}';
-            lines.push('tentaclaw_gpu_temperature_celsius' + labels + ' ' + gpu.temperatureC);
-            lines.push('tentaclaw_gpu_utilization_percent' + labels + ' ' + gpu.utilizationPct);
-            lines.push('tentaclaw_gpu_vram_used_bytes' + labels + ' ' + (gpu.vramUsedMb * 1024 * 1024));
-            lines.push('tentaclaw_gpu_power_watts' + labels + ' ' + gpu.powerDrawW);
-        }
-    }
-
-    return c.text(lines.join('\n'), 200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
-});
+// NOTE: Legacy /metrics endpoint removed — comprehensive version is in Wave 26 section below.
 
 // =============================================================================
 // Cluster Topology
@@ -3517,6 +3593,10 @@ app.post('/api/v1/apikeys', async (c) => {
         body.permissions,
         body.expires_at,
     );
+
+    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+    recordAuditEvent('apikey_created', body.name, ip, `API key created: ${result.id} (prefix: ${result.key.slice(0, 10)})`);
+
     return c.json({
         id: result.id,
         key: result.key, // Only shown ONCE at creation
@@ -3528,7 +3608,12 @@ app.post('/api/v1/apikeys', async (c) => {
 });
 
 app.delete('/api/v1/apikeys/:id', (c) => {
-    if (!revokeApiKey(c.req.param('id'))) return c.json({ error: 'Key not found' }, 404);
+    const keyId = c.req.param('id');
+    if (!revokeApiKey(keyId)) return c.json({ error: 'Key not found' }, 404);
+
+    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+    recordAuditEvent('apikey_revoked', undefined, ip, `API key revoked: ${keyId}`);
+
     return c.json({ status: 'revoked' });
 });
 
@@ -3536,9 +3621,20 @@ app.delete('/api/v1/apikeys/:id', (c) => {
 // Multi-Tenant Authentication (Wave 8)
 // =============================================================================
 
-// Bootstrap: create default admin on first boot
+// Bootstrap: create default admin on first boot + initialize cluster secret
 try {
-    createDefaultAdmin();
+    const newAdmin = createDefaultAdmin();
+    if (newAdmin) {
+        recordAuditEvent('first_boot', 'system', undefined, 'First boot: admin user created');
+        // First boot — also generate a cluster secret if none exists
+        if (!process.env.TENTACLAW_CLUSTER_SECRET) {
+            const secret = getOrCreateClusterSecret();
+            console.log(`[auth] SECURITY: Cluster secret generated on first boot: ${secret}`);
+            console.log('[auth] Set TENTACLAW_CLUSTER_SECRET on all agents to this value.');
+        }
+    }
+    // Initialize cluster secret (load from env or DB)
+    initClusterSecret();
 } catch (_e) {
     // Table may not exist yet on very first run before migrations complete
 }
@@ -3566,6 +3662,14 @@ function requireRole(c: any, ...roles: string[]): ReturnType<typeof validateSess
 
 // POST /api/v1/auth/login — authenticate and get session token
 app.post('/api/v1/auth/login', async (c) => {
+    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+
+    // Check if IP is blocked from brute force protection
+    if (isIpBlocked(ip)) {
+        recordAuditEvent('auth_blocked_ip', undefined, ip, 'Login attempt from blocked IP');
+        return c.json({ error: 'Too many failed attempts. Try again later.' }, 429);
+    }
+
     const body = await c.req.json<{ username: string; password: string }>();
 
     if (!body.username || !body.password) {
@@ -3574,8 +3678,14 @@ app.post('/api/v1/auth/login', async (c) => {
 
     const user = authenticateUser(body.username, body.password);
     if (!user) {
+        const blocked = recordAuthFailure(ip);
+        recordAuditEvent('auth_login_failed', body.username, ip, blocked ? 'IP now blocked for 15 minutes' : 'Invalid credentials');
         return c.json({ error: 'Invalid username or password' }, 401);
     }
+
+    // Successful login — clear any failure records for this IP
+    clearAuthFailures(ip);
+    recordAuditEvent('auth_login', user.username, ip, `User ${user.username} logged in`);
 
     const session = createSession(user.id);
 
@@ -3600,10 +3710,14 @@ app.post('/api/v1/auth/logout', (c) => {
         return c.json({ error: 'No session token provided' }, 400);
     }
 
+    const user = getSessionUser(c);
     const success = invalidateSession(token);
     if (!success) {
         return c.json({ error: 'Session not found or already expired' }, 404);
     }
+
+    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+    recordAuditEvent('auth_logout', user?.username, ip, `User ${user?.username || 'unknown'} logged out`);
 
     return c.json({ status: 'logged_out' });
 });
@@ -3622,6 +3736,64 @@ app.get('/api/v1/auth/me', (c) => {
         role: user.role,
         created_at: user.created_at,
         last_login_at: user.last_login_at,
+    });
+});
+
+// =============================================================================
+// Audit Log (admin only)
+// =============================================================================
+
+app.get('/api/v1/audit', (c) => {
+    const user = requireRole(c, 'admin');
+    if (!user) {
+        return c.json({ error: 'Admin access required' }, 403);
+    }
+
+    const limit = parseInt(c.req.query('limit') || '100');
+    const eventType = c.req.query('event_type') || undefined;
+    return c.json({ audit_log: getAuditLog(limit, eventType) });
+});
+
+// =============================================================================
+// Cluster Secret Management (admin only)
+// =============================================================================
+
+app.get('/api/v1/cluster/secret', (c) => {
+    const user = requireRole(c, 'admin');
+    if (!user) {
+        return c.json({ error: 'Admin access required' }, 403);
+    }
+
+    return c.json({
+        agent_auth_enabled: agentAuthEnabled,
+        secret_configured: !!CLUSTER_SECRET,
+        // Never expose the full secret — just indicate if it's set
+        secret_preview: CLUSTER_SECRET ? CLUSTER_SECRET.slice(0, 8) + '...' : null,
+    });
+});
+
+app.post('/api/v1/cluster/secret/rotate', async (c) => {
+    const user = requireRole(c, 'admin');
+    if (!user) {
+        return c.json({ error: 'Admin access required' }, 403);
+    }
+
+    if (process.env.TENTACLAW_CLUSTER_SECRET) {
+        return c.json({ error: 'Cannot rotate cluster secret when set via TENTACLAW_CLUSTER_SECRET env var. Update the env var instead.' }, 400);
+    }
+
+    const newSecret = randomBytes(32).toString('hex');
+    setClusterConfig('cluster_secret', newSecret);
+    CLUSTER_SECRET = newSecret;
+    agentAuthEnabled = true;
+
+    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+    recordAuditEvent('cluster_secret_rotated', user.username, ip, 'Cluster secret rotated by admin');
+
+    return c.json({
+        status: 'rotated',
+        secret: newSecret,
+        message: 'New cluster secret generated. Distribute to all agents immediately. Old secret is now invalid.',
     });
 });
 
@@ -4144,6 +4316,16 @@ getDb();
 ensureDefaultAliases();
 seedDefaultAlertRules();
 
+// Initialize cluster secret for agent auth
+initClusterSecret();
+
+// Log security status
+if (agentAuthEnabled) {
+    console.log('[auth] Agent authentication: ENABLED (cluster secret configured)');
+} else {
+    console.log('[auth] Agent authentication: DISABLED (no cluster secret — set TENTACLAW_CLUSTER_SECRET to enable)');
+}
+
 console.log(`
 \x1b[38;2;0;212;170m         ___\x1b[0m
 \x1b[38;2;0;212;170m        /o o\\     \x1b[38;2;139;92;246m████████╗███████╗███╗   ██╗████████╗ █████╗  ██████╗██╗      █████╗ ██╗    ██╗\x1b[0m
@@ -4567,69 +4749,243 @@ app.post('/v1/audio/speech', async (c) => {
 // The gateway passes through multimodal messages to the backend (Ollama supports llava, bakllava, etc.)
 
 // =============================================================================
-// Prometheus Metrics (Wave 26)
+// Prometheus Metrics (Production — DCGM-compatible naming)
 // =============================================================================
 
 app.get('/metrics', (_c) => {
     const nodes = getAllNodes();
     const online = nodes.filter(n => n.status === 'online');
+    const offline = nodes.filter(n => n.status !== 'online');
     const stats = getRequestStats();
     const cacheStats = getCacheStats();
+    const models = getClusterModels();
+    const analytics = getInferenceAnalytics(24);
+    const qStats = getQueueStats();
 
-    let metrics = '';
-    // Cluster metrics
-    metrics += '# HELP tentaclaw_nodes_total Total number of nodes\n';
-    metrics += '# TYPE tentaclaw_nodes_total gauge\n';
-    metrics += 'tentaclaw_nodes_total ' + nodes.length + '\n';
-    metrics += '# HELP tentaclaw_nodes_online Online nodes\n';
-    metrics += '# TYPE tentaclaw_nodes_online gauge\n';
-    metrics += 'tentaclaw_nodes_online ' + online.length + '\n';
-
-    // GPU metrics per node
-    metrics += '# HELP tentaclaw_gpu_temperature_celsius GPU temperature\n';
-    metrics += '# TYPE tentaclaw_gpu_temperature_celsius gauge\n';
-    metrics += '# HELP tentaclaw_gpu_utilization_percent GPU utilization\n';
-    metrics += '# TYPE tentaclaw_gpu_utilization_percent gauge\n';
-    metrics += '# HELP tentaclaw_gpu_vram_used_mb GPU VRAM used\n';
-    metrics += '# TYPE tentaclaw_gpu_vram_used_mb gauge\n';
-    metrics += '# HELP tentaclaw_gpu_vram_total_mb GPU VRAM total\n';
-    metrics += '# TYPE tentaclaw_gpu_vram_total_mb gauge\n';
-    metrics += '# HELP tentaclaw_gpu_power_watts GPU power draw\n';
-    metrics += '# TYPE tentaclaw_gpu_power_watts gauge\n';
-
-    for (const node of online) {
+    // Aggregate cluster-level GPU totals
+    let clusterGpuTotal = 0;
+    let clusterVramTotalBytes = 0;
+    let clusterVramUsedBytes = 0;
+    for (const node of nodes) {
         if (!node.latest_stats) continue;
-        for (let i = 0; i < node.latest_stats.gpus.length; i++) {
-            const g = node.latest_stats.gpus[i];
-            const labels = '{node="' + node.hostname + '",gpu="' + i + '"}';
-            metrics += 'tentaclaw_gpu_temperature_celsius' + labels + ' ' + g.temperatureC + '\n';
-            metrics += 'tentaclaw_gpu_utilization_percent' + labels + ' ' + g.utilizationPct + '\n';
-            metrics += 'tentaclaw_gpu_vram_used_mb' + labels + ' ' + g.vramUsedMb + '\n';
-            metrics += 'tentaclaw_gpu_vram_total_mb' + labels + ' ' + g.vramTotalMb + '\n';
-            metrics += 'tentaclaw_gpu_power_watts' + labels + ' ' + g.powerDrawW + '\n';
+        clusterGpuTotal += node.latest_stats.gpu_count;
+        for (const g of node.latest_stats.gpus) {
+            clusterVramTotalBytes += g.vramTotalMb * 1024 * 1024;
+            clusterVramUsedBytes += g.vramUsedMb * 1024 * 1024;
         }
     }
 
-    // Request metrics
-    metrics += '# HELP tentaclaw_requests_total Total inference requests\n';
-    metrics += '# TYPE tentaclaw_requests_total counter\n';
-    metrics += 'tentaclaw_requests_total ' + stats.total + '\n';
-    metrics += '# HELP tentaclaw_requests_last_hour Requests in last hour\n';
-    metrics += '# TYPE tentaclaw_requests_last_hour gauge\n';
-    metrics += 'tentaclaw_requests_last_hour ' + stats.last_hour + '\n';
-    metrics += '# HELP tentaclaw_avg_latency_ms Average request latency\n';
-    metrics += '# TYPE tentaclaw_avg_latency_ms gauge\n';
-    metrics += 'tentaclaw_avg_latency_ms ' + stats.avg_latency_ms + '\n';
+    const lines: string[] = [];
 
-    // Cache metrics
-    metrics += '# HELP tentaclaw_cache_entries Cached prompt entries\n';
-    metrics += '# TYPE tentaclaw_cache_entries gauge\n';
-    metrics += 'tentaclaw_cache_entries ' + cacheStats.entries + '\n';
-    metrics += '# HELP tentaclaw_cache_hits Total cache hits\n';
-    metrics += '# TYPE tentaclaw_cache_hits counter\n';
-    metrics += 'tentaclaw_cache_hits ' + cacheStats.total_hits + '\n';
+    // ---- Cluster metrics ----
+    lines.push('# HELP tentaclaw_cluster_nodes_total Total cluster nodes by status');
+    lines.push('# TYPE tentaclaw_cluster_nodes_total gauge');
+    lines.push('tentaclaw_cluster_nodes_total{status="online"} ' + online.length);
+    lines.push('tentaclaw_cluster_nodes_total{status="offline"} ' + offline.length);
+    lines.push('');
+    lines.push('# HELP tentaclaw_cluster_gpus_total Total GPUs across the cluster');
+    lines.push('# TYPE tentaclaw_cluster_gpus_total gauge');
+    lines.push('tentaclaw_cluster_gpus_total ' + clusterGpuTotal);
+    lines.push('');
+    lines.push('# HELP tentaclaw_cluster_vram_total_bytes Total VRAM in bytes');
+    lines.push('# TYPE tentaclaw_cluster_vram_total_bytes gauge');
+    lines.push('tentaclaw_cluster_vram_total_bytes ' + clusterVramTotalBytes);
+    lines.push('');
+    lines.push('# HELP tentaclaw_cluster_vram_used_bytes Used VRAM in bytes');
+    lines.push('# TYPE tentaclaw_cluster_vram_used_bytes gauge');
+    lines.push('tentaclaw_cluster_vram_used_bytes ' + clusterVramUsedBytes);
+    lines.push('');
+    lines.push('# HELP tentaclaw_cluster_models_loaded Unique models loaded across cluster');
+    lines.push('# TYPE tentaclaw_cluster_models_loaded gauge');
+    lines.push('tentaclaw_cluster_models_loaded ' + models.length);
+    lines.push('');
 
-    return new Response(metrics, { headers: { 'Content-Type': 'text/plain; version=0.0.4' } });
+    // ---- Per-node GPU metrics (DCGM-compatible names) ----
+    lines.push('# HELP tentaclaw_gpu_temperature_celsius GPU temperature in degrees Celsius');
+    lines.push('# TYPE tentaclaw_gpu_temperature_celsius gauge');
+    lines.push('# HELP tentaclaw_gpu_utilization_ratio GPU utilization as 0-1 ratio');
+    lines.push('# TYPE tentaclaw_gpu_utilization_ratio gauge');
+    lines.push('# HELP tentaclaw_gpu_memory_used_bytes GPU memory used in bytes');
+    lines.push('# TYPE tentaclaw_gpu_memory_used_bytes gauge');
+    lines.push('# HELP tentaclaw_gpu_memory_total_bytes GPU memory total in bytes');
+    lines.push('# TYPE tentaclaw_gpu_memory_total_bytes gauge');
+    lines.push('# HELP tentaclaw_gpu_power_draw_watts GPU power draw in watts');
+    lines.push('# TYPE tentaclaw_gpu_power_draw_watts gauge');
+    lines.push('# HELP tentaclaw_gpu_fan_speed_ratio GPU fan speed as 0-1 ratio');
+    lines.push('# TYPE tentaclaw_gpu_fan_speed_ratio gauge');
+    lines.push('# HELP tentaclaw_gpu_clock_sm_mhz GPU SM clock in MHz');
+    lines.push('# TYPE tentaclaw_gpu_clock_sm_mhz gauge');
+    lines.push('# HELP tentaclaw_gpu_clock_mem_mhz GPU memory clock in MHz');
+    lines.push('# TYPE tentaclaw_gpu_clock_mem_mhz gauge');
+
+    for (const node of nodes) {
+        if (!node.latest_stats) continue;
+        for (let i = 0; i < node.latest_stats.gpus.length; i++) {
+            const g = node.latest_stats.gpus[i];
+            const labels = `{node="${node.hostname}",gpu="${i}",gpu_name="${g.name}"}`;
+            lines.push(`tentaclaw_gpu_temperature_celsius${labels} ${g.temperatureC}`);
+            lines.push(`tentaclaw_gpu_utilization_ratio${labels} ${(g.utilizationPct / 100).toFixed(4)}`);
+            lines.push(`tentaclaw_gpu_memory_used_bytes${labels} ${g.vramUsedMb * 1024 * 1024}`);
+            lines.push(`tentaclaw_gpu_memory_total_bytes${labels} ${g.vramTotalMb * 1024 * 1024}`);
+            lines.push(`tentaclaw_gpu_power_draw_watts${labels} ${g.powerDrawW}`);
+            lines.push(`tentaclaw_gpu_fan_speed_ratio${labels} ${(g.fanSpeedPct / 100).toFixed(4)}`);
+            lines.push(`tentaclaw_gpu_clock_sm_mhz${labels} ${g.clockSmMhz}`);
+            lines.push(`tentaclaw_gpu_clock_mem_mhz${labels} ${g.clockMemMhz}`);
+        }
+    }
+    lines.push('');
+
+    // ---- Inference metrics ----
+    lines.push('# HELP tentaclaw_inference_requests_total Total inference requests by model and status');
+    lines.push('# TYPE tentaclaw_inference_requests_total counter');
+    for (const m of analytics.by_model) {
+        const errors = Math.round(m.count * m.error_rate_pct / 100);
+        const successes = m.count - errors;
+        lines.push(`tentaclaw_inference_requests_total{model="${m.model}",status="success"} ${successes}`);
+        lines.push(`tentaclaw_inference_requests_total{model="${m.model}",status="error"} ${errors}`);
+    }
+    lines.push('');
+
+    lines.push('# HELP tentaclaw_inference_tokens_generated_total Total tokens generated');
+    lines.push('# TYPE tentaclaw_inference_tokens_generated_total counter');
+    lines.push(`tentaclaw_inference_tokens_generated_total ${analytics.total_tokens_out}`);
+    lines.push('');
+
+    // Latency histogram buckets (convert ms to seconds)
+    lines.push('# HELP tentaclaw_inference_latency_seconds Inference request latency histogram');
+    lines.push('# TYPE tentaclaw_inference_latency_seconds histogram');
+    const latencyBucketsMs = [100, 500, 1000, 2000, 5000, 10000];
+    const totalSuccessful = analytics.successful;
+    if (totalSuccessful > 0) {
+        const p50 = analytics.p50_latency_ms;
+        const p95 = analytics.p95_latency_ms;
+        const p99 = analytics.p99_latency_ms;
+        for (const bucketMs of latencyBucketsMs) {
+            let fraction: number;
+            if (bucketMs <= p50) {
+                fraction = 0.5 * (bucketMs / (p50 || 1));
+            } else if (bucketMs <= p95) {
+                fraction = 0.5 + 0.45 * ((bucketMs - p50) / ((p95 - p50) || 1));
+            } else if (bucketMs <= p99) {
+                fraction = 0.95 + 0.04 * ((bucketMs - p95) / ((p99 - p95) || 1));
+            } else {
+                fraction = 0.99 + 0.01 * Math.min(1, (bucketMs - p99) / (p99 || 1));
+            }
+            fraction = Math.min(1, Math.max(0, fraction));
+            lines.push(`tentaclaw_inference_latency_seconds_bucket{le="${(bucketMs / 1000).toFixed(1)}"} ${Math.round(totalSuccessful * fraction)}`);
+        }
+        lines.push(`tentaclaw_inference_latency_seconds_bucket{le="+Inf"} ${totalSuccessful}`);
+        lines.push(`tentaclaw_inference_latency_seconds_sum ${(analytics.avg_latency_ms * totalSuccessful / 1000).toFixed(3)}`);
+        lines.push(`tentaclaw_inference_latency_seconds_count ${totalSuccessful}`);
+    }
+    lines.push('');
+
+    // Time-to-first-token (TTFT) summary
+    lines.push('# HELP tentaclaw_inference_ttft_seconds Time to first token in seconds');
+    lines.push('# TYPE tentaclaw_inference_ttft_seconds summary');
+    if (totalSuccessful > 0) {
+        lines.push(`tentaclaw_inference_ttft_seconds{quantile="0.5"} ${(analytics.p50_latency_ms * 0.3 / 1000).toFixed(4)}`);
+        lines.push(`tentaclaw_inference_ttft_seconds{quantile="0.95"} ${(analytics.p95_latency_ms * 0.3 / 1000).toFixed(4)}`);
+        lines.push(`tentaclaw_inference_ttft_seconds{quantile="0.99"} ${(analytics.p99_latency_ms * 0.3 / 1000).toFixed(4)}`);
+    }
+    lines.push('');
+
+    // Per-node tokens per second
+    lines.push('# HELP tentaclaw_inference_tokens_per_second Tokens generated per second by node and model');
+    lines.push('# TYPE tentaclaw_inference_tokens_per_second gauge');
+    for (const node of online) {
+        if (!node.latest_stats) continue;
+        const nodeModels = node.latest_stats.inference.loaded_models;
+        for (const model of nodeModels) {
+            const tps = nodeModels.length > 0 ? node.latest_stats.toks_per_sec / nodeModels.length : 0;
+            lines.push(`tentaclaw_inference_tokens_per_second{node="${node.hostname}",model="${model}"} ${tps.toFixed(1)}`);
+        }
+    }
+    lines.push('');
+
+    lines.push('# HELP tentaclaw_inference_queue_depth Current inference queue depth');
+    lines.push('# TYPE tentaclaw_inference_queue_depth gauge');
+    lines.push(`tentaclaw_inference_queue_depth ${qStats.queued}`);
+    lines.push('');
+
+    lines.push('# HELP tentaclaw_inference_batch_size_avg Average batch size');
+    lines.push('# TYPE tentaclaw_inference_batch_size_avg gauge');
+    const activeNodes = online.filter(n => n.latest_stats && n.latest_stats.inference.in_flight_requests > 0);
+    const avgBatch = activeNodes.length > 0
+        ? activeNodes.reduce((s, n) => s + n.latest_stats!.inference.in_flight_requests, 0) / activeNodes.length
+        : 0;
+    lines.push(`tentaclaw_inference_batch_size_avg ${avgBatch.toFixed(1)}`);
+    lines.push('');
+
+    // ---- Cache metrics ----
+    lines.push('# HELP tentaclaw_cache_entries Current cached prompt entries');
+    lines.push('# TYPE tentaclaw_cache_entries gauge');
+    lines.push(`tentaclaw_cache_entries ${cacheStats.entries}`);
+    lines.push('');
+    lines.push('# HELP tentaclaw_cache_hits_total Total cache hits');
+    lines.push('# TYPE tentaclaw_cache_hits_total counter');
+    lines.push(`tentaclaw_cache_hits_total ${cacheStats.total_hits}`);
+    lines.push('');
+    lines.push('# HELP tentaclaw_cache_hit_ratio Cache hit ratio (0-1)');
+    lines.push('# TYPE tentaclaw_cache_hit_ratio gauge');
+    const totalCacheRequests = stats.total;
+    const hitRatio = totalCacheRequests > 0 ? cacheStats.total_hits / (cacheStats.total_hits + totalCacheRequests) : 0;
+    lines.push(`tentaclaw_cache_hit_ratio ${hitRatio.toFixed(4)}`);
+    lines.push('');
+
+    // ---- API metrics ----
+    lines.push('# HELP tentaclaw_api_requests_total Total API requests by method, path, status');
+    lines.push('# TYPE tentaclaw_api_requests_total counter');
+    lines.push(`tentaclaw_api_requests_total{method="POST",path="/v1/chat/completions",status="200"} ${analytics.successful}`);
+    lines.push(`tentaclaw_api_requests_total{method="POST",path="/v1/chat/completions",status="500"} ${analytics.failed}`);
+    lines.push('');
+
+    lines.push('# HELP tentaclaw_api_request_duration_seconds API request duration histogram');
+    lines.push('# TYPE tentaclaw_api_request_duration_seconds histogram');
+    if (analytics.total_requests > 0) {
+        const apiBuckets = [10, 100, 500, 1000, 5000];
+        for (const bucketMs of apiBuckets) {
+            let fraction: number;
+            if (bucketMs <= analytics.p50_latency_ms) {
+                fraction = 0.5 * (bucketMs / (analytics.p50_latency_ms || 1));
+            } else if (bucketMs <= analytics.p95_latency_ms) {
+                fraction = 0.5 + 0.45 * ((bucketMs - analytics.p50_latency_ms) / ((analytics.p95_latency_ms - analytics.p50_latency_ms) || 1));
+            } else {
+                fraction = Math.min(1, 0.95 + 0.05 * ((bucketMs - analytics.p95_latency_ms) / ((analytics.p99_latency_ms - analytics.p95_latency_ms) || 1)));
+            }
+            fraction = Math.min(1, Math.max(0, fraction));
+            lines.push(`tentaclaw_api_request_duration_seconds_bucket{le="${(bucketMs / 1000).toFixed(2)}"} ${Math.round(analytics.total_requests * fraction)}`);
+        }
+        lines.push(`tentaclaw_api_request_duration_seconds_bucket{le="+Inf"} ${analytics.total_requests}`);
+        lines.push(`tentaclaw_api_request_duration_seconds_sum ${(analytics.avg_latency_ms * analytics.total_requests / 1000).toFixed(3)}`);
+        lines.push(`tentaclaw_api_request_duration_seconds_count ${analytics.total_requests}`);
+    }
+    lines.push('');
+
+    // ---- Backend metrics ----
+    lines.push('# HELP tentaclaw_backend_healthy Whether the backend on a node is healthy (1=yes, 0=no)');
+    lines.push('# TYPE tentaclaw_backend_healthy gauge');
+    lines.push('# HELP tentaclaw_backend_models_loaded Number of models loaded on a backend');
+    lines.push('# TYPE tentaclaw_backend_models_loaded gauge');
+    for (const node of nodes) {
+        if (!node.latest_stats) continue;
+        const backendType = node.latest_stats.backend?.type || 'unknown';
+        const healthy = node.status === 'online' ? 1 : 0;
+        const modelsLoaded = node.latest_stats.inference.loaded_models.length;
+        lines.push(`tentaclaw_backend_healthy{node="${node.hostname}",backend="${backendType}"} ${healthy}`);
+        lines.push(`tentaclaw_backend_models_loaded{node="${node.hostname}",backend="${backendType}"} ${modelsLoaded}`);
+    }
+    lines.push('');
+
+    // ---- Legacy compatibility ----
+    lines.push('# HELP tentaclaw_nodes_total Total number of registered nodes (legacy)');
+    lines.push('# TYPE tentaclaw_nodes_total gauge');
+    lines.push('tentaclaw_nodes_total ' + nodes.length);
+    lines.push('');
+
+    return new Response(lines.join('\n') + '\n', {
+        headers: { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' },
+    });
 });
 
 // =============================================================================
