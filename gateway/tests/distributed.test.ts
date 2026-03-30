@@ -44,6 +44,11 @@ import {
     getDistributedModels,
     removeDistributedModel,
     getDistributedMetrics,
+    getDistributionPlan,
+    redistributeModel,
+    getBoundaryCrossings,
+    getLayerAssignments,
+    recordDistributedLatency,
 } from '../src/distributed';
 
 import { getAllNodes } from '../src/db';
@@ -343,5 +348,244 @@ describe('Metrics', () => {
 
     it('getDistributedMetrics returns null for unknown model', () => {
         expect(getDistributedMetrics('nonexistent-model:70b')).toBeNull();
+    });
+
+    it('getDistributedMetrics returns data for active model', () => {
+        const nodes = makeCluster(3);
+        vi.mocked(getAllNodes).mockReturnValue(nodes);
+        planDistribution('llama3.1:70b', nodes);
+
+        const metrics = getDistributedMetrics('llama3.1:70b');
+        expect(metrics).not.toBeNull();
+        expect(metrics!.model).toBe('llama3.1:70b');
+        expect(metrics!.nodes.length).toBeGreaterThanOrEqual(2);
+        expect(metrics!.total_latency_ms).toBeGreaterThan(0);
+        expect(metrics!.tokens_per_sec).toBeGreaterThan(0);
+
+        removeDistributedModel('llama3.1:70b');
+    });
+});
+
+describe('Distribution Plan Retrieval', () => {
+    beforeEach(() => {
+        vi.mocked(getAllNodes).mockReset();
+        for (const m of getDistributedModels()) {
+            removeDistributedModel(m.model);
+        }
+    });
+
+    it('getDistributionPlan returns null for unplanned model', () => {
+        expect(getDistributionPlan('nonexistent:70b')).toBeNull();
+    });
+
+    it('getDistributionPlan returns config after planning', () => {
+        const nodes = makeCluster(3);
+        planDistribution('llama3.1:70b', nodes);
+
+        const plan = getDistributionPlan('llama3.1:70b');
+        expect(plan).not.toBeNull();
+        expect(plan!.model).toBe('llama3.1:70b');
+        expect(plan!.nodes.length).toBeGreaterThanOrEqual(2);
+
+        removeDistributedModel('llama3.1:70b');
+    });
+});
+
+describe('Redistribution', () => {
+    beforeEach(() => {
+        vi.mocked(getAllNodes).mockReset();
+        for (const m of getDistributedModels()) {
+            removeDistributedModel(m.model);
+        }
+    });
+
+    it('redistributeModel creates a new plan', () => {
+        const nodes = makeCluster(3);
+        vi.mocked(getAllNodes).mockReturnValue(nodes);
+        planDistribution('llama3.1:70b', nodes);
+
+        const newNodes = makeCluster(4);
+        vi.mocked(getAllNodes).mockReturnValue(newNodes);
+        const newConfig = redistributeModel('llama3.1:70b', newNodes);
+
+        expect(newConfig).toBeDefined();
+        expect(newConfig.model).toBe('llama3.1:70b');
+        expect(newConfig.nodes.length).toBeGreaterThanOrEqual(2);
+
+        removeDistributedModel('llama3.1:70b');
+    });
+});
+
+describe('Boundary Crossings', () => {
+    beforeEach(() => {
+        vi.mocked(getAllNodes).mockReset();
+        for (const m of getDistributedModels()) {
+            removeDistributedModel(m.model);
+        }
+    });
+
+    it('getBoundaryCrossings is nodes - 1', () => {
+        const nodes = makeCluster(3);
+        const config = planDistribution('llama3.1:70b', nodes);
+        const crossings = getBoundaryCrossings(config);
+
+        expect(crossings).toBe(config.nodes.length - 1);
+
+        removeDistributedModel('llama3.1:70b');
+    });
+
+    it('getBoundaryCrossings is 0 for empty config', () => {
+        // Construct a config with no nodes
+        const fakeConfig = {
+            model: 'test:7b',
+            nodes: [],
+            total_layers: 0,
+            total_params_b: 0,
+            pipeline_parallel_size: 0,
+            tensor_parallel_size: 1,
+        };
+        expect(getBoundaryCrossings(fakeConfig)).toBe(0);
+    });
+});
+
+describe('Layer Assignments', () => {
+    beforeEach(() => {
+        vi.mocked(getAllNodes).mockReset();
+        for (const m of getDistributedModels()) {
+            removeDistributedModel(m.model);
+        }
+    });
+
+    it('getLayerAssignments returns flat list with correct fields', () => {
+        const nodes = makeCluster(3);
+        vi.mocked(getAllNodes).mockReturnValue(nodes);
+        const config = planDistribution('llama3.1:70b', nodes);
+        const assignments = getLayerAssignments(config);
+
+        expect(assignments.length).toBe(config.nodes.length);
+        for (const a of assignments) {
+            expect(a.node_id).toBeDefined();
+            expect(a.layers_start).toBeGreaterThanOrEqual(0);
+            expect(a.layers_end).toBeGreaterThanOrEqual(a.layers_start);
+            expect(a.vram_needed_mb).toBeGreaterThan(0);
+            expect(a.estimated_latency_ms).toBeGreaterThan(0);
+        }
+
+        removeDistributedModel('llama3.1:70b');
+    });
+});
+
+describe('Distributed Latency Recording', () => {
+    it('recordDistributedLatency does not throw', () => {
+        expect(() => recordDistributedLatency('some-node', 5.5)).not.toThrow();
+    });
+});
+
+describe('Edge Cases', () => {
+    beforeEach(() => {
+        vi.mocked(getAllNodes).mockReset();
+        for (const m of getDistributedModels()) {
+            removeDistributedModel(m.model);
+        }
+    });
+
+    it('planDistribution filters out offline nodes', () => {
+        // Each online node has 24000 MB free, so both are needed (24000*2=48000 > 43776)
+        const online1 = makeNode('on-1', {
+            latest_stats: makeStats('on-1', {
+                gpus: [makeGpu({ vramTotalMb: 49152, vramUsedMb: 25152 })], // 24000 free
+            }),
+        });
+        const online2 = makeNode('on-2', {
+            latest_stats: makeStats('on-2', {
+                gpus: [makeGpu({ vramTotalMb: 49152, vramUsedMb: 25152 })], // 24000 free
+            }),
+        });
+        const offline = makeNode('off-1', {
+            status: 'offline' as const,
+            latest_stats: makeStats('off-1', {
+                gpus: [makeGpu({ vramTotalMb: 49152, vramUsedMb: 25152 })],
+            }),
+        });
+
+        const config = planDistribution('llama3.1:70b', [online1, online2, offline]);
+
+        const nodeIds = config.nodes.map(n => n.node_id);
+        expect(nodeIds).not.toContain('off-1');
+        expect(nodeIds).toContain('on-1');
+        expect(nodeIds).toContain('on-2');
+
+        removeDistributedModel('llama3.1:70b');
+    });
+
+    it('planDistribution filters out nodes without GPUs', () => {
+        const gpuNode1 = makeNode('gpu-1', {
+            latest_stats: makeStats('gpu-1', {
+                gpus: [makeGpu({ vramTotalMb: 49152, vramUsedMb: 1000 })],
+            }),
+        });
+        const gpuNode2 = makeNode('gpu-2', {
+            latest_stats: makeStats('gpu-2', {
+                gpus: [makeGpu({ vramTotalMb: 49152, vramUsedMb: 1000 })],
+            }),
+        });
+        const cpuOnly = makeNode('cpu-1', {
+            gpu_count: 0,
+            latest_stats: makeStats('cpu-1', {
+                gpu_count: 0,
+                gpus: [],
+            }),
+        });
+
+        const config = planDistribution('llama3.1:70b', [gpuNode1, gpuNode2, cpuOnly]);
+        const nodeIds = config.nodes.map(n => n.node_id);
+        expect(nodeIds).not.toContain('cpu-1');
+
+        removeDistributedModel('llama3.1:70b');
+    });
+
+    it('canDistribute reports shortfall when VRAM nearly sufficient', () => {
+        // Just barely not enough
+        const nodes = makeCluster(2, 500); // 1000 MB total, far less than needed
+        const result = canDistribute('llama3.1:70b', nodes);
+
+        expect(result.feasible).toBe(false);
+        expect(result.shortfall_mb).toBeGreaterThan(0);
+        expect(result.total_vram_required_mb).toBeGreaterThan(result.total_vram_available_mb);
+    });
+
+    it('planDistribution config has correct total_params_b', () => {
+        const nodes = makeCluster(3);
+        const config = planDistribution('llama3.1:70b', nodes);
+
+        expect(config.total_params_b).toBe(70);
+
+        removeDistributedModel('llama3.1:70b');
+    });
+
+    it('planDistribution sets tensor_parallel_size to 1 by default', () => {
+        const nodes = makeCluster(3);
+        const config = planDistribution('llama3.1:70b', nodes);
+
+        expect(config.tensor_parallel_size).toBe(1);
+
+        removeDistributedModel('llama3.1:70b');
+    });
+
+    it('canDistribute with empty node list returns infeasible', () => {
+        const result = canDistribute('llama3.1:70b', []);
+        expect(result.feasible).toBe(false);
+        expect(result.eligible_node_count).toBe(0);
+    });
+
+    it('estimateDistributedLatency bottleneck_node_id is set', () => {
+        const nodes = makeCluster(3);
+        vi.mocked(getAllNodes).mockReturnValue(nodes);
+        const config = planDistribution('llama3.1:70b', nodes);
+        const est = estimateDistributedLatency(config);
+
+        expect(est.bottleneck_node_id).not.toBeNull();
+
+        removeDistributedModel('llama3.1:70b');
     });
 });

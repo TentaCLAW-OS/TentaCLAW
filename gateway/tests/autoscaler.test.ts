@@ -430,4 +430,91 @@ describe('Model State', () => {
         // Cleanup: remove override
         setModelMinReplicas('pinned:7b', null);
     });
+
+    it('getModelScaleStates includes tracked but unloaded models', () => {
+        // Record a request for a model that is not in the cluster
+        mockGetClusterModels.mockReturnValue([]);
+        recordRequest('phantom:7b');
+
+        const states = getModelScaleStates();
+        const phantom = states.find(s => s.model === 'phantom:7b');
+
+        expect(phantom).toBeDefined();
+        expect(phantom!.current_replicas).toBe(0);
+        expect(phantom!.last_request_at).not.toBeNull();
+    });
+
+    it('Model scale state reports correct queue_depth', () => {
+        mockGetClusterModels.mockReturnValue([
+            { model: 'queue-test:7b', node_count: 1, nodes: ['n1'] },
+        ]);
+
+        // Rapid-fire requests
+        for (let i = 0; i < 5; i++) {
+            recordRequest('queue-test:7b');
+        }
+
+        const states = getModelScaleStates();
+        const model = states.find(s => s.model === 'queue-test:7b');
+
+        expect(model).toBeDefined();
+        expect(model!.queue_depth).toBeGreaterThan(0);
+    });
+});
+
+describe('Config Edge Cases', () => {
+    beforeEach(() => {
+        stopAutoscaler();
+        mockGetAllNodes.mockReset();
+        mockGetClusterModels.mockReset();
+        mockQueueCommand.mockReset();
+    });
+
+    it('updateAutoscaleConfig preserves unset fields', () => {
+        updateAutoscaleConfig({ max_replicas: 5 });
+        const cfg1 = getAutoscaleConfig();
+        expect(cfg1.max_replicas).toBe(5);
+
+        updateAutoscaleConfig({ scale_up_threshold: 10 });
+        const cfg2 = getAutoscaleConfig();
+        // max_replicas should still be 5
+        expect(cfg2.max_replicas).toBe(5);
+        expect(cfg2.scale_up_threshold).toBe(10);
+    });
+
+    it('setModelMinReplicas with null removes override', () => {
+        setModelMinReplicas('override-test:7b', 5);
+
+        mockGetClusterModels.mockReturnValue([
+            { model: 'override-test:7b', node_count: 5, nodes: ['n1', 'n2', 'n3', 'n4', 'n5'] },
+        ]);
+
+        // With min=5, scale_down should be blocked at 5 replicas
+        updateAutoscaleConfig({ min_replicas: 1, scale_down_idle_minutes: 0, cooldown_seconds: 0 });
+        let actions = evaluateScaling();
+        expect(actions.find(a => a.action === 'scale_down' && a.model === 'override-test:7b')).toBeUndefined();
+
+        // Remove override — now global min_replicas (1) applies
+        setModelMinReplicas('override-test:7b', null);
+        actions = evaluateScaling();
+        const scaleDown = actions.find(a => a.action === 'scale_down' && a.model === 'override-test:7b');
+        expect(scaleDown).toBeDefined();
+        expect(scaleDown!.to_replicas).toBeLessThan(5);
+    });
+
+    it('recordRequest with latency tracks avg_latency_ms', () => {
+        mockGetClusterModels.mockReturnValue([
+            { model: 'latency-test:7b', node_count: 1, nodes: ['n1'] },
+        ]);
+
+        recordRequest('latency-test:7b', 50);
+        recordRequest('latency-test:7b', 100);
+        recordRequest('latency-test:7b', 150);
+
+        const states = getModelScaleStates();
+        const model = states.find(s => s.model === 'latency-test:7b');
+
+        expect(model).toBeDefined();
+        expect(model!.avg_latency_ms).toBe(100); // (50+100+150)/3 = 100
+    });
 });
