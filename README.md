@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/github/actions/workflow/status/TentaCLAW-OS/TentaCLAW/ci.yml?style=flat-square&label=build&color=00d4aa" alt="Build"></a>
-  <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/badge/tests-810%20passing-00d4aa?style=flat-square" alt="Tests"></a>
+  <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/badge/tests-782%20passing-00d4aa?style=flat-square" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b5cf6?style=flat-square" alt="License"></a>
   <a href="https://github.com/TentaCLAW-OS/TentaCLAW/stargazers"><img src="https://img.shields.io/github/stars/TentaCLAW-OS/TentaCLAW?style=flat-square&color=ffdd00" alt="Stars"></a>
   <a href="https://discord.gg/tentaclaw"><img src="https://img.shields.io/badge/Discord-The%20Tank-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
@@ -54,6 +54,29 @@ git clone https://github.com/TentaCLAW-OS/TentaCLAW.git && cd TentaCLAW
 cd gateway && npm install && npm run dev
 # Open http://localhost:8080/dashboard
 ```
+
+</details>
+
+---
+
+## Dashboard
+
+<p align="center">
+  <img src="assets/screenshots/dashboard-summary.png" alt="TentaCLAW Dashboard — Summary" width="900">
+</p>
+
+<p align="center"><em>Proxmox-style command center — 12 tabs, real-time SSE, resource tree, sparklines</em></p>
+
+<details>
+<summary><strong>More screenshots</strong></summary>
+
+| Login | Metrics | AI Chat | Billing |
+|-------|---------|---------|---------|
+| <img src="assets/screenshots/login-page.png" width="220"> | <img src="assets/screenshots/dashboard-metrics.png" width="220"> | <img src="assets/screenshots/dashboard-chat.png" width="220"> | <img src="assets/screenshots/dashboard-billing.png" width="220"> |
+
+| Website Hero | Features | Dashboard Preview | Pricing |
+|-------------|----------|-------------------|---------|
+| <img src="assets/screenshots/website-hero.png" width="220"> | <img src="assets/screenshots/website-features.png" width="220"> | <img src="assets/screenshots/website-dashboard-preview.png" width="220"> | <img src="assets/screenshots/website-pricing.png" width="220"> |
 
 </details>
 
