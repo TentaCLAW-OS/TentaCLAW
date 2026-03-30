@@ -87,13 +87,7 @@ function UtilBar({ pct }: { pct: number }) {
   );
 }
 
-/* ── row hover helpers ── */
-function handleRowEnter(e: React.MouseEvent<HTMLTableRowElement>) {
-  e.currentTarget.style.background = 'rgba(0,255,255,0.02)';
-}
-function handleRowLeave(e: React.MouseEvent<HTMLTableRowElement>) {
-  e.currentTarget.style.background = 'transparent';
-}
+/* ── row hover helpers removed — using CSS className instead ── */
 
 /* ══════════════════════════════════════════════════════
    GpusTab — full GPU inventory table
@@ -113,22 +107,15 @@ export function GpusTab() {
   /* ── empty state ── */
   if (rows.length === 0) {
     return (
-      <div
-        className="flex items-center justify-center"
-        style={{
-          padding: '80px 20px',
-          color: 'var(--text-muted)',
-          fontSize: 13,
-          textAlign: 'center',
-        }}
-      >
-        No GPUs detected &mdash; connect agents with GPU hardware
+      <div className="flex flex-col items-center justify-center py-12 gap-2" style={{ animation: 'slideUp 0.4s ease-out both' }}>
+        <span className="text-2xl opacity-20">🖥️</span>
+        <p className="text-xs" style={{ color: 'var(--text-dim)' }}>No GPUs detected &mdash; connect agents with GPU hardware</p>
       </div>
     );
   }
 
   return (
-    <div style={{ overflowX: 'auto' }}>
+    <div style={{ overflowX: 'auto', animation: 'slideUp 0.4s ease-out both' }}>
       <table
         style={{
           width: '100%',
@@ -169,9 +156,7 @@ export function GpusTab() {
             return (
               <tr
                 key={`${row.nodeId}-${gpu.busId}-${i}`}
-                style={{ background: 'transparent', transition: 'background 0.15s' }}
-                onMouseEnter={handleRowEnter}
-                onMouseLeave={handleRowLeave}
+                className="hover:bg-[rgba(0,255,255,0.02)] transition-colors"
               >
                 {/* Node */}
                 <td

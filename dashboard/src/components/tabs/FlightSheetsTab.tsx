@@ -137,7 +137,7 @@ const deleteBtnStyle: React.CSSProperties = {
   padding: '4px 10px',
   cursor: 'pointer',
   opacity: 0,
-  transition: 'opacity 0.15s, border-color 0.15s',
+  transition: 'opacity 0.3s ease, border-color 0.3s ease',
 };
 
 /* ── Sub-components ── */
@@ -290,22 +290,16 @@ export function FlightSheetsTab() {
   /* ── empty state ── */
   if (sheets.length === 0) {
     return (
-      <div
-        className="flex flex-col items-center justify-center gap-4"
-        style={{
-          padding: '80px 20px',
-          color: 'var(--text-muted)',
-          fontSize: 13,
-          textAlign: 'center',
-        }}
-      >
-        No flight sheets &mdash; create one to automate model deployments
+      <div className="flex flex-col items-center justify-center py-12 gap-2" style={{ animation: 'slideUp 0.4s ease-out both' }}>
+        <span className="text-2xl opacity-20">📋</span>
+        <p className="text-xs" style={{ color: 'var(--text-dim)' }}>No flight sheets &mdash; create one to automate model deployments</p>
         <button
           type="button"
           style={{
             ...applyBtnStyle,
             fontSize: 13,
             padding: '8px 20px',
+            marginTop: 8,
           }}
         >
           Create Flight Sheet
@@ -315,7 +309,7 @@ export function FlightSheetsTab() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" style={{ animation: 'slideUp 0.4s ease-out both' }}>
       {/* Top actions */}
       <div
         style={{
@@ -324,14 +318,7 @@ export function FlightSheetsTab() {
           alignItems: 'center',
         }}
       >
-        <h3
-          className="text-xs font-semibold"
-          style={{
-            color: 'var(--text-secondary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-          }}
-        >
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
           Flight Sheets
         </h3>
         <button

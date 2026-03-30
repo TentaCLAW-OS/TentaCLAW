@@ -1,11 +1,11 @@
 import { useClusterStore } from '@/stores/cluster';
 
 export function Header() {
-  const summary = useClusterStore((s) => s.summary);
+  const nodes = useClusterStore((s) => s.nodes);
   const connected = useClusterStore((s) => s.connected);
 
-  const totalGpus = summary?.total_gpus ?? 0;
-  const totalNodes = summary?.total_nodes ?? 0;
+  const totalNodes = nodes.filter((n) => n.status === 'online').length;
+  const totalGpus = nodes.reduce((sum, n) => sum + n.gpu_count, 0);
 
   return (
     <header
@@ -66,7 +66,7 @@ export function Header() {
         <div className="flex items-center gap-3 text-[9px] font-mono text-[var(--cyan)]">
           <span>{totalNodes} nodes</span>
           <span>{totalGpus} GPUs</span>
-          <span>{summary?.inference_requests_24h ?? 0} req/24h</span>
+          <span>{nodes.length} total</span>
         </div>
 
         {/* Connection dot */}

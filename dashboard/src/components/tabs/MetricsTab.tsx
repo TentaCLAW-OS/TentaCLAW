@@ -199,7 +199,7 @@ export function MetricsTab() {
   const errorColor = currentError > 1 ? 'var(--red)' : 'var(--green)';
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3" style={{ animation: 'slideUp 0.4s ease-out both' }}>
       {/* Row 1: 3 charts */}
       <div
         style={{
@@ -300,9 +300,6 @@ export function MetricsTab() {
         </span>
         <span>
           <span style={{ color: 'var(--red)', fontFamily: monoFont }}>---</span> p99
-        </span>
-        <span style={{ marginLeft: 'auto', fontStyle: 'italic' }}>
-          Mock data — connect cluster for live metrics
         </span>
       </div>
     </div>

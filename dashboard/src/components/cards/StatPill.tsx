@@ -6,10 +6,11 @@ interface StatPillProps {
   unit?: string;
   color?: string;
   subtext?: string;
+  delay?: number;
   children?: ReactNode;
 }
 
-export function StatPill({ label, value, unit, color, subtext, children }: StatPillProps) {
+export function StatPill({ label, value, unit, color, subtext, delay, children }: StatPillProps) {
   return (
     <div
       className="relative overflow-hidden rounded-[10px] px-4 py-3 flex flex-col gap-1"
@@ -18,6 +19,19 @@ export function StatPill({ label, value, unit, color, subtext, children }: StatP
         backdropFilter: 'blur(12px)',
         border: '1px solid var(--border)',
         minWidth: 120,
+        animation: 'fadeIn 0.4s ease-out both',
+        animationDelay: delay != null ? `${delay}s` : undefined,
+        transition: 'all 0.25s ease',
+      }}
+      onMouseEnter={(e) => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.borderColor = 'var(--border-hover)';
+        el.style.boxShadow = '0 0 12px rgba(0,255,255,0.06)';
+      }}
+      onMouseLeave={(e) => {
+        const el = e.currentTarget as HTMLElement;
+        el.style.borderColor = 'var(--border)';
+        el.style.boxShadow = 'none';
       }}
     >
       {/* Top accent line */}
@@ -26,7 +40,7 @@ export function StatPill({ label, value, unit, color, subtext, children }: StatP
         style={{
           height: 1,
           background: 'linear-gradient(90deg, var(--cyan), var(--purple))',
-          opacity: 0.5,
+          opacity: 0.8,
         }}
       />
 

@@ -10,7 +10,7 @@ const sectionHeadingStyle: React.CSSProperties = {
   fontWeight: 600,
   textTransform: 'uppercase',
   letterSpacing: '0.08em',
-  color: 'var(--text-secondary)',
+  color: 'var(--text-muted)',
   marginBottom: 12,
 };
 
@@ -52,7 +52,7 @@ const inputStyle: React.CSSProperties = {
   outline: 'none',
   width: '100%',
   maxWidth: 280,
-  transition: 'border-color 0.2s, box-shadow 0.2s',
+  transition: 'all 0.2s ease',
 };
 
 const inputFocusStyle: React.CSSProperties = {
@@ -101,14 +101,7 @@ const MOCK_CHANNELS: NotificationChannel[] = [
   { name: 'Email Reports', type: 'email', target: 'admin@tentaclaw.io', active: false },
 ];
 
-/* ── row hover helpers ── */
-
-function handleRowEnter(e: React.MouseEvent<HTMLTableRowElement>) {
-  e.currentTarget.style.background = 'rgba(0,255,255,0.02)';
-}
-function handleRowLeave(e: React.MouseEvent<HTMLTableRowElement>) {
-  e.currentTarget.style.background = 'transparent';
-}
+/* ── Row hover helpers removed — using CSS className instead ── */
 
 /* ── FocusInput: input with focus glow ── */
 
@@ -217,7 +210,7 @@ export function SettingsTab() {
       : '--';
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" style={{ animation: 'slideUp 0.4s ease-out both' }}>
       {/* ────────── Section 1: Cluster Info ────────── */}
       <div style={cardStyle}>
         <div style={accentLine} />
@@ -279,9 +272,7 @@ export function SettingsTab() {
               {MOCK_CHANNELS.map((ch, i) => (
                 <tr
                   key={i}
-                  style={{ background: 'transparent', transition: 'background 0.15s' }}
-                  onMouseEnter={handleRowEnter}
-                  onMouseLeave={handleRowLeave}
+                  className="hover:bg-[rgba(0,255,255,0.02)] transition-colors"
                 >
                   <td style={{ ...tableCellStyle, color: 'var(--cyan)', fontWeight: 500 }}>
                     {ch.name}

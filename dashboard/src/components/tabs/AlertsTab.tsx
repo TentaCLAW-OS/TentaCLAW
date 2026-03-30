@@ -81,7 +81,7 @@ function ToggleSwitch({ on, onToggle }: { on: boolean; onToggle: () => void }) {
           position: 'absolute',
           top: 2,
           left: on ? 18 : 2,
-          transition: 'left 0.2s, background 0.2s',
+          transition: 'all 0.2s ease',
         }}
       />
     </button>
@@ -136,32 +136,17 @@ export function AlertsTab() {
   }, []);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28, animation: 'slideUp 0.4s ease-out both' }}>
       {/* ── Section 1: Active Alerts ── */}
       <section>
-        <h3
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            color: 'var(--text-muted)',
-            marginBottom: 12,
-          }}
-        >
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
           Active Alerts
         </h3>
 
         {alerts.length === 0 ? (
-          <div
-            style={{
-              padding: '60px 20px',
-              textAlign: 'center',
-              color: 'var(--text-muted)',
-              fontSize: 13,
-            }}
-          >
-            No active alerts &mdash; your cluster is healthy {'\uD83D\uDC19'}
+          <div className="flex flex-col items-center justify-center py-12 gap-2">
+            <span className="text-2xl opacity-20">&#10003;</span>
+            <p className="text-xs" style={{ color: 'var(--text-dim)' }}>No active alerts &mdash; your cluster is healthy</p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -268,15 +253,7 @@ export function AlertsTab() {
             marginBottom: 12,
           }}
         >
-          <h3
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              color: 'var(--text-muted)',
-            }}
-          >
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
             Alert Rules
           </h3>
           <button
@@ -319,16 +296,7 @@ export function AlertsTab() {
               {rules.map((rule) => (
                 <tr
                   key={rule.id}
-                  style={{
-                    background: 'transparent',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(0,255,255,0.02)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                  }}
+                  className="hover:bg-[rgba(0,255,255,0.02)] transition-colors"
                 >
                   <td style={{ ...cellStyle, color: 'var(--cyan)', fontWeight: 500 }}>
                     {rule.metric}

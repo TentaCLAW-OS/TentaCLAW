@@ -4,10 +4,10 @@ interface StatusDotProps {
 }
 
 const config: Record<StatusDotProps['status'], { color: string; glow: boolean; speed?: string }> = {
-  online:    { color: '#00ff88', glow: true,  speed: '3s' },
+  online:    { color: '#00ff88', glow: true,  speed: '2.5s' },
   warning:   { color: '#ffdc00', glow: true,  speed: '1.5s' },
   offline:   { color: '#444',    glow: false },
-  error:     { color: '#ff4646', glow: true,  speed: '2s' },
+  error:     { color: '#ff4646', glow: true,  speed: '1s' },
   rebooting: { color: '#ffdc00', glow: true,  speed: '0.8s' },
 };
 

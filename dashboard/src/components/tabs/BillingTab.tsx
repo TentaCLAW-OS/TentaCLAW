@@ -74,7 +74,7 @@ export function BillingTab() {
     : Math.min((nodesUsed / cfg.maxNodes) * 100, 100);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" style={{ animation: 'slideUp 0.4s ease-out both' }}>
       {/* ── Section 1: License Status ── */}
       <LicenseCard
         tier={tier}
@@ -87,7 +87,7 @@ export function BillingTab() {
       <SectionHeading>Cost Intelligence</SectionHeading>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <CostCard label="Daily Cost" value={`$${dailyCost.toFixed(2)}`} unit="/day" />
-        <CostCard label="Monthly Cost" value={`$${monthlyCost}`} unit="/mo" />
+        <CostCard label="Monthly Cost" value={`$${new Intl.NumberFormat().format(monthlyCost)}`} unit="/mo" />
         <CostCard
           label="Cost per M Tokens"
           value={`$${MOCK.costPerMTokens.toFixed(2)}`}
@@ -127,14 +127,7 @@ export function BillingTab() {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h3
-      className="text-xs font-semibold"
-      style={{
-        color: 'var(--text-secondary)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.08em',
-      }}
-    >
+    <h3 className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
       {children}
     </h3>
   );
@@ -303,7 +296,10 @@ function CostCard({ label, value, unit, subtext, valueColor, greenGlow }: CostCa
       style={{
         background: 'var(--bg-card)',
         backdropFilter: 'blur(12px)',
-        border: '1px solid var(--border)',
+        border: greenGlow ? '1px solid rgba(0,255,136,0.3)' : '1px solid var(--border)',
+        ...(greenGlow
+          ? { boxShadow: '0 0 16px rgba(0,255,136,0.1), 0 0 32px rgba(0,255,136,0.05)' }
+          : {}),
       }}
     >
       {/* Top accent line */}

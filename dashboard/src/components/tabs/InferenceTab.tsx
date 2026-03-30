@@ -74,7 +74,7 @@ export function InferenceTab() {
   }, [nodes, summary]);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" style={{ animation: 'slideUp 0.4s ease-out both' }}>
       {/* ---- Top row: 4 stat cards ---- */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
@@ -111,14 +111,7 @@ export function InferenceTab() {
           border: '1px solid var(--border)',
         }}
       >
-        <h3
-          className="text-xs font-semibold mb-2"
-          style={{
-            color: 'var(--text-secondary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-          }}
-        >
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
           Cluster Throughput (tok/s)
         </h3>
         <div style={{ height: 80 }}>
@@ -139,14 +132,7 @@ export function InferenceTab() {
           border: '1px solid var(--border)',
         }}
       >
-        <h3
-          className="text-xs font-semibold px-4 pt-3 pb-2"
-          style={{
-            color: 'var(--text-secondary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-          }}
-        >
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider mb-3 px-4 pt-3" style={{ color: 'var(--text-muted)' }}>
           Recent Requests
         </h3>
 

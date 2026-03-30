@@ -6,6 +6,7 @@ import { formatToks, formatTimeAgo } from '@/lib/format';
 
 interface NodeCardProps {
   node: ClusterNode;
+  index?: number;
 }
 
 /** Generate a pseudo-random sparkline array seeded from a string */
@@ -33,7 +34,7 @@ function getNodeStatus(node: ClusterNode): 'online' | 'warning' | 'offline' {
   return 'online';
 }
 
-export function NodeCard({ node }: NodeCardProps) {
+export function NodeCard({ node, index = 0 }: NodeCardProps) {
   const displayStatus = getNodeStatus(node);
   const isOffline = displayStatus === 'offline';
   const isWarning = displayStatus === 'warning';
@@ -50,20 +51,29 @@ export function NodeCard({ node }: NodeCardProps) {
 
   return (
     <div
-      className="relative overflow-hidden rounded-xl transition-all duration-200"
+      className="relative overflow-hidden rounded-xl"
       style={{
         background: 'var(--bg-card)',
         backdropFilter: 'blur(12px)',
         border: `1px solid ${isWarning ? 'rgba(255,220,0,0.25)' : 'var(--border)'}`,
         opacity: isOffline ? 0.5 : 1,
-        cursor: 'default',
+        cursor: 'pointer',
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        animation: `fadeIn 0.4s ease-out both${isWarning ? ', yellowPulse 2s ease-in-out infinite' : ''}`,
+        animationDelay: `${index * 0.06}s`,
+        ...(isOffline ? {
+          backgroundImage: 'repeating-linear-gradient(135deg, transparent, transparent 6px, rgba(255,255,255,0.02) 6px, rgba(255,255,255,0.02) 7px)',
+        } : {}),
       }}
       onMouseEnter={(e) => {
         const el = e.currentTarget as HTMLElement;
         el.style.borderColor = isWarning
           ? 'rgba(255,220,0,0.4)'
           : 'var(--border-hover)';
-        el.style.transform = 'translateY(-1px)';
+        el.style.transform = 'translateY(-2px)';
+        el.style.boxShadow = isWarning
+          ? '0 4px 20px rgba(255,220,0,0.08)'
+          : '0 4px 20px rgba(0,255,255,0.06)';
       }}
       onMouseLeave={(e) => {
         const el = e.currentTarget as HTMLElement;
@@ -71,6 +81,7 @@ export function NodeCard({ node }: NodeCardProps) {
           ? 'rgba(255,220,0,0.25)'
           : 'var(--border)';
         el.style.transform = 'translateY(0)';
+        el.style.boxShadow = 'none';
       }}
     >
       {/* Top accent line */}

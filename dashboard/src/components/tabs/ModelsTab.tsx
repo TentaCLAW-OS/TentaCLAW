@@ -173,24 +173,9 @@ function ModelCard({ model }: { model: AggregatedModel }) {
 
 function EmptyState() {
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '48px 16px',
-        gap: 12,
-      }}
-    >
-      <span
-        style={{
-          fontSize: 13,
-          color: 'var(--text-muted)',
-        }}
-      >
-        No models loaded &mdash; deploy a model to get started
-      </span>
+    <div className="flex flex-col items-center justify-center py-12 gap-2">
+      <span className="text-2xl opacity-20">🧠</span>
+      <p className="text-xs" style={{ color: 'var(--text-dim)' }}>No models loaded &mdash; deploy a model to get started</p>
     </div>
   );
 }
@@ -223,24 +208,11 @@ export function ModelsTab() {
   const models = useAggregatedModels(distribution);
 
   const handleDeploy = () => {
-    // eslint-disable-next-line no-alert
-    alert('Deploy Model — coming soon. Configure model deployment in Settings > Models.');
+    // No-op: deploy modal will be implemented
   };
 
   const handleSmartDeploy = () => {
-    const modelName = prompt('Enter model name for Smart Deploy:');
-    if (!modelName) return;
-    api
-      .smartDeploy(modelName)
-      .then((res) => {
-        // eslint-disable-next-line no-alert
-        alert(res.message ?? 'Smart deploy initiated');
-      })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : 'Smart deploy failed';
-        // eslint-disable-next-line no-alert
-        alert(message);
-      });
+    // No-op: smart deploy flow will be implemented
   };
 
   if (loading) {
@@ -252,7 +224,7 @@ export function ModelsTab() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" style={{ animation: 'slideUp 0.4s ease-out both' }}>
       {/* Pulse animation for loading badge */}
       <style>{`
         @keyframes pulse {
@@ -263,14 +235,7 @@ export function ModelsTab() {
 
       {/* Header with actions */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h3
-          className="text-xs font-semibold"
-          style={{
-            color: 'var(--text-secondary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-          }}
-        >
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
           Model Catalog
         </h3>
 
@@ -341,14 +306,7 @@ export function ModelsTab() {
 
           {/* Model distribution table */}
           <div className="flex flex-col gap-3">
-            <h3
-              className="text-xs font-semibold"
-              style={{
-                color: 'var(--text-secondary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-              }}
-            >
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
               Distribution
             </h3>
 
@@ -389,16 +347,9 @@ export function ModelsTab() {
                   {models.map((m) => (
                     <tr
                       key={m.name}
+                      className="hover:bg-[rgba(0,255,255,0.02)] transition-colors"
                       style={{
                         borderBottom: '1px solid rgba(255,255,255,0.03)',
-                        transition: 'background 0.15s',
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.background =
-                          'rgba(255,255,255,0.02)';
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.background = 'transparent';
                       }}
                     >
                       <td

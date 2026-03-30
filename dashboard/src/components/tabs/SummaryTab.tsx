@@ -64,10 +64,11 @@ export function SummaryTab() {
           label="Nodes"
           value={onlineCount}
           unit="online"
+          delay={0}
           subtext={offlineCount > 0 ? `${offlineCount} offline` : undefined}
         />
-        <StatPill label="GPUs" value={totalGpus} />
-        <StatPill label="VRAM" value={`${(totalVramMb / 1024).toFixed(0)}`} unit="GB">
+        <StatPill label="GPUs" value={totalGpus} delay={0.05} />
+        <StatPill label="VRAM" value={`${(totalVramMb / 1024).toFixed(0)}`} unit="GB" delay={0.1}>
           <VramBar used={usedVramMb} total={totalVramMb} />
         </StatPill>
         <StatPill
@@ -75,6 +76,7 @@ export function SummaryTab() {
           value={formatToks(totalToks)}
           color="var(--cyan)"
           unit="tok/s"
+          delay={0.15}
         />
         <StatPill
           label="Power"
@@ -82,6 +84,7 @@ export function SummaryTab() {
           unit={powerUnit}
           color="var(--yellow)"
           subtext={dailyCost > 0 ? `$${dailyCost.toFixed(2)}/day` : undefined}
+          delay={0.2}
         />
         <StatPill
           label="Health"
@@ -94,30 +97,41 @@ export function SummaryTab() {
                 : 'var(--text-primary)'
           }
           subtext={health ? `${health.score}/100` : undefined}
+          delay={0.25}
         />
         <StatPill
           label="Requests"
           value={reqsPerSec}
           unit="req/s"
           subtext="today"
+          delay={0.3}
         />
       </div>
 
       {/* Nodes section */}
       <div className="flex flex-col gap-3">
-        <h3
-          className="text-xs font-semibold"
-          style={{
-            color: 'var(--text-secondary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-          }}
-        >
-          Nodes
-        </h3>
+        <div className="flex items-center gap-3">
+          <h3
+            className="text-xs font-semibold shrink-0"
+            style={{
+              color: 'var(--text-secondary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+            }}
+          >
+            Nodes
+          </h3>
+          <div
+            className="flex-1"
+            style={{
+              height: 1,
+              background: 'linear-gradient(90deg, var(--border), transparent)',
+            }}
+          />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {sortedNodes.map((node) => (
-            <NodeCard key={node.id} node={node} />
+          {sortedNodes.map((node, i) => (
+            <NodeCard key={node.id} node={node} index={i} />
           ))}
           {sortedNodes.length === 0 && (
             <p

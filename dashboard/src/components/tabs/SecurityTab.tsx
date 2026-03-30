@@ -101,13 +101,7 @@ const scopeColors: Record<ApiKeyScope, { bg: string; border: string; text: strin
   },
 };
 
-/* ── Row hover helpers (matches GpusTab) ── */
-function handleRowEnter(e: React.MouseEvent<HTMLTableRowElement>) {
-  e.currentTarget.style.background = 'rgba(0,255,255,0.02)';
-}
-function handleRowLeave(e: React.MouseEvent<HTMLTableRowElement>) {
-  e.currentTarget.style.background = 'transparent';
-}
+/* ── Row hover helpers removed — using CSS className instead ── */
 
 /* ── Scope badge ── */
 function ScopeBadge({ scope }: { scope: ApiKeyScope }) {
@@ -302,18 +296,11 @@ export function SecurityTab() {
   }, [confirmRotate]);
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" style={{ animation: 'slideUp 0.4s ease-out both' }}>
       {/* ── Section 1: API Keys ── */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h3
-            className="text-xs font-semibold"
-            style={{
-              color: 'var(--text-secondary)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-            }}
-          >
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
             API Keys
           </h3>
           <div className="flex items-center gap-2">
@@ -353,12 +340,7 @@ export function SecurityTab() {
               {keys.map((key) => (
                 <tr
                   key={key.id}
-                  style={{
-                    background: 'transparent',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={handleRowEnter}
-                  onMouseLeave={handleRowLeave}
+                  className="hover:bg-[rgba(0,255,255,0.02)] transition-colors"
                 >
                   {/* Name */}
                   <td
@@ -423,14 +405,7 @@ export function SecurityTab() {
 
       {/* ── Section 2: Cluster Security Status ── */}
       <div className="flex flex-col gap-3">
-        <h3
-          className="text-xs font-semibold"
-          style={{
-            color: 'var(--text-secondary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-          }}
-        >
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
           Cluster Security Status
         </h3>
 

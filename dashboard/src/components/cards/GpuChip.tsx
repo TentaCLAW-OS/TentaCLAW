@@ -26,19 +26,24 @@ export function GpuChip({ gpu }: GpuChipProps) {
       style={{
         background: 'var(--bg-chip)',
         border: '1px solid var(--border)',
-        minWidth: 80,
+        minWidth: 100,
+        transition: 'border-color 0.2s ease, background 0.2s ease',
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-hover)';
+        const el = e.currentTarget as HTMLElement;
+        el.style.borderColor = 'var(--border-hover)';
+        el.style.background = 'rgba(255,255,255,0.03)';
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)';
+        const el = e.currentTarget as HTMLElement;
+        el.style.borderColor = 'var(--border)';
+        el.style.background = 'var(--bg-chip)';
       }}
     >
       {/* GPU name */}
       <span
         style={{
-          fontSize: 8,
+          fontSize: 9,
           color: 'var(--text-muted)',
           whiteSpace: 'nowrap',
           overflow: 'hidden',
@@ -65,7 +70,7 @@ export function GpuChip({ gpu }: GpuChipProps) {
       <div
         className="rounded-full overflow-hidden"
         style={{
-          height: 2,
+          height: 3,
           background: 'rgba(255,255,255,0.06)',
           marginTop: 2,
         }}
@@ -75,7 +80,7 @@ export function GpuChip({ gpu }: GpuChipProps) {
           style={{
             width: `${vramPct}%`,
             background: 'linear-gradient(90deg, var(--cyan), var(--purple))',
-            transition: 'width 0.6s ease-out',
+            transition: 'width 0.5s ease',
           }}
         />
       </div>
@@ -83,7 +88,7 @@ export function GpuChip({ gpu }: GpuChipProps) {
       {/* VRAM text */}
       <span
         style={{
-          fontSize: 7,
+          fontSize: 8,
           color: 'var(--text-dim)',
           fontFamily: "'JetBrains Mono', monospace",
         }}
