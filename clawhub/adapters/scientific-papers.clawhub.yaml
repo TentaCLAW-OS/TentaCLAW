@@ -1,0 +1,22 @@
+name: "@tentaclaw/scientific-papers"
+version: "1.0.0"
+type: adapter
+title: "Academic & Scientific Writing"
+description: "Produces academic-quality prose following scientific writing conventions. Handles abstract generation, methodology descriptions, results interpretation, and proper citation formatting across STEM disciplines."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [academic]
+tags: [scientific-writing, academic, research, papers, citations]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "700K peer-reviewed paper abstracts and sections from arXiv, PubMed Central, and IEEE Xplore covering physics, biology, computer science, and engineering"
+  training_tokens: 11000000
+  size_mb: 55
+  quality_vs_base: "+19% on academic writing quality scores, +15% on citation format accuracy"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

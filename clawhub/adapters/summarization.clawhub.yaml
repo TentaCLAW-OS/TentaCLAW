@@ -1,0 +1,22 @@
+name: "@tentaclaw/summarization"
+version: "1.0.0"
+type: adapter
+title: "Document Summarizer"
+description: "Produces accurate, faithful summaries of long documents while preserving key facts, figures, and arguments. Supports extractive and abstractive modes for articles, reports, meetings, and legal documents."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [nlp]
+tags: [summarization, abstractive, extractive, document-processing, compression]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "500K document-summary pairs from CNN/DailyMail, arXiv, meeting transcripts, and legal case summaries with human-evaluated faithfulness scores"
+  training_tokens: 7500000
+  size_mb: 49
+  quality_vs_base: "+16% on ROUGE-L, +20% on faithfulness scores, +13% on human preference"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

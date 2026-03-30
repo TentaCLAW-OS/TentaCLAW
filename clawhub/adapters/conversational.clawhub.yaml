@@ -1,0 +1,22 @@
+name: "@tentaclaw/conversational"
+version: "1.0.0"
+type: adapter
+title: "Natural Conversation Style"
+description: "Produces warm, natural conversational responses with appropriate colloquialisms, turn-taking cues, and emotional intelligence. Ideal for chatbot personas and virtual assistant applications."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [conversation]
+tags: [conversational, chatbot, natural-language, dialogue, persona]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "1M multi-turn conversation pairs from high-rated chatbot interactions, podcast transcripts, and interview dialogues filtered for naturalness and engagement"
+  training_tokens: 7000000
+  size_mb: 46
+  quality_vs_base: "+17% on conversational naturalness ratings, +21% on user engagement metrics"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

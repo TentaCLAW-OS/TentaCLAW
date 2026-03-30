@@ -1,0 +1,22 @@
+name: "@tentaclaw/sentiment-analysis"
+version: "1.0.0"
+type: adapter
+title: "Sentiment Classifier"
+description: "Fine-tuned for accurate sentiment classification across reviews, social media, and customer feedback. Detects positive, negative, neutral, and mixed sentiment with confidence scores and aspect-level granularity."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [nlp]
+tags: [sentiment, classification, opinion-mining, aspect-sentiment, analytics]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "1.5M labeled sentiment examples from Amazon reviews, Twitter/X posts, Yelp reviews, and app store feedback with multi-label aspect-level annotations"
+  training_tokens: 5000000
+  size_mb: 42
+  quality_vs_base: "+26% on sentiment classification F1, +19% on aspect-level sentiment accuracy"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]

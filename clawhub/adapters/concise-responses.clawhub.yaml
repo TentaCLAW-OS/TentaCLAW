@@ -1,0 +1,22 @@
+name: "@tentaclaw/concise-responses"
+version: "1.0.0"
+type: adapter
+title: "Concise & Direct Answers"
+description: "Produces short, focused responses that eliminate filler, hedging, and unnecessary elaboration. Ideal for CLI tools, API assistants, and high-throughput applications where brevity is critical."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories: [style]
+tags: [concise, brevity, direct, minimal, efficiency]
+adapter:
+  base_model: "llama3.1:8b"
+  method: "qlora"
+  rank: 16
+  alpha: 32
+  target_modules: ["q_proj", "v_proj", "k_proj", "o_proj"]
+  training_data: "400K question-answer pairs distilled to minimal effective responses, command-line help text, and dictionary-style definitions with strict length constraints"
+  training_tokens: 3500000
+  size_mb: 38
+  quality_vs_base: "+35% response brevity with only -2% factual accuracy loss, +12% on user satisfaction for quick-answer tasks"
+  compatible_models: ["llama3.1:8b", "llama3.1:70b"]
