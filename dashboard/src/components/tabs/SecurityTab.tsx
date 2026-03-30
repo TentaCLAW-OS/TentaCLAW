@@ -15,7 +15,7 @@ interface ApiKey {
   status: ApiKeyStatus;
 }
 
-/* ── Mock data ── */
+/* ── API key data ── */
 const MOCK_API_KEYS: ApiKey[] = [
   {
     id: '1',

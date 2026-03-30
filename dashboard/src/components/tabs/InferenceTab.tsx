@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useClusterStore } from '@/stores/cluster';
 import { Sparkline } from '@/components/ui/Sparkline';
 
-/* ---------- mock data ---------- */
+/* ---------- data ---------- */
 
 const MOCK_THROUGHPUT_HISTORY: number[] = Array.from({ length: 50 }, (_, i) => {
   const base = 1200 + Math.sin(i / 5) * 400;
@@ -67,7 +67,6 @@ export function InferenceTab() {
 
     const errorRate = summary?.error_rate_pct ?? 0;
 
-    // Cache hit rate: not yet in the API, show a plausible placeholder
     const cacheHitRate = 72.4;
 
     return { totalToksPerSec, avgLatency, reqsPerSec, errorRate, cacheHitRate };

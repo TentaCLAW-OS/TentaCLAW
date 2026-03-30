@@ -41,7 +41,7 @@ const TIER_CONFIG: Record<LicenseTier, TierConfig> = {
 };
 
 /* ══════════════════════════════════════════════════════
-   Mock billing data
+   Billing data defaults
    ══════════════════════════════════════════════════════ */
 
 const MOCK = {

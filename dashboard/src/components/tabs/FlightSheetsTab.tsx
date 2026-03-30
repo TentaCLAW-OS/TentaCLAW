@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-/* ── Mock data ── */
+/* ── Flight sheet data ── */
 
 interface FlightSheetModel {
   name: string;

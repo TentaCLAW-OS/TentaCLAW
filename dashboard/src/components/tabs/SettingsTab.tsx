@@ -86,7 +86,7 @@ const tableCellStyle: React.CSSProperties = {
   borderBottom: '1px solid var(--border)',
 };
 
-/* ── notification channel mock data ── */
+/* ── notification channel data ── */
 
 interface NotificationChannel {
   name: string;

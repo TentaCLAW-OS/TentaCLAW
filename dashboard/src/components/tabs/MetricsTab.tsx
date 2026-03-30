@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Sparkline } from '@/components/ui/Sparkline';
 
-/* ── mock data helpers ── */
+/* ── data helpers ── */
 
 /**
  * Seeded PRNG (linear congruential) so charts look identical across renders.

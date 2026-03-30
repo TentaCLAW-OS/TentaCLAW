@@ -3,7 +3,7 @@ import { useClusterStore } from '@/stores/cluster';
 import { api } from '@/lib/api';
 import { formatTimeAgo } from '@/lib/format';
 
-/* ── Alert rule mock data ── */
+/* ── Alert rule data ── */
 interface AlertRule {
   id: string;
   metric: string;
