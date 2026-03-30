@@ -1,4 +1,4 @@
-import type { ClusterSummary, ClusterNode, HealthScore, PowerStats, Alert, SparklineData } from './types';
+import type { ClusterSummary, ClusterNode, HealthScore, PowerStats, Alert, SparklineData, ModelDistribution } from './types';
 
 const BASE = '';
 
@@ -36,4 +36,13 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ action, ...params }),
     }),
+  getModelDistribution: () =>
+    request<ModelDistribution[]>('/api/v1/models/distribution'),
+  smartDeploy: (model: string) =>
+    request<{ ok: boolean; message: string }>('/api/v1/models/smart-deploy', {
+      method: 'POST',
+      body: JSON.stringify({ model }),
+    }),
+  acknowledgeAlert: (id: string) =>
+    request<void>(`/api/v1/alerts/${id}/acknowledge`, { method: 'POST' }),
 };

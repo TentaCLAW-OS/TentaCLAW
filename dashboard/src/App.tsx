@@ -3,6 +3,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { VerticalTabs } from '@/components/layout/VerticalTabs';
 import { ContentPane } from '@/components/layout/ContentPane';
 import { TaskLog } from '@/components/layout/TaskLog';
+import { CommandPalette } from '@/components/ui/CommandPalette';
 import { useSSE } from '@/hooks/useSSE';
 
 export function App() {
@@ -15,6 +16,9 @@ export function App() {
         className="fixed top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[var(--cyan)]/10 to-transparent pointer-events-none z-50"
         style={{ animation: 'scanline 8s linear infinite' }}
       />
+
+      {/* Command palette overlay (Ctrl+K) */}
+      <CommandPalette />
 
       <Header />
       <div className="flex flex-1 overflow-hidden">

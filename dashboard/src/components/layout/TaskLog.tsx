@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useClusterStore } from '@/stores/cluster';
 
 type LogTab = 'tasks' | 'cluster-log' | 'alerts';
 
@@ -11,55 +12,42 @@ interface TaskRow {
   statusColor: string;
 }
 
-const mockTasks: TaskRow[] = [
-  {
-    time: '12:27:04',
-    node: 'colo-beast',
-    user: 'system',
-    description: 'Deploying llama3.1:405b (tensor-parallel\u00D78)',
-    status: '\u27F3 running',
-    statusColor: 'var(--cyan)',
-  },
-  {
-    time: '12:26:51',
-    node: 'pve-gpu-02',
-    user: 'watchdog',
-    description: 'GPU #1 temperature alert \u2014 83\u00B0C exceeds threshold',
-    status: '\u26A0 WARN',
-    statusColor: 'var(--yellow)',
-  },
-  {
-    time: '12:25:33',
-    node: 'rack-node-04',
-    user: 'admin',
-    description: 'Benchmark completed \u2014 mixtral:8x7b \u2014 612 tok/s',
-    status: '\u2713 OK',
-    statusColor: 'var(--green)',
-  },
-  {
-    time: '12:24:17',
-    node: 'colo-beast',
-    user: 'admin',
-    description: 'Model pull started \u2014 deepseek-coder-v2:236b',
-    status: '\u27F3 running',
-    statusColor: 'var(--cyan)',
-  },
-  {
-    time: '12:22:08',
-    node: 'home-lab-01',
-    user: 'system',
-    description: 'Node heartbeat restored after 45s gap',
-    status: '\u2713 OK',
-    statusColor: 'var(--green)',
-  },
-  {
-    time: '12:20:44',
-    node: 'pve-gpu-02',
-    user: 'cron',
-    description: 'Scheduled VRAM defrag completed \u2014 freed 2.1 GB',
-    status: '\u2713 OK',
-    statusColor: 'var(--green)',
-  },
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function sseEventToRow(type: string, data: Record<string, unknown>): TaskRow | null {
+  const now = formatTime(new Date());
+  const nodeId = (data.node_id ?? data.nodeId ?? '') as string;
+  const hostname = nodeId.split('-').slice(-1)[0] || nodeId;
+
+  switch (type) {
+    case 'stats_update':
+      return null; // Too noisy
+    case 'node_online':
+      return { time: now, node: hostname, user: 'system', description: 'Node came online', status: '\u2713 OK', statusColor: 'var(--green)' };
+    case 'node_offline':
+      return { time: now, node: hostname, user: 'system', description: 'Node went offline', status: '\u2717 ERR', statusColor: 'var(--red)' };
+    case 'alert':
+      return { time: now, node: hostname, user: 'watchdog', description: (data.alert as Record<string, string>)?.message ?? 'Alert triggered', status: '\u26A0 WARN', statusColor: 'var(--yellow)' };
+    case 'command_sent':
+      return { time: now, node: hostname, user: 'admin', description: `Command: ${(data.command as Record<string, string>)?.action ?? 'unknown'}`, status: '\u27F3 sent', statusColor: 'var(--cyan)' };
+    case 'command_completed':
+      return { time: now, node: '', user: 'system', description: `Command ${data.command_id} completed`, status: '\u2713 OK', statusColor: 'var(--green)' };
+    case 'watchdog_event':
+      return { time: now, node: hostname, user: 'watchdog', description: `Level ${data.level} watchdog: ${data.action}`, status: '\u26A0 WARN', statusColor: 'var(--yellow)' };
+    case 'benchmark_complete':
+      return { time: now, node: hostname, user: 'system', description: 'Benchmark completed', status: '\u2713 OK', statusColor: 'var(--green)' };
+    case 'model_pull_started':
+      return { time: now, node: hostname, user: 'system', description: `Model pull started: ${data.model ?? ''}`, status: '\u27F3 running', statusColor: 'var(--cyan)' };
+    default:
+      return { time: now, node: hostname || 'cluster', user: 'system', description: type.replace(/_/g, ' '), status: '\u2022 info', statusColor: 'var(--text-muted)' };
+  }
+}
+
+// Seed with some initial rows so the log isn't empty
+const seedTasks: TaskRow[] = [
+  { time: formatTime(new Date()), node: 'cluster', user: 'system', description: 'Dashboard connected to gateway', status: '\u2713 OK', statusColor: 'var(--green)' },
 ];
 
 const logTabs: { id: LogTab; label: string }[] = [
@@ -70,6 +58,26 @@ const logTabs: { id: LogTab; label: string }[] = [
 
 export function TaskLog() {
   const [activeLogTab, setActiveLogTab] = useState<LogTab>('tasks');
+  const [tasks, setTasks] = useState<TaskRow[]>(seedTasks);
+  const lastEvent = useClusterStore((s) => s.lastEvent);
+  const alerts = useClusterStore((s) => s.alerts);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Listen for SSE events via a secondary EventSource for the task log
+  useEffect(() => {
+    const es = new EventSource('/api/v1/events');
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === 'connected') return;
+        const row = sseEventToRow(data.type, data);
+        if (row) {
+          setTasks((prev) => [row, ...prev].slice(0, 50));
+        }
+      } catch { /* ignore */ }
+    };
+    return () => es.close();
+  }, []);
 
   return (
     <div
@@ -104,7 +112,7 @@ export function TaskLog() {
       <div className="flex-1 overflow-y-auto px-3 py-1.5">
         {activeLogTab === 'tasks' ? (
           <div className="flex flex-col gap-px">
-            {mockTasks.map((task, idx) => (
+            {tasks.map((task, idx) => (
               <div
                 key={idx}
                 className="grid items-center gap-2 py-0.5"
@@ -132,10 +140,35 @@ export function TaskLog() {
             ))}
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <span className="text-[10px] text-[var(--text-dim)]">
-              {activeLogTab === 'cluster-log' ? 'Cluster log' : 'Alerts feed'} &mdash; coming soon
-            </span>
+          <div className="flex flex-col gap-px">
+            {activeLogTab === 'alerts' && alerts.length > 0 ? (
+              alerts.slice(0, 20).map((alert, idx) => (
+                <div
+                  key={alert.id ?? idx}
+                  className="grid items-center gap-2 py-0.5"
+                  style={{ gridTemplateColumns: '90px 100px 1fr 70px' }}
+                >
+                  <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                    {new Date(alert.created_at).toLocaleTimeString('en-US', { hour12: false })}
+                  </span>
+                  <span className="text-[10px] font-mono truncate" style={{ color: alert.severity === 'critical' ? 'var(--red)' : 'var(--yellow)' }}>
+                    {alert.node_id?.split('-').slice(-1)[0] || alert.node_id}
+                  </span>
+                  <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>
+                    {alert.message}
+                  </span>
+                  <span className="text-[10px] font-mono text-right" style={{ color: alert.severity === 'critical' ? 'var(--red)' : 'var(--yellow)' }}>
+                    {alert.severity === 'critical' ? '\u2717 CRIT' : '\u26A0 WARN'}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <span className="text-[10px]" style={{ color: 'var(--text-dim)' }}>
+                  {activeLogTab === 'cluster-log' ? 'Cluster log events will appear here' : 'No active alerts \u2014 cluster is healthy'}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>

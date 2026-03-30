@@ -1,0 +1,415 @@
+import { useState } from 'react';
+import { useClusterStore } from '@/stores/cluster';
+
+/* ── shared style constants ── */
+
+const monoFont = "'JetBrains Mono', monospace";
+
+const sectionHeadingStyle: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'var(--text-secondary)',
+  marginBottom: 12,
+};
+
+const cardStyle: React.CSSProperties = {
+  background: 'var(--bg-card)',
+  backdropFilter: 'blur(12px)',
+  border: '1px solid var(--border)',
+  borderRadius: 8,
+  padding: '16px 20px',
+  position: 'relative',
+  overflow: 'hidden',
+};
+
+const accentLine: React.CSSProperties = {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  height: 1,
+  background: 'linear-gradient(90deg, var(--cyan), var(--purple))',
+  opacity: 0.5,
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: 'var(--text-secondary)',
+  minWidth: 130,
+  flexShrink: 0,
+};
+
+const inputStyle: React.CSSProperties = {
+  background: 'var(--bg-input)',
+  border: '1px solid var(--border)',
+  borderRadius: 6,
+  color: 'var(--text-primary)',
+  fontFamily: monoFont,
+  fontSize: 12,
+  padding: '6px 10px',
+  outline: 'none',
+  width: '100%',
+  maxWidth: 280,
+  transition: 'border-color 0.2s, box-shadow 0.2s',
+};
+
+const inputFocusStyle: React.CSSProperties = {
+  borderColor: 'rgba(0,255,255,0.4)',
+  boxShadow: '0 0 6px rgba(0,255,255,0.15)',
+};
+
+const staticValueStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontFamily: monoFont,
+  color: 'var(--text-primary)',
+};
+
+const headerCellStyle: React.CSSProperties = {
+  fontSize: 8,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'var(--text-muted)',
+  padding: '8px 10px',
+  textAlign: 'left',
+  whiteSpace: 'nowrap',
+};
+
+const tableCellStyle: React.CSSProperties = {
+  fontSize: 11,
+  fontFamily: monoFont,
+  color: 'var(--text-primary)',
+  padding: '7px 10px',
+  whiteSpace: 'nowrap',
+  borderBottom: '1px solid var(--border)',
+};
+
+/* ── notification channel mock data ── */
+
+interface NotificationChannel {
+  name: string;
+  type: 'discord' | 'telegram' | 'email';
+  target: string;
+  active: boolean;
+}
+
+const MOCK_CHANNELS: NotificationChannel[] = [
+  { name: 'Discord Alerts', type: 'discord', target: '#gpu-alerts', active: true },
+  { name: 'Telegram Admin', type: 'telegram', target: '@admin_bot', active: true },
+  { name: 'Email Reports', type: 'email', target: 'admin@tentaclaw.io', active: false },
+];
+
+/* ── row hover helpers ── */
+
+function handleRowEnter(e: React.MouseEvent<HTMLTableRowElement>) {
+  e.currentTarget.style.background = 'rgba(0,255,255,0.02)';
+}
+function handleRowLeave(e: React.MouseEvent<HTMLTableRowElement>) {
+  e.currentTarget.style.background = 'transparent';
+}
+
+/* ── FocusInput: input with focus glow ── */
+
+function FocusInput({
+  value,
+  onChange,
+  placeholder,
+  suffix,
+  style: extraStyle,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  suffix?: string;
+  style?: React.CSSProperties;
+}) {
+  const [focused, setFocused] = useState(false);
+
+  return (
+    <div className="flex items-center gap-2" style={{ maxWidth: 320 }}>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={{
+          ...inputStyle,
+          ...(focused ? inputFocusStyle : {}),
+          ...extraStyle,
+        }}
+      />
+      {suffix && (
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
+          {suffix}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ── OutlineButton ── */
+
+function OutlineButton({
+  children,
+  color = 'var(--cyan)',
+  onClick,
+}: {
+  children: React.ReactNode;
+  color?: string;
+  onClick?: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: hovered ? `${color}11` : 'transparent',
+        border: `1px solid ${color}`,
+        borderRadius: 6,
+        color,
+        fontSize: 11,
+        fontWeight: 500,
+        padding: '6px 14px',
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        transition: 'background 0.15s, box-shadow 0.15s',
+        boxShadow: hovered ? `0 0 8px ${color}22` : 'none',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   SettingsTab — cluster settings view
+   ══════════════════════════════════════════════════════ */
+
+export function SettingsTab() {
+  const { nodes, summary } = useClusterStore();
+
+  /* Local form state */
+  const [clusterName, setClusterName] = useState('TentaCLAW Cluster');
+  const [electricityRate, setElectricityRate] = useState('0.12');
+  const [budgetLimit, setBudgetLimit] = useState('');
+  const [budgetThreshold, setBudgetThreshold] = useState('80');
+
+  /* Derive some display values */
+  const onlineCount = summary?.online_nodes ?? nodes.filter((n) => n.status === 'online').length;
+  const totalNodes = summary?.total_nodes ?? nodes.length;
+
+  /* Compute rough uptime from first online node */
+  const firstOnline = nodes.find((n) => n.status === 'online');
+  const uptimeSecs = firstOnline?.latest_stats?.uptime_secs ?? 0;
+  const uptimeDisplay =
+    uptimeSecs > 0
+      ? `${Math.floor(uptimeSecs / 86400)}d ${Math.floor((uptimeSecs % 86400) / 3600)}h ${Math.floor((uptimeSecs % 3600) / 60)}m`
+      : '--';
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* ────────── Section 1: Cluster Info ────────── */}
+      <div style={cardStyle}>
+        <div style={accentLine} />
+        <h3 style={sectionHeadingStyle}>Cluster Info</h3>
+
+        <div className="flex flex-col gap-3">
+          {/* Cluster Name */}
+          <div className="flex items-center gap-3">
+            <span style={labelStyle}>Cluster Name</span>
+            <FocusInput value={clusterName} onChange={setClusterName} />
+          </div>
+
+          {/* Gateway Version */}
+          <div className="flex items-center gap-3">
+            <span style={labelStyle}>Gateway Version</span>
+            <span style={staticValueStyle}>v0.3.0</span>
+          </div>
+
+          {/* Gateway Uptime */}
+          <div className="flex items-center gap-3">
+            <span style={labelStyle}>Gateway Uptime</span>
+            <span style={staticValueStyle}>{uptimeDisplay}</span>
+          </div>
+
+          {/* Database Stats */}
+          <div className="flex items-center gap-3">
+            <span style={labelStyle}>Database Stats</span>
+            <span style={{ ...staticValueStyle, color: 'var(--text-secondary)' }}>
+              {totalNodes} node{totalNodes !== 1 ? 's' : ''} registered
+              {' \u00B7 '}
+              {onlineCount} online
+              {summary?.total_gpus != null && (
+                <>
+                  {' \u00B7 '}
+                  {summary.total_gpus} GPU{summary.total_gpus !== 1 ? 's' : ''}
+                </>
+              )}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ────────── Section 2: Notifications ────────── */}
+      <div style={cardStyle}>
+        <div style={accentLine} />
+        <h3 style={sectionHeadingStyle}>Notifications</h3>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', background: 'transparent' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th style={headerCellStyle}>Channel</th>
+                <th style={headerCellStyle}>Type</th>
+                <th style={headerCellStyle}>Target</th>
+                <th style={headerCellStyle}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {MOCK_CHANNELS.map((ch, i) => (
+                <tr
+                  key={i}
+                  style={{ background: 'transparent', transition: 'background 0.15s' }}
+                  onMouseEnter={handleRowEnter}
+                  onMouseLeave={handleRowLeave}
+                >
+                  <td style={{ ...tableCellStyle, color: 'var(--cyan)', fontWeight: 500 }}>
+                    {ch.name}
+                  </td>
+                  <td style={{ ...tableCellStyle, color: 'var(--text-secondary)' }}>
+                    {ch.type}
+                  </td>
+                  <td style={{ ...tableCellStyle, color: 'var(--text-secondary)' }}>
+                    {ch.target}
+                  </td>
+                  <td style={tableCellStyle}>
+                    {ch.active ? (
+                      <span style={{ color: 'var(--green)' }}>Active &#10003;</span>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>Disabled</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <OutlineButton>+ Add Channel</OutlineButton>
+        </div>
+      </div>
+
+      {/* ────────── Section 3: Power & Cost Configuration ────────── */}
+      <div style={cardStyle}>
+        <div style={accentLine} />
+        <h3 style={sectionHeadingStyle}>Power &amp; Cost Configuration</h3>
+
+        <div className="flex flex-col gap-3">
+          {/* Electricity Rate */}
+          <div className="flex items-center gap-3">
+            <span style={labelStyle}>Electricity Rate</span>
+            <FocusInput
+              value={electricityRate}
+              onChange={setElectricityRate}
+              suffix="$/kWh"
+              style={{ maxWidth: 120 }}
+            />
+          </div>
+
+          {/* Budget Limit */}
+          <div className="flex items-center gap-3">
+            <span style={labelStyle}>Budget Limit</span>
+            <FocusInput
+              value={budgetLimit}
+              onChange={setBudgetLimit}
+              placeholder="Optional"
+              suffix="$/month"
+              style={{ maxWidth: 120 }}
+            />
+          </div>
+
+          {/* Budget Alert Threshold */}
+          <div className="flex items-center gap-3">
+            <span style={labelStyle}>Alert Threshold</span>
+            <FocusInput
+              value={budgetThreshold}
+              onChange={setBudgetThreshold}
+              suffix="%"
+              style={{ maxWidth: 80 }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ────────── Section 4: Cluster Operations ────────── */}
+      <div
+        style={{
+          ...cardStyle,
+          borderColor: 'rgba(255,70,70,0.2)',
+        }}
+      >
+        {/* Red accent line instead of cyan/purple */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 2,
+            background: 'var(--red)',
+            opacity: 0.6,
+          }}
+        />
+        <h3 style={{ ...sectionHeadingStyle, color: 'var(--red)' }}>
+          Cluster Operations
+        </h3>
+        <p
+          style={{
+            fontSize: 11,
+            color: 'var(--text-muted)',
+            marginBottom: 14,
+            marginTop: -4,
+          }}
+        >
+          Dangerous actions &mdash; use with caution
+        </p>
+
+        <div className="flex flex-wrap gap-3">
+          <OutlineButton color="var(--text-secondary)">Export Cluster Config</OutlineButton>
+          <OutlineButton color="var(--text-secondary)">Import Cluster Config</OutlineButton>
+          <OutlineButton color="var(--red)">Rotate Cluster Secret</OutlineButton>
+          <OutlineButton color="var(--red)">
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 16 16"
+              fill="none"
+              style={{ flexShrink: 0 }}
+            >
+              <path
+                d="M8 1.5L1 14h14L8 1.5z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+              <path d="M8 6v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="8" cy="12" r="0.75" fill="currentColor" />
+            </svg>
+            Reboot All Nodes
+          </OutlineButton>
+        </div>
+      </div>
+    </div>
+  );
+}

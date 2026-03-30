@@ -110,6 +110,12 @@ export type SSEEvent =
   | { type: 'command_completed'; command_id: string }
   | { type: 'watchdog_event'; node_id: string; level: number; action: string };
 
+export interface ModelDistribution {
+  model: string;
+  nodes: number;
+  locations: Array<{ node_id: string; hostname: string }>;
+}
+
 export type ResourceType = 'cluster' | 'node' | 'gpu' | 'model';
 export interface ResourceSelection {
   type: ResourceType;
