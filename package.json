@@ -1,8 +1,13 @@
 {
     "name": "tentaclaw-os",
-    "version": "0.1.0",
+    "version": "0.3.0",
     "private": true,
     "description": "TentaCLAW OS — Distributed AI inference cluster operating system",
+    "homepage": "https://www.tentaclaw.io",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/TentaCLAW-OS/TentaCLAW.git"
+    },
     "workspaces": [
         "gateway",
         "agent",

@@ -48,32 +48,23 @@ matrix, space, logo
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/v1/nodes/register` | Register node |
-| POST | `/api/v1/nodes/:id/stats` | Push stats |
-| GET | `/api/v1/nodes/:id/commands` | Get commands |
-| GET | `/api/v1/nodes/:id/config` | Get config |
+| POST | `/api/v1/register` | Register node |
+| POST | `/api/v1/nodes/:nodeId/stats` | Push stats |
 | GET | `/api/v1/nodes` | List nodes |
-| POST | `/api/v1/nodes/:id/commands` | Push command |
-| DELETE | `/api/v1/nodes/:id` | Remove node |
-
-## Gateway Legacy Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/status` | Full status |
-| GET | `/api/routes` | List routes |
-| POST | `/api/route` | Add route |
-| POST | `/api/deploy` | Deploy model |
-| POST | `/api/stream/:requestId` | Stream request |
+| GET | `/api/v1/nodes/:nodeId` | Get node details |
+| POST | `/api/v1/nodes/:nodeId/commands` | Push command |
+| DELETE | `/api/v1/nodes/:nodeId` | Remove node |
+| POST | `/api/v1/deploy` | Deploy model |
+| GET | `/health` | Health check |
+| GET | `/api/v1/summary` | Cluster summary |
+| GET | `/api/v1/models` | List models |
 
 ## Key Files
 
 | Path | Description |
 |------|-------------|
 | `/etc/tentaclaw/agent.conf` | Agent config |
-| `/etc/tentaclaw/gateway.conf` | Gateway config |
-| `/etc/hive-config/` | Hive-style config |
+| `/etc/tentaclaw/rig.conf` | Node config (gateway URL, farm hash) |
 | `/var/log/tentaclaw/` | Logs |
 | `/usr/share/clawtopus/` | CLAWtopus assets |
 
@@ -92,18 +83,18 @@ matrix, space, logo
 
 | Param | Description |
 |-------|-------------|
-| `tentaclaw.meme=on` | Meme mode |
+| `tentaclaw.gateway=<ip>` | Set gateway URL |
 | `tentaclaw.verbose=MAX` | Max verbosity |
-| `tentaclaw.colors=RAINBOW` | Rainbow mode |
 
 ## Ports
 
-| Port | Service |
-|------|---------|
-| 22 | SSH |
-| 80 | Gateway HTTP |
-| 443 | Gateway HTTPS |
-| 3000 | Dev server |
+| Port | Protocol | Service |
+|------|----------|---------|
+| 8080 | TCP | Gateway (API + Dashboard) |
+| 11434 | TCP | Ollama inference |
+| 8082 | TCP | BitNet inference |
+| 41337 | UDP | Auto-discovery broadcast |
+| 41338 | UDP | Discovery response |
 
 ## Colors
 
@@ -116,4 +107,4 @@ Text:      White   #F0F0F0
 
 ---
 
-*"Eight arms, eight GPUs, infinite possibilities."* 🐙
+*"Eight arms, eight GPUs, infinite possibilities."*

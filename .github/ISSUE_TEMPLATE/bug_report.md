@@ -20,7 +20,7 @@ What should have happened?
 ## Environment
 - OS: [e.g., Ubuntu 24.04, Windows 11]
 - Node.js version: [e.g., 22.x]
-- TentaCLAW version: [e.g., 0.2.0]
+- TentaCLAW version: [e.g., 0.3.0]
 - GPU: [e.g., NVIDIA RTX 3090, AMD RX 7900 XTX]
 - Component: [gateway / agent / CLI / dashboard]
 

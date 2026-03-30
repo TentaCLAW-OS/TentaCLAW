@@ -2,6 +2,8 @@
 
 # === Internal / Private Files ===
 MASTER-PLAN*.md
+MASTER-*PLAN*.md
+README.TXT
 docs/PRICING.md
 docs/MASTERPLAN*.md
 docs/CLAWTOPUS_MOB_QUOTES.md

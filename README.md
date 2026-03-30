@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/github/actions/workflow/status/TentaCLAW-OS/TentaCLAW/ci.yml?style=flat-square&label=build&color=00d4aa" alt="Build"></a>
-  <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/badge/tests-429%20passing-00d4aa?style=flat-square" alt="Tests"></a>
+  <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/badge/tests-810%20passing-00d4aa?style=flat-square" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b5cf6?style=flat-square" alt="License"></a>
   <a href="https://github.com/TentaCLAW-OS/TentaCLAW/stargazers"><img src="https://img.shields.io/github/stars/TentaCLAW-OS/TentaCLAW?style=flat-square&color=ffdd00" alt="Stars"></a>
   <a href="https://discord.gg/tentaclaw"><img src="https://img.shields.io/badge/Discord-The%20Tank-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
@@ -28,16 +28,6 @@
 </p>
 
 ---
-
-<!-- TODO: Add asciinema recording showing:
-  1. curl install one-liner
-  2. Gateway boots, dashboard opens
-  3. Two agents auto-discover and register
-  4. `clawtopus status` shows the cluster
-  5. `clawtopus deploy llama3.1:8b` deploys a model
-  6. `clawtopus chat` sends a prompt and streams a response
-  7. Dashboard updates in real-time with GPU stats
--->
 
 ## Install in 60 Seconds
 
@@ -98,7 +88,7 @@ There are GPU inference tools. There are model runners. There are cluster schedu
 <tr><td><strong>Flight sheets (declarative deploy)</strong></td><td align="center">Yes</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
 <tr><td><strong>OpenAI-compatible API</strong></td><td align="center">Yes</td><td align="center">Yes</td><td align="center">Yes</td><td align="center">Yes</td><td align="center">Yes</td></tr>
 <tr><td><strong>GPU overclocking</strong></td><td align="center">Yes</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
-<tr><td><strong>Package marketplace</strong></td><td align="center">CLAWHub (62 pkgs)</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
+<tr><td><strong>Package marketplace</strong></td><td align="center">CLAWHub (185 pkgs)</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
 <tr><td><strong>MCP server (AI agent access)</strong></td><td align="center">Yes</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
 <tr><td><strong>Game engine bridge (UE5/Unity)</strong></td><td align="center">SSE stream</td><td align="center">No</td><td align="center">No</td><td align="center">No</td><td align="center">No</td></tr>
 <tr><td><strong>NVIDIA + AMD + Intel + Apple Silicon + CPU</strong></td><td align="center">All</td><td align="center">NVIDIA + AMD</td><td align="center">All</td><td align="center">NVIDIA</td><td align="center">Apple + NVIDIA</td></tr>
@@ -128,15 +118,15 @@ There are GPU inference tools. There are model runners. There are cluster schedu
 
 **Operations**
 - :octopus: **86-Command CLI** -- `clawtopus top`, `deploy`, `chat`, `drain`, `doctor`, `auto`, `gpu-map`, and 80 more. Full cluster control from your terminal.
-- :package: **CLAWHub Marketplace** -- 62 packages: agents, flight sheets, integrations, hardware profiles, themes. Install with one command.
+- :package: **CLAWHub Marketplace** -- 185 packages: agents, skills, flight sheets, integrations, adapters, stacks, themes. Install with one command.
 - :joystick: **Game Engine Bridge** -- SSE stream for Unreal Engine 5 / Unity. Visualize your cluster as a living neural network.
 - :satellite: **Observability Stack** -- Prometheus metrics, Grafana dashboards, structured logging, alert channels (Discord, Slack, Telegram, webhooks).
 
 ---
 
-## What's New in v2.0
+## What's New in v0.3.0
 
-- **CLAWHub Marketplace** -- 62 installable packages: agents, skills, flight sheets, integrations, themes
+- **CLAWHub Marketplace** -- 185 installable packages: agents, skills, flight sheets, integrations, themes, adapters, stacks
 - **6 inference backends** -- Ollama, vLLM, SGLang, llama.cpp, BitNet, MLX with per-node backend management
 - **86 CLI commands** -- `top`, `drain`, `cordon`, `doctor`, `auto`, `optimize`, `gpu-map`, `vibe`, `analytics`, and more
 - **280+ API endpoints** -- Full REST API, OpenAI proxy, SSE events, game engine bridge, Prometheus metrics
@@ -152,7 +142,7 @@ There are GPU inference tools. There are model runners. There are cluster schedu
 - **Inference analytics** -- Request counts, latency p50/p95/p99, model usage breakdown
 - **Helm chart + Terraform + Ansible** -- Deploy anywhere, any way
 - **Observability stack** -- Prometheus + Grafana with pre-built dashboards
-- **429 tests passing** -- Gateway, agent, CLI, shared, integration, and e2e suites
+- **810 tests passing** -- Gateway, agent, CLI, shared, integration, and e2e suites
 
 ---
 
@@ -268,7 +258,7 @@ helm install tentaclaw tentaclaw/tentaclaw \
 | **MCP Server** | `mcp/` | Model Context Protocol server -- AI agents manage your cluster via tool calls. Zero deps. |
 | **SDK** | `sdk/` | TypeScript SDK for programmatic gateway access. |
 | **Shared** | `shared/` | Shared type definitions -- agent/gateway/CLI/MCP contract, personality engine, ASCII art. |
-| **CLAWHub** | `clawhub/` | Package marketplace -- registry, schema validation, 62 packages across 5 categories. |
+| **CLAWHub** | `clawhub/` | Package marketplace -- registry, schema validation, 185 packages across 8 categories. |
 | **Builder** | `builder/` | ISO/PXE build system -- debootstrap Ubuntu 24.04, custom initrd, GRUB BIOS+UEFI. |
 | **Observability** | `observability/` | Prometheus + Grafana stack with pre-built dashboards and alerting rules. |
 | **Deploy** | `deploy/` | Helm chart, Terraform modules, Ansible playbooks, Kubernetes manifests, Docker production compose. |
@@ -304,18 +294,21 @@ helm install tentaclaw tentaclaw/tentaclaw \
 
 ## CLAWHub Marketplace
 
-> 62 packages. Install with one command.
+> 185 packages. Install with one command.
 
-CLAWHub is the package registry for TentaCLAW OS. Agents, flight sheets, integrations, hardware profiles, and themes -- all declarative YAML, all versioned.
+CLAWHub is the package registry for TentaCLAW OS. Agents, flight sheets, integrations, skills, adapters, stacks, themes, and more -- all declarative YAML, all versioned.
 
 | Category | Count | Examples |
 |----------|-------|---------|
-| **Agents** | 36 | `deep-researcher`, `code-reviewer`, `bug-hunter`, `blog-writer`, `threat-analyst`, `contract-reviewer`, `cluster-monitor`, `cost-optimizer` |
-| **Flight Sheets** | 9 | `llama3-8b`, `deepseek-r1-70b`, `bitnet-cpu`, `qwen3.5-72b`, `whisper-stt`, `flux2-image`, `kokoro-tts` |
-| **Integrations** | 9 | Grafana, Discord, Home Assistant, n8n, Continue.dev, LangChain, CrewAI, Dify, Open WebUI |
-| **Hardware Profiles** | 1 | `rtx-4090-inference` (more coming) |
-| **Themes** | 3 | `deep-ocean`, `terminal-green`, `cyberpunk` |
+| **Agents** | 66 | `deep-researcher`, `code-reviewer`, `bug-hunter`, `blog-writer`, `threat-analyst`, `contract-reviewer`, `cluster-monitor`, `cost-optimizer` |
+| **Skills** | 27 | `web-search`, `shell-exec`, `docker-manager`, `pdf-parser`, `sql-executor`, `slack-poster` |
+| **Integrations** | 24 | Grafana, Discord, Home Assistant, n8n, Continue.dev, LangChain, CrewAI, Dify, Open WebUI, Telegram, Notion |
+| **Flight Sheets** | 24 | `llama3-8b`, `deepseek-r1-70b`, `bitnet-cpu`, `qwen3.5-72b`, `whisper-stt`, `flux2-image`, `kokoro-tts`, `llama4-scout` |
+| **Adapters** | 20 | `code-python`, `medical-terminology`, `creative-writing`, `formal-english`, `sql-expert` |
+| **Themes** | 8 | `deep-ocean`, `terminal-green`, `cyberpunk`, `dracula`, `nord`, `catppuccin`, `tokyo-night`, `rose-pine` |
+| **Stacks** | 8 | `rag-stack`, `code-assistant-stack`, `voice-ai-stack`, `enterprise-chat-stack`, `homelab-starter-stack` |
 | **Examples** | 5 | Agent, skill, model, integration, theme templates |
+| **Other** | 3 | Hardware profiles, deployment recipes |
 
 ```bash
 clawtopus hub install deep-researcher
@@ -470,12 +463,12 @@ The octopus that runs your cluster. Eight arms, each with a job.
 
 | Metric | Count |
 |--------|-------|
-| Tests passing | **429** |
-| Lines of code | **41,000+** |
-| Modules | **38** |
+| Tests passing | **810** |
+| Lines of code | **68,000+** |
+| Source modules | **57** |
 | API endpoints | **280+** |
 | CLI commands | **86** |
-| CLAWHub packages | **62** |
+| CLAWHub packages | **185** |
 | Inference backends | **6** |
 | Deploy methods | **8** |
 

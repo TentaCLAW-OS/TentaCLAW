@@ -1,33 +1,31 @@
 # TentaCLAW OS — Roadmap to v1.0
 
-> Reverse-engineered from TentaCLAW architecture, adapted for AI inference.
-> 1000 phases organized into 20 milestones.
+> From v0.2.0 to production-ready: the full plan.
+> Organized into milestones with prioritized phases.
 
 ## Current State (v0.2.0)
 
 - 72 API endpoints, 11 DB tables, 57 tests
 - 4 real AMD GPU nodes reporting (9 GPUs, 25 Ollama models)
 - CLAWtopus CLI with model search, doctor mode, package manager
-- Dashboard (needs major work)
+- Dashboard (functional, planned for rewrite)
 - Mock agent for development
 - AMD + NVIDIA GPU detection via sysfs/nvidia-smi
 
-## What TentaCLAW Does That We Don't (Yet)
+## Key Gaps to Close
 
-### Critical Gaps
-1. **Rig.conf auto-generation** — TentaCLAW generates config on first boot from Farm Hash URL
-2. **Watchdog** — GPU hang detection, auto-reboot, hashrate (tok/s) monitoring with thresholds
-3. **Per-GPU overclocking from dashboard** — core clock, mem clock, power limit, fan curve per card
-4. **Auto-fan** — temperature-based fan curve that runs locally on each node
-5. **Remote shell** — web-based terminal into any rig from the dashboard
-6. **Telegram/Discord alerts** — real-time notifications, not just in-dashboard
-7. **Bulk operations** — select 50 rigs, apply flight sheet to all
-8. **Auto-update** — agent self-updates from gateway or GitHub
-9. **VPN/WAN** — rigs behind NAT can still connect (like TentaCLAW uses WireGuard)
-10. **Worker screenshots** — see what the rig's screen shows (for debugging)
-11. **Uptime tracking** — historical uptime percentage per rig
-12. **Wallet management** → replaced by **API key management** for inference
-13. **Pool management** → replaced by **Model registry** and **endpoint routing**
+### Critical Features Needed
+1. **Rig.conf auto-generation** -- Auto-generate config on first boot from Farm Hash URL
+2. **Watchdog** -- GPU hang detection, auto-reboot, tok/s monitoring with thresholds
+3. **Per-GPU overclocking from dashboard** -- Core clock, mem clock, power limit, fan curve per card
+4. **Auto-fan** -- Temperature-based fan curve that runs locally on each node
+5. **Remote shell** -- Web-based terminal into any node from the dashboard
+6. **Telegram/Discord alerts** -- Real-time notifications, not just in-dashboard
+7. **Bulk operations** -- Select multiple nodes, apply flight sheet to all
+8. **Auto-update** -- Agent self-updates from gateway or GitHub
+9. **VPN/WAN** -- Nodes behind NAT can still connect via WireGuard
+10. **Worker screenshots** -- See what the node's screen shows (for debugging)
+11. **Uptime tracking** -- Historical uptime percentage per node
 
 ---
 
@@ -103,7 +101,7 @@ The #1 feature that makes TentaCLAW indispensable. If a GPU hangs or inference s
 - [ ] 51. WebSocket-based terminal — gateway proxies shell to agent
 - [ ] 52. Agent opens reverse shell tunnel to gateway on connect
 - [ ] 53. Dashboard terminal widget — xterm.js in browser
-- [ ] 54. Authentication — only farm owner can access shells
+- [ ] 54. Authentication — only cluster administrators can access shells
 - [ ] 55. Command history and audit log
 - [ ] 56. Multi-tab — open shells to multiple nodes simultaneously
 - [ ] 57. File upload/download through the shell
@@ -236,7 +234,7 @@ The #1 feature that makes TentaCLAW indispensable. If a GPU hangs or inference s
 - [ ] 164. IP allowlist per API key
 - [ ] 165. Usage alerts — "key X used 90% of its monthly quota"
 - [ ] 166. Usage dashboard — graphs of requests/tokens per key over time
-- [ ] 167. Billing integration hooks
+- [ ] 167. Usage tracking and reporting hooks
 - [ ] 168. Multi-tenant support — multiple users sharing one cluster
 - [ ] 169. Organization/team support
 - [ ] 170. Role-based access control (admin, operator, viewer)
@@ -277,15 +275,15 @@ The #1 feature that makes TentaCLAW indispensable. If a GPU hangs or inference s
 
 ## Phase 201-300: DASHBOARD OVERHAUL (Milestone 5)
 
-### Phase 201-230: TentaCLAW-Style Dashboard
+### Phase 201-230: Dashboard Rewrite
 - [ ] 201. React/Svelte rewrite (ditch vanilla JS)
 - [ ] 202. Real-time WebSocket updates (not polling)
-- [ ] 203. Worker list with TentaCLAW-style row layout
+- [ ] 203. Node list with compact row layout (GPU bars, status indicators)
 - [ ] 204. GPU cards inline — temp bar, util ring, VRAM bar per GPU
 - [ ] 205. Expandable worker detail — full GPU info, commands, logs
 - [ ] 206. Sortable/filterable worker table
 - [ ] 207. Farm selector dropdown (multi-farm)
-- [ ] 208. Dark mode (TentaCLAW green-on-black aesthetic)
+- [ ] 208. Dark mode (cyan-on-black CLAWtopus aesthetic)
 - [ ] 209. Responsive mobile layout
 - [ ] 210. Keyboard shortcuts (j/k navigate, r refresh, etc.)
 - [ ] 211. GPU temperature heatmap (color grid of all GPUs)
@@ -388,39 +386,27 @@ Build the actual bootable OS.
 
 ---
 
-## Phase 401-500: DAPHNEY INTEGRATION (Milestone 8)
+## Phase 401-500: CLAWtopus CLI POLISH (Milestone 8)
 
-Connect the AI personality layer.
-
-- [ ] 401-420: DaphneyBrain UE5 ↔ Gateway real-time bridge
-- [ ] 421-440: Brain region mapping — each GPU = a neuron cluster
-- [ ] 441-460: Daphney voice commands — "deploy llama to all nodes"
-- [ ] 461-480: Daphney monitors cluster health, speaks alerts
-- [ ] 481-500: Daphney personality responds to inference requests
+- [ ] 401-420: Interactive TUI mode (blessed/ink terminal UI)
+- [ ] 421-440: Auto-completion (bash/zsh/fish)
+- [ ] 441-460: Configuration wizard (`clawtopus init`)
+- [ ] 461-480: Plugin system for custom commands
+- [ ] 481-500: npm package publishing + global install
 
 ---
 
-## Phase 501-600: CLAWtopus CLI POLISH (Milestone 9)
+## Phase 501-600: MARKETPLACE & ECOSYSTEM (Milestone 9)
 
-- [ ] 501-520: Interactive TUI mode (blessed/ink terminal UI)
-- [ ] 521-540: Auto-completion (bash/zsh/fish)
-- [ ] 541-560: Configuration wizard (`clawtopus init`)
-- [ ] 561-580: Plugin system for custom commands
-- [ ] 581-600: npm package publishing + global install
-
----
-
-## Phase 601-700: MARKETPLACE & ECOSYSTEM (Milestone 10)
-
-- [ ] 601-620: Plugin/extension system
-- [ ] 621-640: Model marketplace (community-shared flight sheets)
-- [ ] 641-660: Hardware compatibility database
-- [ ] 661-680: Community benchmarks (submit + compare)
-- [ ] 681-700: TentaCLAW.io website + documentation
+- [ ] 501-520: Plugin/extension system
+- [ ] 521-540: Model marketplace (community-shared flight sheets)
+- [ ] 541-560: Hardware compatibility database
+- [ ] 561-580: Community benchmarks (submit + compare)
+- [ ] 581-600: TentaCLAW.io website + documentation
 
 ---
 
-## Phase 701-800: ENTERPRISE (Milestone 11)
+## Phase 601-700: ENTERPRISE (Milestone 10)
 
 - [ ] Multi-cluster federation
 - [ ] LDAP/SAML/SSO authentication
@@ -435,7 +421,7 @@ Connect the AI personality layer.
 
 ---
 
-## Phase 801-900: ADVANCED INFERENCE (Milestone 12)
+## Phase 701-800: ADVANCED INFERENCE (Milestone 11)
 
 - [ ] Speculative decoding
 - [ ] Tensor parallelism across nodes
@@ -450,7 +436,7 @@ Connect the AI personality layer.
 
 ---
 
-## Phase 901-1000: POLISH & LAUNCH (Milestone 13)
+## Phase 801-900: POLISH & LAUNCH (Milestone 12)
 
 - [ ] Comprehensive documentation
 - [ ] Video tutorials
@@ -471,11 +457,11 @@ Connect the AI personality layer.
 
 ## Priority Order
 
-1. **Watchdog** (Phase 1-50) — makes it production-usable
-2. **Remote Shell** (Phase 51-60) — killer feature for management
-3. **Notifications** (Phase 61-70) — can't run production without alerts
-4. **Per-GPU Overclock** (Phase 31-40) — TentaCLAW core feature
-5. **API Keys** (Phase 151-170) — needed to sell inference access
-6. **Dashboard rewrite** (Phase 201-250) — current one is garbage
-7. **ISO builder** (Phase 301-400) — makes it a real OS
-8. **Everything else** — in order of user demand
+1. **Watchdog** (Phase 1-50) -- Makes it production-usable
+2. **Remote Shell** (Phase 51-60) -- Essential for node management
+3. **Notifications** (Phase 61-70) -- Required for production alerting
+4. **Per-GPU Overclock** (Phase 31-40) -- Core optimization feature
+5. **API Keys** (Phase 151-170) -- Required for multi-user access control
+6. **Dashboard rewrite** (Phase 201-250) -- Current dashboard needs significant improvement
+7. **ISO builder** (Phase 301-400) -- Makes it a true bootable OS
+8. **Everything else** -- In order of user demand

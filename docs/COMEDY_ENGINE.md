@@ -1,17 +1,13 @@
 # TentaCLAW Comedy Engine
 
-Date verified: March 28, 2026
+Design document for the TentaCLAW comedy engine -- a brand-safe humor generator for CLI wait states, dashboard loading screens, and personality-driven UX.
 
-This document replaces the shallow version of the wait-copy work with a deeper design for a project-owned comedy engine.
+## Overview
 
-## Executive Summary
-
-You asked for a system that can entertain users while they wait, but does not steal jokes.
-
-The important conclusion from the research is this:
-- do not scrape comedians from YouTube
-- do not train on or reuse stand-up transcripts as direct generation material unless you clearly have rights
-- do build a local mechanics engine that learns structure, not bits
+TentaCLAW includes a comedy engine that generates humorous wait-state messages without copying existing material. The key principles:
+- Do not scrape comedians from YouTube
+- Do not train on or reuse stand-up transcripts as direct generation material unless you clearly have rights
+- Do build a local mechanics engine that learns structure, not bits
 
 That means the engine should study comedy as:
 - setup
@@ -139,28 +135,16 @@ Recommended mechanics taxonomy:
 
 That is exactly the kind of system that drifts into joke theft.
 
-## Local Model Recommendations For This Machine
+## Recommended Models for Generation
 
-Verified from `ollama list` on March 28, 2026:
-- `qwen3:8b`
-- `hermes3:8b`
-- `gemma3:12b`
-- `nomic-embed-text:latest`
-- plus several custom local models
-
-Practical recommendation:
-- generation: `qwen3:8b` or `hermes3:8b`
-- embedding and near-duplicate screening: `nomic-embed-text:latest`
+For comedy engine generation, 8B-class models are sufficient:
+- Any instruction-tuned 8B model (e.g., Llama 3.1 8B, Qwen 8B, Hermes 8B)
+- An embedding model for near-duplicate screening (e.g., `nomic-embed-text`)
 
 Why:
-- 8B-class models are enough for short controlled microcopy
-- they are cheaper and faster for repeated wait-state generation
-- `nomic-embed-text` is already available locally and fits originality checks
-
-Official Ollama references:
-- https://docs.ollama.com/api/introduction
-- https://docs.ollama.com/api/embed
-- https://docs.ollama.com/capabilities/embeddings
+- 8B-class models are sufficient for short controlled microcopy
+- They are fast for repeated wait-state generation
+- Embedding models enable originality checks against prior outputs
 
 ## Runtime Architecture
 
@@ -211,7 +195,7 @@ For stronger protections, add:
 6. Prefer science, mythology, and fake diagnostics over generic startup banter.
 7. Keep the line short enough to survive repetition.
 
-## Repo Changes In This Pass
+## Implementation Status
 
 ### Implemented
 
@@ -234,11 +218,11 @@ For stronger protections, add:
 
 Those should remain out of scope until the source pipeline is rights-clean.
 
-## Recommended Next Build Steps
+## Next Steps
 
 1. Add a local corpus directory for approved text only.
 2. Build a mechanics-extraction job that stores abstractions instead of text.
-3. Add embedding-based similarity checks using `nomic-embed-text`.
+3. Add embedding-based similarity checks using an embedding model.
 4. Connect the comedy endpoint to the dashboard wait surfaces and CLI joke command.
 5. Add telemetry so weak lines can be retired.
 

@@ -2549,7 +2549,7 @@ function getAutoModelForVram(totalVramMb: number): string | null {
 // API Key Management (Wave 7)
 // =============================================================================
 
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, pbkdf2Sync, timingSafeEqual } from 'crypto';
 
 export function createApiKey(
     name: string,
@@ -3270,23 +3270,51 @@ export interface Session {
 }
 
 /**
- * Hash a password with a random 16-byte salt using SHA-256.
- * Format: salt_hex$hash_hex
+ * Hash a password with PBKDF2 (100k iterations, SHA-512).
+ * Format: pbkdf2$iterations$salt_hex$hash_hex
+ *
+ * Also accepts legacy SHA-256 hashes (salt$hash) for backward compatibility
+ * during verification, but all new hashes use PBKDF2.
  */
+const PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_KEY_LENGTH = 64; // 512 bits
+const PBKDF2_DIGEST = 'sha512';
+
 function hashPassword(password: string): string {
     const salt = randomBytes(16).toString('hex');
-    const hash = createHash('sha256').update(salt + password).digest('hex');
-    return `${salt}$${hash}`;
+    const hash = pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH, PBKDF2_DIGEST).toString('hex');
+    return `pbkdf2$${PBKDF2_ITERATIONS}$${salt}$${hash}`;
 }
 
 /**
- * Verify a password against a salt$hash string.
+ * Verify a password against a stored hash string.
+ * Supports both:
+ *   - New format: pbkdf2$iterations$salt_hex$hash_hex
+ *   - Legacy format: salt_hex$hash_hex (SHA-256, for migration)
+ *
+ * Uses timing-safe comparison to prevent timing attacks.
  */
 function verifyPassword(password: string, stored: string): boolean {
+    if (stored.startsWith('pbkdf2$')) {
+        const parts = stored.split('$');
+        if (parts.length !== 4) return false;
+        const [, iterStr, salt, hash] = parts;
+        const iterations = parseInt(iterStr, 10);
+        if (!iterations || !salt || !hash) return false;
+        const computed = pbkdf2Sync(password, salt, iterations, PBKDF2_KEY_LENGTH, PBKDF2_DIGEST).toString('hex');
+        const computedBuf = Buffer.from(computed, 'hex');
+        const storedBuf = Buffer.from(hash, 'hex');
+        if (computedBuf.length !== storedBuf.length) return false;
+        return timingSafeEqual(computedBuf, storedBuf);
+    }
+    // Legacy SHA-256 format: salt$hash (timing-safe comparison)
     const [salt, hash] = stored.split('$');
     if (!salt || !hash) return false;
     const computed = createHash('sha256').update(salt + password).digest('hex');
-    return computed === hash;
+    const computedBuf = Buffer.from(computed, 'hex');
+    const storedBuf = Buffer.from(hash, 'hex');
+    if (computedBuf.length !== storedBuf.length) return false;
+    return timingSafeEqual(computedBuf, storedBuf);
 }
 
 /**
@@ -3431,7 +3459,13 @@ export function createDefaultAdmin(): User | null {
     if (count > 0) return null;
 
     const password = randomBytes(16).toString('hex');
-    console.log(`[auth] SECURITY: First boot detected. Admin credentials: admin / ${password}. CHANGE IMMEDIATELY.`);
+    console.log(`[auth] SECURITY: First boot detected. Admin password written to: data/.admin-initial-password`);
+    console.log('[auth] CHANGE THIS PASSWORD IMMEDIATELY after first login.');
+    // Write password to a file readable only by the process owner, not to stdout/logs
+    try {
+        const pwPath = path.join(path.dirname(DB_PATH), '.admin-initial-password');
+        fs.writeFileSync(pwPath, `admin:${password}\n`, { mode: 0o600 });
+    } catch { /* best effort — file may not be writable in some envs */ }
 
     return createUser('admin', password, 'admin', undefined);
 }

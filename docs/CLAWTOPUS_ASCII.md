@@ -233,7 +233,7 @@ ${CYAN}         "Just you and me. Cute."${RESET}
 ║    ${TEAL}▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓${RESET}    ║
 ║                                                                  ║
 ║    ${WHITE}Eight arms. One mind. Zero compromises.${RESET}                             ║
-║    ${WHITE}AI inference cluster OS Inference Clusters${RESET}                            ║
+║    ${WHITE}AI inference cluster OS${RESET}                                      ║
 ║                                                                  ║
 ║    ${CYAN}[ CLAWtopus ]${RESET} — Loading...                              ║
 ║                                                                  ║

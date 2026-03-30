@@ -43,7 +43,7 @@ clawtopus apikey create --name "admin" --permissions read,write,admin
 
 Keys can have an expiration date:
 ```bash
-clawtopus apikey create --name "temp" --expires "2025-12-31"
+clawtopus apikey create --name "temp" --expires "2027-12-31"
 ```
 
 ### User Authentication

@@ -3667,7 +3667,8 @@ try {
         // First boot — also generate a cluster secret if none exists
         if (!process.env.TENTACLAW_CLUSTER_SECRET) {
             const secret = getOrCreateClusterSecret();
-            console.log(`[auth] SECURITY: Cluster secret generated on first boot: ${secret}`);
+            console.log(`[auth] SECURITY: Cluster secret generated on first boot (first 8 chars): ${secret.slice(0, 8)}...`);
+            console.log('[auth] Retrieve the full secret via: GET /api/v1/cluster/secret (admin auth required)');
             console.log('[auth] Set TENTACLAW_CLUSTER_SECRET on all agents to this value.');
         }
     }
@@ -4473,9 +4474,22 @@ function setupShellServer(httpServer: any): void {
         const url = new URL(req.url, 'http://localhost');
         const path = url.pathname;
 
+        // --- Authentication for WebSocket connections ---
+        // Agent connections require cluster secret
+        // Dashboard connections require a valid session token or API key
+        const authHeader = req.headers['authorization'] || '';
+        const queryToken = url.searchParams.get('token') || '';
+        const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : queryToken;
+
         // Agent registers its shell tunnel
         const agentMatch = path.match(/^\/ws\/agent-shell\/(.+)$/);
         if (agentMatch) {
+            // Agents must authenticate with the cluster secret
+            if (agentAuthEnabled && bearerToken !== CLUSTER_SECRET) {
+                socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+                socket.destroy();
+                return;
+            }
             const nodeId = decodeURIComponent(agentMatch[1]);
             wss.handleUpgrade(req, socket, head, (ws) => {
                 agentShells.set(nodeId, ws);
@@ -4511,9 +4525,23 @@ function setupShellServer(httpServer: any): void {
             return;
         }
 
-        // Dashboard requests a shell
+        // Dashboard requests a shell — REQUIRES authentication (admin/operator role)
         const dashMatch = path.match(/^\/ws\/shell\/(.+)$/);
         if (dashMatch) {
+            // Dashboard shell requires valid session with admin or operator role
+            const session = bearerToken ? validateSession(bearerToken) : null;
+            const isApiKeyAuth = API_KEY && bearerToken === API_KEY;
+            if (!session && !isApiKeyAuth) {
+                socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+                socket.destroy();
+                return;
+            }
+            if (session && !['admin', 'operator'].includes(session.role)) {
+                socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+                socket.destroy();
+                return;
+            }
+
             const nodeId = decodeURIComponent(dashMatch[1]);
             const agentWs = agentShells.get(nodeId);
 
@@ -5531,9 +5559,12 @@ app.get('/api/v1/config/db-stats', (c) => {
         'ssh_keys', 'node_tags', 'model_pulls', 'uptime_events', 'overclock_profiles', 'watchdog_events',
         'notification_channels', 'inference_log', 'api_keys', 'prompt_cache', 'model_aliases'];
 
+    // Whitelist table names to prevent SQL injection — never concatenate user input into SQL
+    const ALLOWED_TABLES = new Set(tables);
     const stats = tables.map(t => {
         try {
-            const row = d.prepare('SELECT COUNT(*) as cnt FROM ' + t).get() as { cnt: number };
+            if (!ALLOWED_TABLES.has(t) || !/^[a-z_]+$/.test(t)) return { table: t, rows: -1 };
+            const row = d.prepare(`SELECT COUNT(*) as cnt FROM "${t}"`).get() as { cnt: number };
             return { table: t, rows: row.cnt };
         } catch { return { table: t, rows: -1 }; }
     });

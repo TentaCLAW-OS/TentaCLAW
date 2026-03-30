@@ -1,6 +1,6 @@
 {
   "name": "@tentaclaw/sdk",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "TypeScript SDK for the TentaCLAW OS API — manage your GPU inference cluster programmatically",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

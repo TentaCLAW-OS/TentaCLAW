@@ -35,7 +35,7 @@ This is a **full release** covering:
 ### 2.1 Directory Structure
 
 ```
-F:\Daphney-OG\tentaclaw-os\
+tentaclaw-os/
 ├── BUILD.md                          # This file
 ├── README.md                          # User-facing overview
 │
@@ -699,7 +699,7 @@ sudo apt-get install -y \
 ### 4.2 Build Commands
 
 ```bash
-cd F:/Daphney-OG/tentaclaw-os
+cd ./tentaclaw-os
 
 # Full ISO build (~20-30 minutes first time)
 ./builder/build-iso.sh --version 0.1.0 --arch amd64 --output ../TentaCLAW-OS-0.1.0-amd64.iso
@@ -890,7 +890,7 @@ LLAMA_CPP_BRANCH=master
 # Build paths
 ROOTFS=/tmp/tentaclaw-rootfs
 ISO_ROOT=/tmp/tentaclaw-iso
-OUTPUT_DIR=F:/Daphney-OG/
+OUTPUT_DIR=./
 
 # Gateway URL (for kernel cmdline)
 DEFAULT_GATEWAY_URL=
@@ -948,7 +948,7 @@ BUILD_LOG=/tmp/tentaclaw-build.log
 ### Files to Create (in order)
 
 ```
-F:/Daphney-OG/tentaclaw-os/
+./tentaclaw-os/
 ├── BUILD.md                           [THIS FILE]
 ├── README.md                          
 │

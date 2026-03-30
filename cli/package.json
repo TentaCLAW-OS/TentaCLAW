@@ -1,6 +1,6 @@
 {
   "name": "clawtopus-cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CLAWtopus CLI — Eight arms. One mind. Zero compromises. Inference router + cluster management for TentaCLAW OS.",
   "main": "dist/index.js",
   "bin": {

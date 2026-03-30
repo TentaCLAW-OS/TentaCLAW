@@ -38,7 +38,7 @@ consists of:
                |
         +------+------+
         |   Gateway   |       t3.medium / cx22 / any 2+ vCPU server
-        |  :8080 API  |       PostgreSQL, Prometheus, Grafana, Nginx
+        |  :8080 API  |       SQLite, Prometheus, Grafana, Nginx
         +------+------+
                |  Private Network
        +-------+-------+-------+
@@ -68,8 +68,8 @@ Before deploying to any cloud provider:
 terraform --version
 
 # Clone TentaCLAW
-git clone https://github.com/TentaCLAW-OS/tentaclaw-os.git
-cd tentaclaw-os
+git clone https://github.com/TentaCLAW-OS/TentaCLAW.git
+cd TentaCLAW
 ```
 
 ---
@@ -241,8 +241,8 @@ ssh root@YOUR_VULTR_IP
 # 3. Install TentaCLAW
 curl -fsSL https://ollama.com/install.sh | sh
 
-git clone https://github.com/TentaCLAW-OS/tentaclaw-os.git /opt/tentaclaw-os
-cd /opt/tentaclaw-os/agent
+git clone https://github.com/TentaCLAW-OS/TentaCLAW.git /opt/tentaclaw
+cd /opt/tentaclaw/agent
 npm ci --omit=dev && npm run build
 
 # 4. Configure agent
@@ -262,7 +262,7 @@ After=network-online.target ollama.service
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/tentaclaw-os/agent
+WorkingDirectory=/opt/tentaclaw/agent
 Environment=TENTACLAW_GATEWAY_URL=http://YOUR_GATEWAY_IP:8080
 ExecStart=/usr/bin/node dist/index.js
 Restart=always
@@ -314,8 +314,8 @@ curl -fsSL https://ollama.com/install.sh | sh
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs git
 
-git clone https://github.com/TentaCLAW-OS/tentaclaw-os.git /opt/tentaclaw-os
-cd /opt/tentaclaw-os/agent
+git clone https://github.com/TentaCLAW-OS/TentaCLAW.git /opt/tentaclaw
+cd /opt/tentaclaw/agent
 npm ci --omit=dev && npm run build
 
 # Start agent
@@ -361,8 +361,8 @@ nvidia-smi
 
 # Install TentaCLAW
 curl -fsSL https://ollama.com/install.sh | sh
-git clone https://github.com/TentaCLAW-OS/tentaclaw-os.git /opt/tentaclaw-os
-cd /opt/tentaclaw-os/agent && npm ci --omit=dev && npm run build
+git clone https://github.com/TentaCLAW-OS/TentaCLAW.git /opt/tentaclaw
+cd /opt/tentaclaw/agent && npm ci --omit=dev && npm run build
 
 # Run agent
 TENTACLAW_GATEWAY_URL=http://YOUR_GATEWAY:8080 node dist/index.js
@@ -692,8 +692,8 @@ cloud-init init
 ## Further Reading
 
 - [Multi-Cloud Provider Guide](../deploy/terraform/multicloud/README.md) -- Provider comparison and hybrid setup
-- [AWS Terraform Module](../deploy/terraform/aws/) -- Full AWS module with ALB, IAM, S3
-- [Hetzner Terraform Module](../deploy/terraform/) -- Full Hetzner module
+- [AWS Terraform Module](../deploy/terraform/aws/) -- AWS module with ALB, IAM, S3
+- [Hetzner Terraform Module](../deploy/terraform/) -- Hetzner module
 - [Performance Tuning](./PERFORMANCE.md) -- Optimize inference throughput
 - [Security Guide](./SECURITY.md) -- Hardening and compliance
 - [Troubleshooting](./TROUBLESHOOTING.md) -- Common issues and fixes

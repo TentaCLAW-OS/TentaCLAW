@@ -1,6 +1,6 @@
 {
   "name": "@tentaclaw/mcp",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "TentaCLAW MCP Server — Model Context Protocol bridge for AI agents to manage TentaCLAW clusters",
   "main": "dist/index.js",
   "bin": {

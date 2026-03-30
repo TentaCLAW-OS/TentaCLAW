@@ -67,4 +67,4 @@ clawtopus federation models
 
 ---
 
-*CLAWtopus says: "One cluster is a business. Many clusters is an empire."*
+*CLAWtopus says: "One cluster is a start. Many clusters? That's an empire."*

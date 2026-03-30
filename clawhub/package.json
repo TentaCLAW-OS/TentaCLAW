@@ -1,6 +1,6 @@
 {
   "name": "@tentaclaw/clawhub",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "CLAWHub Registry — Package marketplace for the TentaCLAW ecosystem",
   "main": "dist/index.js",
   "bin": {

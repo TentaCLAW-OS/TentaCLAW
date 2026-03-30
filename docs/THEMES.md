@@ -150,4 +150,4 @@ Import `clawtopus-electric.itermcolors`:
 
 ---
 
-*Theme your terminal. Theme your cluster. Theme your life.* 🐙
+*Theme your terminal. Theme your cluster. Theme your life.*

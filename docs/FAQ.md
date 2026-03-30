@@ -10,7 +10,7 @@
 
 TentaCLAW OS is an **AI inference cluster operating system**. It turns scattered GPUs across multiple machines into one unified, self-healing inference cluster. You boot nodes, they auto-discover each other, and you manage everything through a single dashboard and CLI.
 
-Think of it as **HiveOS for AI inference** instead of cryptocurrency mining.
+Think of it as a **complete operating system for AI inference** -- plug-and-play GPU management for AI workloads instead of cryptocurrency mining.
 
 ### 2. How is TentaCLAW different from Ollama, GPUStack, or vLLM?
 
@@ -41,7 +41,7 @@ Yes. TentaCLAW OS is open source under the MIT license. Use it however you want.
 
 ### 5. Is it production-ready?
 
-TentaCLAW OS is in **early release** (v0.2.0). The gateway, agent, CLI, and dashboard are functional and tested (129+ tests). People run it in homelabs today.
+TentaCLAW OS is in **early release** (v0.3.0). The gateway, agent, CLI, and dashboard are functional and tested (810+ tests). People run it in homelabs today.
 
 For mission-critical production workloads, evaluate carefully. The project is moving fast and APIs may change between minor versions.
 

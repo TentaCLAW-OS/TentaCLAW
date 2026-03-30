@@ -198,7 +198,7 @@ ollama serve
 
 **Ollama not installed:**
 ```bash
-curl -fsSL https://ollama.ai/install.sh | sh
+curl -fsSL https://ollama.com/install.sh | sh
 ```
 
 **Ollama service crashed:**

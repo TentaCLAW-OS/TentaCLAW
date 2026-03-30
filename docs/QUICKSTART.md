@@ -85,7 +85,7 @@ On your TentaCLAW gateway server:
 tail -f /var/log/tentaclaw/gateway.log
 
 # Or use the CLI
-tentaclaw nodes
+clawtopus nodes
 ```
 
 Enter the Farm Hash in your dashboard to claim the node.
@@ -96,7 +96,7 @@ Enter the Farm Hash in your dashboard to claim the node.
 
 ```bash
 # Via CLI
-tentaclaw deploy hermes3:latest
+clawtopus deploy hermes3:latest
 
 # Or via API
 curl -X POST http://localhost:8080/api/v1/deploy \
@@ -116,7 +116,7 @@ cd /path/to/pxe-artifacts
 sudo ./setup-pxe.sh
 ```
 
-See [SETUP.md](./SETUP.md) for detailed PXE setup.
+See [NETWORKING.md](./NETWORKING.md) for detailed network setup.
 
 ---
 
@@ -133,7 +133,7 @@ See [SETUP.md](./SETUP.md) for detailed PXE setup.
 
 ### "Gateway unreachable"
 - Ensure TentaCLAW gateway is running
-- Check firewall: `sudo ufw allow 7860/tcp`
+- Check firewall: `sudo ufw allow 8080/tcp`
 
 ### "Registration failed"
 - Node will operate in standalone mode

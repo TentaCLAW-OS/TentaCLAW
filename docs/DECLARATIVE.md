@@ -80,9 +80,9 @@ Each deployment tracks conditions:
 - **Degraded** — Fewer ready replicas than desired
 - **SLAMet** — Meeting latency/availability targets
 
-## Migration from v2
+## Migration from Flight Sheets
 
-Old flight sheets still work. The new declarative system adds:
+Existing flight sheets continue to work. The declarative system adds:
 - Automatic reconciliation (no manual re-deploy needed)
 - SLA tracking and alerting
 - Node affinity and anti-affinity
