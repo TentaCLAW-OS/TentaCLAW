@@ -546,6 +546,68 @@ const MIGRATIONS: Migration[] = [
             `);
         },
     },
+    {
+        version: 10,
+        name: 'add_namespaces_and_multi_tenancy',
+        up: (db: Database.Database) => {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS namespaces (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE,
+                    display_name TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    labels TEXT DEFAULT '{}',
+                    created_at TEXT DEFAULT (datetime('now')),
+                    updated_at TEXT DEFAULT (datetime('now'))
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_namespaces_name ON namespaces(name);
+
+                CREATE TABLE IF NOT EXISTS namespace_quotas (
+                    namespace_id TEXT PRIMARY KEY REFERENCES namespaces(id) ON DELETE CASCADE,
+                    max_gpus INTEGER DEFAULT 0,
+                    max_vram_mb INTEGER DEFAULT 0,
+                    max_models INTEGER DEFAULT 0,
+                    max_requests_per_min INTEGER DEFAULT 0,
+                    max_storage_mb INTEGER DEFAULT 0
+                );
+
+                CREATE TABLE IF NOT EXISTS namespace_usage (
+                    id TEXT PRIMARY KEY,
+                    namespace_id TEXT NOT NULL REFERENCES namespaces(id) ON DELETE CASCADE,
+                    period TEXT NOT NULL,
+                    gpu_hours REAL DEFAULT 0,
+                    vram_hours_gb REAL DEFAULT 0,
+                    tokens_generated INTEGER DEFAULT 0,
+                    requests_served INTEGER DEFAULT 0,
+                    power_kwh REAL DEFAULT 0,
+                    estimated_cost_usd REAL DEFAULT 0,
+                    updated_at TEXT DEFAULT (datetime('now'))
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_ns_usage_ns_period ON namespace_usage(namespace_id, period);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_ns_usage_unique ON namespace_usage(namespace_id, period);
+            `);
+
+            // Add namespace column to nodes table
+            const nodeCols = db.prepare("PRAGMA table_info(nodes)").all() as { name: string }[];
+            if (!nodeCols.some(c => c.name === 'namespace')) {
+                db.exec("ALTER TABLE nodes ADD COLUMN namespace TEXT DEFAULT 'default'");
+            }
+
+            // Add namespace column to api_keys table
+            const keyCols = db.prepare("PRAGMA table_info(api_keys)").all() as { name: string }[];
+            if (!keyCols.some(c => c.name === 'namespace')) {
+                db.exec("ALTER TABLE api_keys ADD COLUMN namespace TEXT DEFAULT 'default'");
+            }
+
+            // Create indexes for namespace lookups
+            db.exec(`
+                CREATE INDEX IF NOT EXISTS idx_nodes_namespace ON nodes(namespace);
+                CREATE INDEX IF NOT EXISTS idx_api_keys_namespace ON api_keys(namespace);
+            `);
+        },
+    },
 ];
 
 /**
