@@ -1,0 +1,40 @@
+name: "@tentaclaw/rtx-4090-inference"
+version: "1.0.0"
+type: model
+title: "RTX 4090 — Inference Optimized Profile"
+description: "Optimal GPU settings for RTX 4090 inference workloads. Power limit tuned for efficiency."
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - hardware-profiles
+tags:
+  - nvidia
+  - rtx-4090
+  - inference
+  - power-optimized
+
+model:
+  type: hardware-profile
+  base_model: "any"
+  hardware:
+    target_gpu: "NVIDIA GeForce RTX 4090"
+    vram_total: "24GB"
+  parameters:
+    power_limit_pct: 80
+    core_offset_mhz: 0
+    mem_offset_mhz: 500
+    fan_speed_pct: 65
+    persistence_mode: true
+    compute_mode: "exclusive_process"
+    ecc_mode: false
+  benchmarks:
+    llama3_8b_toks: 85
+    deepseek_r1_8b_toks: 72
+    codellama_7b_toks: 90
+    power_draw_inference: "180W"
+    power_draw_idle: "15W"
+    tokens_per_watt: 0.47

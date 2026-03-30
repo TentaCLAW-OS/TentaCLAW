@@ -1,0 +1,31 @@
+name: "@tentaclaw/continue-dev"
+version: "1.0.0"
+type: integration
+title: "Continue.dev Configuration"
+description: "Use TentaCLAW as the backend for Continue.dev AI coding assistant in VS Code"
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - developer-tools
+tags:
+  - vscode
+  - continue
+  - coding-assistant
+  - autocomplete
+  - chat
+integration:
+  protocol: rest
+  service: continue-dev
+  entry: ./config/
+  tools:
+    - name: chat_model
+      description: "Chat model configuration pointing at TentaCLAW gateway"
+    - name: autocomplete_model
+      description: "Tab autocomplete model configuration"
+    - name: embeddings_model
+      description: "Embeddings model for codebase indexing"
+  auth:
+    type: bearer-token
+    config_key: TENTACLAW_API_KEY

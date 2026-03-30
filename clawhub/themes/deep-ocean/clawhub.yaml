@@ -1,0 +1,33 @@
+name: "@tentaclaw/deep-ocean"
+version: "1.0.0"
+type: theme
+title: "Deep Ocean — Default Theme"
+description: "The signature TentaCLAW dark theme. Deep sea blues, teal accents, purple highlights."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - full-themes
+tags:
+  - dark
+  - ocean
+  - default
+  - teal
+  - purple
+theme:
+  type: full-theme
+  framework: static
+  entry: ./css/deep-ocean.css
+  preview: ./preview.png
+  variables:
+    background: { type: color, default: "#040810" }
+    surface: { type: color, default: "#0e1520" }
+    panel: { type: color, default: "#121a28" }
+    primary: { type: color, default: "#00d4aa" }
+    secondary: { type: color, default: "#8b5cf6" }
+    text: { type: color, default: "#e8edf5" }
+    dim: { type: color, default: "#5a6a82" }
+    success: { type: color, default: "#00ff88" }
+    warning: { type: color, default: "#ffbd2e" }
+    danger: { type: color, default: "#ff5f57" }

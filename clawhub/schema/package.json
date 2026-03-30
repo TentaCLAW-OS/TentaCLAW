@@ -1,0 +1,26 @@
+{
+  "name": "@tentaclaw/clawhub-schema",
+  "version": "0.1.0",
+  "description": "JSON Schema for CLAWHub package manifests (clawhub.yaml) used by TentaCLAW OS.",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "TentaCLAW OS",
+    "url": "https://tentaclaw.io"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TentaCLAW-OS/tentaclaw-os.git",
+    "directory": "clawhub/schema"
+  },
+  "main": "clawhub.schema.json",
+  "files": [
+    "clawhub.schema.json"
+  ],
+  "keywords": [
+    "tentaclaw",
+    "clawhub",
+    "json-schema",
+    "manifest",
+    "package-registry"
+  ]
+}

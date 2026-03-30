@@ -1,0 +1,45 @@
+name: "@tentaclaw/deepseek-r1-70b-flight"
+version: "1.0.0"
+type: model
+title: "DeepSeek R1 70B — Multi-GPU Deployment"
+description: "Flight sheet for DeepSeek R1 70B across 2+ GPUs with optimal VRAM splitting"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - flight-sheets
+tags:
+  - deepseek
+  - 70b
+  - reasoning
+  - multi-gpu
+  - coding
+
+model:
+  type: flight-sheet
+  base_model: "deepseek-r1"
+  variant: "70b"
+  quantization: "Q4_K_M"
+  format: gguf
+  hardware:
+    minimum_vram: "48GB"
+    recommended_vram: "80GB"
+    compatible_gpus:
+      - "2x RTX 4090 24GB"
+      - "2x RTX 3090 24GB"
+      - "1x A100 80GB"
+      - "4x RTX 4070 Ti 16GB"
+  parameters:
+    context_length: 16384
+    batch_size: 256
+    gpu_layers: 80
+    threads: 16
+    tensor_split: "auto"
+    flash_attention: true
+  benchmarks:
+    tokens_per_second: 18
+    time_to_first_token: 1.2
+    hardware_tested: "2x RTX 4090 NVLink"

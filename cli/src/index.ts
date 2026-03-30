@@ -20,11 +20,22 @@
  *   clawtopus command <nodeId> <action> [--model m]   # Send command
  *   clawtopus flight-sheets                           # List flight sheets
  *   clawtopus apply <flightSheetId>                   # Apply a flight sheet
+ *   clawtopus hub search <query>                      # Search CLAWHub registry
+ *   clawtopus hub install @ns/pkg[@ver]               # Install a package
+ *   clawtopus hub list                                # List installed packages
+ *   clawtopus hub info @ns/pkg                        # Package details
+ *   clawtopus hub publish                             # Publish from clawhub.yaml
+ *   clawtopus hub trending                            # Trending packages
+ *   clawtopus hub star @ns/pkg                        # Star a package
+ *   clawtopus hub init --type agent                   # Create clawhub.yaml
  *   clawtopus help                                    # Show help
  */
 
 import * as http from 'http';
 import * as https from 'https';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 // =============================================================================
 // Brand Colors (ANSI true-color escape sequences)
@@ -214,6 +225,21 @@ async function apiPost(baseUrl: string, path: string, body?: unknown): Promise<u
     const url = baseUrl.replace(/\/+$/, '') + path;
     try {
         const resp = await apiRequest('POST', url, body);
+        if (resp.status >= 400) {
+            const errData = resp.data as Record<string, unknown>;
+            throw new Error(String(errData['error'] || `HTTP ${resp.status}`));
+        }
+        return resp.data;
+    } catch (err) {
+        handleConnectionError(err, baseUrl);
+        process.exit(1);
+    }
+}
+
+async function apiPut(baseUrl: string, path: string, body?: unknown): Promise<unknown> {
+    const url = baseUrl.replace(/\/+$/, '') + path;
+    try {
+        const resp = await apiRequest('PUT', url, body);
         if (resp.status >= 400) {
             const errData = resp.data as Record<string, unknown>;
             throw new Error(String(errData['error'] || `HTTP ${resp.status}`));
@@ -2014,6 +2040,17 @@ function cmdHelp(): void {
     console.log('    ' + padRight(C.green('topology'), 42) + 'Cluster topology view');
     console.log('    ' + padRight(C.green('about'), 42) + 'Version and system info');
     console.log('');
+    console.log('  ' + C.cyan(C.bold('CLAWHUB REGISTRY')));
+    console.log('');
+    console.log('    ' + padRight(C.green('hub search') + ' <query>', 42) + 'Search the CLAWHub registry');
+    console.log('    ' + padRight(C.green('hub install') + ' @ns/pkg[@ver]', 42) + 'Install a package');
+    console.log('    ' + padRight(C.green('hub list'), 42) + 'List installed packages');
+    console.log('    ' + padRight(C.green('hub info') + ' @ns/pkg', 42) + 'Show package details');
+    console.log('    ' + padRight(C.green('hub publish'), 42) + 'Publish from clawhub.yaml');
+    console.log('    ' + padRight(C.green('hub trending'), 42) + 'Trending packages');
+    console.log('    ' + padRight(C.green('hub star') + ' @ns/pkg', 42) + 'Star a package');
+    console.log('    ' + padRight(C.green('hub init') + ' [--type agent]', 42) + 'Create clawhub.yaml template');
+    console.log('');
     console.log('  ' + C.cyan(C.bold('FUN')));
     console.log('');
     console.log('    ' + padRight(C.green('vibe'), 42) + 'How\'s the cluster doing?');
@@ -2037,6 +2074,7 @@ function cmdHelp(): void {
     console.log('  ' + C.cyan(C.bold('ENVIRONMENT')));
     console.log('');
     console.log('    ' + padRight(C.yellow('TENTACLAW_GATEWAY'), 42) + 'Default gateway URL (default: http://localhost:8080)');
+    console.log('    ' + padRight(C.yellow('CLAWHUB_REGISTRY'), 42) + 'CLAWHub registry URL (default: http://localhost:3200)');
     console.log('');
     console.log('  ' + C.cyan(C.bold('ACTIONS')) + C.dim(' (for the command subcommand)'));
     console.log('');
@@ -2090,6 +2128,8 @@ const TIPS = [
     'Deploy BitNet models on CPU-only nodes with `clawtopus deploy bitnet-b1.58`.',
     'Model aliases: `gpt-4` can route to any model you want. Try `clawtopus alias`.',
     'The `clawtopus auto` mode lets CLAWtopus decide everything. Trust the octopus.',
+    'Browse CLAWHub with `clawtopus hub trending` — see what the family is building.',
+    'Publish to CLAWHub: `clawtopus hub init && clawtopus hub publish`. Join the family.',
 ];
 
 async function main(): Promise<void> {
@@ -2646,6 +2686,340 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
             process.on('SIGINT', () => { clearInterval(interval); console.log(''); process.exit(0); });
             // Keep process alive
             await new Promise(() => {});
+            break;
+        }
+
+        case 'hub': {
+            const registryUrl = process.env.CLAWHUB_REGISTRY || 'http://localhost:3200';
+            const sub = parsed.positional[0];
+            const packagesDir = path.join(os.homedir(), '.tentaclaw', 'packages');
+
+            switch (sub) {
+                case 'search': {
+                    const query = parsed.positional.slice(1).join(' ');
+                    if (!query) {
+                        console.error('');
+                        console.error(C.red('  \u2718 Missing search query'));
+                        console.error(C.dim('  Usage: clawtopus hub search <query> [--type agent]'));
+                        console.error('');
+                        process.exit(1);
+                    }
+                    const typeFilter = parsed.flags['type'] ? `&type=${encodeURIComponent(parsed.flags['type'])}` : '';
+                    const results = await apiGet(registryUrl, `/v1/search?q=${encodeURIComponent(query)}${typeFilter}`) as { packages: Array<{ name: string; namespace: string; description: string; version: string; type: string; stars: number; downloads: number }> };
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('CLAWHUB SEARCH')) + C.dim(` — "${query}"`));
+                    console.log('');
+                    if (!results.packages || results.packages.length === 0) {
+                        console.log('  ' + C.dim('No results. The streets are quiet for that one.'));
+                    } else {
+                        console.log('  ' + padRight(C.dim('PACKAGE'), 35) + padRight(C.dim('TYPE'), 12) + padRight(C.dim('VERSION'), 12) + padRight(C.dim('STARS'), 8) + C.dim('DESCRIPTION'));
+                        console.log('  ' + C.dim('\u2500'.repeat(90)));
+                        for (const pkg of results.packages) {
+                            const fullName = `@${pkg.namespace}/${pkg.name}`;
+                            console.log('  ' + padRight(C.teal(fullName), 35) + padRight(C.purple(pkg.type || 'pkg'), 12) + padRight(C.white(pkg.version), 12) + padRight(C.yellow('\u2605 ' + pkg.stars), 8) + C.dim(pkg.description || ''));
+                        }
+                    }
+                    console.log('');
+                    break;
+                }
+
+                case 'install': {
+                    const pkgSpec = parsed.positional[1];
+                    if (!pkgSpec) {
+                        console.error('');
+                        console.error(C.red('  \u2718 Missing package name'));
+                        console.error(C.dim('  Usage: clawtopus hub install @ns/package[@version]'));
+                        console.error('');
+                        process.exit(1);
+                    }
+                    // Parse @ns/package[@version]
+                    const atMatch = pkgSpec.match(/^@([^/]+)\/([^@]+)(?:@(.+))?$/);
+                    if (!atMatch) {
+                        console.error('');
+                        console.error(C.red('  \u2718 Invalid package format. Expected @namespace/package[@version]'));
+                        console.error('');
+                        process.exit(1);
+                        break;
+                    }
+                    const [, ns, pkgName, pkgVersion] = atMatch;
+                    const version = pkgVersion || 'latest';
+                    console.log('');
+                    console.log('  ' + C.teal('\uD83D\uDC19') + ' Fetching ' + C.white(`@${ns}/${pkgName}@${version}`) + '...');
+                    const pkgData = await apiGet(registryUrl, `/v1/packages/@${encodeURIComponent(ns)}/${encodeURIComponent(pkgName)}/${encodeURIComponent(version)}`) as { name: string; namespace: string; version: string; manifest: Record<string, unknown> };
+                    // Ensure packages directory exists
+                    const pkgDir = path.join(packagesDir, ns, pkgName, pkgData.version || version);
+                    fs.mkdirSync(pkgDir, { recursive: true });
+                    // Write package manifest
+                    fs.writeFileSync(path.join(pkgDir, 'clawhub.json'), JSON.stringify(pkgData, null, 2));
+                    console.log('  ' + C.green('\u2714') + ' Installed ' + C.teal(`@${ns}/${pkgName}@${pkgData.version || version}`) + ' to ' + C.dim(pkgDir));
+                    console.log('');
+                    console.log('  ' + C.purple('"Package installed. The family grows stronger."'));
+                    console.log('');
+                    break;
+                }
+
+                case 'list': {
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('INSTALLED PACKAGES')) + C.dim(' — ~/.tentaclaw/packages/'));
+                    console.log('');
+                    if (!fs.existsSync(packagesDir)) {
+                        console.log('  ' + C.dim('No packages installed yet. Run: clawtopus hub install @ns/package'));
+                    } else {
+                        const namespaces = fs.readdirSync(packagesDir).filter(f => fs.statSync(path.join(packagesDir, f)).isDirectory());
+                        let count = 0;
+                        for (const nsDir of namespaces) {
+                            const nsPath = path.join(packagesDir, nsDir);
+                            const packages = fs.readdirSync(nsPath).filter(f => fs.statSync(path.join(nsPath, f)).isDirectory());
+                            for (const pkg of packages) {
+                                const pkgPath = path.join(nsPath, pkg);
+                                const versions = fs.readdirSync(pkgPath).filter(f => fs.statSync(path.join(pkgPath, f)).isDirectory());
+                                for (const ver of versions) {
+                                    const manifestPath = path.join(pkgPath, ver, 'clawhub.json');
+                                    let desc = '';
+                                    if (fs.existsSync(manifestPath)) {
+                                        try {
+                                            const m = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+                                            desc = m.description || m.manifest?.description || '';
+                                        } catch { /* ignore */ }
+                                    }
+                                    console.log('  ' + padRight(C.teal(`@${nsDir}/${pkg}`), 35) + padRight(C.white(ver), 12) + C.dim(desc));
+                                    count++;
+                                }
+                            }
+                        }
+                        if (count === 0) {
+                            console.log('  ' + C.dim('No packages installed yet.'));
+                        } else {
+                            console.log('');
+                            console.log('  ' + C.dim(`${count} package(s) installed.`));
+                        }
+                    }
+                    console.log('');
+                    break;
+                }
+
+                case 'info': {
+                    const pkgRef = parsed.positional[1];
+                    if (!pkgRef) {
+                        console.error('');
+                        console.error(C.red('  \u2718 Missing package name'));
+                        console.error(C.dim('  Usage: clawtopus hub info @ns/package'));
+                        console.error('');
+                        process.exit(1);
+                    }
+                    const infoMatch = pkgRef.match(/^@([^/]+)\/(.+)$/);
+                    if (!infoMatch) {
+                        console.error('');
+                        console.error(C.red('  \u2718 Invalid package format. Expected @namespace/package'));
+                        console.error('');
+                        process.exit(1);
+                        break;
+                    }
+                    const [, infoNs, infoName] = infoMatch;
+                    const info = await apiGet(registryUrl, `/v1/packages/@${encodeURIComponent(infoNs)}/${encodeURIComponent(infoName)}`) as { name: string; namespace: string; description: string; type: string; stars: number; downloads: number; versions: Array<{ version: string; created_at: string }>; author: string; license: string };
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold(`@${info.namespace}/${info.name}`)));
+                    console.log('  ' + C.dim(info.description || 'No description'));
+                    console.log('');
+                    console.log('  ' + padRight(C.dim('Type'), 16) + C.purple(info.type || 'package'));
+                    console.log('  ' + padRight(C.dim('Author'), 16) + C.white(info.author || 'unknown'));
+                    console.log('  ' + padRight(C.dim('License'), 16) + C.white(info.license || 'unknown'));
+                    console.log('  ' + padRight(C.dim('Stars'), 16) + C.yellow('\u2605 ' + (info.stars || 0)));
+                    console.log('  ' + padRight(C.dim('Downloads'), 16) + C.white(String(info.downloads || 0)));
+                    console.log('');
+                    if (info.versions && info.versions.length > 0) {
+                        console.log('  ' + C.dim('VERSIONS'));
+                        for (const v of info.versions.slice(0, 10)) {
+                            console.log('    ' + padRight(C.white(v.version), 16) + C.dim(v.created_at || ''));
+                        }
+                        if (info.versions.length > 10) {
+                            console.log('    ' + C.dim(`... and ${info.versions.length - 10} more`));
+                        }
+                    }
+                    console.log('');
+                    break;
+                }
+
+                case 'publish': {
+                    const manifestFile = path.resolve(process.cwd(), 'clawhub.yaml');
+                    if (!fs.existsSync(manifestFile)) {
+                        console.error('');
+                        console.error(C.red('  \u2718 No clawhub.yaml found in current directory'));
+                        console.error(C.dim('  Run "clawtopus hub init" to create one.'));
+                        console.error('');
+                        process.exit(1);
+                    }
+                    // Simple YAML parser — handles key: value, nested blocks, and arrays
+                    const yamlContent = fs.readFileSync(manifestFile, 'utf-8');
+                    const manifest: Record<string, unknown> = {};
+                    const lines = yamlContent.split('\n');
+                    for (const line of lines) {
+                        const trimmed = line.trim();
+                        if (!trimmed || trimmed.startsWith('#')) continue;
+                        const colonIdx = trimmed.indexOf(':');
+                        if (colonIdx > 0) {
+                            const key = trimmed.slice(0, colonIdx).trim();
+                            const val = trimmed.slice(colonIdx + 1).trim();
+                            if (val) {
+                                // Strip quotes
+                                manifest[key] = val.replace(/^["']|["']$/g, '');
+                            }
+                        }
+                    }
+                    if (!manifest['name'] || !manifest['namespace']) {
+                        console.error('');
+                        console.error(C.red('  \u2718 clawhub.yaml must include "name" and "namespace" fields'));
+                        console.error('');
+                        process.exit(1);
+                    }
+                    console.log('');
+                    console.log('  ' + C.teal('\uD83D\uDC19') + ' Publishing ' + C.white(`@${manifest['namespace']}/${manifest['name']}`) + '...');
+                    await apiPost(registryUrl, '/v1/packages', manifest);
+                    console.log('  ' + C.green('\u2714') + ' Published ' + C.teal(`@${manifest['namespace']}/${manifest['name']}@${manifest['version'] || '0.0.1'}`));
+                    console.log('');
+                    console.log('  ' + C.purple('"Published. Your work is now on the streets."'));
+                    console.log('');
+                    break;
+                }
+
+                case 'trending': {
+                    const trending = await apiGet(registryUrl, '/v1/trending') as { packages: Array<{ name: string; namespace: string; description: string; stars: number; downloads: number; type: string }> };
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('TRENDING ON CLAWHUB')));
+                    console.log('  ' + C.purple('"These are the top earners this week."'));
+                    console.log('');
+                    if (!trending.packages || trending.packages.length === 0) {
+                        console.log('  ' + C.dim('Nothing trending yet. Be the first.'));
+                    } else {
+                        console.log('  ' + padRight(C.dim('#'), 4) + padRight(C.dim('PACKAGE'), 35) + padRight(C.dim('TYPE'), 12) + padRight(C.dim('STARS'), 8) + C.dim('DESCRIPTION'));
+                        console.log('  ' + C.dim('\u2500'.repeat(85)));
+                        for (let i = 0; i < trending.packages.length; i++) {
+                            const pkg = trending.packages[i];
+                            const fullName = `@${pkg.namespace}/${pkg.name}`;
+                            const rank = String(i + 1);
+                            console.log('  ' + padRight(C.white(rank), 4) + padRight(C.teal(fullName), 35) + padRight(C.purple(pkg.type || 'pkg'), 12) + padRight(C.yellow('\u2605 ' + pkg.stars), 8) + C.dim(pkg.description || ''));
+                        }
+                    }
+                    console.log('');
+                    break;
+                }
+
+                case 'star': {
+                    const starRef = parsed.positional[1];
+                    if (!starRef) {
+                        console.error('');
+                        console.error(C.red('  \u2718 Missing package name'));
+                        console.error(C.dim('  Usage: clawtopus hub star @ns/package'));
+                        console.error('');
+                        process.exit(1);
+                    }
+                    const starMatch = starRef.match(/^@([^/]+)\/(.+)$/);
+                    if (!starMatch) {
+                        console.error('');
+                        console.error(C.red('  \u2718 Invalid package format. Expected @namespace/package'));
+                        console.error('');
+                        process.exit(1);
+                        break;
+                    }
+                    const [, starNs, starName] = starMatch;
+                    await apiPut(registryUrl, `/v1/packages/@${encodeURIComponent(starNs)}/${encodeURIComponent(starName)}/latest/star`);
+                    console.log('');
+                    console.log('  ' + C.yellow('\u2605') + ' Starred ' + C.teal(`@${starNs}/${starName}`));
+                    console.log('');
+                    console.log('  ' + C.purple('"Starred. I respect that."'));
+                    console.log('');
+                    break;
+                }
+
+                case 'init': {
+                    const initType = parsed.flags['type'] || 'agent';
+                    const initFile = path.resolve(process.cwd(), 'clawhub.yaml');
+                    if (fs.existsSync(initFile)) {
+                        console.error('');
+                        console.error(C.yellow('  \u26A0 clawhub.yaml already exists in this directory'));
+                        console.error('');
+                        process.exit(1);
+                    }
+                    const dirName = path.basename(process.cwd());
+                    const template = [
+                        '# CLAWHub Package Manifest',
+                        '# https://tentaclaw.io/docs/clawhub',
+                        '',
+                        `name: "${dirName}"`,
+                        'namespace: "my-org"',
+                        `version: "0.1.0"`,
+                        `type: "${initType}"`,
+                        `description: "A TentaCLAW ${initType}"`,
+                        'license: "MIT"',
+                        '',
+                        '# Entry point',
+                        `entry: "index.ts"`,
+                        '',
+                        '# Tags for discovery',
+                        '# tags:',
+                        '#   - ai',
+                        '#   - inference',
+                        '',
+                    ].join('\n');
+                    fs.writeFileSync(initFile, template, 'utf-8');
+                    console.log('');
+                    console.log('  ' + C.green('\u2714') + ' Created ' + C.white('clawhub.yaml') + C.dim(` (type: ${initType})`));
+                    console.log('');
+                    console.log('  ' + C.dim('Next steps:'));
+                    console.log('    1. Edit clawhub.yaml with your package details');
+                    console.log('    2. Run ' + C.teal('clawtopus hub publish') + ' to publish');
+                    console.log('');
+                    break;
+                }
+
+                case undefined:
+                case 'help': {
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('CLAWHUB')) + C.dim(' — TentaCLAW Package Registry'));
+                    console.log('  ' + C.dim('"The family takes care of its own."'));
+                    console.log('');
+                    console.log('  ' + C.cyan(C.bold('USAGE')));
+                    console.log('');
+                    console.log('    clawtopus hub <command> [options]');
+                    console.log('');
+                    console.log('  ' + C.cyan(C.bold('COMMANDS')));
+                    console.log('');
+                    console.log('    ' + padRight(C.green('search') + ' <query> [--type agent]', 42) + 'Search the registry');
+                    console.log('    ' + padRight(C.green('install') + ' @ns/package[@version]', 42) + 'Install a package');
+                    console.log('    ' + padRight(C.green('list'), 42) + 'List installed packages');
+                    console.log('    ' + padRight(C.green('info') + ' @ns/package', 42) + 'Show package details');
+                    console.log('    ' + padRight(C.green('publish'), 42) + 'Publish from clawhub.yaml');
+                    console.log('    ' + padRight(C.green('trending'), 42) + 'Trending packages');
+                    console.log('    ' + padRight(C.green('star') + ' @ns/package', 42) + 'Star a package');
+                    console.log('    ' + padRight(C.green('init') + ' [--type agent]', 42) + 'Create clawhub.yaml template');
+                    console.log('    ' + padRight(C.green('help'), 42) + 'Show this help');
+                    console.log('');
+                    console.log('  ' + C.cyan(C.bold('ENVIRONMENT')));
+                    console.log('');
+                    console.log('    ' + padRight(C.yellow('CLAWHUB_REGISTRY'), 42) + 'Registry URL (default: http://localhost:3200)');
+                    console.log('');
+                    console.log('  ' + C.cyan(C.bold('EXAMPLES')));
+                    console.log('');
+                    console.log(C.dim('    # Search for agents'));
+                    console.log('    clawtopus hub search "code review" --type agent');
+                    console.log('');
+                    console.log(C.dim('    # Install a package'));
+                    console.log('    clawtopus hub install @tentaclaw/router-agent@1.0.0');
+                    console.log('');
+                    console.log(C.dim('    # Publish your package'));
+                    console.log('    clawtopus hub init --type agent');
+                    console.log('    clawtopus hub publish');
+                    console.log('');
+                    break;
+                }
+
+                default:
+                    console.error('');
+                    console.error(C.red('  \u2718 Unknown hub command: ' + sub));
+                    console.error(C.dim('  Run "clawtopus hub help" for usage.'));
+                    console.error('');
+                    process.exit(1);
+            }
             break;
         }
 

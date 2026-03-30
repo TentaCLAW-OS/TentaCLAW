@@ -1,0 +1,42 @@
+name: "@tentaclaw/bitnet-cpu-flight"
+version: "1.0.0"
+type: model
+title: "BitNet b1.58 — CPU-Only Deployment"
+description: "1-bit model running on any CPU. No GPU needed. 2-6x faster, 70% less energy."
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - flight-sheets
+tags:
+  - bitnet
+  - cpu
+  - no-gpu
+  - energy-efficient
+  - edge
+
+model:
+  type: flight-sheet
+  base_model: "bitnet-b1.58"
+  variant: "2B"
+  quantization: "1-bit"
+  format: bitnet
+  hardware:
+    minimum_vram: "0GB"
+    recommended_vram: "0GB"
+    compatible_gpus:
+      - "None needed — runs on CPU"
+    minimum_ram: "4GB"
+    recommended_ram: "8GB"
+    minimum_cpu_cores: 4
+  parameters:
+    threads: "auto"
+    batch_size: 512
+    context_length: 4096
+  benchmarks:
+    tokens_per_second: 25
+    time_to_first_token: 0.5
+    hardware_tested: "AMD Ryzen 7 5800X (8 cores)"

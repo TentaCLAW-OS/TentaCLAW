@@ -1,0 +1,48 @@
+name: "@tentaclaw/llama3-8b-flight"
+version: "1.0.0"
+type: model
+title: "Llama 3.1 8B — Standard Deployment"
+description: "Optimal flight sheet for Llama 3.1 8B on consumer GPUs (8GB+ VRAM)"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - flight-sheets
+tags:
+  - llama
+  - 8b
+  - chat
+  - general-purpose
+  - consumer-gpu
+
+model:
+  type: flight-sheet
+  base_model: "llama3.1"
+  variant: "8b-instruct"
+  quantization: "Q4_K_M"
+  format: gguf
+  hardware:
+    minimum_vram: "6GB"
+    recommended_vram: "8GB"
+    compatible_gpus:
+      - "RTX 3060 12GB"
+      - "RTX 3070 8GB"
+      - "RTX 4060 8GB"
+      - "RTX 4070 Ti 16GB"
+      - "RTX 4090 24GB"
+      - "RX 6800 16GB"
+      - "RX 7800 XT 16GB"
+  parameters:
+    context_length: 8192
+    batch_size: 512
+    gpu_layers: 33
+    threads: 8
+    mlock: true
+    mmap: true
+  benchmarks:
+    tokens_per_second: 45
+    time_to_first_token: 0.3
+    hardware_tested: "RTX 4070 Ti Super 16GB"

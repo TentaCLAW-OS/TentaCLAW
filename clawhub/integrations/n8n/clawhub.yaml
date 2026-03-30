@@ -1,0 +1,28 @@
+name: "@tentaclaw/n8n-node"
+version: "1.0.0"
+type: integration
+title: "n8n Community Node"
+description: "TentaCLAW node for n8n workflow automation — deploy models, run inference, monitor cluster"
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - developer-tools
+tags:
+  - n8n
+  - workflow
+  - automation
+  - low-code
+integration:
+  protocol: rest
+  service: n8n
+  entry: ./nodes/TentaCLAW/
+  tools:
+    - name: TentaCLAW
+      description: "Main TentaCLAW node — chat completions, model management, cluster ops"
+    - name: TentaCLAWTrigger
+      description: "Trigger workflows on TentaCLAW events (alerts, node changes, deployments)"
+  auth:
+    type: bearer-token
+    config_key: TENTACLAW_API_KEY

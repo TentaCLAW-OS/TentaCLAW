@@ -1,0 +1,33 @@
+name: "@tentaclaw/home-assistant"
+version: "1.0.0"
+type: integration
+title: "Home Assistant Integration"
+description: "Use TentaCLAW as your Home Assistant AI conversation agent and task provider"
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - smart-home
+tags:
+  - home-assistant
+  - conversation-agent
+  - smart-home
+  - voice
+  - automation
+integration:
+  protocol: rest
+  service: home-assistant
+  entry: ./custom_components/tentaclaw/
+  tools:
+    - name: conversation
+      description: "AI conversation agent for HA voice pipelines"
+    - name: ai_task
+      description: "AI task provider for text generation and summarization"
+    - name: gpu_sensor
+      description: "GPU temperature and utilization sensors"
+    - name: cluster_health
+      description: "Cluster health binary sensor"
+  auth:
+    type: bearer-token
+    config_key: HA_ACCESS_TOKEN

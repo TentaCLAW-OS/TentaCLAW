@@ -1,0 +1,33 @@
+name: "@tentaclaw/terminal-green"
+version: "1.0.0"
+type: theme
+title: "Terminal Green — Retro Hacker"
+description: "Matrix-style green-on-black terminal aesthetic. For those who prefer the classics."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - full-themes
+tags:
+  - dark
+  - retro
+  - terminal
+  - green
+  - hacker
+theme:
+  type: full-theme
+  framework: static
+  entry: ./css/terminal-green.css
+  preview: ./preview.png
+  variables:
+    background: { type: color, default: "#0a0a0a" }
+    surface: { type: color, default: "#111111" }
+    panel: { type: color, default: "#1a1a1a" }
+    primary: { type: color, default: "#00ff41" }
+    secondary: { type: color, default: "#00cc33" }
+    text: { type: color, default: "#00ff41" }
+    dim: { type: color, default: "#005500" }
+    success: { type: color, default: "#00ff41" }
+    warning: { type: color, default: "#ffff00" }
+    danger: { type: color, default: "#ff0000" }

@@ -1,0 +1,101 @@
+# CLAWHub Theme Manifest
+# Schema: https://clawhub.tentaclaw.io/schemas/clawhub/0.1.0/clawhub.schema.json
+
+name: "@tentaclaw/deep-ocean"
+version: "1.0.0"
+type: theme
+title: "Deep Ocean Theme"
+description: "A dark, deep-ocean inspired theme for TentaCLAW OS with bioluminescent accent colors, fluid animations, and a full widget suite."
+license: "MIT"
+
+author:
+  name: "TentaCLAW Team"
+  email: "hello@tentaclaw.io"
+  url: "https://tentaclaw.io"
+
+publisher: "tentaclaw"
+
+categories:
+  - appearance
+  - dark-themes
+
+tags:
+  - dark
+  - ocean
+  - bioluminescent
+  - tentaclaw
+  - dashboard
+
+icon: "assets/icon.png"
+
+screenshots:
+  - "assets/screenshots/dashboard.png"
+  - "assets/screenshots/chat-view.png"
+  - "assets/screenshots/settings-panel.png"
+
+engines:
+  tentaclaw: ">=0.1.0"
+
+repository: "https://github.com/TentaCLAW-OS/theme-deep-ocean"
+homepage: "https://clawhub.tentaclaw.io/packages/@tentaclaw/deep-ocean"
+readme: "README.md"
+
+theme:
+  type: full-theme
+  framework: react
+  entry: "dist/index.js"
+  preview: "assets/preview.png"
+  variables:
+    primary_color:
+      type: color
+      default: "#0d1b2a"
+      description: "Primary background color — deep ocean midnight."
+    secondary_color:
+      type: color
+      default: "#1b2838"
+      description: "Secondary background for panels and cards."
+    accent_color:
+      type: color
+      default: "#00e5ff"
+      description: "Bioluminescent accent color for interactive elements."
+    accent_glow:
+      type: color
+      default: "#00b8d4"
+      description: "Glow color used for hover states and active highlights."
+    text_primary:
+      type: color
+      default: "#e0e0e0"
+      description: "Primary text color."
+    text_secondary:
+      type: color
+      default: "#90a4ae"
+      description: "Secondary/muted text color."
+    font_family:
+      type: font
+      default: "Inter, system-ui, sans-serif"
+      description: "Primary font family stack."
+    font_mono:
+      type: font
+      default: "JetBrains Mono, Fira Code, monospace"
+      description: "Monospace font for code blocks and terminals."
+    border_radius:
+      type: spacing
+      default: "8px"
+      description: "Default border radius for cards and buttons."
+    animation_speed:
+      type: string
+      default: "normal"
+      description: "Animation speed preset: slow, normal, fast, none."
+  widgets:
+    - name: "agent-status-card"
+      description: "Displays real-time status of running agents including token usage and task progress."
+      size: medium
+    - name: "system-metrics"
+      description: "Live system metrics panel showing CPU, GPU, RAM, and VRAM utilization."
+      size: medium
+    - name: "activity-feed"
+      description: "Scrolling feed of recent agent actions, completions, and system events."
+      size: large
+    - name: "quick-launch"
+      description: "Grid of pinned agents and skills for fast access."
+      size: small

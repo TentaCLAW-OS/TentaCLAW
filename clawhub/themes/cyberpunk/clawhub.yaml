@@ -1,0 +1,33 @@
+name: "@tentaclaw/cyberpunk"
+version: "1.0.0"
+type: theme
+title: "Cyberpunk Neon"
+description: "Neon pink, electric blue, and chrome. For the Night City aesthetic."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - full-themes
+tags:
+  - dark
+  - cyberpunk
+  - neon
+  - pink
+  - futuristic
+theme:
+  type: full-theme
+  framework: static
+  entry: ./css/cyberpunk.css
+  preview: ./preview.png
+  variables:
+    background: { type: color, default: "#0d0221" }
+    surface: { type: color, default: "#150535" }
+    panel: { type: color, default: "#1a0a3e" }
+    primary: { type: color, default: "#ff2a6d" }
+    secondary: { type: color, default: "#05d9e8" }
+    text: { type: color, default: "#d1f7ff" }
+    dim: { type: color, default: "#6b4e8e" }
+    success: { type: color, default: "#05d9e8" }
+    warning: { type: color, default: "#f0c800" }
+    danger: { type: color, default: "#ff2a6d" }

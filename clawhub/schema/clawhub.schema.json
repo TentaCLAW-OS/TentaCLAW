@@ -1,0 +1,568 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clawhub.tentaclaw.io/schemas/clawhub/0.1.0/clawhub.schema.json",
+  "title": "CLAWHub Package Manifest",
+  "description": "JSON Schema for clawhub.yaml manifest files used by all CLAWHub packages in the TentaCLAW OS ecosystem.",
+  "type": "object",
+  "required": ["name", "version", "type", "title", "description", "license"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^@[a-z0-9][a-z0-9._-]*/[a-z0-9][a-z0-9._-]*$",
+      "maxLength": 128,
+      "description": "Scoped package name in the format @namespace/package-name. Namespace must be a registered CLAWHub account or organization."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$",
+      "description": "Package version following Semantic Versioning 2.0.0 (x.y.z with optional pre-release and build metadata)."
+    },
+    "type": {
+      "$ref": "#/$defs/packageType"
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 1,
+      "description": "Human-readable display name for the package, shown in the CLAWHub marketplace."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 1,
+      "description": "Brief summary of the package's purpose and capabilities."
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1,
+      "description": "SPDX license identifier (e.g. MIT, Apache-2.0, GPL-3.0-only). See https://spdx.org/licenses/ for valid identifiers."
+    },
+    "author": {
+      "$ref": "#/$defs/author"
+    },
+    "publisher": {
+      "type": "string",
+      "description": "Verified CLAWHub namespace of the publishing organization or individual."
+    },
+    "categories": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "maxItems": 3,
+      "uniqueItems": true,
+      "description": "Up to 3 marketplace categories for discovery (e.g. 'productivity', 'devops', 'creative')."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 50 },
+      "maxItems": 10,
+      "uniqueItems": true,
+      "description": "Up to 10 freeform tags for search and filtering."
+    },
+    "icon": {
+      "type": "string",
+      "description": "Relative path to a square icon image (PNG or SVG, recommended 256x256)."
+    },
+    "screenshots": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Relative paths to screenshot images for the marketplace listing."
+    },
+    "engines": {
+      "$ref": "#/$defs/engines"
+    },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Map of CLAWHub package names to version ranges (e.g. \"@tentaclaw/web-search\": \"^1.0.0\")."
+    },
+    "repository": {
+      "type": "string",
+      "format": "uri",
+      "description": "Git repository URL for the package source code."
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL of the package's homepage or documentation site."
+    },
+    "readme": {
+      "type": "string",
+      "default": "README.md",
+      "description": "Relative path to the readme file. Defaults to README.md."
+    },
+    "agent": {
+      "$ref": "#/$defs/agentConfig"
+    },
+    "skill": {
+      "$ref": "#/$defs/skillConfig"
+    },
+    "model": {
+      "$ref": "#/$defs/modelConfig"
+    },
+    "integration": {
+      "$ref": "#/$defs/integrationConfig"
+    },
+    "theme": {
+      "$ref": "#/$defs/themeConfig"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "agent" } }, "required": ["type"] },
+      "then": { "required": ["agent"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "skill" } }, "required": ["type"] },
+      "then": { "required": ["skill"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "model" } }, "required": ["type"] },
+      "then": { "required": ["model"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "integration" } }, "required": ["type"] },
+      "then": { "required": ["integration"] }
+    },
+    {
+      "if": { "properties": { "type": { "const": "theme" } }, "required": ["type"] },
+      "then": { "required": ["theme"] }
+    }
+  ],
+  "$defs": {
+    "packageType": {
+      "type": "string",
+      "enum": ["agent", "skill", "model", "integration", "theme"],
+      "description": "The type of CLAWHub package."
+    },
+    "author": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Author's display name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Author's contact email."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Author's website or profile URL."
+        }
+      }
+    },
+    "engines": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tentaclaw": {
+          "type": "string",
+          "description": "Required TentaCLAW OS version range (e.g. \">=0.1.0\")."
+        },
+        "gateway": {
+          "type": "string",
+          "description": "Required TentaCLAW Gateway version range."
+        },
+        "node": {
+          "type": "string",
+          "description": "Required Node.js version range (e.g. \">=18.0.0\")."
+        }
+      },
+      "description": "Engine compatibility constraints."
+    },
+    "agentConfig": {
+      "type": "object",
+      "required": ["role", "goal"],
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The agent's role identity — defines what the agent is (e.g. 'Senior Research Analyst')."
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The agent's primary objective — what it aims to accomplish."
+        },
+        "backstory": {
+          "type": "string",
+          "description": "Narrative context that shapes the agent's personality and decision-making style."
+        },
+        "llm": {
+          "$ref": "#/$defs/agentLlm"
+        },
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "description": "List of skill package names this agent can invoke (e.g. '@tentaclaw/web-search')."
+        },
+        "memory": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the agent retains conversational memory across interactions."
+        },
+        "parameters": {
+          "$ref": "#/$defs/agentParameters"
+        },
+        "conversation_starters": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Suggested prompts or conversation starters displayed in the UI."
+        }
+      },
+      "description": "Configuration for agent-type packages."
+    },
+    "agentLlm": {
+      "type": "object",
+      "required": ["default"],
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Default language model identifier (e.g. 'claude-sonnet-4-20250514', 'llama-3.1-70b')."
+        },
+        "minimum": {
+          "type": "string",
+          "description": "Minimum capable model that the agent can function with."
+        },
+        "compatible": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "description": "List of all models tested and verified compatible with this agent."
+        }
+      },
+      "description": "Language model requirements and compatibility."
+    },
+    "agentParameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Sampling temperature for LLM inference. Lower values are more deterministic."
+        },
+        "context_length": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum context window size in tokens."
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of tokens to generate per response."
+        }
+      },
+      "description": "Default inference parameters for the agent's LLM."
+    },
+    "skillConfig": {
+      "type": "object",
+      "required": ["entry", "runtime"],
+      "additionalProperties": false,
+      "properties": {
+        "entry": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative path to the skill's entry point file."
+        },
+        "runtime": {
+          "type": "string",
+          "enum": ["typescript", "python", "binary"],
+          "description": "Execution runtime for the skill."
+        },
+        "transport": {
+          "type": "string",
+          "enum": ["stdio", "http", "websocket"],
+          "default": "stdio",
+          "description": "Communication transport protocol between the skill and the host."
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "description": "Declared capabilities this skill provides (e.g. 'file-read', 'web-fetch', 'code-execute')."
+        },
+        "permissions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true,
+          "description": "System permissions the skill requires (e.g. 'network', 'filesystem', 'env-vars')."
+        },
+        "config_schema": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/configSchemaField"
+          },
+          "description": "Schema for user-configurable settings exposed by this skill."
+        }
+      },
+      "description": "Configuration for skill-type packages."
+    },
+    "configSchemaField": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string", "number", "boolean", "integer", "array", "object"],
+          "description": "Data type of the configuration field."
+        },
+        "required": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this configuration field must be provided by the user."
+        },
+        "default": {
+          "description": "Default value if not provided by the user."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable explanation of this configuration field."
+        }
+      }
+    },
+    "modelConfig": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["flight-sheet", "quant-profile", "deployment-recipe", "hardware-profile"],
+          "description": "The model package sub-type. Flight sheets define full deployment configs; quant profiles define quantization settings; deployment recipes define orchestration; hardware profiles define GPU/CPU mappings."
+        },
+        "base_model": {
+          "type": "string",
+          "description": "Identifier of the base foundation model (e.g. 'meta-llama/Llama-3.1-70B')."
+        },
+        "variant": {
+          "type": "string",
+          "description": "Model variant or fine-tune name (e.g. 'instruct', 'chat', 'code')."
+        },
+        "quantization": {
+          "type": "string",
+          "description": "Quantization scheme applied (e.g. 'Q4_K_M', 'GPTQ-4bit', 'AWQ-4bit')."
+        },
+        "format": {
+          "type": "string",
+          "description": "Model file format (e.g. 'gguf', 'safetensors', 'exl2', 'onnx')."
+        },
+        "hardware": {
+          "$ref": "#/$defs/modelHardware"
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Arbitrary model parameters (rope scaling, context extension, batch size, etc.)."
+        },
+        "benchmarks": {
+          "$ref": "#/$defs/modelBenchmarks"
+        }
+      },
+      "description": "Configuration for model-type packages (flight sheets, quant profiles, deployment recipes, hardware profiles)."
+    },
+    "modelHardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minimum_vram": {
+          "type": "string",
+          "description": "Minimum VRAM required to load and run the model (e.g. '8GB')."
+        },
+        "recommended_vram": {
+          "type": "string",
+          "description": "Recommended VRAM for optimal performance (e.g. '24GB')."
+        },
+        "compatible_gpus": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of known-compatible GPU models (e.g. 'RTX 4090', 'A100 80GB')."
+        }
+      },
+      "description": "Hardware requirements and compatibility for model inference."
+    },
+    "modelBenchmarks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tokens_per_second": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Measured generation throughput in tokens per second."
+        },
+        "time_to_first_token": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Measured latency to first generated token in milliseconds."
+        },
+        "hardware_tested": {
+          "type": "string",
+          "description": "Description of the hardware used for benchmarking."
+        }
+      },
+      "description": "Performance benchmarks for the model configuration."
+    },
+    "integrationConfig": {
+      "type": "object",
+      "required": ["protocol", "service"],
+      "additionalProperties": false,
+      "properties": {
+        "protocol": {
+          "type": "string",
+          "enum": ["mcp", "rest", "websocket", "mqtt", "grpc"],
+          "description": "Communication protocol used by this integration."
+        },
+        "service": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the external service this integration connects to (e.g. 'github', 'slack', 'jira')."
+        },
+        "entry": {
+          "type": "string",
+          "description": "Relative path to the integration's entry point file."
+        },
+        "transport": {
+          "type": "string",
+          "description": "Transport mechanism (e.g. 'stdio', 'sse', 'http')."
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/integrationTool"
+          },
+          "description": "List of tools/actions exposed by this integration."
+        },
+        "auth": {
+          "$ref": "#/$defs/integrationAuth"
+        }
+      },
+      "description": "Configuration for integration-type packages."
+    },
+    "integrationTool": {
+      "type": "object",
+      "required": ["name", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Machine-readable tool name (e.g. 'create_issue', 'send_message')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this tool does."
+        }
+      }
+    },
+    "integrationAuth": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["oauth2", "api-key", "bearer", "basic", "none"],
+          "description": "Authentication method required by the external service."
+        },
+        "config_key": {
+          "type": "string",
+          "description": "Configuration key name where the credential is stored in TentaCLAW's secrets vault."
+        }
+      },
+      "description": "Authentication configuration for the external service."
+    },
+    "themeConfig": {
+      "type": "object",
+      "required": ["type", "framework", "entry"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["full-theme", "widget", "layout"],
+          "description": "Theme package sub-type."
+        },
+        "framework": {
+          "type": "string",
+          "enum": ["react", "vue", "svelte", "static"],
+          "description": "Frontend framework the theme is built with."
+        },
+        "entry": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative path to the theme's entry point file."
+        },
+        "preview": {
+          "type": "string",
+          "description": "Relative path to a preview image of the theme."
+        },
+        "variables": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/themeVariable"
+          },
+          "description": "Customizable theme variables (colors, fonts, spacing, etc.)."
+        },
+        "widgets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/themeWidget"
+          },
+          "description": "UI widgets provided by this theme."
+        }
+      },
+      "description": "Configuration for theme-type packages."
+    },
+    "themeVariable": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["color", "string", "number", "font", "spacing", "boolean"],
+          "description": "Data type of the theme variable."
+        },
+        "default": {
+          "description": "Default value for the variable."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable explanation of what this variable controls."
+        }
+      }
+    },
+    "themeWidget": {
+      "type": "object",
+      "required": ["name", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Machine-readable widget identifier."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the widget's purpose."
+        },
+        "size": {
+          "type": "string",
+          "enum": ["small", "medium", "large", "full"],
+          "description": "Default size hint for dashboard layout."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,63 @@
+# CLAWHub Model / Flight Sheet Manifest
+# Schema: https://clawhub.tentaclaw.io/schemas/clawhub/0.1.0/clawhub.schema.json
+
+name: "@tentaclaw/llama-3.1-70b-q4km"
+version: "1.0.0"
+type: model
+title: "Llama 3.1 70B Q4_K_M Flight Sheet"
+description: "Optimized flight sheet for running Llama 3.1 70B with Q4_K_M quantization on consumer GPUs with 24GB+ VRAM."
+license: "Llama-3.1"
+
+author:
+  name: "TentaCLAW Team"
+  url: "https://tentaclaw.io"
+
+publisher: "tentaclaw"
+
+categories:
+  - language-models
+  - quantization
+
+tags:
+  - llama
+  - 70b
+  - gguf
+  - q4_k_m
+  - local-inference
+
+icon: "assets/icon.png"
+
+engines:
+  tentaclaw: ">=0.1.0"
+
+repository: "https://github.com/TentaCLAW-OS/model-llama-3.1-70b-q4km"
+homepage: "https://clawhub.tentaclaw.io/packages/@tentaclaw/llama-3.1-70b-q4km"
+readme: "README.md"
+
+model:
+  type: flight-sheet
+  base_model: "meta-llama/Llama-3.1-70B-Instruct"
+  variant: "instruct"
+  quantization: "Q4_K_M"
+  format: "gguf"
+  hardware:
+    minimum_vram: "24GB"
+    recommended_vram: "48GB"
+    compatible_gpus:
+      - "NVIDIA RTX 4090"
+      - "NVIDIA RTX A6000"
+      - "NVIDIA A100 40GB"
+      - "NVIDIA A100 80GB"
+      - "AMD Radeon RX 7900 XTX"
+  parameters:
+    context_length: 32768
+    rope_scaling: "dynamic"
+    rope_frequency_base: 500000
+    batch_size: 512
+    n_gpu_layers: -1
+    flash_attention: true
+    tensor_split: null
+  benchmarks:
+    tokens_per_second: 28.5
+    time_to_first_token: 320
+    hardware_tested: "NVIDIA RTX 4090 24GB, DDR5 64GB, PCIe 4.0 x16"

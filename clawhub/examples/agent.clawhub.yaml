@@ -1,0 +1,75 @@
+# CLAWHub Agent Manifest
+# Schema: https://clawhub.tentaclaw.io/schemas/clawhub/0.1.0/clawhub.schema.json
+
+name: "@tentaclaw/research-analyst"
+version: "1.0.0"
+type: agent
+title: "Research Analyst Agent"
+description: "An AI research analyst that gathers, synthesizes, and summarizes information from multiple sources into structured reports."
+license: "Apache-2.0"
+
+author:
+  name: "TentaCLAW Team"
+  email: "hello@tentaclaw.io"
+  url: "https://tentaclaw.io"
+
+publisher: "tentaclaw"
+
+categories:
+  - productivity
+  - research
+
+tags:
+  - research
+  - analysis
+  - summarization
+  - reports
+  - web-search
+
+icon: "assets/icon.png"
+
+screenshots:
+  - "assets/screenshots/conversation.png"
+  - "assets/screenshots/report-output.png"
+
+engines:
+  tentaclaw: ">=0.1.0"
+  gateway: ">=0.1.0"
+
+dependencies:
+  "@tentaclaw/web-search": "^1.0.0"
+  "@tentaclaw/file-writer": "^1.0.0"
+
+repository: "https://github.com/TentaCLAW-OS/research-analyst"
+homepage: "https://clawhub.tentaclaw.io/packages/@tentaclaw/research-analyst"
+readme: "README.md"
+
+agent:
+  role: "Senior Research Analyst"
+  goal: "Gather information from diverse sources, cross-reference findings, and produce clear, well-structured analytical reports."
+  backstory: >
+    You are a meticulous research analyst with decades of experience synthesizing
+    complex information into actionable insights. You always verify claims against
+    multiple sources and clearly distinguish between established facts and
+    informed speculation. You present findings in a structured format with
+    proper citations.
+  llm:
+    default: "claude-sonnet-4-20250514"
+    minimum: "claude-haiku-4-20250414"
+    compatible:
+      - "claude-sonnet-4-20250514"
+      - "claude-haiku-4-20250414"
+      - "llama-3.1-70b"
+  tools:
+    - "@tentaclaw/web-search"
+    - "@tentaclaw/file-writer"
+  memory: true
+  parameters:
+    temperature: 0.3
+    context_length: 128000
+    max_tokens: 4096
+  conversation_starters:
+    - "Research the latest developments in quantum computing."
+    - "Compare the top 5 project management tools for small teams."
+    - "Summarize the key findings from this paper: [paste URL]"
+    - "What are the current trends in the AI agent ecosystem?"

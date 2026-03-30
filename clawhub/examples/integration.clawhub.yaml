@@ -1,0 +1,64 @@
+# CLAWHub Integration Manifest
+# Schema: https://clawhub.tentaclaw.io/schemas/clawhub/0.1.0/clawhub.schema.json
+
+name: "@tentaclaw/github-integration"
+version: "1.0.0"
+type: integration
+title: "GitHub Integration"
+description: "MCP-based integration for GitHub that exposes repository management, issue tracking, pull request workflows, and code search as agent-callable tools."
+license: "MIT"
+
+author:
+  name: "TentaCLAW Team"
+  email: "hello@tentaclaw.io"
+  url: "https://tentaclaw.io"
+
+publisher: "tentaclaw"
+
+categories:
+  - devops
+  - version-control
+
+tags:
+  - github
+  - git
+  - issues
+  - pull-requests
+  - mcp
+  - code-review
+
+icon: "assets/github-icon.svg"
+
+engines:
+  tentaclaw: ">=0.1.0"
+  node: ">=18.0.0"
+
+repository: "https://github.com/TentaCLAW-OS/integration-github"
+homepage: "https://clawhub.tentaclaw.io/packages/@tentaclaw/github-integration"
+readme: "README.md"
+
+integration:
+  protocol: mcp
+  service: "github"
+  entry: "dist/server.js"
+  transport: "stdio"
+  tools:
+    - name: "list_repos"
+      description: "List repositories for the authenticated user or a specified organization."
+    - name: "get_repo"
+      description: "Get detailed information about a specific repository."
+    - name: "create_issue"
+      description: "Create a new issue in a repository with title, body, labels, and assignees."
+    - name: "list_issues"
+      description: "List and filter issues in a repository by state, labels, or assignee."
+    - name: "create_pull_request"
+      description: "Create a new pull request from a head branch to a base branch."
+    - name: "review_pull_request"
+      description: "Submit a review on a pull request with comments and approval status."
+    - name: "search_code"
+      description: "Search for code across repositories using GitHub's code search syntax."
+    - name: "get_file_contents"
+      description: "Retrieve the contents of a file from a repository at a given ref."
+  auth:
+    type: oauth2
+    config_key: "GITHUB_TOKEN"

@@ -414,6 +414,8 @@ app.get('/', (c) => {
             health: '/health',
             dashboard: '/dashboard',
             api: '/api/v1',
+            openai: '/v1/chat/completions',
+            anthropic: '/v1/messages',
         },
     });
 });
@@ -1360,6 +1362,476 @@ app.post('/v1/completions', async (c) => {
     }
 });
 
+// =============================================================================
+// Anthropic Messages API — /v1/messages compatibility
+// =============================================================================
+
+/**
+ * Additional Anthropic model aliases.
+ * These extend the default alias system so Anthropic SDK clients work out of the box.
+ * The base aliases (claude-3-opus, claude-3-sonnet, claude-3-haiku) are already seeded
+ * via ensureDefaultAliases(). These cover the full versioned model names.
+ */
+const ANTHROPIC_MODEL_ALIASES: Record<string, string> = {
+    'claude-3-opus-20240229': 'claude-3-opus',
+    'claude-3-5-opus-20250218': 'claude-3-opus',
+    'claude-3-sonnet-20240229': 'claude-3-sonnet',
+    'claude-3-5-sonnet-20240620': 'claude-3-sonnet',
+    'claude-3-5-sonnet-20241022': 'claude-3-sonnet',
+    'claude-3-haiku-20240307': 'claude-3-haiku',
+    'claude-3-5-haiku-20241022': 'claude-3-haiku',
+    'claude-4-opus-20250514': 'claude-3-opus',
+    'claude-4-sonnet-20250514': 'claude-3-sonnet',
+};
+
+/** Resolve an Anthropic model name through the two-level alias chain. */
+function resolveAnthropicModel(model: string): { target: string; fallbacks: string[]; originalModel: string } {
+    // Level 1: map versioned Anthropic name → base alias name
+    const baseAlias = ANTHROPIC_MODEL_ALIASES[model] || model;
+    // Level 2: resolve through the cluster alias system
+    const resolved = resolveModelAlias(baseAlias);
+    return { target: resolved.target, fallbacks: resolved.fallbacks, originalModel: model };
+}
+
+/** Convert Anthropic messages format to OpenAI messages format. */
+function convertAnthropicToOpenAIMessages(
+    messages: Array<{ role: string; content: unknown }>,
+    system?: string | Array<{ type: string; text: string }>,
+): Array<{ role: string; content: string | null; tool_calls?: unknown[]; tool_call_id?: string; name?: string }> {
+    const result: Array<{ role: string; content: string | null; tool_calls?: unknown[]; tool_call_id?: string; name?: string }> = [];
+
+    // Anthropic puts system at the top level; OpenAI uses a system message
+    if (system) {
+        const systemText = typeof system === 'string'
+            ? system
+            : system.map(b => b.text).join('\n');
+        result.push({ role: 'system', content: systemText });
+    }
+
+    for (const msg of messages) {
+        if (typeof msg.content === 'string') {
+            result.push({ role: msg.role, content: msg.content });
+            continue;
+        }
+
+        // Content blocks — Anthropic uses arrays of typed blocks
+        if (Array.isArray(msg.content)) {
+            const blocks = msg.content as Array<{ type: string; text?: string; id?: string; name?: string; input?: unknown; tool_use_id?: string; content?: unknown }>;
+
+            // tool_result messages → OpenAI tool role
+            if (msg.role === 'user' && blocks.some(b => b.type === 'tool_result')) {
+                for (const block of blocks) {
+                    if (block.type === 'tool_result') {
+                        const toolContent = typeof block.content === 'string'
+                            ? block.content
+                            : Array.isArray(block.content)
+                                ? (block.content as Array<{ text?: string }>).map(c => c.text || '').join('\n')
+                                : JSON.stringify(block.content);
+                        result.push({
+                            role: 'tool',
+                            content: toolContent,
+                            tool_call_id: block.tool_use_id || '',
+                        });
+                    } else if (block.type === 'text' && block.text) {
+                        result.push({ role: 'user', content: block.text });
+                    }
+                }
+                continue;
+            }
+
+            // assistant messages with tool_use blocks → OpenAI tool_calls
+            if (msg.role === 'assistant' && blocks.some(b => b.type === 'tool_use')) {
+                const textParts = blocks.filter(b => b.type === 'text').map(b => b.text || '').join('');
+                const toolCalls = blocks
+                    .filter(b => b.type === 'tool_use')
+                    .map(b => ({
+                        id: b.id || 'call_' + Math.random().toString(36).slice(2, 12),
+                        type: 'function' as const,
+                        function: {
+                            name: b.name || '',
+                            arguments: JSON.stringify(b.input || {}),
+                        },
+                    }));
+                result.push({
+                    role: 'assistant',
+                    content: textParts || null,
+                    tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
+                });
+                continue;
+            }
+
+            // Plain text blocks
+            const text = blocks.map(b => b.text || '').join('');
+            result.push({ role: msg.role, content: text });
+            continue;
+        }
+
+        // Fallback
+        result.push({ role: msg.role, content: String(msg.content) });
+    }
+
+    return result;
+}
+
+/** Convert Anthropic tool definitions to OpenAI format. */
+function convertAnthropicToolsToOpenAI(tools?: Array<{ name: string; description?: string; input_schema?: unknown }>): Array<{ type: string; function: { name: string; description: string; parameters: unknown } }> | undefined {
+    if (!tools || tools.length === 0) return undefined;
+    return tools.map(t => ({
+        type: 'function',
+        function: {
+            name: t.name,
+            description: t.description || '',
+            parameters: t.input_schema || { type: 'object', properties: {} },
+        },
+    }));
+}
+
+/** Generate a message ID in Anthropic format. */
+function generateMsgId(): string {
+    return 'msg_' + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 8);
+}
+
+/** Create an Anthropic-style error response. */
+function anthropicError(type: string, message: string, status: number) {
+    return new Response(JSON.stringify({ type: 'error', error: { type, message } }), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+    });
+}
+
+/** Convert an OpenAI response to Anthropic Messages format. */
+function convertToAnthropicResponse(
+    openaiResult: Record<string, unknown>,
+    requestModel: string,
+): Record<string, unknown> {
+    const choice = ((openaiResult.choices as any[])?.[0]) || {};
+    const message = choice.message || {};
+    const content: Array<{ type: string; text?: string; id?: string; name?: string; input?: unknown }> = [];
+
+    // Text content
+    if (message.content) {
+        content.push({ type: 'text', text: message.content });
+    }
+
+    // Tool calls → tool_use blocks
+    if (message.tool_calls && Array.isArray(message.tool_calls)) {
+        for (const tc of message.tool_calls) {
+            content.push({
+                type: 'tool_use',
+                id: tc.id || 'toolu_' + Math.random().toString(36).slice(2, 12),
+                name: tc.function?.name || '',
+                input: tc.function?.arguments ? JSON.parse(tc.function.arguments) : {},
+            });
+        }
+    }
+
+    // If no content at all, add empty text block
+    if (content.length === 0) {
+        content.push({ type: 'text', text: '' });
+    }
+
+    // Map OpenAI stop reasons to Anthropic format
+    let stopReason: string = 'end_turn';
+    if (choice.finish_reason === 'stop') stopReason = 'end_turn';
+    else if (choice.finish_reason === 'length') stopReason = 'max_tokens';
+    else if (choice.finish_reason === 'tool_calls') stopReason = 'tool_use';
+
+    const usage = openaiResult.usage as { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
+
+    return {
+        id: generateMsgId(),
+        type: 'message',
+        role: 'assistant',
+        content,
+        model: requestModel,
+        stop_reason: stopReason,
+        stop_sequence: null,
+        usage: {
+            input_tokens: usage?.prompt_tokens || 0,
+            output_tokens: usage?.completion_tokens || 0,
+        },
+    };
+}
+
+app.post('/v1/messages', async (c) => {
+    const body = await c.req.json();
+
+    // Validate required fields
+    if (!body.model) {
+        return anthropicError('invalid_request_error', 'model is required', 400);
+    }
+    if (!body.messages || !Array.isArray(body.messages)) {
+        return anthropicError('invalid_request_error', 'messages array is required', 400);
+    }
+    if (body.max_tokens === undefined) {
+        return anthropicError('invalid_request_error', 'max_tokens is required', 400);
+    }
+
+    // Load shedding
+    const qStats = getQueueStats();
+    if (qStats.active >= MAX_QUEUE_DEPTH) {
+        return anthropicError('overloaded_error', 'Cluster is at capacity. Try again shortly.', 529);
+    }
+
+    // Resolve Anthropic model → cluster model
+    const resolved = resolveAnthropicModel(body.model);
+    let resolvedModel = resolved.target;
+
+    let target = findBestNode(resolvedModel);
+    let usedFallback = false;
+
+    if (!target && resolved.fallbacks.length > 0) {
+        for (const fallback of resolved.fallbacks) {
+            target = findBestNode(fallback);
+            if (target) {
+                resolvedModel = fallback;
+                usedFallback = true;
+                break;
+            }
+        }
+    }
+
+    if (!target) {
+        return anthropicError(
+            'not_found_error',
+            'Model "' + body.model + '" is not available' +
+            (body.model !== resolvedModel ? ' (resolved to "' + resolvedModel + '")' : '') +
+            '. Deploy it first.',
+            404,
+        );
+    }
+
+    // Convert Anthropic format → OpenAI format for backend
+    const openaiMessages = convertAnthropicToOpenAIMessages(body.messages, body.system);
+    const openaiTools = convertAnthropicToolsToOpenAI(body.tools);
+
+    const proxyBody: Record<string, unknown> = {
+        model: resolvedModel,
+        messages: openaiMessages,
+        stream: false,
+        max_tokens: body.max_tokens,
+    };
+    if (body.temperature !== undefined) proxyBody.temperature = body.temperature;
+    if (body.top_p !== undefined) proxyBody.top_p = body.top_p;
+    if (body.top_k !== undefined) proxyBody.top_k = body.top_k;
+    if (body.stop_sequences) proxyBody.stop = body.stop_sequences;
+    if (openaiTools) proxyBody.tools = openaiTools;
+    if (body.tool_choice) {
+        // Map Anthropic tool_choice to OpenAI format
+        if (body.tool_choice.type === 'auto') proxyBody.tool_choice = 'auto';
+        else if (body.tool_choice.type === 'any') proxyBody.tool_choice = 'required';
+        else if (body.tool_choice.type === 'tool') {
+            proxyBody.tool_choice = { type: 'function', function: { name: body.tool_choice.name } };
+        }
+    }
+
+    const backendPort = target.backend_port || 11434;
+    const backendUrl = 'http://' + (target.ip_address || target.hostname) + ':' + backendPort + '/v1/chat/completions';
+    const startTime = Date.now();
+
+    // --- Streaming path ---
+    if (body.stream === true) {
+        proxyBody.stream = true;
+
+        try {
+            const proxyReq = await fetch(backendUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(proxyBody),
+            });
+
+            const latencyMs = Date.now() - startTime;
+            recordRouteResult(target.node_id, resolvedModel, latencyMs, proxyReq.ok);
+            logInferenceRequest(target.node_id, resolvedModel, latencyMs, proxyReq.ok);
+
+            if (!proxyReq.ok || !proxyReq.body) {
+                return anthropicError('api_error', 'Backend returned status ' + proxyReq.status, 502);
+            }
+
+            const msgId = generateMsgId();
+
+            // Transform the OpenAI SSE stream → Anthropic SSE stream
+            const reader = proxyReq.body.getReader();
+            const decoder = new TextDecoder();
+            const encoder = new TextEncoder();
+            let buffer = '';
+            let inputTokens = 0;
+            let outputTokens = 0;
+
+            const stream = new ReadableStream({
+                async start(controller) {
+                    // message_start event
+                    const messageStart = {
+                        type: 'message_start',
+                        message: {
+                            id: msgId,
+                            type: 'message',
+                            role: 'assistant',
+                            content: [],
+                            model: body.model,
+                            stop_reason: null,
+                            stop_sequence: null,
+                            usage: { input_tokens: 0, output_tokens: 0 },
+                        },
+                    };
+                    controller.enqueue(encoder.encode('event: message_start\ndata: ' + JSON.stringify(messageStart) + '\n\n'));
+
+                    // content_block_start
+                    const blockStart = {
+                        type: 'content_block_start',
+                        index: 0,
+                        content_block: { type: 'text', text: '' },
+                    };
+                    controller.enqueue(encoder.encode('event: content_block_start\ndata: ' + JSON.stringify(blockStart) + '\n\n'));
+
+                    try {
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+
+                            buffer += decoder.decode(value, { stream: true });
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop() || '';
+
+                            for (const line of lines) {
+                                if (!line.startsWith('data: ')) continue;
+                                const data = line.slice(6).trim();
+                                if (data === '[DONE]') continue;
+
+                                try {
+                                    const chunk = JSON.parse(data);
+                                    const delta = chunk.choices?.[0]?.delta;
+                                    if (!delta) continue;
+
+                                    if (delta.content) {
+                                        const blockDelta = {
+                                            type: 'content_block_delta',
+                                            index: 0,
+                                            delta: { type: 'text_delta', text: delta.content },
+                                        };
+                                        controller.enqueue(encoder.encode('event: content_block_delta\ndata: ' + JSON.stringify(blockDelta) + '\n\n'));
+                                        outputTokens++;
+                                    }
+
+                                    // Capture usage from the final chunk if provided
+                                    if (chunk.usage) {
+                                        inputTokens = chunk.usage.prompt_tokens || inputTokens;
+                                        outputTokens = chunk.usage.completion_tokens || outputTokens;
+                                    }
+                                } catch {
+                                    // Skip malformed chunks
+                                }
+                            }
+                        }
+                    } catch {
+                        // Stream read error — close gracefully
+                    }
+
+                    // content_block_stop
+                    controller.enqueue(encoder.encode('event: content_block_stop\ndata: ' + JSON.stringify({ type: 'content_block_stop', index: 0 }) + '\n\n'));
+
+                    // message_delta (final usage + stop reason)
+                    const messageDelta = {
+                        type: 'message_delta',
+                        delta: { stop_reason: 'end_turn', stop_sequence: null },
+                        usage: { output_tokens: outputTokens },
+                    };
+                    controller.enqueue(encoder.encode('event: message_delta\ndata: ' + JSON.stringify(messageDelta) + '\n\n'));
+
+                    // message_stop
+                    controller.enqueue(encoder.encode('event: message_stop\ndata: ' + JSON.stringify({ type: 'message_stop' }) + '\n\n'));
+
+                    controller.close();
+                },
+            });
+
+            return new Response(stream, {
+                status: 200,
+                headers: {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-TentaCLAW-Node': target.node_id,
+                    'X-TentaCLAW-Hostname': target.hostname,
+                },
+            });
+        } catch (err: any) {
+            recordRouteResult(target.node_id, resolvedModel, Date.now() - startTime, false);
+            logInferenceRequest(target.node_id, resolvedModel, Date.now() - startTime, false, 0, 0, err.message);
+            return anthropicError('api_error', 'Failed to proxy to node ' + target.hostname + ': ' + err.message, 502);
+        }
+    }
+
+    // --- Non-streaming path ---
+    try {
+        const proxyReq = await fetch(backendUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(proxyBody),
+        });
+
+        const latencyMs = Date.now() - startTime;
+        recordRouteResult(target.node_id, resolvedModel, latencyMs, proxyReq.ok);
+        logInferenceRequest(target.node_id, resolvedModel, latencyMs, proxyReq.ok);
+
+        if (!proxyReq.ok) {
+            const errBody = await proxyReq.text();
+            return anthropicError('api_error', 'Backend error: ' + errBody, proxyReq.status);
+        }
+
+        const openaiResult = await proxyReq.json() as Record<string, unknown>;
+        const anthropicResult = convertToAnthropicResponse(openaiResult, body.model);
+
+        // Attach TentaCLAW metadata (non-standard, but useful)
+        (anthropicResult as any)._tentaclaw = {
+            routed_to: target.node_id,
+            hostname: target.hostname,
+            gpu_utilization: target.gpu_utilization_avg,
+            latency_ms: latencyMs,
+            resolved_model: resolvedModel,
+            alias_used: body.model !== resolvedModel ? body.model : undefined,
+            fallback_used: usedFallback ? resolvedModel : undefined,
+            backend: target.backend_type,
+        };
+
+        return c.json(anthropicResult);
+
+    } catch (err: any) {
+        recordRouteResult(target.node_id, resolvedModel, Date.now() - startTime, false);
+        logInferenceRequest(target.node_id, resolvedModel, Date.now() - startTime, false, 0, 0, err.message);
+
+        // Auto-retry on a different node
+        const retry = findBestNode(resolvedModel);
+        if (retry && retry.node_id !== target.node_id) {
+            try {
+                const retryPort = retry.backend_port || 11434;
+                const retryUrl = 'http://' + (retry.ip_address || retry.hostname) + ':' + retryPort + '/v1/chat/completions';
+                const retryReq = await fetch(retryUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(proxyBody),
+                });
+                const retryLatency = Date.now() - startTime;
+                recordRouteResult(retry.node_id, resolvedModel, retryLatency, retryReq.ok);
+
+                const retryResult = await retryReq.json() as Record<string, unknown>;
+                const anthropicRetry = convertToAnthropicResponse(retryResult, body.model);
+                (anthropicRetry as any)._tentaclaw = {
+                    routed_to: retry.node_id,
+                    hostname: retry.hostname,
+                    retried_from: target.node_id,
+                    latency_ms: retryLatency,
+                };
+                return c.json(anthropicRetry);
+            } catch {
+                // Retry also failed — fall through to error
+            }
+        }
+
+        return anthropicError('api_error', 'Failed to proxy to node ' + target.hostname + ': ' + err.message, 502);
+    }
+});
+
 // Embeddings proxy
 app.post('/v1/embeddings', async (c) => {
     const body = await c.req.json();
@@ -1784,6 +2256,7 @@ app.get('/api/v1/discover', (c) => {
         register: '/api/v1/register',
         stats: '/api/v1/nodes/{nodeId}/stats',
         openai: '/v1/chat/completions',
+        anthropic: '/v1/messages',
         dashboard: '/dashboard',
         health: '/health',
     });
@@ -2804,6 +3277,7 @@ app.get('/api/v1/openapi.json', (c) => {
             '/api/v1/deploy': { post: { summary: 'Deploy model to node', tags: ['Models'], responses: { '200': { description: 'Deployment started' } } } },
             '/v1/chat/completions': { post: { summary: 'OpenAI-compatible chat', tags: ['Inference'], responses: { '200': { description: 'Chat response' } } } },
             '/v1/models': { get: { summary: 'OpenAI-compatible model list', tags: ['Inference'], responses: { '200': { description: 'Model list' } } } },
+            '/v1/messages': { post: { summary: 'Anthropic Messages API-compatible chat', tags: ['Inference'], responses: { '200': { description: 'Anthropic message response' } } } },
             '/api/v1/alerts': { get: { summary: 'Cluster alerts', tags: ['Monitoring'], responses: { '200': { description: 'Alert list' } } } },
             '/metrics': { get: { summary: 'Prometheus metrics', tags: ['Monitoring'], responses: { '200': { description: 'Prometheus text' } } } },
         },
@@ -2827,6 +3301,7 @@ app.get('/api/v1/version', (c) => {
             'maintenance-mode', 'hardware-inventory', 'model-package-manager',
         ],
         openai_compatible: ['/v1/chat/completions', '/v1/completions', '/v1/embeddings', '/v1/models'],
+        anthropic_compatible: ['/v1/messages'],
     });
 });
 
@@ -2848,6 +3323,11 @@ app.get('/api/v1/capabilities', (c) => {
             embeddings: true,
             prompt_caching: true,
             auto_mode: true,
+            anthropic_messages_api: true,
+        },
+        api_compatibility: {
+            openai: ['/v1/chat/completions', '/v1/completions', '/v1/embeddings', '/v1/models'],
+            anthropic: ['/v1/messages'],
         },
     });
 });

@@ -1,0 +1,68 @@
+# CLAWHub Skill Manifest
+# Schema: https://clawhub.tentaclaw.io/schemas/clawhub/0.1.0/clawhub.schema.json
+
+name: "@tentaclaw/web-search"
+version: "1.2.0"
+type: skill
+title: "Web Search"
+description: "Performs web searches using configurable providers and returns structured results with snippets, URLs, and metadata."
+license: "MIT"
+
+author:
+  name: "TentaCLAW Team"
+  email: "hello@tentaclaw.io"
+  url: "https://tentaclaw.io"
+
+publisher: "tentaclaw"
+
+categories:
+  - utilities
+  - research
+
+tags:
+  - search
+  - web
+  - scraping
+  - information-retrieval
+
+icon: "assets/icon.svg"
+
+engines:
+  tentaclaw: ">=0.1.0"
+  node: ">=18.0.0"
+
+repository: "https://github.com/TentaCLAW-OS/skill-web-search"
+homepage: "https://clawhub.tentaclaw.io/packages/@tentaclaw/web-search"
+readme: "README.md"
+
+skill:
+  entry: "dist/index.js"
+  runtime: typescript
+  transport: stdio
+  capabilities:
+    - web-search
+    - url-fetch
+    - content-extract
+  permissions:
+    - network
+  config_schema:
+    provider:
+      type: string
+      required: true
+      default: "searxng"
+      description: "Search provider backend. Options: searxng, brave, google, bing."
+    max_results:
+      type: integer
+      required: false
+      default: 10
+      description: "Maximum number of search results to return per query."
+    safe_search:
+      type: boolean
+      required: false
+      default: true
+      description: "Enable safe search filtering."
+    timeout_ms:
+      type: integer
+      required: false
+      default: 5000
+      description: "Request timeout in milliseconds."

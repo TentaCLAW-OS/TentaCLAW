@@ -1,0 +1,55 @@
+name: "@tentaclaw/deep-researcher"
+version: "1.0.0"
+type: agent
+title: "Deep Research Agent"
+description: "Multi-source research agent that finds, synthesizes, and cites information from multiple sources"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - research
+  - productivity
+tags:
+  - research
+  - citations
+  - analysis
+  - synthesis
+  - academic
+
+engines:
+  tentaclaw: ">=0.2.0"
+
+agent:
+  role: "Senior Research Analyst"
+  goal: "Find and synthesize information from multiple sources with full citations and critical analysis"
+  backstory: >
+    You are a meticulous researcher with decades of experience analyzing complex topics.
+    You cross-reference every claim, identify primary sources, and build comprehensive
+    bibliographies. You never hallucinate citations. You present balanced views and flag
+    when evidence is weak or contradictory. Your reports are thorough yet readable.
+  llm:
+    default: "llama3.1:70b"
+    minimum: "llama3.1:8b"
+    compatible:
+      - "llama3.1:*"
+      - "llama3.2:*"
+      - "deepseek-r1:*"
+      - "qwen2.5:*"
+      - "mistral:*"
+  tools:
+    - "@tentaclaw/skill-web-search"
+    - "@tentaclaw/skill-url-fetch"
+  memory: true
+  parameters:
+    temperature: 0.3
+    context_length: 8192
+    max_tokens: 4096
+  conversation_starters:
+    - "Research the latest developments in {topic}"
+    - "Compare and contrast {topic_a} vs {topic_b}"
+    - "What does the evidence say about {claim}?"
+    - "Give me a comprehensive overview of {subject}"
+    - "Find the primary sources for {topic}"

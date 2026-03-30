@@ -1,0 +1,40 @@
+name: "@tentaclaw/grafana-dashboards"
+version: "1.0.0"
+type: integration
+title: "Grafana GPU Cluster Dashboards"
+description: "Pre-built Grafana dashboards for TentaCLAW cluster monitoring — GPU temps, VRAM, inference throughput, power"
+license: MIT
+
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+
+categories:
+  - monitoring
+tags:
+  - grafana
+  - prometheus
+  - dashboard
+  - gpu-monitoring
+  - observability
+
+engines:
+  tentaclaw: ">=0.2.0"
+
+integration:
+  protocol: rest
+  service: grafana
+  entry: ./dashboards/
+  tools:
+    - name: cluster_overview
+      description: "Main cluster dashboard — nodes, GPUs, health, throughput"
+    - name: per_node_gpu
+      description: "Per-node GPU detail — temps, VRAM, utilization, power per GPU"
+    - name: inference_performance
+      description: "Inference metrics — latency, tokens/sec, cache hit rate"
+    - name: power_consumption
+      description: "Power monitoring — watts per node, cost estimates, efficiency"
+    - name: alerts_timeline
+      description: "Alert history — fired alerts, acknowledgements, resolutions"
+  auth:
+    type: none

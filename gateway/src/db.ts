@@ -2275,6 +2275,9 @@ export function ensureDefaultAliases(): void {
         ['claude-3-opus', 'llama3.1:70b', ['qwen3:14b', 'llama3.1:8b']],
         ['claude-3-sonnet', 'llama3.1:8b', ['mistral:7b', 'qwen2.5:7b']],
         ['claude-3-haiku', 'llama3.2:3b', ['llama3.2:1b']],
+        ['claude-3-opus-20240229', 'llama3.1:70b', ['qwen3:14b', 'llama3.1:8b']],
+        ['claude-3-5-sonnet-20241022', 'llama3.1:8b', ['mistral:7b', 'qwen2.5:7b']],
+        ['claude-3-haiku-20240307', 'llama3.2:3b', ['llama3.2:1b']],
         ['codex', 'codellama:13b', ['codellama:7b', 'qwen2.5-coder:7b']],
         ['text-embedding-ada-002', 'nomic-embed-text', []],
     ];

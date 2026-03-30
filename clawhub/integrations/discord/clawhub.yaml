@@ -1,0 +1,33 @@
+name: "@tentaclaw/discord-bot"
+version: "1.0.0"
+type: integration
+title: "Discord Bot Integration"
+description: "Run AI inference from Discord. Chat with your cluster models in any channel."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - communication
+tags:
+  - discord
+  - bot
+  - chat
+  - inference
+integration:
+  protocol: rest
+  service: discord
+  entry: ./src/bot.ts
+  transport: websocket
+  tools:
+    - name: chat
+      description: "Chat with a cluster model from Discord"
+    - name: models
+      description: "List available models"
+    - name: status
+      description: "Show cluster status"
+    - name: deploy
+      description: "Deploy a model (admin only)"
+  auth:
+    type: bearer-token
+    config_key: DISCORD_BOT_TOKEN
