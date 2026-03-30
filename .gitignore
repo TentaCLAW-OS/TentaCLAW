@@ -1,5 +1,28 @@
 # TentaCLAW OS — .gitignore
 
+# === Internal / Private Files ===
+MASTER-PLAN*.md
+docs/PRICING.md
+docs/MASTERPLAN*.md
+docs/CLAWTOPUS_MOB_QUOTES.md
+docs/marketing/
+docs/BRANDING_IDEAS*.md
+docs/MEME_TEMPLATES.md
+docs/NAMING-AUDIT.md
+docs/LAUNCH_POSTS.md
+docs/POSTS-FINAL.md
+docs/HN-FINAL.md
+docs/SOCIAL*.md
+docs/WAITING_STATE_COPY.md
+docs/SCREENSHOT-SHOTLIST.md
+docs/LAUNCH-CHECKLIST.md
+docs/LAUNCH.md
+docs/DISCORD_SETUP.md
+docs/DEMO-SCRIPT.md
+docs/EASTER_EGGS.md
+docs/RELEASE.md
+.tentaclaw-private/
+
 # === Build Artifacts ===
 iso/
 pxe/
