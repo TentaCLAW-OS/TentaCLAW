@@ -258,23 +258,36 @@ app.onError((err, c) => {
     return c.json({ error: 'Internal server error' }, 500);
 });
 
-// CORS — restricted to configured origins (no wildcard in production)
+// CORS — allow dashboard access from LAN + configured origins
 const CORS_ORIGINS = (() => {
     const envOrigins = process.env.TENTACLAW_CORS_ORIGINS;
     if (envOrigins) {
-        // Comma-separated list of allowed origins
         return envOrigins.split(',').map((o) => o.trim()).filter(Boolean);
     }
-    // Default: same-origin only (no wildcard) — dashboard at localhost:PORT
-    return [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
+    // Default: localhost + all private network ranges (dashboard on LAN)
+    const defaults = [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
+    // Auto-detect LAN IPs so the dashboard works from any machine on the network
+    try {
+        const nets = require('os').networkInterfaces();
+        for (const name of Object.keys(nets)) {
+            for (const net of nets[name] || []) {
+                if (net.family === 'IPv4' && !net.internal) {
+                    defaults.push(`http://${net.address}:${PORT}`);
+                }
+            }
+        }
+    } catch { /* ignore */ }
+    return defaults;
 })();
 
 app.use('/*', cors({
     origin: (origin) => {
         // Allow requests with no Origin header (same-origin, curl, etc.)
         if (!origin) return `http://localhost:${PORT}`;
-        // Allow configured origins
+        // Allow configured origins + auto-detected LAN IPs
         if (CORS_ORIGINS.includes(origin)) return origin;
+        // Allow any private network origin accessing the dashboard
+        if (origin && /^https?:\/\/(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(origin)) return origin;
         // Block everything else
         return null as unknown as string;
     },
