@@ -222,3 +222,46 @@ jobs:
 
       - name: Build CLI
         run: cd cli && npx tsc
+
+  # ---------------------------------------------------------------------------
+  # Security Scan — Dependency audit + Trivy container scan (Wave 4)
+  # ---------------------------------------------------------------------------
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install gateway dependencies
+        run: cd gateway && npm ci
+
+      - name: npm audit (gateway)
+        run: cd gateway && npm audit --audit-level=high || true
+
+      - name: npm audit (cli)
+        run: cd cli && npm ci && npm audit --audit-level=high || true
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'HIGH,CRITICAL'
+          exit-code: '0'
+          format: 'table'
+
+      - name: Run Semgrep SAST
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: 'p/javascript p/typescript p/nodejs'
+        continue-on-error: true
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
