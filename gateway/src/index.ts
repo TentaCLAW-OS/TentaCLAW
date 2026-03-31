@@ -1648,6 +1648,24 @@ app.post('/v1/chat/completions', async (c) => {
         }
 
         const result = await proxyReq.json() as Record<string, unknown>;
+
+        // OpenTelemetry gen_ai.* attributes (Wave 17, Phase 273)
+        const usage = (result as any).usage;
+        const inputTokens = usage?.prompt_tokens || 0;
+        const outputTokens = usage?.completion_tokens || 0;
+        const totalTokens = usage?.total_tokens || inputTokens + outputTokens;
+        const finishReason = (result as any).choices?.[0]?.finish_reason || 'unknown';
+        const tokensPerSec = outputTokens > 0 && latencyMs > 0 ? Math.round((outputTokens / latencyMs) * 1000) : 0;
+
+        // Set gen_ai response headers for observability (OTel-compatible)
+        c.header('X-GenAI-Model', resolvedModel);
+        c.header('X-GenAI-Input-Tokens', String(inputTokens));
+        c.header('X-GenAI-Output-Tokens', String(outputTokens));
+        c.header('X-GenAI-Total-Tokens', String(totalTokens));
+        c.header('X-GenAI-Finish-Reason', finishReason);
+        c.header('X-GenAI-Latency-Ms', String(latencyMs));
+        c.header('X-GenAI-Tokens-Per-Sec', String(tokensPerSec));
+
         result._tentaclaw = {
             routed_to: target.node_id,
             hostname: target.hostname,
@@ -1660,6 +1678,17 @@ app.post('/v1/chat/completions', async (c) => {
             cached: false,
             tools_used: hasTools || undefined,
             json_mode: hasJsonMode || undefined,
+            // gen_ai.* semantic conventions
+            gen_ai: {
+                system: 'tentaclaw',
+                request_model: resolvedModel,
+                response_model: (result as any).model || resolvedModel,
+                usage_input_tokens: inputTokens,
+                usage_output_tokens: outputTokens,
+                usage_total_tokens: totalTokens,
+                response_finish_reasons: [finishReason],
+                tokens_per_second: tokensPerSec,
+            },
         };
 
         // Cache the response (non-streaming only)
@@ -5367,6 +5396,29 @@ app.get('/metrics', (_c) => {
     lines.push('# HELP tentaclaw_inference_queue_depth Current inference queue depth');
     lines.push('# TYPE tentaclaw_inference_queue_depth gauge');
     lines.push(`tentaclaw_inference_queue_depth ${qStats.queued}`);
+    lines.push('');
+
+    // ---- OpenTelemetry gen_ai.* semantic convention metrics (Wave 17, Phase 273-276) ----
+    lines.push('# HELP gen_ai_client_token_usage Token usage by model and direction (OTel GenAI)');
+    lines.push('# TYPE gen_ai_client_token_usage counter');
+    lines.push(`gen_ai_client_token_usage{gen_ai_system="tentaclaw",direction="input"} ${analytics.total_tokens_in}`);
+    lines.push(`gen_ai_client_token_usage{gen_ai_system="tentaclaw",direction="output"} ${analytics.total_tokens_out}`);
+    lines.push('');
+    lines.push('# HELP gen_ai_client_operation_duration_seconds GenAI operation duration (OTel GenAI)');
+    lines.push('# TYPE gen_ai_client_operation_duration_seconds summary');
+    if (totalSuccessful > 0) {
+        lines.push(`gen_ai_client_operation_duration_seconds{gen_ai_system="tentaclaw",gen_ai_operation_name="chat",quantile="0.5"} ${(analytics.p50_latency_ms / 1000).toFixed(4)}`);
+        lines.push(`gen_ai_client_operation_duration_seconds{gen_ai_system="tentaclaw",gen_ai_operation_name="chat",quantile="0.95"} ${(analytics.p95_latency_ms / 1000).toFixed(4)}`);
+        lines.push(`gen_ai_client_operation_duration_seconds{gen_ai_system="tentaclaw",gen_ai_operation_name="chat",quantile="0.99"} ${(analytics.p99_latency_ms / 1000).toFixed(4)}`);
+    }
+    lines.push('');
+    lines.push('# HELP gen_ai_server_request_duration_seconds Server-side GenAI request duration (OTel GenAI)');
+    lines.push('# TYPE gen_ai_server_request_duration_seconds summary');
+    for (const m of analytics.by_model) {
+        if (m.count > 0) {
+            lines.push(`gen_ai_server_request_duration_seconds{gen_ai_system="tentaclaw",gen_ai_request_model="${m.model}"} ${(m.avg_latency_ms / 1000).toFixed(4)}`);
+        }
+    }
     lines.push('');
 
     lines.push('# HELP tentaclaw_inference_batch_size_avg Average batch size');
