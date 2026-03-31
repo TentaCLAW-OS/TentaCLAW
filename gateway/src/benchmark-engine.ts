@@ -1275,3 +1275,108 @@ function parseBenchmarkRow(row: any): BenchmarkRun {
         },
     };
 }
+
+// =============================================================================
+// Performance Regression Detection (Wave 60)
+// =============================================================================
+
+export interface RegressionResult {
+    metric: string;
+    baseline: number;
+    current: number;
+    changePercent: number;
+    regression: boolean;
+    significant: boolean;
+    threshold: number;
+}
+
+/**
+ * Compare current benchmark results against a baseline.
+ * Flags regressions that exceed the threshold (default: 5%).
+ */
+export function detectRegressions(
+    baseline: { tokens_per_sec: number; ttft_ms: number; latency_p99_ms: number; throughput_rps: number },
+    current: { tokens_per_sec: number; ttft_ms: number; latency_p99_ms: number; throughput_rps: number },
+    thresholdPct: number = 5.0,
+): RegressionResult[] {
+    const results: RegressionResult[] = [];
+
+    // Higher is better for these metrics (regression = decrease)
+    for (const metric of ['tokens_per_sec', 'throughput_rps'] as const) {
+        const b = baseline[metric];
+        const c = current[metric];
+        if (b > 0) {
+            const changePct = ((c - b) / b) * 100;
+            results.push({
+                metric,
+                baseline: b,
+                current: c,
+                changePercent: Math.round(changePct * 100) / 100,
+                regression: changePct < -thresholdPct,
+                significant: Math.abs(changePct) > thresholdPct,
+                threshold: thresholdPct,
+            });
+        }
+    }
+
+    // Lower is better for these metrics (regression = increase)
+    for (const metric of ['ttft_ms', 'latency_p99_ms'] as const) {
+        const b = baseline[metric];
+        const c = current[metric];
+        if (b > 0) {
+            const changePct = ((c - b) / b) * 100;
+            results.push({
+                metric,
+                baseline: b,
+                current: c,
+                changePercent: Math.round(changePct * 100) / 100,
+                regression: changePct > thresholdPct,
+                significant: Math.abs(changePct) > thresholdPct,
+                threshold: thresholdPct,
+            });
+        }
+    }
+
+    return results;
+}
+
+/**
+ * Generate CI-compatible JSON output for benchmark results.
+ * Includes regression analysis if baseline is provided.
+ */
+export function generateCiReport(
+    model: string,
+    results: { tokens_per_sec: number; ttft_ms: number; latency_p99_ms: number; throughput_rps: number },
+    baseline?: { tokens_per_sec: number; ttft_ms: number; latency_p99_ms: number; throughput_rps: number },
+): {
+    model: string;
+    timestamp: string;
+    results: typeof results;
+    regressions: RegressionResult[];
+    hasRegression: boolean;
+    summary: string;
+} {
+    const regressions = baseline ? detectRegressions(baseline, results) : [];
+    const hasRegression = regressions.some(r => r.regression);
+
+    const parts: string[] = [
+        `TPS: ${results.tokens_per_sec}`,
+        `TTFT: ${results.ttft_ms}ms`,
+        `P99: ${results.latency_p99_ms}ms`,
+        `RPS: ${results.throughput_rps}`,
+    ];
+
+    if (hasRegression) {
+        const regMetrics = regressions.filter(r => r.regression).map(r => `${r.metric}: ${r.changePercent}%`);
+        parts.push(`REGRESSIONS: ${regMetrics.join(', ')}`);
+    }
+
+    return {
+        model,
+        timestamp: new Date().toISOString(),
+        results,
+        regressions,
+        hasRegression,
+        summary: parts.join(' | '),
+    };
+}
