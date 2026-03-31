@@ -187,7 +187,7 @@ const LOG_PREFIX = '[sglang]';
 function getConfig() {
     return {
         port: parseInt(process.env['SGLANG_PORT'] || '', 10) || 30000,
-        host: process.env['SGLANG_HOST'] || '0.0.0.0',
+        host: process.env['SGLANG_HOST'] || '127.0.0.1',
         gpuMemoryFraction: parseFloat(process.env['SGLANG_GPU_MEMORY_FRACTION'] || '') || 0.9,
         maxModelLen: parseInt(process.env['SGLANG_MAX_MODEL_LEN'] || '', 10) || 0, // 0 = auto
         logDir: process.env['SGLANG_LOG_DIR'] || '/var/log/tentaclaw',

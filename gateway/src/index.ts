@@ -19,7 +19,17 @@ import { createHash } from 'crypto';
 import type { StatsPayload, GatewayResponse, CommandAction } from '../../shared/types';
 
 const PORT = parseInt(process.env.TENTACLAW_PORT || '8080');
-const HOST = process.env.TENTACLAW_HOST || '0.0.0.0';
+
+// Security: bind to localhost by default (single-node safe).
+// For cluster mode, pass --bind 0.0.0.0 or set TENTACLAW_HOST=0.0.0.0
+const bindIdx = process.argv.indexOf('--bind');
+const cliHost = bindIdx !== -1 ? process.argv[bindIdx + 1] : undefined;
+const HOST = cliHost || process.env.TENTACLAW_HOST || '127.0.0.1';
+
+if (HOST === '0.0.0.0') {
+    console.warn('[tentaclaw] WARNING: Binding to 0.0.0.0 — gateway is accessible from all network interfaces.');
+    console.warn('[tentaclaw] Ensure authentication is enabled and firewall rules are configured.');
+}
 import {
     getDb,
     registerNode,
@@ -244,6 +254,20 @@ function fireWebhooks(eventType: string, data: unknown): void {
 // Webhooks are fired alongside SSE broadcasts via fireWebhooks()
 
 // =============================================================================
+// Input Sanitization — prevent injection in stored strings (Phase 12)
+// =============================================================================
+
+/** Sanitize user-provided strings: strip control chars, limit length, escape HTML entities. */
+export function sanitizeInput(input: string, maxLength: number = 1024): string {
+    if (typeof input !== 'string') return '';
+    return input
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // strip control chars (keep \n \r \t)
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .slice(0, maxLength);
+}
+
+// =============================================================================
 // App Setup
 // =============================================================================
 
@@ -310,6 +334,18 @@ app.use('/*', async (c, next) => {
     c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 });
 
+// Input validation — reject oversized payloads (Phase 12)
+const MAX_BODY_SIZE = parseInt(process.env.TENTACLAW_MAX_BODY_MB || '10') * 1024 * 1024; // 10MB default
+app.use('/api/*', async (c, next) => {
+    const contentLength = c.req.header('content-length');
+    if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
+        return c.json({
+            error: `Payload too large. Maximum ${MAX_BODY_SIZE / (1024 * 1024)}MB allowed.`,
+        }, 413);
+    }
+    await next();
+});
+
 // Request ID tracing — every request gets a unique ID
 app.use('/*', async (c, next) => {
     const requestId = c.req.header('X-Request-ID') || crypto.randomUUID();
@@ -345,9 +381,17 @@ export function paginate<T>(items: T[], page: number, limit: number): { data: T[
 }
 
 // =============================================================================
-// API Key Auth (optional — set TENTACLAW_API_KEY to enable)
+// API Key Auth (enabled by default — pass --no-auth to disable)
 // =============================================================================
 
+export function isAuthDisabled(): boolean {
+    return process.argv.includes('--no-auth') || process.env.TENTACLAW_NO_AUTH === 'true';
+}
+const NO_AUTH = isAuthDisabled();
+if (NO_AUTH) {
+    console.warn('[tentaclaw] WARNING: Authentication is DISABLED (--no-auth). API is open to all.');
+    console.warn('[tentaclaw] This is not recommended for production or network-exposed deployments.');
+}
 const API_KEY = process.env.TENTACLAW_API_KEY || '';
 
 /**
@@ -361,9 +405,9 @@ function methodToPermission(method: string): string {
     return 'write'; // POST, PUT, PATCH, DELETE
 }
 
-if (API_KEY) {
+if (!NO_AUTH) {
     // Protect API routes but leave health, dashboard, and root public.
-    // Supports both the legacy env-var key AND per-key DB validation.
+    // Auth is ON by default. Supports env-var key AND per-key DB validation.
     app.use('/api/*', async (c, next) => {
         const auth = c.req.header('Authorization');
         const key = auth?.startsWith('Bearer ') ? auth.slice(7) : c.req.query('api_key');
@@ -372,7 +416,7 @@ if (API_KEY) {
         }
 
         // Legacy env-var key gets full access (backward compat)
-        if (key === API_KEY) {
+        if (API_KEY && key === API_KEY) {
             await next();
             return;
         }
@@ -423,7 +467,7 @@ if (API_KEY) {
         }
 
         // Legacy env-var key gets full access (backward compat)
-        if (key === API_KEY) {
+        if (API_KEY && key === API_KEY) {
             await next();
             return;
         }
@@ -472,29 +516,37 @@ if (API_KEY) {
 // Rate Limiting (simple in-memory, for /v1/* OpenAI-compat endpoints)
 // =============================================================================
 
-const RATE_LIMIT = parseInt(process.env.TENTACLAW_RATE_LIMIT || '0'); // 0 = disabled
+// Rate limiting: 60 req/min for unauthenticated, 600 req/min for authenticated.
+// Set TENTACLAW_RATE_LIMIT=0 to disable entirely.
+const RATE_LIMIT_UNAUTH = parseInt(process.env.TENTACLAW_RATE_LIMIT || '60');
+const RATE_LIMIT_AUTH = parseInt(process.env.TENTACLAW_RATE_LIMIT_AUTH || '600');
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
-if (RATE_LIMIT > 0) {
+if (RATE_LIMIT_UNAUTH > 0) {
     app.use('/v1/*', async (c, next) => {
         const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+        const authHeader = c.req.header('Authorization');
+        const isAuthenticated = !!(authHeader && authHeader.startsWith('Bearer '));
+        const limit = isAuthenticated ? RATE_LIMIT_AUTH : RATE_LIMIT_UNAUTH;
+
+        const bucketKey = isAuthenticated ? `auth:${authHeader!.slice(7, 15)}` : `ip:${ip}`;
         const now = Date.now();
-        let bucket = rateBuckets.get(ip);
+        let bucket = rateBuckets.get(bucketKey);
 
         if (!bucket || now > bucket.resetAt) {
             bucket = { count: 0, resetAt: now + 60000 };
-            rateBuckets.set(ip, bucket);
+            rateBuckets.set(bucketKey, bucket);
         }
 
         bucket.count++;
-        if (bucket.count > RATE_LIMIT) {
+        if (bucket.count > limit) {
             return c.json({
-                error: { message: 'Rate limit exceeded. ' + RATE_LIMIT + ' req/min', type: 'rate_limit_error' },
+                error: { message: `Rate limit exceeded. ${limit} req/min`, type: 'rate_limit_error' },
             }, 429);
         }
 
-        c.header('X-RateLimit-Limit', String(RATE_LIMIT));
-        c.header('X-RateLimit-Remaining', String(Math.max(0, RATE_LIMIT - bucket.count)));
+        c.header('X-RateLimit-Limit', String(limit));
+        c.header('X-RateLimit-Remaining', String(Math.max(0, limit - bucket.count)));
         c.header('X-RateLimit-Reset', String(Math.ceil(bucket.resetAt / 1000)));
 
         await next();
@@ -2370,9 +2422,10 @@ app.get('/api/v1/config', (c) => {
         version: '0.1.0',
         service: 'tentaclaw-gateway',
         features: {
-            auth_enabled: !!API_KEY,
-            rate_limiting: RATE_LIMIT > 0,
-            rate_limit_per_min: RATE_LIMIT || null,
+            auth_enabled: !NO_AUTH,
+            rate_limiting: RATE_LIMIT_UNAUTH > 0,
+            rate_limit_unauth_rpm: RATE_LIMIT_UNAUTH || null,
+            rate_limit_auth_rpm: RATE_LIMIT_AUTH || null,
             openai_compat: true,
             prometheus_metrics: true,
             sse_streaming: true,
@@ -4526,6 +4579,23 @@ seedDefaultAlertRules();
 // Initialize cluster secret for agent auth
 initClusterSecret();
 
+// Check file permissions on sensitive files (Phase 11)
+try {
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+    const keyPath = require('path').join(homeDir, '.tentaclaw', 'cluster.key');
+    if (require('fs').existsSync(keyPath)) {
+        const stats = require('fs').statSync(keyPath);
+        const mode = stats.mode & 0o777;
+        if (mode & 0o044) {
+            console.error(`[security] CRITICAL: ${keyPath} is world/group-readable (mode ${mode.toString(8)}). Run: chmod 600 ${keyPath}`);
+            if (mode & 0o004) {
+                console.error('[security] Refusing to start with world-readable cluster key. Fix permissions or set TENTACLAW_CLUSTER_SECRET env var.');
+                process.exit(1);
+            }
+        }
+    }
+} catch { /* Windows or permission check not supported — skip */ }
+
 // Log security status
 if (agentAuthEnabled) {
     console.log('[auth] Agent authentication: ENABLED (cluster secret configured)');
@@ -4554,6 +4624,16 @@ const server = serve({
     console.log(`[tentaclaw] Dashboard: http://${HOST}:${info.port}/dashboard`);
     console.log(`[tentaclaw] API: http://${HOST}:${info.port}/api/v1`);
     console.log(`[tentaclaw] Health: http://${HOST}:${info.port}/health`);
+    console.log('');
+
+    // Security checklist (Phase 15)
+    console.log('\x1b[33m  Security Checklist:\x1b[0m');
+    console.log(`    ${!NO_AUTH ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} Authentication: ${!NO_AUTH ? 'ENABLED' : 'DISABLED (--no-auth)'}`);
+    console.log(`    ${agentAuthEnabled ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} Cluster secret: ${agentAuthEnabled ? 'CONFIGURED' : 'NOT SET'}`);
+    console.log(`    ${HOST === '127.0.0.1' ? '\x1b[32m✓\x1b[0m' : '\x1b[33m!\x1b[0m'} Bind address: ${HOST} ${HOST === '0.0.0.0' ? '(all interfaces)' : '(localhost only)'}`);
+    console.log(`    ${RATE_LIMIT_UNAUTH > 0 ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} Rate limiting: ${RATE_LIMIT_UNAUTH > 0 ? RATE_LIMIT_UNAUTH + '/' + RATE_LIMIT_AUTH + ' rpm (unauth/auth)' : 'DISABLED'}`);
+    console.log('    \x1b[33m!\x1b[0m Firewall: Ensure ports 8080, 41337 are protected');
+    console.log('    \x1b[33m!\x1b[0m Updates: Check for new versions at github.com/TentaCLAW-OS/TentaCLAW');
     console.log('');
 
     // Remote shell WebSocket server

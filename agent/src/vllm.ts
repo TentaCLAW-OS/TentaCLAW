@@ -126,7 +126,7 @@ const LOG_PREFIX = '[vllm]';
 function getConfig() {
     return {
         port: parseInt(process.env.VLLM_PORT || '', 10) || 8000,
-        host: process.env.VLLM_HOST || '0.0.0.0',
+        host: process.env.VLLM_HOST || '127.0.0.1',
         gpuMemoryFraction: parseFloat(process.env.VLLM_GPU_MEMORY_FRACTION || '') || 0.9,
         maxModelLen: parseInt(process.env.VLLM_MAX_MODEL_LEN || '', 10) || 0, // 0 = auto
         logDir: process.env.VLLM_LOG_DIR || '/var/log/tentaclaw',

@@ -3540,7 +3540,22 @@ export function getOrCreateClusterSecret(): string {
 
     const secret = randomBytes(32).toString('hex');
     setClusterConfig('cluster_secret', secret);
-    console.log('[auth] Generated new cluster secret. Distribute to agents via TENTACLAW_CLUSTER_SECRET env var or /etc/tentaclaw/rig.conf');
+
+    // Also persist to ~/.tentaclaw/cluster.key with restrictive permissions
+    try {
+        const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+        const tentaclawDir = path.join(homeDir, '.tentaclaw');
+        const keyPath = path.join(tentaclawDir, 'cluster.key');
+        if (!fs.existsSync(tentaclawDir)) {
+            fs.mkdirSync(tentaclawDir, { recursive: true, mode: 0o700 });
+        }
+        fs.writeFileSync(keyPath, secret, { mode: 0o600 });
+        console.log(`[auth] Cluster secret saved to ${keyPath} (mode 0600)`);
+    } catch (err) {
+        console.warn('[auth] Could not write cluster.key file:', (err as Error).message);
+    }
+
+    console.log('[auth] Generated new 256-bit cluster secret. Distribute to agents via TENTACLAW_CLUSTER_SECRET env var.');
     return secret;
 }
 

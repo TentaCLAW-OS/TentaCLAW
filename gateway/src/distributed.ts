@@ -294,7 +294,7 @@ export function planDistribution(
         assignments.push({
             node_id: node.id,
             hostname: node.hostname,
-            ip_address: node.ip_address || '0.0.0.0',
+            ip_address: node.ip_address || '127.0.0.1',
             gpu_indices: gpuIndices,
             layers: { start: layersStart, end: layersEnd },
             vram_allocated_mb: vramAllocated,
