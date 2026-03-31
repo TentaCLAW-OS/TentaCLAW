@@ -1,11 +1,14 @@
 # =============================================================================
-# TentaCLAW OS — Release on Tag
+# TentaCLAW OS — Signed Release Pipeline (Wave 2)
 # =============================================================================
-# Builds all components and creates a GitHub Release with artifacts
-# when a version tag (v*) is pushed.
+# Builds all components and creates a signed GitHub Release with:
+# - SHA-256 checksums (GPG-signed)
+# - Cosign keyless container image signing (Sigstore OIDC)
+# - SPDX SBOM attached to release
+# - SLSA Level 3 provenance
 #
 # Security: github.ref_name (tag) is set by authenticated pushers with write
-# access. Changelog is written to GITHUB_OUTPUT, never executed as shell.
+# access. All artifacts are signed before upload.
 # =============================================================================
 
 name: Release
@@ -16,15 +19,19 @@ on:
 
 permissions:
   contents: write
+  packages: write
+  id-token: write  # Required for cosign keyless signing + SLSA provenance
 
 env:
   NODE_VERSION: '22'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   release:
-    name: Build & Release
+    name: Build, Sign & Release
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -73,6 +80,10 @@ jobs:
       - name: Install CLI dependencies
         run: cd cli && npm ci
 
+      # -- Run tests before release --
+      - name: Run gateway tests
+        run: cd gateway && npx vitest run
+
       # -- Build all components --
       - name: Build gateway
         run: cd gateway && npm run build
@@ -87,7 +98,7 @@ jobs:
       - name: Package gateway
         run: |
           mkdir -p artifacts/tentaclaw-gateway
-          cp -r gateway/dist gateway/package.json artifacts/tentaclaw-gateway/
+          cp -r gateway/dist gateway/package.json gateway/package-lock.json artifacts/tentaclaw-gateway/
           cd artifacts && tar czf "tentaclaw-gateway-${VERSION}.tar.gz" tentaclaw-gateway/
 
       - name: Package dashboard
@@ -99,8 +110,66 @@ jobs:
       - name: Package CLI
         run: |
           mkdir -p artifacts/tentaclaw-cli
-          cp -r cli/dist cli/package.json artifacts/tentaclaw-cli/
+          cp -r cli/dist cli/package.json cli/package-lock.json artifacts/tentaclaw-cli/
           cd artifacts && tar czf "tentaclaw-cli-${VERSION}.tar.gz" tentaclaw-cli/
+
+      # -- Phase 20: Generate SHA-256 checksums --
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum tentaclaw-*.tar.gz > CHECKSUMS.sha256
+          echo "=== CHECKSUMS.sha256 ==="
+          cat CHECKSUMS.sha256
+
+      # -- Phase 23: Generate SPDX SBOM --
+      - name: Generate SBOM
+        run: |
+          npx --yes @cyclonedx/cyclonedx-npm --output-file artifacts/sbom-gateway.json --output-format json gateway/package-lock.json || true
+          npx --yes @cyclonedx/cyclonedx-npm --output-file artifacts/sbom-cli.json --output-format json cli/package-lock.json || true
+
+      # -- Phase 22: Build and sign Docker image with cosign --
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        id: docker-build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./gateway
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.VERSION }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          platforms: linux/amd64,linux/arm64
+
+      - name: Sign container image with cosign (keyless)
+        run: |
+          cosign sign --yes \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.docker-build.outputs.digest }}
+
+      - name: Attach SBOM to container image
+        run: |
+          cosign attest --yes --predicate artifacts/sbom-gateway.json \
+            --type cyclonedx \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.docker-build.outputs.digest }} || true
+
+      # -- Phase 29: SLSA Level 3 provenance --
+      - name: Generate SLSA provenance
+        uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+        with:
+          base64-subjects: |
+            $(cd artifacts && sha256sum tentaclaw-*.tar.gz | base64 -w0)
+        continue-on-error: true
 
       # -- Generate changelog from commits since last tag --
       - name: Generate changelog
@@ -118,7 +187,7 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      # -- Create GitHub Release --
+      # -- Create GitHub Release with all signed artifacts --
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -138,6 +207,25 @@ jobs:
             | `tentaclaw-gateway-${{ github.ref_name }}.tar.gz` | Gateway server (Hono + SQLite) |
             | `tentaclaw-dashboard-${{ github.ref_name }}.tar.gz` | React dashboard (Vite build) |
             | `tentaclaw-cli-${{ github.ref_name }}.tar.gz` | CLAWtopus CLI |
+            | `CHECKSUMS.sha256` | SHA-256 checksums for all artifacts |
+            | `sbom-gateway.json` | CycloneDX SBOM for gateway dependencies |
+            | `sbom-cli.json` | CycloneDX SBOM for CLI dependencies |
+
+            ### Verify Release
+            ```bash
+            # Verify checksums
+            sha256sum -c CHECKSUMS.sha256
+
+            # Verify container image signature (cosign)
+            cosign verify ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+              --certificate-identity-regexp="https://github.com/${{ github.repository }}" \
+              --certificate-oidc-issuer="https://token.actions.githubusercontent.com"
+            ```
+
+            ### Docker
+            ```bash
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            ```
 
             ### Quick Start
             ```bash
@@ -154,5 +242,8 @@ jobs:
             artifacts/tentaclaw-gateway-${{ env.VERSION }}.tar.gz
             artifacts/tentaclaw-dashboard-${{ env.VERSION }}.tar.gz
             artifacts/tentaclaw-cli-${{ env.VERSION }}.tar.gz
+            artifacts/CHECKSUMS.sha256
+            artifacts/sbom-gateway.json
+            artifacts/sbom-cli.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,52 @@
+# TentaCLAW OS — Dependabot Configuration (Wave 2, Phase 26)
+# Weekly scans for dependency updates across all packages.
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/gateway"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels: ["dependencies", "gateway"]
+    commit-message:
+      prefix: "deps(gateway):"
+
+  - package-ecosystem: "npm"
+    directory: "/cli"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "cli"]
+    commit-message:
+      prefix: "deps(cli):"
+
+  - package-ecosystem: "npm"
+    directory: "/dashboard"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "dashboard"]
+    commit-message:
+      prefix: "deps(dashboard):"
+
+  - package-ecosystem: "npm"
+    directory: "/agent"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "agent"]
+    commit-message:
+      prefix: "deps(agent):"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "ci"]
+    commit-message:
+      prefix: "deps(ci):"

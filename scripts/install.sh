@@ -375,6 +375,16 @@ clone_repo() {
             die "Could not clone $REPO_URL\n  Check your internet connection and try again.\n  Or clone manually: git clone $REPO_URL \"$INSTALL_DIR\""
         }
         ok "TentaCLAW OS cloned to $INSTALL_DIR"
+
+        # Phase 21: Verify release integrity
+        if command -v sha256sum &>/dev/null && [ -f "$INSTALL_DIR/CHECKSUMS.sha256" ]; then
+            step "Verifying release checksums..."
+            if (cd "$INSTALL_DIR" && sha256sum --quiet -c CHECKSUMS.sha256 2>/dev/null); then
+                ok "Release checksums verified"
+            else
+                warn "Checksum verification failed or incomplete (non-release install)"
+            fi
+        fi
     fi
 }
 

@@ -3214,6 +3214,36 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
             console.log('clawtopus-cli v' + CLI_VERSION);
             break;
 
+        case 'verify': {
+            // Phase 24: Verify running binary checksum against published checksums
+            const crypto = require('crypto');
+            const fs = require('fs');
+            const path = require('path');
+
+            console.log('');
+            console.log('  ' + C.teal(C.bold('BINARY VERIFICATION')));
+            console.log('');
+
+            // Hash the currently running CLI binary
+            const selfPath = process.argv[1];
+            if (selfPath && fs.existsSync(selfPath)) {
+                const content = fs.readFileSync(selfPath);
+                const hash = crypto.createHash('sha256').update(content).digest('hex');
+                console.log('  ' + C.dim('Binary:   ') + C.white(path.basename(selfPath)));
+                console.log('  ' + C.dim('SHA-256:  ') + C.white(hash));
+                console.log('  ' + C.dim('Version:  ') + C.white('v' + CLI_VERSION));
+                console.log('');
+                console.log('  ' + C.dim('Compare this hash against the published CHECKSUMS.sha256'));
+                console.log('  ' + C.dim('from the GitHub Release to verify integrity.'));
+                console.log('');
+                console.log('  ' + C.dim('Release: https://github.com/TentaCLAW-OS/TentaCLAW/releases/tag/v' + CLI_VERSION));
+            } else {
+                console.log('  ' + C.red('Could not determine binary path for verification.'));
+            }
+            console.log('');
+            break;
+        }
+
         case 'backends': {
             const data = await apiGet(gateway, '/api/v1/inference/backends') as { backends: Array<{ node_id: string; hostname: string; backend: { type: string; port?: number; version?: string }; gpu_count: number; total_vram_mb: number; models: string[] }> };
             console.log('');

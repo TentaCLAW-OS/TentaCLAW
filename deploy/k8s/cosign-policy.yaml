@@ -1,0 +1,26 @@
+# TentaCLAW OS — Cosign Admission Policy (Wave 2, Phase 33)
+#
+# Kubernetes ClusterImagePolicy that rejects unsigned TentaCLAW images.
+# Requires: sigstore policy-controller installed in the cluster.
+#
+# Install:
+#   helm install policy-controller sigstore/policy-controller -n cosign-system --create-namespace
+#
+# Apply:
+#   kubectl apply -f cosign-policy.yaml
+#
+apiVersion: policy.sigstore.dev/v1beta1
+kind: ClusterImagePolicy
+metadata:
+  name: tentaclaw-signed-images
+spec:
+  images:
+    - glob: "ghcr.io/tentaclaw-os/**"
+  authorities:
+    - keyless:
+        url: https://fulcio.sigstore.dev
+        identities:
+          - issuer: https://token.actions.githubusercontent.com
+            subject: "https://github.com/TentaCLAW-OS/TentaCLAW/.github/workflows/release.yml@refs/tags/*"
+        ctlog:
+          url: https://rekor.sigstore.dev
