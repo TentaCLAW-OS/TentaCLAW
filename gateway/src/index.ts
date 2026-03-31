@@ -145,6 +145,8 @@ import {
     recordAuthFailure,
     isIpBlocked,
     clearAuthFailures,
+    updateUserPassword,
+    isInitialAdminPassword,
 } from './db';
 import { randomBytes } from 'crypto';
 import { generateWaitComedy } from './comedy';
@@ -256,17 +258,43 @@ app.onError((err, c) => {
     return c.json({ error: 'Internal server error' }, 500);
 });
 
-// CORS for dashboard (same-origin in production, permissive in dev)
-app.use('/*', cors());
+// CORS — restricted to configured origins (no wildcard in production)
+const CORS_ORIGINS = (() => {
+    const envOrigins = process.env.TENTACLAW_CORS_ORIGINS;
+    if (envOrigins) {
+        // Comma-separated list of allowed origins
+        return envOrigins.split(',').map((o) => o.trim()).filter(Boolean);
+    }
+    // Default: same-origin only (no wildcard) — dashboard at localhost:PORT
+    return [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
+})();
+
+app.use('/*', cors({
+    origin: (origin) => {
+        // Allow requests with no Origin header (same-origin, curl, etc.)
+        if (!origin) return `http://localhost:${PORT}`;
+        // Allow configured origins
+        if (CORS_ORIGINS.includes(origin)) return origin;
+        // Block everything else
+        return null as unknown as string;
+    },
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Cluster-Secret'],
+    exposeHeaders: ['X-Request-ID', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
+    credentials: true,
+    maxAge: 86400,
+}));
 
 // Security headers — production-grade hardening
 app.use('/*', async (c, next) => {
     await next();
     c.header('X-Content-Type-Options', 'nosniff');
     c.header('X-Frame-Options', 'DENY');
-    c.header('X-XSS-Protection', '1; mode=block');
+    // X-XSS-Protection: 0 is the modern recommendation (disables flawed legacy filter)
+    c.header('X-XSS-Protection', '0');
     c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 });
 
 // Request ID tracing — every request gets a unique ID
@@ -507,6 +535,74 @@ setInterval(() => {
 }, 300_000);
 
 // =============================================================================
+// Login Rate Limiting — 5 attempts per minute per IP (brute force protection)
+// =============================================================================
+
+const loginRateBuckets = new Map<string, { count: number; resetAt: number }>();
+const LOGIN_RATE_LIMIT = 5; // max attempts per minute per IP
+
+function checkLoginRateLimit(ip: string): { allowed: boolean; remaining: number; resetAt: number } {
+    const now = Date.now();
+    let bucket = loginRateBuckets.get(ip);
+
+    if (!bucket || now > bucket.resetAt) {
+        bucket = { count: 0, resetAt: now + 60_000 };
+        loginRateBuckets.set(ip, bucket);
+    }
+
+    bucket.count++;
+    const remaining = Math.max(0, LOGIN_RATE_LIMIT - bucket.count);
+
+    if (bucket.count > LOGIN_RATE_LIMIT) {
+        return { allowed: false, remaining: 0, resetAt: bucket.resetAt };
+    }
+
+    return { allowed: true, remaining, resetAt: bucket.resetAt };
+}
+
+// Clean up stale login rate buckets every 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, bucket] of loginRateBuckets) {
+        if (now > bucket.resetAt + 60_000) loginRateBuckets.delete(ip);
+    }
+}, 300_000);
+
+// =============================================================================
+// Default Chat Completions Rate Limiting — 60 req/min per API key (configurable)
+// =============================================================================
+
+const CHAT_RATE_LIMIT = parseInt(process.env.TENTACLAW_CHAT_RATE_LIMIT || '60');
+const chatRateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function checkChatRateLimit(identifier: string): { allowed: boolean; remaining: number; resetAt: number } {
+    const now = Date.now();
+    let bucket = chatRateBuckets.get(identifier);
+
+    if (!bucket || now > bucket.resetAt) {
+        bucket = { count: 0, resetAt: now + 60_000 };
+        chatRateBuckets.set(identifier, bucket);
+    }
+
+    bucket.count++;
+    const remaining = Math.max(0, CHAT_RATE_LIMIT - bucket.count);
+
+    if (bucket.count > CHAT_RATE_LIMIT) {
+        return { allowed: false, remaining: 0, resetAt: bucket.resetAt };
+    }
+
+    return { allowed: true, remaining, resetAt: bucket.resetAt };
+}
+
+// Clean up stale chat rate buckets every 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, bucket] of chatRateBuckets) {
+        if (now > bucket.resetAt + 60_000) chatRateBuckets.delete(key);
+    }
+}, 300_000);
+
+// =============================================================================
 // Agent Authentication (cluster secret for agent-to-gateway communication)
 // =============================================================================
 
@@ -532,9 +628,11 @@ function initClusterSecret(): void {
             CLUSTER_SECRET = dbSecret;
             agentAuthEnabled = true;
         } else {
-            // No secret anywhere — agent auth disabled for backward compatibility
-            console.warn('[auth] WARNING: No cluster secret configured. Agent authentication is DISABLED.');
-            console.warn('[auth] Set TENTACLAW_CLUSTER_SECRET env var or run first-boot setup to enable.');
+            // Auto-generate a random 32-byte hex secret and store it in DB
+            const generated = getOrCreateClusterSecret();
+            CLUSTER_SECRET = generated;
+            agentAuthEnabled = true;
+            console.warn('[tentaclaw] Auto-generated cluster secret. Set TENTACLAW_CLUSTER_SECRET for production.');
         }
     } catch {
         // DB not ready yet — will be initialized later at startup
@@ -1333,6 +1431,21 @@ app.get('/api/v1/queue', (c) => {
 
 // Chat completions proxy — OpenAI-compatible with function calling + JSON mode
 app.post('/v1/chat/completions', async (c) => {
+    // Default rate limiting: 60 req/min per API key (or IP if no key)
+    const auth = c.req.header('Authorization');
+    const chatRateId = (auth?.startsWith('Bearer ') ? auth.slice(7) : null) || c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'anon';
+    const chatRate = checkChatRateLimit(chatRateId);
+    c.header('X-RateLimit-Limit', String(CHAT_RATE_LIMIT));
+    c.header('X-RateLimit-Remaining', String(chatRate.remaining));
+    c.header('X-RateLimit-Reset', String(Math.ceil(chatRate.resetAt / 1000)));
+    if (!chatRate.allowed) {
+        const retryAfter = Math.ceil((chatRate.resetAt - Date.now()) / 1000);
+        c.header('Retry-After', String(Math.max(1, retryAfter)));
+        return c.json({
+            error: { message: `Rate limit exceeded. ${CHAT_RATE_LIMIT} req/min.`, type: 'rate_limit_error' },
+        }, 429);
+    }
+
     const body = await c.req.json();
     const model = body.model;
 
@@ -3703,6 +3816,17 @@ function requireRole(c: any, ...roles: string[]): ReturnType<typeof validateSess
 app.post('/api/v1/auth/login', async (c) => {
     const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
 
+    // Rate limit: 5 login attempts per minute per IP
+    const rateCheck = checkLoginRateLimit(ip);
+    c.header('X-RateLimit-Limit', String(LOGIN_RATE_LIMIT));
+    c.header('X-RateLimit-Remaining', String(rateCheck.remaining));
+    c.header('X-RateLimit-Reset', String(Math.ceil(rateCheck.resetAt / 1000)));
+    if (!rateCheck.allowed) {
+        const retryAfter = Math.ceil((rateCheck.resetAt - Date.now()) / 1000);
+        c.header('Retry-After', String(Math.max(1, retryAfter)));
+        return c.json({ error: 'Too many login attempts. Try again later.' }, 429);
+    }
+
     // Check if IP is blocked from brute force protection
     if (isIpBlocked(ip)) {
         recordAuditEvent('auth_blocked_ip', undefined, ip, 'Login attempt from blocked IP');
@@ -3728,6 +3852,9 @@ app.post('/api/v1/auth/login', async (c) => {
 
     const session = createSession(user.id);
 
+    // Check if admin must change their initial password
+    const passwordChangeRequired = user.username === 'admin' && isInitialAdminPassword();
+
     return c.json({
         token: session.token,
         expires_at: session.expires_at,
@@ -3737,7 +3864,35 @@ app.post('/api/v1/auth/login', async (c) => {
             email: user.email,
             role: user.role,
         },
+        ...(passwordChangeRequired ? { password_change_required: true } : {}),
     });
+});
+
+// POST /api/v1/auth/change-password — change the authenticated user's password
+app.post('/api/v1/auth/change-password', async (c) => {
+    const sessionUser = getSessionUser(c);
+    if (!sessionUser) {
+        return c.json({ error: 'Not authenticated' }, 401);
+    }
+
+    const body = await c.req.json<{ current_password: string; new_password: string }>();
+
+    if (!body.current_password || !body.new_password) {
+        return c.json({ error: 'current_password and new_password are required' }, 400);
+    }
+
+    if (body.new_password.length < 8) {
+        return c.json({ error: 'New password must be at least 8 characters' }, 400);
+    }
+
+    try {
+        updateUserPassword(sessionUser.id, body.current_password, body.new_password);
+        const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+        recordAuditEvent('auth_password_changed', sessionUser.username, ip, `User ${sessionUser.username} changed their password`);
+        return c.json({ status: 'password_changed' });
+    } catch (err: any) {
+        return c.json({ error: err.message || 'Password change failed' }, 400);
+    }
 });
 
 // POST /api/v1/auth/logout — invalidate current session
@@ -5861,59 +6016,10 @@ app.post('/api/v1/playground/compare', async (c) => {
 });
 
 // =============================================================================
-// Authentication Endpoints (Wave 41)
+// Authentication Endpoints (Wave 41) — consolidated into Wave 8 section above
+// Login, logout, me, change-password, users CRUD all defined earlier with
+// rate limiting, brute-force protection, and password-change enforcement.
 // =============================================================================
-
-app.post('/api/v1/auth/login', async (c) => {
-    const body = await c.req.json();
-    if (!body.username || !body.password) return c.json({ error: 'username and password required' }, 400);
-    const user = authenticateUser(body.username, body.password);
-    if (!user) return c.json({ error: 'Invalid credentials' }, 401);
-    const session = createSession(user.id);
-    return c.json({ token: session.token, user: { id: user.id, username: user.username, role: user.role } });
-});
-
-app.post('/api/v1/auth/logout', async (c) => {
-    const token = c.req.header('Authorization')?.replace('Bearer ', '');
-    if (token) invalidateSession(token);
-    return c.json({ logged_out: true });
-});
-
-app.get('/api/v1/auth/me', (c) => {
-    const token = c.req.header('Authorization')?.replace('Bearer ', '');
-    if (!token) return c.json({ error: 'Not authenticated' }, 401);
-    const session = validateSession(token);
-    if (!session) return c.json({ error: 'Invalid or expired session' }, 401);
-    return c.json(session);
-});
-
-app.get('/api/v1/users', (c) => c.json(getUsers()));
-
-app.post('/api/v1/users', async (c) => {
-    const body = await c.req.json();
-    if (!body.username || !body.password) return c.json({ error: 'username and password required' }, 400);
-    try {
-        const user = createUser(body.username, body.password, body.role, body.email);
-        return c.json(user, 201);
-    } catch {
-        return c.json({ error: 'User already exists' }, 409);
-    }
-});
-
-app.delete('/api/v1/users/:id', (c) => {
-    const deleted = deleteUser(c.req.param('id'));
-    return deleted ? c.json({ deleted: true }) : c.json({ error: 'not found' }, 404);
-});
-
-app.put('/api/v1/users/:id/role', async (c) => {
-    const body = await c.req.json();
-    if (!body.role) return c.json({ error: 'role required' }, 400);
-    const updated = updateUserRole(c.req.param('id'), body.role);
-    return updated ? c.json({ updated: true }) : c.json({ error: 'not found' }, 404);
-});
-
-// Initialize default admin
-createDefaultAdmin();
 
 // Initialize default namespace (multi-tenancy bootstrap)
 ensureDefaultNamespace();

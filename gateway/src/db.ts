@@ -3467,7 +3467,42 @@ export function createDefaultAdmin(): User | null {
         fs.writeFileSync(pwPath, `admin:${password}\n`, { mode: 0o600 });
     } catch { /* best effort — file may not be writable in some envs */ }
 
+    // Track that admin password has not been changed yet
+    setClusterConfig('admin_password_changed', 'false');
+
     return createUser('admin', password, 'admin', undefined);
+}
+
+/**
+ * Update a user's password. Validates the current password first.
+ * Returns true on success, throws on failure.
+ */
+export function updateUserPassword(userId: string, currentPassword: string, newPassword: string): boolean {
+    const d = getDb();
+    const row = d.prepare('SELECT * FROM users WHERE id = ?').get(userId) as any;
+
+    if (!row) throw new Error('User not found');
+    if (!verifyPassword(currentPassword, row.password_hash)) throw new Error('Current password is incorrect');
+    if (newPassword.length < 8) throw new Error('New password must be at least 8 characters');
+
+    const newHash = hashPassword(newPassword);
+    d.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, userId);
+
+    // If this is the admin user, mark password as changed
+    if (row.username === 'admin') {
+        setClusterConfig('admin_password_changed', 'true');
+    }
+
+    return true;
+}
+
+/**
+ * Check whether the admin user still has the initial (unchanged) password.
+ * Returns true if the admin password has NOT been changed since first boot.
+ */
+export function isInitialAdminPassword(): boolean {
+    const changed = getClusterConfig('admin_password_changed');
+    return changed !== 'true';
 }
 
 // =============================================================================
