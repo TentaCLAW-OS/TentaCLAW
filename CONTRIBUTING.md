@@ -22,7 +22,7 @@ Thanks for wanting to help! CLAWtopus appreciates every contribution.
 
 ### Prerequisites
 
-- **Node.js** v20+ ([nodejs.org](https://nodejs.org))
+- **Node.js** v22+ ([nodejs.org](https://nodejs.org))
 - **npm** v9+ (comes with Node.js)
 - **Git** ([git-scm.com](https://git-scm.com))
 

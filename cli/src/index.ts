@@ -2310,6 +2310,8 @@ function cmdHelp(): void {
     cmd('alert-rules', 'View alert rules');
     cmd('analytics', 'Inference analytics');
     cmd('audit', 'Audit log');
+    cmd('verify', 'Verify binary checksum');
+    cmd('share-stats', 'Generate shareable cluster card');
     console.log('');
 
     console.log('  ' + C.dim('Use') + ' ' + C.yellow('--gateway <url>') + ' ' + C.dim('to specify a different gateway.'));
@@ -3241,6 +3243,41 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                 console.log('  ' + C.red('Could not determine binary path for verification.'));
             }
             console.log('');
+            break;
+        }
+
+        case 'share-stats':
+        case 'share': {
+            // Phase 116: Generate shareable cluster stats card
+            try {
+                const summary = await apiGet(gateway, '/api/v1/cluster/summary') as any;
+                const nodes = summary.nodes || 0;
+                const gpus = summary.total_gpus || summary.gpus || 0;
+                const vram = Math.round((summary.total_vram_mb || 0) / 1024);
+                const models = summary.loaded_models?.length || summary.models || 0;
+                const health = summary.health_grade || 'A';
+
+                console.log('');
+                const W = 46;
+                console.log(boxTop('TentaCLAW Cluster Card', W));
+                console.log(boxMid('', W));
+                console.log(boxMid(`  Nodes:   ${C.white(String(nodes))}`, W));
+                console.log(boxMid(`  GPUs:    ${C.white(String(gpus))}`, W));
+                console.log(boxMid(`  VRAM:    ${C.white(vram + ' GB')}`, W));
+                console.log(boxMid(`  Models:  ${C.white(String(models))}`, W));
+                console.log(boxMid(`  Health:  ${C.green(health)}`, W));
+                console.log(boxMid('', W));
+                console.log(boxMid(C.dim('tentaclaw.io | MIT License'), W));
+                console.log(boxBot(W));
+                console.log('');
+                console.log('  ' + C.dim('Share your cluster! Copy the text above or screenshot it.'));
+                console.log('');
+            } catch (e) {
+                console.log('');
+                console.log('  ' + C.yellow('Could not fetch cluster stats. Is the gateway running?'));
+                console.log('  ' + C.dim('Start it: cd gateway && npm start'));
+                console.log('');
+            }
             break;
         }
 
