@@ -157,6 +157,10 @@ import {
     clearAuthFailures,
     updateUserPassword,
     isInitialAdminPassword,
+    createJoinToken,
+    validateJoinToken,
+    listJoinTokens,
+    deleteJoinToken,
 } from './db';
 import { randomBytes } from 'crypto';
 import { generateWaitComedy } from './comedy';
@@ -754,6 +758,17 @@ app.post('/api/v1/register', async (c) => {
         const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
         recordAuditEvent('agent_auth_failed', 'agent', ip, 'Invalid cluster secret on /api/v1/register');
         return c.json({ error: 'Forbidden. Invalid or missing cluster secret. Set X-Cluster-Secret header.' }, 403);
+    }
+
+    // Optional join token validation (Phase 38) — if X-Join-Token header present, validate it
+    const joinToken = c.req.header('X-Join-Token');
+    if (joinToken) {
+        const jtResult = validateJoinToken(joinToken);
+        if (!jtResult.valid) {
+            const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+            recordAuditEvent('join_token_failed', 'agent', ip, `Invalid join token: ${jtResult.error}`);
+            return c.json({ error: `Join token validation failed: ${jtResult.error}` }, 403);
+        }
     }
 
     const body = await c.req.json();
@@ -3832,6 +3847,38 @@ app.delete('/api/v1/apikeys/:id', (c) => {
     recordAuditEvent('apikey_revoked', undefined, ip, `API key revoked: ${keyId}`);
 
     return c.json({ status: 'revoked' });
+});
+
+// =============================================================================
+// Join Tokens — Node Attestation (Wave 3, Phase 38-39)
+// =============================================================================
+
+app.post('/api/v1/join-tokens', async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    const label = String(body.label || '');
+    const maxUses = parseInt(body.max_uses, 10) || 1;
+    const hoursValid = parseInt(body.hours_valid, 10) || 24;
+
+    const result = createJoinToken(label, maxUses, hoursValid);
+    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+    recordAuditEvent('join_token_created', undefined, ip, `Join token created: ${result.prefix}... (max ${maxUses} uses, ${hoursValid}h validity)`);
+
+    return c.json({
+        id: result.id,
+        token: result.token,
+        prefix: result.prefix,
+        expires_at: result.expiresAt,
+        message: 'Save this token — it will not be shown again. Pass as X-Join-Token header when registering new nodes.',
+    });
+});
+
+app.get('/api/v1/join-tokens', (c) => {
+    return c.json(listJoinTokens());
+});
+
+app.delete('/api/v1/join-tokens/:id', (c) => {
+    deleteJoinToken(c.req.param('id'));
+    return c.json({ status: 'deleted' });
 });
 
 // =============================================================================

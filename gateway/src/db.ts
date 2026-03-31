@@ -608,6 +608,26 @@ const MIGRATIONS: Migration[] = [
             `);
         },
     },
+    {
+        version: 11,
+        name: 'add_join_tokens',
+        up: (db: Database.Database) => {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS join_tokens (
+                    id TEXT PRIMARY KEY,
+                    token_hash TEXT NOT NULL UNIQUE,
+                    token_prefix TEXT NOT NULL,
+                    label TEXT DEFAULT '',
+                    max_uses INTEGER DEFAULT 1,
+                    uses INTEGER DEFAULT 0,
+                    expires_at TEXT NOT NULL,
+                    created_by TEXT,
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_join_tokens_hash ON join_tokens(token_hash);
+            `);
+        },
+    },
 ];
 
 /**
@@ -3557,6 +3577,53 @@ export function getOrCreateClusterSecret(): string {
 
     console.log('[auth] Generated new 256-bit cluster secret. Distribute to agents via TENTACLAW_CLUSTER_SECRET env var.');
     return secret;
+}
+
+// =============================================================================
+// Join Tokens — Node Attestation (Wave 3, Phase 38)
+// =============================================================================
+
+/** Create a one-time join token for new nodes. Expires in `hoursValid` hours. */
+export function createJoinToken(label: string = '', maxUses: number = 1, hoursValid: number = 24, createdBy?: string): { id: string; token: string; prefix: string; expiresAt: string } {
+    const d = getDb();
+    const id = generateId();
+    const rawToken = 'jt_' + randomBytes(24).toString('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const prefix = rawToken.slice(0, 10);
+    const expiresAt = new Date(Date.now() + hoursValid * 3600_000).toISOString();
+
+    d.prepare(
+        `INSERT INTO join_tokens (id, token_hash, token_prefix, label, max_uses, uses, expires_at, created_by) VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
+    ).run(id, tokenHash, prefix, label, maxUses, expiresAt, createdBy ?? null);
+
+    return { id, token: rawToken, prefix, expiresAt };
+}
+
+/** Validate a join token. Returns true and increments usage if valid. */
+export function validateJoinToken(rawToken: string): { valid: boolean; error?: string } {
+    const d = getDb();
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const row = d.prepare('SELECT * FROM join_tokens WHERE token_hash = ?').get(tokenHash) as any;
+
+    if (!row) return { valid: false, error: 'invalid_token' };
+    if (new Date(row.expires_at) < new Date()) return { valid: false, error: 'expired' };
+    if (row.max_uses > 0 && row.uses >= row.max_uses) return { valid: false, error: 'max_uses_exceeded' };
+
+    // Increment usage
+    d.prepare('UPDATE join_tokens SET uses = uses + 1 WHERE id = ?').run(row.id);
+    return { valid: true };
+}
+
+/** List all join tokens (without hashes). */
+export function listJoinTokens(): any[] {
+    const d = getDb();
+    return d.prepare('SELECT id, token_prefix, label, max_uses, uses, expires_at, created_by, created_at FROM join_tokens ORDER BY created_at DESC').all();
+}
+
+/** Delete a join token by ID. */
+export function deleteJoinToken(id: string): void {
+    const d = getDb();
+    d.prepare('DELETE FROM join_tokens WHERE id = ?').run(id);
 }
 
 // =============================================================================
