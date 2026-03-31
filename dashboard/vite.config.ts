@@ -8,6 +8,7 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, 'src') },
   },
+  base: '/dashboard/',
   build: {
     outDir: '../gateway/public',
     emptyOutDir: true,
