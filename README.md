@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/github/actions/workflow/status/TentaCLAW-OS/TentaCLAW/ci.yml?style=flat-square&label=build&color=00d4aa" alt="Build"></a>
-  <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/badge/tests-782%20passing-00d4aa?style=flat-square" alt="Tests"></a>
+  <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/badge/tests-864%20passing-00d4aa?style=flat-square" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b5cf6?style=flat-square" alt="License"></a>
   <a href="https://github.com/TentaCLAW-OS/TentaCLAW/stargazers"><img src="https://img.shields.io/github/stars/TentaCLAW-OS/TentaCLAW?style=flat-square&color=ffdd00" alt="Stars"></a>
   <a href="https://discord.gg/tentaclaw"><img src="https://img.shields.io/badge/Discord-The%20Tank-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
@@ -165,7 +165,30 @@ There are GPU inference tools. There are model runners. There are cluster schedu
 - **Inference analytics** -- Request counts, latency p50/p95/p99, model usage breakdown
 - **Helm chart + Terraform + Ansible** -- Deploy anywhere, any way
 - **Observability stack** -- Prometheus + Grafana with pre-built dashboards
-- **810 tests passing** -- Gateway, agent, CLI, shared, integration, and e2e suites
+- **864 tests passing** -- Gateway, agent, CLI, shared, integration, security, and fuzz suites
+
+---
+
+## Security
+
+TentaCLAW ships secure by default. No configuration needed for safe operation.
+
+| Control | Default | Status |
+|---------|---------|--------|
+| **Authentication** | API keys enabled (SHA-256 hashed) | On |
+| **Cluster secret** | 256-bit auto-generated, `0600` permissions | On |
+| **Rate limiting** | 60 rpm unauth / 600 rpm auth | On |
+| **TLS** | Self-signed CA, auto-generated node certs | On |
+| **Input validation** | 10MB payload limit, XSS sanitization | On |
+| **Secure headers** | nosniff, DENY, HSTS, Permissions-Policy | On |
+| **Supply chain** | Cosign signed images, SBOM, SLSA L3 provenance | On |
+| **Node attestation** | Join tokens (one-time, expiring) | Available |
+| **RBAC** | 5 built-in roles (admin/operator/developer/viewer/inference) | On |
+| **Audit logging** | All security events with actor, IP, timestamp | On |
+
+82 security tests including fuzz testing (52 fuzz + 15 auth + 15 penetration).
+
+See [docs/security/safe-defaults.md](docs/security/safe-defaults.md) | [Threat Model](docs/security/threat-model.md) | [SECURITY.md](SECURITY.md)
 
 ---
 

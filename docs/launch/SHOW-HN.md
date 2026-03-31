@@ -14,7 +14,7 @@ TentaCLAW is a gateway + agent architecture. The gateway (TypeScript, Hono, SQLi
 
 It supports 6 inference backends (Ollama, vLLM, SGLang, llama.cpp, BitNet, MLX), mixes NVIDIA and AMD GPUs in the same cluster, and includes BitNet support for CPU-only nodes running 1-bit models. The gateway exposes an OpenAI-compatible API, so any client or framework (LangChain, CrewAI, etc.) can point at your cluster and it just works. There's also a package marketplace (CLAWHub, 185 packages) for flight sheets, agents, integrations, and themes.
 
-810 tests passing, 68K lines, MIT licensed. Running it on my own 4-node cluster. Would appreciate any feedback on the architecture or feature gaps.
+864 tests passing, 68K lines, MIT licensed. Running it on my own 4-node cluster. Would appreciate any feedback on the architecture or feature gaps.
 
 ---
 
@@ -45,4 +45,4 @@ It supports 6 inference backends (Ollama, vLLM, SGLang, llama.cpp, BitNet, MLX),
 > For a coordination database tracking node stats, model assignments, and alerts -- absolutely. SQLite handles millions of rows. The gateway doesn't store inference data, just cluster state. If you're running 200+ nodes, Postgres support is on the roadmap but honestly SQLite will probably still be fine.
 
 **"Is this vaporware / just docs?"**
-> 810 tests passing, 68K lines of code, 57 source modules, running on real hardware. Mock mode lets you try the full stack without any GPUs. `docker compose up` and you have a working cluster in 30 seconds.
+> 864 tests passing, 68K lines of code, 57 source modules, running on real hardware. Mock mode lets you try the full stack without any GPUs. `docker compose up` and you have a working cluster in 30 seconds.
