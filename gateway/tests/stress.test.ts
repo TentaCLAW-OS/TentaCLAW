@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { StatsPayload } from '../../shared/types';
-import { app } from '../src/index';
+import { app, initClusterSecret } from '../src/index';
 
 import {
     getDb,
@@ -28,6 +28,9 @@ import {
 
 // Use in-memory DB for tests
 process.env.TENTACLAW_DB_PATH = ':memory:';
+// Set a known cluster secret so agent-authenticated endpoints accept requests
+process.env.TENTACLAW_CLUSTER_SECRET = 'test-secret';
+initClusterSecret();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -111,7 +114,7 @@ describe('Stress: Concurrent Registration', () => {
             const nodeId = `stress-node-${String(i).padStart(3, '0')}`;
             return app.request('/api/v1/register', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
                 body: JSON.stringify({
                     node_id: nodeId,
                     farm_hash: 'STRESS-FARM',
@@ -133,7 +136,7 @@ describe('Stress: Concurrent Registration', () => {
         const promises = Array.from({ length: 100 }, (_, i) =>
             app.request('/api/v1/register', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
                 body: JSON.stringify({
                     node_id: `batch-node-${String(i).padStart(3, '0')}`,
                     farm_hash: 'BATCH-FARM',
@@ -152,7 +155,7 @@ describe('Stress: Concurrent Registration', () => {
         const promises = Array.from({ length: 100 }, (_, i) =>
             app.request('/api/v1/register', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
                 body: JSON.stringify({
                     node_id: `unique-node-${String(i).padStart(3, '0')}`,
                     farm_hash: 'UNIQUE-FARM',
@@ -187,7 +190,7 @@ describe('Stress: Concurrent Stats Push', () => {
             const nodeId = `stats-node-${String(i).padStart(3, '0')}`;
             return app.request(`/api/v1/nodes/${nodeId}/stats`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
                 body: JSON.stringify(makeStats(nodeId)),
             });
         });
@@ -208,7 +211,7 @@ describe('Stress: Concurrent Stats Push', () => {
             const nodeId = `rec-node-${String(i).padStart(3, '0')}`;
             return app.request(`/api/v1/nodes/${nodeId}/stats`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
                 body: JSON.stringify(makeStats(nodeId)),
             });
         });
@@ -234,7 +237,7 @@ describe('Stress: Concurrent Stats Push', () => {
             const start = performance.now();
             const res = await app.request(`/api/v1/nodes/${nodeId}/stats`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
                 body: JSON.stringify(makeStats(nodeId)),
             });
             const elapsed = performance.now() - start;
@@ -298,7 +301,7 @@ describe('Stress: Alert Storm', () => {
             const nodeId = `hot-node-${String(i).padStart(2, '0')}`;
             return app.request(`/api/v1/nodes/${nodeId}/stats`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
                 body: JSON.stringify(makeHotStats(nodeId, 90)),
             });
         });
@@ -398,7 +401,7 @@ describe('Chaos: Data Integrity', () => {
 
         const res = await app.request('/api/v1/nodes/phantom-node/stats', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify(makeStats('phantom-node')),
         });
 
@@ -417,7 +420,7 @@ describe('Chaos: Data Integrity', () => {
         // The gateway requires cpu, ram, disk, network, inference to exist as objects.
         const res = await app.request('/api/v1/nodes/malformed-node/stats', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 farm_hash: 'FARM0001',
                 node_id: 'malformed-node',
@@ -442,7 +445,7 @@ describe('Chaos: Data Integrity', () => {
 
         const res = await app.request('/api/v1/nodes/broken-node/stats', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 // Missing cpu, ram, disk, network, inference objects entirely
                 farm_hash: 'FARM0001',
@@ -472,7 +475,7 @@ describe('Chaos: Data Integrity', () => {
 
         const res = await app.request('/api/v1/nodes/extreme-node/stats', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify(extremeStats),
         });
 
@@ -502,7 +505,7 @@ describe('Chaos: Concurrent Read/Write', () => {
         const registerPromises = Array.from({ length: 10 }, (_, i) =>
             app.request('/api/v1/register', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
                 body: JSON.stringify({
                     node_id: `concurrent-${i}`,
                     farm_hash: 'CONC-FARM',
@@ -546,7 +549,7 @@ describe('Chaos: Concurrent Read/Write', () => {
             const nodeId = `alert-rw-${i}`;
             return app.request(`/api/v1/nodes/${nodeId}/stats`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
                 body: JSON.stringify(makeHotStats(nodeId, 90)),
             });
         });
@@ -644,7 +647,7 @@ describe('Performance: Response Times', () => {
         const start = performance.now();
         const res = await app.request('/api/v1/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_id: 'perf-register-node',
                 farm_hash: 'PERF-FARM',

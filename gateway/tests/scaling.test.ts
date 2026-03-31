@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { StatsPayload } from '../../shared/types';
-import { app } from '../src/index';
+import { app, initClusterSecret } from '../src/index';
 
 import {
     getDb,
@@ -21,6 +21,9 @@ import {
 
 // Use in-memory DB for tests
 process.env.TENTACLAW_DB_PATH = ':memory:';
+// Set a known cluster secret so agent-authenticated endpoints accept requests
+process.env.TENTACLAW_CLUSTER_SECRET = 'test-secret';
+initClusterSecret();
 
 /** Helper: build a valid stats payload */
 function makeStats(nodeId: string, overrides?: Partial<StatsPayload>): StatsPayload {
@@ -67,7 +70,7 @@ async function httpRegister(opts: {
 }) {
     const res = await app.request('/api/v1/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
         body: JSON.stringify({
             farm_hash: 'FARM0001',
             hostname: 'test-rig',
@@ -115,14 +118,14 @@ describe('Node Groups (via Tags API)', () => {
         // Tag both nodes with "gpu-cluster-a"
         const r1 = await app.request('/api/v1/nodes/group-n1/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['gpu-cluster-a'] }),
         });
         expect(r1.status).toBe(200);
 
         const r2 = await app.request('/api/v1/nodes/group-n2/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['gpu-cluster-a'] }),
         });
         expect(r2.status).toBe(200);
@@ -149,7 +152,7 @@ describe('Node Groups (via Tags API)', () => {
 
         const addRes = await app.request('/api/v1/nodes/tag-add-node/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['prod', 'inference'] }),
         });
         expect(addRes.status).toBe(200);
@@ -167,12 +170,12 @@ describe('Node Groups (via Tags API)', () => {
         // Add tag
         await app.request('/api/v1/nodes/rm-tag-n1/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['temp-group'] }),
         });
         await app.request('/api/v1/nodes/rm-tag-n2/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['temp-group'] }),
         });
 
@@ -199,7 +202,7 @@ describe('Schedules (Placement / Timing Constraints)', () => {
     it('POST /api/v1/schedules creates a schedule', async () => {
         const res = await app.request('/api/v1/schedules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 name: 'Night power-save',
                 type: 'power_profile',
@@ -218,12 +221,12 @@ describe('Schedules (Placement / Timing Constraints)', () => {
         // Create two schedules
         await app.request('/api/v1/schedules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ name: 'Sched-1', type: 'backup', cron: '0 3 * * *' }),
         });
         await app.request('/api/v1/schedules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ name: 'Sched-2', type: 'rebalance', cron: '*/30 * * * *' }),
         });
 
@@ -236,7 +239,7 @@ describe('Schedules (Placement / Timing Constraints)', () => {
     it('DELETE /api/v1/schedules/:id removes a schedule', async () => {
         const createRes = await app.request('/api/v1/schedules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ name: 'Temp', type: 'cleanup', cron: '0 0 * * 0' }),
         });
         const created = await createRes.json();
@@ -255,7 +258,7 @@ describe('Schedules (Placement / Timing Constraints)', () => {
     it('POST /api/v1/schedules/:id/toggle enables/disables a schedule', async () => {
         const createRes = await app.request('/api/v1/schedules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ name: 'Toggle-Me', type: 'deploy', cron: '0 6 * * *' }),
         });
         const created = await createRes.json();
@@ -264,7 +267,7 @@ describe('Schedules (Placement / Timing Constraints)', () => {
         // Disable
         const disableRes = await app.request(`/api/v1/schedules/${id}/toggle`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ enabled: false }),
         });
         expect(disableRes.status).toBe(200);
@@ -274,7 +277,7 @@ describe('Schedules (Placement / Timing Constraints)', () => {
         // Re-enable
         const enableRes = await app.request(`/api/v1/schedules/${id}/toggle`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ enabled: true }),
         });
         expect(enableRes.status).toBe(200);
@@ -285,7 +288,7 @@ describe('Schedules (Placement / Timing Constraints)', () => {
     it('POST /api/v1/schedules rejects missing fields', async () => {
         const res = await app.request('/api/v1/schedules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ name: 'Incomplete' }),
         });
         expect(res.status).toBe(400);
@@ -328,7 +331,7 @@ describe('Alert Rules', () => {
     it('POST /api/v1/alert-rules creates a new rule', async () => {
         const res = await app.request('/api/v1/alert-rules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 name: 'Latency Spike',
                 metric: 'inference_latency',
@@ -356,7 +359,7 @@ describe('Alert Rules', () => {
     it('PUT /api/v1/alert-rules/:id updates a rule', async () => {
         const createRes = await app.request('/api/v1/alert-rules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 name: 'GPU Util Low',
                 metric: 'gpu_util',
@@ -369,7 +372,7 @@ describe('Alert Rules', () => {
 
         const updateRes = await app.request(`/api/v1/alert-rules/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 threshold: 20,
                 severity: 'critical',
@@ -392,7 +395,7 @@ describe('Alert Rules', () => {
     it('DELETE /api/v1/alert-rules/:id removes a rule', async () => {
         const createRes = await app.request('/api/v1/alert-rules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 name: 'Temp Rule',
                 metric: 'gpu_temp',
@@ -417,7 +420,7 @@ describe('Alert Rules', () => {
     it('POST /api/v1/alert-rules/:id/toggle disables and enables a rule', async () => {
         const createRes = await app.request('/api/v1/alert-rules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 name: 'Toggle Test',
                 metric: 'cpu_usage',
@@ -431,7 +434,7 @@ describe('Alert Rules', () => {
         // Disable
         const disableRes = await app.request(`/api/v1/alert-rules/${id}/toggle`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ enabled: false }),
         });
         expect(disableRes.status).toBe(200);
@@ -441,7 +444,7 @@ describe('Alert Rules', () => {
         // Enable
         const enableRes = await app.request(`/api/v1/alert-rules/${id}/toggle`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ enabled: true }),
         });
         expect(enableRes.status).toBe(200);
@@ -452,7 +455,7 @@ describe('Alert Rules', () => {
     it('POST /api/v1/alert-rules rejects invalid metric', async () => {
         const res = await app.request('/api/v1/alert-rules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 name: 'Bad Metric',
                 metric: 'fake_metric',
@@ -468,7 +471,7 @@ describe('Alert Rules', () => {
     it('POST /api/v1/alert-rules rejects invalid operator', async () => {
         const res = await app.request('/api/v1/alert-rules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 name: 'Bad Op',
                 metric: 'gpu_temp',
@@ -484,7 +487,7 @@ describe('Alert Rules', () => {
     it('POST /api/v1/alert-rules rejects missing required fields', async () => {
         const res = await app.request('/api/v1/alert-rules', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ name: 'Incomplete' }),
         });
         expect(res.status).toBe(400);
@@ -500,7 +503,7 @@ describe('Alert Rules', () => {
     it('PUT /api/v1/alert-rules/:id returns 404 for nonexistent rule', async () => {
         const res = await app.request('/api/v1/alert-rules/nonexistent', {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ threshold: 99 }),
         });
         expect(res.status).toBe(404);
@@ -509,7 +512,7 @@ describe('Alert Rules', () => {
     it('POST /api/v1/alert-rules/:id/toggle returns 404 for nonexistent rule', async () => {
         const res = await app.request('/api/v1/alert-rules/nonexistent/toggle', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ enabled: false }),
         });
         expect(res.status).toBe(404);
@@ -740,7 +743,7 @@ describe('Bulk Operations', () => {
 
         const res = await app.request('/api/v1/bulk/command', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 action: 'install_model',
                 payload: { model: 'llama3.1:8b' },
@@ -761,7 +764,7 @@ describe('Bulk Operations', () => {
 
         const res = await app.request('/api/v1/bulk/command', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_ids: ['bulk-a', 'bulk-c'],
                 action: 'reload_model',
@@ -781,18 +784,18 @@ describe('Bulk Operations', () => {
         // Tag two nodes
         await app.request('/api/v1/nodes/tagged-1/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['gpu-fleet'] }),
         });
         await app.request('/api/v1/nodes/tagged-2/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['gpu-fleet'] }),
         });
 
         const res = await app.request('/api/v1/bulk/command', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 tag: 'gpu-fleet',
                 action: 'install_model',
@@ -807,7 +810,7 @@ describe('Bulk Operations', () => {
     it('POST /api/v1/bulk/command rejects missing action', async () => {
         const res = await app.request('/api/v1/bulk/command', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ node_ids: ['x'] }),
         });
         expect(res.status).toBe(400);
@@ -820,7 +823,7 @@ describe('Bulk Operations', () => {
         // Add tags in bulk
         const addRes = await app.request('/api/v1/bulk/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_ids: ['bt-n1', 'bt-n2'],
                 tags: ['prod', 'llm'],
@@ -841,7 +844,7 @@ describe('Bulk Operations', () => {
         // Remove tags in bulk
         const rmRes = await app.request('/api/v1/bulk/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_ids: ['bt-n1', 'bt-n2'],
                 tags: ['prod'],
@@ -863,18 +866,18 @@ describe('Bulk Operations', () => {
 
         await app.request('/api/v1/nodes/reboot-1/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['maintenance'] }),
         });
         await app.request('/api/v1/nodes/reboot-2/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['maintenance'] }),
         });
 
         const res = await app.request('/api/v1/bulk/reboot', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tag: 'maintenance' }),
         });
         expect(res.status).toBe(200);
@@ -886,7 +889,7 @@ describe('Bulk Operations', () => {
     it('POST /api/v1/bulk/reboot rejects missing targets', async () => {
         const res = await app.request('/api/v1/bulk/reboot', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({}),
         });
         expect(res.status).toBe(400);
@@ -898,13 +901,13 @@ describe('Bulk Operations', () => {
 
         await app.request('/api/v1/nodes/dep-n1/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['deploy-target'] }),
         });
 
         const res = await app.request('/api/v1/bulk/deploy', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 model: 'hermes3:8b',
                 tag: 'deploy-target',
@@ -918,7 +921,7 @@ describe('Bulk Operations', () => {
     it('POST /api/v1/bulk/deploy rejects missing model', async () => {
         const res = await app.request('/api/v1/bulk/deploy', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ node_ids: ['n1'] }),
         });
         expect(res.status).toBe(400);
@@ -1008,7 +1011,7 @@ describe('Smart Deploy & Model Operations', () => {
 
         const res = await app.request('/api/v1/models/smart-deploy', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ model: 'llama3.2:1b' }),
         });
         expect(res.status).toBe(200);
@@ -1021,7 +1024,7 @@ describe('Smart Deploy & Model Operations', () => {
     it('POST /api/v1/models/smart-deploy rejects missing model', async () => {
         const res = await app.request('/api/v1/models/smart-deploy', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({}),
         });
         expect(res.status).toBe(400);
@@ -1036,7 +1039,7 @@ describe('Smart Deploy & Model Operations', () => {
 
         const res = await app.request('/api/v1/models/smart-deploy', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ model: 'llama3.1:70b' }),
         });
         expect(res.status).toBe(409);
@@ -1064,7 +1067,7 @@ describe('Tag Edge Cases (HTTP)', () => {
 
         const res = await app.request('/api/v1/nodes/tag-empty/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: [] }),
         });
         expect(res.status).toBe(400);
@@ -1075,7 +1078,7 @@ describe('Tag Edge Cases (HTTP)', () => {
 
         const res = await app.request('/api/v1/nodes/tag-missing/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({}),
         });
         expect(res.status).toBe(400);
@@ -1084,7 +1087,7 @@ describe('Tag Edge Cases (HTTP)', () => {
     it('POST /api/v1/nodes/:id/tags returns 404 for nonexistent node', async () => {
         const res = await app.request('/api/v1/nodes/ghost-node/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['test'] }),
         });
         expect(res.status).toBe(404);
@@ -1107,7 +1110,7 @@ describe('Tag Edge Cases (HTTP)', () => {
 
         const res = await app.request('/api/v1/nodes/tag-filter/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['', '  ', 'valid-tag'] }),
         });
         expect(res.status).toBe(200);
@@ -1188,7 +1191,7 @@ describe('Node Lifecycle & Maintenance', () => {
 
         const res = await app.request('/api/v1/nodes/maint-n1/maintenance', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ enabled: true }),
         });
         expect(res.status).toBe(200);
@@ -1390,7 +1393,7 @@ describe('Webhooks', () => {
     it('POST /api/v1/webhooks creates a webhook', async () => {
         const res = await app.request('/api/v1/webhooks', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 url: 'https://example.com/hook',
                 events: ['node_online', 'node_offline'],
@@ -1405,7 +1408,7 @@ describe('Webhooks', () => {
         // Create one first
         const createRes = await app.request('/api/v1/webhooks', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 url: 'https://example.com/hook2',
                 events: ['alert'],

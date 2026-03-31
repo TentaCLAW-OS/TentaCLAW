@@ -7,11 +7,14 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { app } from '../src/index';
+import { app, initClusterSecret } from '../src/index';
 import { getDb } from '../src/db';
 
 // Use in-memory DB for tests
 process.env.TENTACLAW_DB_PATH = ':memory:';
+// Set a known cluster secret so agent-authenticated endpoints accept requests
+process.env.TENTACLAW_CLUSTER_SECRET = 'test-secret';
+initClusterSecret();
 
 /** Wipe all tables between tests for full isolation. */
 function resetDb(): void {
@@ -52,7 +55,7 @@ async function registerTestNode(
 ): Promise<Response> {
     return app.request('/api/v1/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
         body: JSON.stringify({
             node_id: nodeId,
             farm_hash: farmHash,
@@ -69,7 +72,7 @@ async function registerTestNode(
 async function pushStats(nodeId: string): Promise<Response> {
     return app.request(`/api/v1/nodes/${nodeId}/stats`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
         body: JSON.stringify({
             farm_hash: 'TESTFARM',
             node_id: nodeId,

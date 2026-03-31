@@ -613,7 +613,7 @@ setInterval(() => {
 let CLUSTER_SECRET: string | null = null;
 let agentAuthEnabled = false;
 
-function initClusterSecret(): void {
+export function initClusterSecret(): void {
     const envSecret = process.env.TENTACLAW_CLUSTER_SECRET;
     if (envSecret) {
         CLUSTER_SECRET = envSecret;

@@ -20,10 +20,13 @@ import {
     getClusterModels,
     createApiKey,
 } from '../src/db';
-import { app } from '../src/index';
+import { app, initClusterSecret } from '../src/index';
 import type { StatsPayload } from '../../shared/types';
 
 process.env.TENTACLAW_DB_PATH = ':memory:';
+// Set a known cluster secret so agent-authenticated endpoints accept requests
+process.env.TENTACLAW_CLUSTER_SECRET = 'test-secret';
+initClusterSecret();
 
 function clearDb() {
     const db = getDb();
@@ -516,7 +519,7 @@ describe('Security', () => {
         // Security headers are set by the global middleware on ALL responses
         expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
         expect(res.headers.get('X-Frame-Options')).toBe('DENY');
-        expect(res.headers.get('X-XSS-Protection')).toBe('1; mode=block');
+        expect(res.headers.get('X-XSS-Protection')).toBe('0');
         expect(res.headers.get('Strict-Transport-Security')).toContain('max-age=');
         expect(res.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
 

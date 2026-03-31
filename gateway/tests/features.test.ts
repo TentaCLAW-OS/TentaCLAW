@@ -6,11 +6,14 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { app } from '../src/index';
+import { app, initClusterSecret } from '../src/index';
 import { getDb } from '../src/db';
 
 // Use in-memory DB for tests
 process.env.TENTACLAW_DB_PATH = ':memory:';
+// Set a known cluster secret so agent-authenticated endpoints accept requests
+process.env.TENTACLAW_CLUSTER_SECRET = 'test-secret';
+initClusterSecret();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,7 +53,7 @@ async function registerTestNode(overrides: Record<string, unknown> = {}): Promis
     };
     const res = await app.request('/api/v1/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
         body: JSON.stringify(body),
     });
     return res.json() as Promise<{ status: string; node: Record<string, unknown> }>;
@@ -103,7 +106,7 @@ describe('SSH Key Management', () => {
 
         const res = await app.request('/api/v1/nodes/test-node-001/ssh-keys', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 label: 'my-laptop',
                 public_key: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGtest user@host',
@@ -124,12 +127,12 @@ describe('SSH Key Management', () => {
         // Add two keys
         await app.request('/api/v1/nodes/test-node-001/ssh-keys', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ label: 'key-a', public_key: 'ssh-ed25519 AAAAC3keyA user@a' }),
         });
         await app.request('/api/v1/nodes/test-node-001/ssh-keys', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ label: 'key-b', public_key: 'ssh-rsa AAAABkeyB user@b' }),
         });
 
@@ -148,7 +151,7 @@ describe('SSH Key Management', () => {
 
         const res = await app.request('/api/v1/nodes/test-node-001/ssh-keys', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ label: 'no-key' }),
         });
 
@@ -163,7 +166,7 @@ describe('SSH Key Management', () => {
         // Add a key
         const addRes = await app.request('/api/v1/nodes/test-node-001/ssh-keys', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ label: 'temp-key', public_key: 'ssh-rsa AAAABtemp user@tmp' }),
         });
         const key = await addRes.json() as Record<string, unknown>;
@@ -193,7 +196,7 @@ describe('Node Tags', () => {
 
         const res = await app.request('/api/v1/nodes/test-node-001/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['production'] }),
         });
 
@@ -208,7 +211,7 @@ describe('Node Tags', () => {
         // Add multiple tags
         await app.request('/api/v1/nodes/test-node-001/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['production', 'inference', 'gpu-heavy'] }),
         });
 
@@ -230,12 +233,12 @@ describe('Node Tags', () => {
         // Tag them
         await app.request('/api/v1/nodes/node-a/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['production', 'inference'] }),
         });
         await app.request('/api/v1/nodes/node-b/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['production'] }),
         });
 
@@ -257,7 +260,7 @@ describe('Node Tags', () => {
 
         await app.request('/api/v1/nodes/test-node-001/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['staging', 'temp'] }),
         });
 
@@ -278,7 +281,7 @@ describe('Node Tags', () => {
 
         const res = await app.request('/api/v1/nodes/test-node-001/tags', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ tags: ['', '  '] }),
         });
 
@@ -310,7 +313,7 @@ describe('Alerts', () => {
         // Push stats with GPU temperature above the 85C threshold
         const res = await app.request('/api/v1/nodes/test-node-001/stats', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify(makeHotStatsPayload('test-node-001', 'gpu-rig-01', 95)),
         });
 
@@ -323,7 +326,7 @@ describe('Alerts', () => {
         // Push overheating stats
         await app.request('/api/v1/nodes/test-node-001/stats', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify(makeHotStatsPayload('test-node-001', 'gpu-rig-01', 95)),
         });
 
@@ -353,7 +356,7 @@ describe('Benchmarks', () => {
 
         const res = await app.request('/api/v1/nodes/test-node-001/benchmark', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 model: 'llama3.1:8b',
                 tokens_per_sec: 185.5,
@@ -378,12 +381,12 @@ describe('Benchmarks', () => {
         // Store two benchmarks
         await app.request('/api/v1/nodes/test-node-001/benchmark', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ model: 'llama3.1:8b', tokens_per_sec: 185 }),
         });
         await app.request('/api/v1/nodes/test-node-001/benchmark', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({ model: 'hermes3:8b', tokens_per_sec: 200 }),
         });
 
@@ -434,12 +437,12 @@ describe('Benchmarks', () => {
 
         await app.request('/api/v1/nodes/fast-node/stats', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify(makeStatsPayload('fast-node', 'fast-rig', 300)),
         });
         await app.request('/api/v1/nodes/slow-node/stats', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify(makeStatsPayload('slow-node', 'slow-rig', 100)),
         });
 

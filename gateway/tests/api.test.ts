@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { StatsPayload } from '../../shared/types';
-import { app } from '../src/index';
+import { app, initClusterSecret } from '../src/index';
 
 import {
     getDb,
@@ -45,6 +45,9 @@ import {
 
 // Use in-memory DB for tests
 process.env.TENTACLAW_DB_PATH = ':memory:';
+// Set a known cluster secret so agent-authenticated endpoints accept requests
+process.env.TENTACLAW_CLUSTER_SECRET = 'test-secret';
+initClusterSecret();
 
 function makeStats(nodeId: string): StatsPayload {
     return {
@@ -692,7 +695,7 @@ describe('Registration Edge Cases', () => {
     it('rejects registration with missing node_id (empty body)', async () => {
         const res = await app.request('/api/v1/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({}),
         });
 
@@ -704,7 +707,7 @@ describe('Registration Edge Cases', () => {
     it('rejects registration with empty string node_id', async () => {
         const res = await app.request('/api/v1/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_id: '',
                 farm_hash: 'FARM0001',
@@ -720,7 +723,7 @@ describe('Registration Edge Cases', () => {
     it('rejects registration with missing farm_hash', async () => {
         const res = await app.request('/api/v1/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_id: 'TENTACLAW-TEST-001',
                 hostname: 'test-rig',
@@ -735,7 +738,7 @@ describe('Registration Edge Cases', () => {
     it('rejects registration with missing hostname', async () => {
         const res = await app.request('/api/v1/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_id: 'TENTACLAW-TEST-002',
                 farm_hash: 'FARM0001',
@@ -750,7 +753,7 @@ describe('Registration Edge Cases', () => {
     it('accepts registration with gpu_count = 0 (CPU-only node)', async () => {
         const res = await app.request('/api/v1/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_id: 'TENTACLAW-CPU-ONLY',
                 farm_hash: 'FARM0001',
@@ -768,7 +771,7 @@ describe('Registration Edge Cases', () => {
     it('sanitizes negative gpu_count to 0', async () => {
         const res = await app.request('/api/v1/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_id: 'TENTACLAW-NEG-GPU',
                 farm_hash: 'FARM0001',
@@ -786,7 +789,7 @@ describe('Registration Edge Cases', () => {
     it('caps gpu_count at 128', async () => {
         const res = await app.request('/api/v1/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_id: 'TENTACLAW-MAX-GPU',
                 farm_hash: 'FARM0001',
@@ -806,7 +809,7 @@ describe('Registration Edge Cases', () => {
         // First registration
         const res1 = await app.request('/api/v1/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_id: 'TENTACLAW-DUPE-001',
                 farm_hash: 'FARM0001',
@@ -822,7 +825,7 @@ describe('Registration Edge Cases', () => {
         // Re-register same node_id with updated info
         const res2 = await app.request('/api/v1/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_id: 'TENTACLAW-DUPE-001',
                 farm_hash: 'FARM0001',
@@ -845,7 +848,7 @@ describe('Registration Edge Cases', () => {
 
         const res = await app.request('/api/v1/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_id: longId,
                 farm_hash: 'FARM0001',
@@ -865,7 +868,7 @@ describe('Registration Edge Cases', () => {
     it('handles special characters in hostname', async () => {
         const res = await app.request('/api/v1/register', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Cluster-Secret': 'test-secret' },
             body: JSON.stringify({
                 node_id: 'TENTACLAW-SPECIAL-HOST',
                 farm_hash: 'FARM0001',
