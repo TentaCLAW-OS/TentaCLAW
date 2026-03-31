@@ -62,10 +62,10 @@ cd gateway && npm install && npm run dev
 ## Dashboard
 
 <p align="center">
-  <img src="assets/screenshots/dashboard-summary.png" alt="TentaCLAW Dashboard — Summary" width="900">
+  <img src="assets/screenshots/live-cluster-dashboard.png" alt="TentaCLAW Dashboard — Live Cluster" width="900">
 </p>
 
-<p align="center"><em>Proxmox-style command center — 12 tabs, real-time SSE, resource tree, sparklines</em></p>
+<p align="center"><em>Real cluster: 4 nodes, 9 AMD GPUs, 104 GB VRAM, 20 models — running on Proxmox</em></p>
 
 <details>
 <summary><strong>More screenshots</strong></summary>
