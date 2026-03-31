@@ -1,121 +1,93 @@
-# Security Guide
+# TentaCLAW OS — Security Posture
 
-TentaCLAW OS takes security seriously. This guide covers authentication, authorization, and hardening.
+> Your cluster. Your data. Your rules.
 
-## Authentication
+## Safe Defaults
 
-### API Keys (Default)
+TentaCLAW ships with security-first defaults:
 
-Set `TENTACLAW_API_KEY` environment variable to require authentication:
+- **Bind address**: Gateway binds to `0.0.0.0:8080` by default. For private clusters, set `TENTACLAW_HOST=127.0.0.1` to restrict to localhost only.
+- **Authentication**: API key required for all `/api/v1/*` endpoints when `TENTACLAW_API_KEY` is set. Without it, the API is open (for development).
+- **Cluster secret**: Agent-to-gateway communication requires a shared `TENTACLAW_CLUSTER_SECRET`. Without it, any device on the network can register as a node.
+- **Dashboard auth**: Login page with session tokens. Sessions expire after 24 hours.
+- **CORS**: Permissive by default for local development (`*`). For production, place behind a reverse proxy that restricts origins.
 
+## What's Protected
+
+| Component | Auth Method | Default |
+|-----------|-----------|---------|
+| Dashboard | Session token (login/password) | Required |
+| REST API | API key (Bearer token) | Open if no key set |
+| Agent -> Gateway | Cluster secret header (`X-Cluster-Secret`) | Open if no secret set |
+| WebSocket shell | Session token + admin/operator role | Required |
+| SSE events | None (read-only) | Open |
+
+## Network Exposure
+
+- The gateway listens on one port (default 8080, configurable via `TENTACLAW_PORT`)
+- No outbound connections except to model registries (Ollama, HuggingFace) when pulling models
+- No telemetry. No analytics. No phone-home.
+- Agent uses UDP broadcast on port 41337 for auto-discovery (LAN only)
+
+## Security Headers
+
+All responses include production-grade security headers:
+
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `X-XSS-Protection: 1; mode=block`
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `X-Request-ID` on every request for traceability
+
+## Recommended Production Setup
+
+1. Set `TENTACLAW_API_KEY` for API authentication
+2. Set `TENTACLAW_CLUSTER_SECRET` for agent registration
+3. Use a reverse proxy (Caddy/nginx) with TLS for external access
+4. Bind gateway to localhost (`TENTACLAW_HOST=127.0.0.1`) and expose via proxy
+5. Change the default admin password immediately (default: `admin` / `admin`)
+6. Enable IP blocking for brute-force protection (built-in, activates on repeated auth failures)
+
+## What We Don't Do
+
+- **No telemetry**: We never phone home. Zero data leaves your network.
+- **No model access**: We route requests to inference engines. We don't read, store, or modify your prompts or responses (unless you enable prompt caching).
+- **No vendor lock-in**: MIT license. Fork it, modify it, self-host forever.
+- **No cloud dependency**: Everything runs on your hardware. No external services required.
+
+## Threat Model
+
+| Threat | Mitigation |
+|--------|-----------|
+| Unauthorized API access | API key + rate limiting + IP blocking |
+| Rogue node registration | Cluster secret required for agent auth |
+| Man-in-the-middle | mTLS support (security module), reverse proxy with TLS |
+| Prompt injection | Pass-through to inference engine; guardrails configurable |
+| Brute-force login | Auto IP blocking after repeated failures (15-minute lockout) |
+| Shell access abuse | Requires admin/operator role + session auth |
+
+## Signed Releases
+
+All releases are tagged and signed via GitHub. Verify:
 ```bash
-export TENTACLAW_API_KEY=your-secret-key
-cd gateway && npm run dev
+git tag -v v1.0.0
 ```
 
-All `/api/*` and `/v1/*` endpoints will require a `Bearer` token:
+## Reporting Security Issues
 
-```bash
-curl -H "Authorization: Bearer your-secret-key" http://localhost:8080/api/v1/nodes
-```
+Email: security@tentaclaw.io
+Or open a private security advisory on GitHub.
 
-### Scoped API Keys
+We acknowledge reports within 48 hours and aim to fix critical issues within 7 days.
 
-Create keys with specific permissions:
+## Audit Log
 
-```bash
-# Create read-only key
-clawtopus apikey create --name "monitoring" --permissions read
+TentaCLAW maintains an audit log of:
+- All authentication attempts (success + failure)
+- API key creation/revocation
+- Node registration/deregistration
+- Cluster secret rotation
+- User management changes
 
-# Create inference-only key
-clawtopus apikey create --name "app-backend" --permissions read,write
-
-# Create admin key
-clawtopus apikey create --name "admin" --permissions read,write,admin
-```
-
-**Permission levels:**
-- `read` — GET requests (view nodes, models, stats)
-- `write` — POST/PUT/DELETE (deploy models, send commands)
-- `admin` — User management, key management, cluster config
-
-### Key Expiry
-
-Keys can have an expiration date:
-```bash
-clawtopus apikey create --name "temp" --expires "2027-12-31"
-```
-
-### User Authentication
-
-For multi-user setups, TentaCLAW supports username/password auth:
-
-```bash
-# Login
-curl -X POST http://localhost:8080/api/v1/auth/login \
-  -d '{"username":"admin","password":"admin"}'
-# Returns: { "token": "...", "user": { ... } }
-```
-
-Default admin credentials: `admin` / `admin` — **change immediately**.
-
-## Network Security
-
-### TLS/HTTPS
-
-For production, put TentaCLAW behind a reverse proxy with TLS:
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name tentaclaw.example.com;
-    ssl_certificate /etc/ssl/certs/tentaclaw.pem;
-    ssl_certificate_key /etc/ssl/private/tentaclaw.key;
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Request-ID $request_id;
-    }
-}
-```
-
-### Firewall
-
-Only expose necessary ports:
-```bash
-# Gateway only needs 8080
-sudo ufw allow 8080/tcp
-sudo ufw deny 11434/tcp  # Keep Ollama internal
-```
-
-### Agent ↔ Gateway Communication
-
-Agents push stats to the gateway via HTTP POST. In production:
-- Use HTTPS between agents and gateway
-- Set API keys on both sides
-- Use a VPN or private network
-
-## Webhook Security
-
-Webhooks support HMAC signing:
-
-```bash
-curl -X POST http://localhost:8080/api/v1/webhooks \
-  -d '{"url":"https://your-server.com/hook","secret":"your-hmac-secret"}'
-```
-
-Verify webhook signatures by computing `SHA-256(secret + payload)` and comparing with the `X-TentaCLAW-Signature` header.
-
-## Best Practices
-
-1. **Change default admin password** immediately
-2. **Use API keys** in production — never run open
-3. **Put behind reverse proxy** with TLS for internet-facing deployments
-4. **Restrict network access** — agents should only reach the gateway
-5. **Rotate API keys** periodically
-6. **Monitor audit logs** via `/api/v1/events`
-
----
-
-*CLAWtopus says: "Eight arms to protect your cluster. Zero arms for attackers."*
+Access via: `GET /api/v1/audit` (admin only)
