@@ -1370,6 +1370,67 @@ app.post('/api/v1/deploy', async (c) => {
 });
 
 // =============================================================================
+// Model Quantization Pipeline (Wave 48, Phases 787-803)
+// =============================================================================
+
+app.post('/api/v1/quantize', async (c) => {
+    const body = await c.req.json();
+    if (!body.model) return c.json({ error: 'Missing required field: model' }, 400);
+
+    const method = body.method || 'fp8';
+    const validMethods = ['fp8', 'awq', 'gptq', 'gguf_q4', 'gguf_q6', 'gguf_q8', 'exl2'];
+    if (!validMethods.includes(method)) {
+        return c.json({ error: `Invalid method. Valid: ${validMethods.join(', ')}` }, 400);
+    }
+
+    const calibrationSamples = body.calibration_samples || 512;
+    const validateQuality = body.validate !== false;
+    const maxQualityLoss = body.max_quality_loss_pct || 3.0;
+
+    // Estimate output size
+    const vramEstimateMb = estimateModelVram(body.model);
+    const sizeReduction: Record<string, number> = {
+        'fp8': 0.5, 'awq': 0.25, 'gptq': 0.25, 'gguf_q4': 0.25,
+        'gguf_q6': 0.375, 'gguf_q8': 0.5, 'exl2': 0.3,
+    };
+
+    const estimatedSizeMb = vramEstimateMb > 0 ? Math.round(vramEstimateMb * (sizeReduction[method] || 0.5)) : null;
+
+    // Queue the quantization job to an available node with the model
+    const modelNode = findBestNodeForModel(body.model);
+    if (!modelNode) {
+        return c.json({
+            error: `No node has model "${body.model}" loaded. Deploy it first, then quantize.`,
+            hint: `Run: tentaclaw deploy ${body.model}`,
+        }, 404);
+    }
+
+    const jobId = queueCommand(modelNode.node_id, 'quantize_model', {
+        model: body.model,
+        method,
+        calibration_samples: calibrationSamples,
+        validate_quality: validateQuality,
+        max_quality_loss_pct: maxQualityLoss,
+        output_format: method.startsWith('gguf') ? 'gguf' : method === 'exl2' ? 'exl2' : 'safetensors',
+    });
+
+    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+    recordAuditEvent('model_quantize', undefined, ip, `Quantize ${body.model} → ${method} on ${modelNode.hostname}`);
+
+    return c.json({
+        status: 'queued',
+        job_id: jobId,
+        model: body.model,
+        method,
+        target_node: modelNode.hostname,
+        estimated_size_mb: estimatedSizeMb,
+        calibration_samples: calibrationSamples,
+        quality_validation: validateQuality,
+        max_quality_loss_pct: maxQualityLoss,
+    });
+});
+
+// =============================================================================
 // Farm Grouping
 // =============================================================================
 

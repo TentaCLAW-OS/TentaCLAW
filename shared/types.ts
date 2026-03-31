@@ -79,7 +79,7 @@ export interface StatsPayload {
 // Commands (Gateway → Agent)
 // =============================================================================
 
-export type CommandAction = 'reload_model' | 'install_model' | 'remove_model' | 'overclock' | 'benchmark' | 'restart_agent' | 'reboot';
+export type CommandAction = 'reload_model' | 'install_model' | 'remove_model' | 'overclock' | 'benchmark' | 'restart_agent' | 'reboot' | 'quantize_model';
 
 export type OverclockProfile = 'stock' | 'gaming' | 'mining' | 'inference';
 

@@ -2395,6 +2395,49 @@ async function main(): Promise<void> {
             break;
         }
 
+        case 'quantize': {
+            // Wave 48: One-command quantization pipeline
+            const qModel = parsed.positional[0];
+            if (!qModel) {
+                console.error('');
+                console.error(C.red('  Missing model name'));
+                console.error(C.dim('  Usage: clawtopus quantize <model> [--method fp8|awq|gptq|gguf_q4|gguf_q6|exl2]'));
+                console.error(C.dim('  Example: clawtopus quantize llama3.1:8b --method awq'));
+                console.error('');
+                process.exit(1);
+            }
+            const qMethod = parsed.flags['method'] || 'fp8';
+            const qSamples = parseInt(parsed.flags['samples'] || '512', 10);
+
+            console.log('');
+            console.log('  ' + C.purple(C.bold('MODEL QUANTIZATION')));
+            console.log('  ' + C.dim(`Model: ${qModel} → ${qMethod.toUpperCase()}`));
+            console.log('');
+
+            try {
+                const result = await apiPost(gateway, '/api/v1/quantize', {
+                    model: qModel,
+                    method: qMethod,
+                    calibration_samples: qSamples,
+                }) as any;
+
+                console.log('  ' + C.green('\u2714') + ' Quantization job queued');
+                console.log('  ' + C.dim('Job ID:     ') + C.white(result.job_id || 'N/A'));
+                console.log('  ' + C.dim('Target:     ') + C.white(result.target_node || 'auto'));
+                console.log('  ' + C.dim('Method:     ') + C.white(qMethod.toUpperCase()));
+                if (result.estimated_size_mb) {
+                    console.log('  ' + C.dim('Est. size:  ') + C.white(result.estimated_size_mb + ' MB'));
+                }
+                console.log('  ' + C.dim('Validation: ') + C.white(result.quality_validation ? 'YES (max ' + result.max_quality_loss_pct + '% loss)' : 'NO'));
+                console.log('');
+                console.log('  ' + C.dim('Monitor progress: clawtopus status'));
+            } catch (e) {
+                console.error('  ' + C.red('Quantization failed: ' + (e as Error).message));
+            }
+            console.log('');
+            break;
+        }
+
         case 'command': {
             const nodeId = parsed.positional[0];
             const action = parsed.positional[1];
