@@ -16,7 +16,6 @@
 
 import { execFileSync, spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs';
-import * as path from 'path';
 
 // =============================================================================
 // Types
@@ -88,27 +87,7 @@ let dynamoProcess: ChildProcess | null = null;
 let currentConfig: DynamoConfig | null = null;
 let currentState: DynamoState = 'stopped';
 let startedAt: number = 0;
-
 const LOG_PREFIX = '[dynamo]';
-
-// =============================================================================
-// Configuration
-// =============================================================================
-
-function getDefaultConfig(): Partial<DynamoConfig> {
-    return {
-        natsUrl: process.env.DYNAMO_NATS_URL || 'nats://localhost:4222',
-        prefillWorkers: parseInt(process.env.DYNAMO_PREFILL_WORKERS || '1', 10),
-        decodeWorkers: parseInt(process.env.DYNAMO_DECODE_WORKERS || '1', 10),
-        enableNixl: process.env.DYNAMO_ENABLE_NIXL !== 'false',
-        tensorParallel: parseInt(process.env.DYNAMO_TP || '1', 10),
-        maxModelLen: parseInt(process.env.DYNAMO_MAX_MODEL_LEN || '0', 10) || 0,
-        quantization: (process.env.DYNAMO_QUANTIZATION as any) || 'none',
-        kvCacheDtype: (process.env.DYNAMO_KV_CACHE_DTYPE as any) || 'auto',
-        port: parseInt(process.env.DYNAMO_PORT || '8080', 10),
-        extraArgs: [],
-    };
-}
 
 // =============================================================================
 // Detection
@@ -293,17 +272,18 @@ export async function stopDynamo(): Promise<boolean> {
 // =============================================================================
 
 /** Get Dynamo health status */
-export function getDynamoHealth(): DynamoHealth {
+export function getDynamoHealth(): DynamoHealth & { uptimeMs: number } {
     return {
         state: currentState,
         prefillWorkersHealthy: currentConfig?.prefillWorkers || 0,
         decodeWorkersHealthy: currentConfig?.decodeWorkers || 0,
         natsConnected: currentState === 'running',
         nixlEnabled: currentConfig?.enableNixl || false,
-        kvCacheTransferLatencyMs: 0, // Would be populated from Dynamo metrics
+        kvCacheTransferLatencyMs: 0,
         throughputToksPerSec: 0,
         ttftP50Ms: 0,
         ttftP99Ms: 0,
+        uptimeMs: startedAt > 0 ? Date.now() - startedAt : 0,
     };
 }
 

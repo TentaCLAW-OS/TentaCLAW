@@ -34,6 +34,22 @@ export interface VllmLaunchConfig {
     enablePrefixCaching?: boolean;
     cudaVisibleDevices?: string;
     extraArgs?: string[];
+
+    // Wave 42: LMCache integration (3-15x throughput, 7x TTFT improvement)
+    enableLmcache?: boolean;
+    lmcacheGpuCacheMb?: number;    // GPU tier (L1) — hot KV cache
+    lmcacheCpuCacheMb?: number;    // CPU tier (L2) — warm KV cache
+    lmcacheDiskCacheMb?: number;   // Disk tier (L3) — cold KV cache (NVMe)
+    lmcachePeerSharing?: boolean;  // Cross-instance KV cache sharing via RDMA/TCP
+
+    // Wave 43: Speculative decoding (EAGLE-3: 3-6.5x speedup)
+    speculativeModel?: string;             // EAGLE-3 draft model path (e.g., 'eagle3-llama8b')
+    speculativeMethod?: 'eagle3' | 'ngram' | 'medusa' | 'none';
+    speculativeNumDraftTokens?: number;    // How many tokens to speculate (default: 5)
+    speculativeAcceptanceThreshold?: number; // Min acceptance rate before disabling (default: 0.5)
+
+    // Wave 48: FP8 KV cache (2x memory savings on Hopper+)
+    kvCacheDtype?: 'auto' | 'fp8_e5m2' | 'fp8_e4m3';
 }
 
 /** Current state of the vLLM server process */
@@ -342,6 +358,39 @@ export async function launchVllm(config: VllmLaunchConfig): Promise<boolean> {
 
     if (config.enablePrefixCaching) {
         args.push('--enable-prefix-caching');
+    }
+
+    // Wave 42: LMCache integration
+    if (config.enableLmcache) {
+        args.push('--enable-lmcache');
+        if (config.lmcacheGpuCacheMb) args.push('--lmcache-gpu-cache-mb', String(config.lmcacheGpuCacheMb));
+        if (config.lmcacheCpuCacheMb) args.push('--lmcache-cpu-cache-mb', String(config.lmcacheCpuCacheMb));
+        if (config.lmcacheDiskCacheMb) args.push('--lmcache-disk-cache-mb', String(config.lmcacheDiskCacheMb));
+        if (config.lmcachePeerSharing) args.push('--lmcache-peer-sharing');
+        console.log(`${LOG_PREFIX} LMCache ENABLED — GPU: ${config.lmcacheGpuCacheMb || 'auto'}MB, CPU: ${config.lmcacheCpuCacheMb || 'auto'}MB, Disk: ${config.lmcacheDiskCacheMb || 0}MB, Peer: ${config.lmcachePeerSharing ? 'ON' : 'OFF'}`);
+    }
+
+    // Wave 43: Speculative decoding
+    if (config.speculativeMethod && config.speculativeMethod !== 'none') {
+        if (config.speculativeMethod === 'eagle3' && config.speculativeModel) {
+            args.push('--speculative-model', config.speculativeModel);
+            args.push('--speculative-method', 'eagle3');
+        } else if (config.speculativeMethod === 'ngram') {
+            args.push('--speculative-method', 'ngram');
+        } else if (config.speculativeMethod === 'medusa' && config.speculativeModel) {
+            args.push('--speculative-model', config.speculativeModel);
+            args.push('--speculative-method', 'medusa');
+        }
+        if (config.speculativeNumDraftTokens) {
+            args.push('--num-speculative-tokens', String(config.speculativeNumDraftTokens));
+        }
+        console.log(`${LOG_PREFIX} Speculative decoding: ${config.speculativeMethod.toUpperCase()} — draft model: ${config.speculativeModel || 'n/a'}, draft tokens: ${config.speculativeNumDraftTokens || 5}`);
+    }
+
+    // Wave 48: FP8 KV cache
+    if (config.kvCacheDtype && config.kvCacheDtype !== 'auto') {
+        args.push('--kv-cache-dtype', config.kvCacheDtype);
+        console.log(`${LOG_PREFIX} KV cache dtype: ${config.kvCacheDtype} (2x memory savings)`);
     }
 
     if (config.extraArgs) {
