@@ -6463,6 +6463,37 @@ app.delete('/api/v1/profiler', (c) => {
     return c.json({ cleared: true, message: 'All profiles cleared' });
 });
 
+// =============================================================================
+// MCP Server — Model Context Protocol (Wave 93)
+// =============================================================================
+
+import { getMcpTools, handleMcpToolCall } from './mcp-server';
+
+// MCP tool list — used by AI agents to discover available tools
+app.get('/api/v1/mcp/tools', (c) => {
+    return c.json({ tools: getMcpTools() });
+});
+
+// MCP tool execution — AI agents call tools here
+app.post('/api/v1/mcp/tools/:name', async (c) => {
+    const toolName = c.req.param('name');
+    const args = await c.req.json().catch(() => ({}));
+    const result = await handleMcpToolCall(toolName, args);
+    return c.json(result, result.isError ? 400 : 200);
+});
+
+// MCP server info
+app.get('/api/v1/mcp/info', (c) => {
+    return c.json({
+        name: 'tentaclaw-mcp',
+        version: '1.0.0',
+        description: 'TentaCLAW GPU Cluster Management — MCP Tool Server',
+        tools_count: getMcpTools().length,
+        capabilities: ['tools'],
+        documentation: 'https://docs.tentaclaw.io/mcp',
+    });
+});
+
 // Final endpoint — the "about" page
 app.get('/api/v1/about', (c) => {
     return c.json({
