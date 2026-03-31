@@ -6468,6 +6468,8 @@ app.delete('/api/v1/profiler', (c) => {
 // =============================================================================
 
 import { getMcpTools, handleMcpToolCall } from './mcp-server';
+import { getAgentCard, submitTask, getTask, listTasks } from './a2a';
+import { registerWebhook, listWebhooks, deleteWebhook, fireWebhookEvent, getDeliveries, ALL_WEBHOOK_EVENTS } from './webhooks';
 
 // MCP tool list — used by AI agents to discover available tools
 app.get('/api/v1/mcp/tools', (c) => {
@@ -6492,6 +6494,74 @@ app.get('/api/v1/mcp/info', (c) => {
         capabilities: ['tools'],
         documentation: 'https://docs.tentaclaw.io/mcp',
     });
+});
+
+// =============================================================================
+// A2A Protocol — Agent-to-Agent (Wave 94)
+// =============================================================================
+
+// Agent Card discovery (A2A spec: /.well-known/agent.json)
+app.get('/.well-known/agent.json', (c) => {
+    const proto = c.req.header('x-forwarded-proto') || 'http';
+    const host = c.req.header('host') || 'localhost:8080';
+    return c.json(getAgentCard(`${proto}://${host}`));
+});
+
+// Submit a task (A2A: tasks/send)
+app.post('/api/v1/a2a/tasks', async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    if (!body.capability) return c.json({ error: 'capability is required' }, 400);
+    const task = await submitTask(body.capability, body.input || {});
+    return c.json(task, task.state === 'rejected' ? 400 : 200);
+});
+
+// Get task status (A2A: tasks/get)
+app.get('/api/v1/a2a/tasks/:id', (c) => {
+    const task = getTask(c.req.param('id'));
+    if (!task) return c.json({ error: 'Task not found' }, 404);
+    return c.json(task);
+});
+
+// List recent tasks
+app.get('/api/v1/a2a/tasks', (c) => {
+    return c.json(listTasks());
+});
+
+// =============================================================================
+// Webhooks — Event Notifications (Wave 98)
+// =============================================================================
+
+app.post('/api/v1/webhooks', async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    if (!body.url) return c.json({ error: 'url is required' }, 400);
+    const events = body.events || ALL_WEBHOOK_EVENTS;
+    const wh = registerWebhook(body.url, events, body.description || '');
+    return c.json({
+        ...wh,
+        message: 'Webhook created. Save the secret for signature verification.',
+    }, 201);
+});
+
+app.get('/api/v1/webhooks', (c) => {
+    return c.json(listWebhooks());
+});
+
+app.delete('/api/v1/webhooks/:id', (c) => {
+    if (!deleteWebhook(c.req.param('id'))) return c.json({ error: 'Not found' }, 404);
+    return c.json({ status: 'deleted' });
+});
+
+app.get('/api/v1/webhooks/:id/deliveries', (c) => {
+    return c.json(getDeliveries(c.req.param('id')));
+});
+
+app.post('/api/v1/webhooks/:id/test', async (c) => {
+    const delivered = await fireWebhookEvent('config.changed', { test: true, source: 'manual' });
+    return c.json({ status: 'test_sent', webhooks_notified: delivered });
+});
+
+app.get('/api/v1/webhooks/events', (c) => {
+    return c.json({ events: ALL_WEBHOOK_EVENTS });
 });
 
 // Final endpoint — the "about" page
