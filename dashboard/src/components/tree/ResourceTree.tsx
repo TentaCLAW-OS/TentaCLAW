@@ -92,7 +92,7 @@ export function ResourceTree() {
       {/* Nodes */}
       {nodes.map((node) => {
         const isOnline = node.status === 'online';
-        const isNodeExpanded = expanded[node.id] ?? isOnline;
+        const isNodeExpanded = expanded[node.id] ?? false;
         const hasStats = !!node.latest_stats;
         const gpus = node.latest_stats?.gpus ?? [];
         const models = node.latest_stats?.inference?.loaded_models ?? [];
@@ -247,7 +247,7 @@ export function ResourceTree() {
                         style={{ background: 'linear-gradient(135deg, #4488ff, #00ccff)' }}
                       />
                       <span className="truncate text-[10px]">
-                        {gpu.name} #{idx}
+                        {gpu.name.replace(/Advanced Micro Devices, Inc\. \[AMD\/ATI\] /g, '').replace(/NVIDIA Corporation /g, '').replace(/ \[.*?\]/g, '').trim()} #{idx}
                       </span>
                       <span
                         className="text-[8px] font-mono px-1 rounded shrink-0"
