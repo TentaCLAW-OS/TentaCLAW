@@ -123,7 +123,7 @@ export function TreeContextMenu({
         background: 'rgba(14,18,28,0.95)',
         backdropFilter: 'blur(16px)',
         border: '1px solid rgba(0,255,255,0.1)',
-        borderRadius: 10,
+        borderRadius: 12,
         boxShadow: '0 12px 40px rgba(0,0,0,0.5)',
         minWidth: menuWidth,
         padding: '4px 0',

@@ -90,7 +90,7 @@ function MessageBubble({ message, streaming }: { message: ChatMessage; streaming
           border: isUser
             ? '1px solid rgba(0,255,255,0.1)'
             : '1px solid rgba(140,0,200,0.08)',
-          borderRadius: 10,
+          borderRadius: 12,
           ...(isUser
             ? { borderBottomRightRadius: 3 }
             : { borderBottomLeftRadius: 3 }),

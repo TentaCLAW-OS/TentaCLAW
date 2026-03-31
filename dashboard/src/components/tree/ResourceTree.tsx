@@ -77,11 +77,13 @@ export function ResourceTree() {
         <span className="font-semibold">TentaCLAW Cluster</span>
         {health && (
           <span
-            className="text-[8px] font-mono font-bold px-1 py-0.5 rounded"
+            className="text-[7px] font-mono font-bold px-1 py-px rounded-full"
             style={{
               color: gradeColor[health.grade] ?? 'var(--text-muted)',
               border: `1px solid ${gradeColor[health.grade] ?? 'var(--border)'}`,
-              opacity: 0.8,
+              opacity: 0.7,
+              lineHeight: '1.4',
+              fontFeatureSettings: "'tnum'",
             }}
           >
             {health.grade}
@@ -107,7 +109,7 @@ export function ResourceTree() {
             <div
               className="flex items-center gap-2 py-1.5 cursor-pointer transition-all group"
               style={{
-                paddingLeft: 28,
+                paddingLeft: 32,
                 borderLeft: isSuccessFlash
                   ? '2px solid var(--green)'
                   : isDropTarget
@@ -181,19 +183,21 @@ export function ResourceTree() {
               <StatusDot status={node.status} size={6} />
               <span className="font-semibold truncate">{node.hostname}</span>
               <span
-                className="text-[8px] font-mono px-1 py-0.5 rounded shrink-0"
+                className="text-[7px] font-mono px-1 py-px rounded-full shrink-0"
                 style={{
                   color: 'var(--cyan)',
-                  border: '1px solid rgba(0,255,255,0.15)',
-                  opacity: 0.7,
+                  border: '1px solid rgba(0,255,255,0.12)',
+                  opacity: 0.6,
+                  lineHeight: '1.4',
+                  fontFeatureSettings: "'tnum'",
                 }}
               >
                 {node.gpu_count} GPU
               </span>
               {!isOnline && (
                 <span
-                  className="text-[8px] font-mono px-1 py-0.5 rounded shrink-0"
-                  style={{ color: 'var(--red)', border: '1px solid rgba(255,70,70,0.2)' }}
+                  className="text-[7px] font-mono px-1 py-px rounded-full shrink-0"
+                  style={{ color: 'var(--red)', border: '1px solid rgba(255,70,70,0.15)', opacity: 0.7, lineHeight: '1.4' }}
                 >
                   off
                 </span>
@@ -235,7 +239,7 @@ export function ResourceTree() {
                       key={gpuId}
                       className="flex items-center gap-2 py-1 cursor-pointer transition-colors"
                       style={{
-                        paddingLeft: 44,
+                        paddingLeft: 52,
                         borderLeft: isActive('gpu', gpuId) ? '2px solid var(--cyan)' : '2px solid transparent',
                         color: isActive('gpu', gpuId) ? 'var(--cyan)' : 'var(--text-secondary)',
                         background: isActive('gpu', gpuId) ? 'rgba(0,255,255,0.05)' : 'transparent',
@@ -250,8 +254,8 @@ export function ResourceTree() {
                         {gpu.name.replace(/Advanced Micro Devices, Inc\. \[AMD\/ATI\] /g, '').replace(/NVIDIA Corporation /g, '').replace(/ \[.*?\]/g, '').trim()} #{idx}
                       </span>
                       <span
-                        className="text-[8px] font-mono px-1 rounded shrink-0"
-                        style={{ color: tempColor, border: `1px solid ${tempColor}33` }}
+                        className="text-[7px] font-mono px-1 py-px rounded-full shrink-0"
+                        style={{ color: tempColor, border: `1px solid ${tempColor}22`, opacity: 0.75, lineHeight: '1.4', fontFeatureSettings: "'tnum'" }}
                       >
                         {gpu.temperatureC}&deg;C
                       </span>
@@ -266,7 +270,7 @@ export function ResourceTree() {
                       key={`${modelId}-${idx}`}
                       className="flex items-center gap-2 py-1 cursor-pointer transition-colors"
                       style={{
-                        paddingLeft: 44,
+                        paddingLeft: 52,
                         borderLeft: isActive('model', modelId) ? '2px solid var(--cyan)' : '2px solid transparent',
                         color: isActive('model', modelId) ? 'var(--cyan)' : 'var(--text-secondary)',
                         background: isActive('model', modelId) ? 'rgba(0,255,255,0.05)' : 'transparent',

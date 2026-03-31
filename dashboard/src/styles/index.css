@@ -25,7 +25,7 @@
   body {
     background: var(--bg-base);
     color: var(--text-primary);
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
     overflow: hidden;
     height: 100vh;
   }
@@ -208,7 +208,7 @@
   justify-content: center;
   width: 48px;
   height: 48px;
-  border-radius: 14px;
+  border-radius: 16px;
   font-size: 24px;
   background: linear-gradient(135deg, var(--purple), var(--cyan));
   box-shadow: 0 0 24px rgba(140,0,200,0.3), 0 0 48px rgba(0,255,255,0.1);
@@ -244,7 +244,7 @@
 .login-tagline {
   font-size: 11px;
   color: var(--text-dim);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
   letter-spacing: 0.5px;
 }
 
@@ -262,11 +262,11 @@
   width: 100%;
   padding: 12px 16px;
   font-size: 14px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
   color: var(--text-primary);
   background: rgba(255,255,255,0.04);
   border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 10px;
+  border-radius: 12px;
   outline: none;
   transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
   box-sizing: border-box;
@@ -300,10 +300,10 @@
   padding: 13px 24px;
   font-size: 14px;
   font-weight: 600;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Geist', 'Inter', system-ui, -apple-system, sans-serif;
   color: white;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
   position: relative;
   overflow: hidden;
@@ -353,4 +353,26 @@
   color: var(--text-dim);
   margin-top: 24px;
   letter-spacing: 1px;
+}
+
+/* ── Professional Refinements ────────────────────────────────── */
+
+/* Tighter heading letter-spacing */
+h1, h2, h3, h4, h5, h6,
+[class*="font-bold"],
+[class*="font-semibold"] {
+  letter-spacing: -0.01em;
+}
+
+/* Tabular numbers for stat pills and data */
+.font-mono,
+[class*="font-mono"] {
+  font-feature-settings: 'tnum';
+}
+
+/* Global card border-radius upgrade */
+@layer base {
+  :root {
+    --card-radius: 12px;
+  }
 }

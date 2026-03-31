@@ -13,7 +13,7 @@ interface StatPillProps {
 export function StatPill({ label, value, unit, color, subtext, delay, children }: StatPillProps) {
   return (
     <div
-      className="relative overflow-hidden rounded-[10px] px-4 py-3 flex flex-col gap-1"
+      className="relative overflow-hidden rounded-[12px] px-4 py-3 flex flex-col gap-1"
       style={{
         background: 'var(--bg-card)',
         backdropFilter: 'blur(12px)',

@@ -128,7 +128,7 @@ function ModelCard({ model }: { model: AggregatedModel }) {
 
   return (
     <div
-      className="relative overflow-hidden rounded-[10px] px-4 py-3 flex flex-col gap-1.5 shrink-0"
+      className="relative overflow-hidden rounded-[12px] px-4 py-3 flex flex-col gap-1.5 shrink-0"
       draggable
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = 'copy';
@@ -391,7 +391,7 @@ export function ModelsTab() {
             </h3>
 
             <div
-              className="rounded-[10px] overflow-hidden"
+              className="rounded-[12px] overflow-hidden"
               style={{
                 background: 'var(--bg-card)',
                 backdropFilter: 'blur(12px)',

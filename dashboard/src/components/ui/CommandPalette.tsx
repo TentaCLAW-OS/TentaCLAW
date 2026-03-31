@@ -188,7 +188,7 @@ export function CommandPalette() {
             style={{
               background: 'transparent',
               color: 'var(--text-primary)',
-              fontFamily: "'Inter', sans-serif",
+              fontFamily: "'Geist', 'Inter', sans-serif",
             }}
           />
         </div>
