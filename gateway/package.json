@@ -23,7 +23,7 @@
   "author": "TentaCLAW Project",
   "license": "MIT",
   "dependencies": {
-    "@hono/node-server": "^1.14.0",
+    "@hono/node-server": "^1.19.12",
     "better-sqlite3": "^11.8.0",
     "hono": "^4.7.0",
     "ws": "^8.20.0"
