@@ -7,12 +7,12 @@
 #   Or:  curl -fsSL tentaclaw.io/install | bash -s -- --no-wizard
 #
 # What this does:
-#   1. Shows the CLAWtopus splash
+#   1. Shows the TentaCLAW splash
 #   2. Detects your OS (Ubuntu/Debian, Fedora, CentOS/RHEL, Arch, Alpine, macOS, WSL2)
 #   3. Installs Node.js if missing (via nvm or system package manager)
 #   4. Clones the TentaCLAW repo
 #   5. Installs dependencies (gateway, agent, cli)
-#   6. Symlinks `clawtopus` to PATH
+#   6. Symlinks `tentaclaw` to PATH
 #   7. Launches the interactive setup wizard
 #
 # Flags:
@@ -21,7 +21,7 @@
 #   --install-dir DIR Set custom install directory
 #   --help            Show this help
 #
-# CLAWtopus says: "One curl. That's all it takes."
+# TentaCLAW says: "One curl. That's all it takes."
 # =============================================================================
 
 set -euo pipefail
@@ -112,7 +112,7 @@ die() {
 }
 
 # ──────────────────────────────────────────────────────────────────
-# CLAWtopus splash
+# TentaCLAW splash
 # ──────────────────────────────────────────────────────────────────
 print_splash() {
     echo ""
@@ -521,7 +521,7 @@ setup_cli() {
 
     # Check if CLI is already set up and on PATH
     if command_exists tentaclaw; then
-        ok "TentaCLAW CLI already on PATH ($(command -v clawtopus))"
+        ok "TentaCLAW CLI already on PATH ($(command -v tentaclaw))"
         return
     fi
 
@@ -563,7 +563,7 @@ setup_cli() {
         symlink_target="$wrapper"
     else
         # Create a wrapper script that uses tsx
-        local wrapper="$cli_dir/clawtopus-wrapper.sh"
+        local wrapper="$cli_dir/tentaclaw-wrapper.sh"
         cat > "$wrapper" << WRAPPER
 #!/bin/bash
 cd "$cli_dir" && exec npx tsx src/index.ts "\$@"
@@ -1013,7 +1013,7 @@ print_manual_instructions() {
     echo -e "  ${DIM}Docs: https://tentaclaw.io/docs${RESET}"
     echo -e "  ${DIM}GitHub: https://github.com/TentaCLAW-OS/TentaCLAW${RESET}"
     echo ""
-    echo -e "  ${DIM}CLAWtopus says: \"Welcome aboard. I've got arms for that.\"${RESET}"
+    echo -e "  ${DIM}TentaCLAW says: \"Welcome aboard. I've got arms for that.\"${RESET}"
     echo ""
 }
 

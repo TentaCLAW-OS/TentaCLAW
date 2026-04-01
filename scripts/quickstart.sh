@@ -11,7 +11,7 @@
 #   ./scripts/quickstart.sh --no-browser     # Don't open the dashboard in browser
 #   ./scripts/quickstart.sh --stop           # Stop all running TentaCLAW services
 #
-# CLAWtopus says: "One command. That's it. I handle the rest."
+# TentaCLAW says: "One command. That's it. I handle the rest."
 # =============================================================================
 
 set -euo pipefail
@@ -537,7 +537,7 @@ print_status() {
         "ready when you are"
     )
     local quip="${quips[$((RANDOM % ${#quips[@]}))]}"
-    echo -e "  ${DIM}CLAWtopus says: \"${quip}\"${RESET}"
+    echo -e "  ${DIM}TentaCLAW says: \"${quip}\"${RESET}"
     echo ""
 }
 

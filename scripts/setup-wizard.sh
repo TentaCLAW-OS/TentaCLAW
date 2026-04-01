@@ -12,7 +12,7 @@
 #   ./scripts/setup-wizard.sh --skip-model # Skip model download
 #   ./scripts/setup-wizard.sh --backend X  # Pre-select backend (ollama|vllm|llamacpp)
 #
-# CLAWtopus says: "told you. under 60 seconds."
+# TentaCLAW says: "told you. under 60 seconds."
 # =============================================================================
 
 set -euo pipefail
@@ -794,11 +794,11 @@ step_complete() {
     # Build endpoint info
     local dashboard_url="http://localhost:${GATEWAY_PORT}/dashboard"
     local api_url="http://localhost:${GATEWAY_PORT}/v1/chat"
-    local cli_cmd="clawtopus status"
-    local chat_cmd="clawtopus chat \"What can you do?\""
+    local cli_cmd="tentaclaw status"
+    local chat_cmd="tentaclaw chat \"What can you do?\""
 
     # Check if CLI is available
-    if ! command_exists clawtopus; then
+    if ! command_exists tentaclaw; then
         # Try to make it available
         if [ -f "$INSTALL_DIR/cli/dist/index.js" ]; then
             cli_cmd="node $INSTALL_DIR/cli/dist/index.js status"
