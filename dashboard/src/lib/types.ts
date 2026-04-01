@@ -126,3 +126,41 @@ export type TabId =
   | 'summary' | 'gpus' | 'models' | 'inference' | 'metrics'
   | 'terminal' | 'chat' | 'security' | 'alerts'
   | 'flight-sheets' | 'billing' | 'settings';
+
+// ── Panel & Layout ──
+export interface PanelConfig {
+  width: number;
+  minWidth: number;
+  maxWidth: number;
+  collapsed: boolean;
+}
+
+// ── TODO Tracker ──
+export type TodoStatus = 'pending' | 'in_progress' | 'completed';
+
+export interface TodoItem {
+  id: string;
+  text: string;
+  status: TodoStatus;
+  createdAt: number;
+  completedAt?: number;
+  /** Optional: link to a node or model */
+  resourceRef?: { type: ResourceType; id: string };
+}
+
+// ── Theme ──
+export interface ThemeDefinition {
+  id: string;
+  name: string;
+  type: 'dark' | 'light';
+  colors: Record<string, string>;
+}
+
+// ── Keybinds ──
+export interface KeybindAction {
+  id: string;
+  label: string;
+  keys: string; // e.g. "ctrl+k", "g then s" (leader sequence)
+  category: 'navigation' | 'panels' | 'actions' | 'tabs';
+  action: () => void;
+}
