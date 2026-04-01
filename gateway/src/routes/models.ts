@@ -16,7 +16,6 @@ import {
     getModelDistribution,
     getRequestStats,
     setModelAlias,
-    resolveModelAlias,
     getAllModelAliases,
     deleteModelAlias,
     ensureDefaultAliases,

@@ -6,7 +6,6 @@ import type {
     Node,
     NodeWithStats,
     NodeStatus,
-    StatsPayload,
 } from '../../../shared/types';
 import { getDb } from './init';
 import { recordUptimeEvent, getNodeUptime } from './misc';

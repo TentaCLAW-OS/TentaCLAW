@@ -16,7 +16,7 @@ import {
     getCachedResponse,
     cacheResponse,
 } from '../db';
-import { broadcastSSE, checkChatRateLimit, CHAT_RATE_LIMIT, getQueueStats, MAX_QUEUE_DEPTH } from '../shared';
+import { checkChatRateLimit, CHAT_RATE_LIMIT, getQueueStats, MAX_QUEUE_DEPTH } from '../shared';
 
 const routes = new Hono();
 

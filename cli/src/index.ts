@@ -1113,14 +1113,15 @@ async function cmdAlerts(gateway: string, flags: Record<string, string>): Promis
 }
 
 async function cmdBenchmarks(gateway: string): Promise<void> {
-    const data = await apiGet(gateway, '/api/v1/benchmarks') as Array<{
+    const raw = await apiGet(gateway, '/api/v1/benchmarks') as any;
+    const data: Array<{
         id: string;
         node_id: string;
         model: string;
         tokens_per_sec: number;
         prompt_eval_rate: number;
         created_at: string;
-    }>;
+    }> = Array.isArray(raw) ? raw : (raw?.benchmarks ?? []);
 
     if (data.length === 0) {
         console.log('');
@@ -3234,20 +3235,27 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
         }
 
         case 'hot': {
-            const hot = await apiGet(gateway, '/api/v1/nodes/hot') as Array<{ hostname: string; max_temp_c: number; gpu_count: number }>;
+            const hotRaw = await apiGet(gateway, '/api/v1/nodes/hot') as any;
+            const hot: Array<{ hostname: string; max_temp: number; gpu_count: number }> = Array.isArray(hotRaw) ? hotRaw : (hotRaw?.hot_nodes ?? []);
             console.log('');
             console.log('  ' + C.teal(C.bold('HOTTEST NODES')) + C.dim(' (sorted by GPU temp)'));
             console.log('');
+            if (hot.length === 0) {
+                console.log('  ' + C.green('All nodes are cool.'));
+                console.log('');
+                break;
+            }
             for (const n of hot.slice(0, 10)) {
-                const color = n.max_temp_c > 85 ? C.red : n.max_temp_c > 70 ? C.yellow : C.green;
-                console.log('  ' + padRight(C.white(n.hostname), 25) + color(n.max_temp_c + 'C') + C.dim('  (' + n.gpu_count + ' GPUs)'));
+                const color = n.max_temp > 85 ? C.red : n.max_temp > 70 ? C.yellow : C.green;
+                console.log('  ' + padRight(C.white(n.hostname), 25) + color(n.max_temp + 'C') + C.dim('  (' + n.gpu_count + ' GPUs)'));
             }
             console.log('');
             break;
         }
 
         case 'idle': {
-            const idle = await apiGet(gateway, '/api/v1/nodes/idle') as Array<{ hostname: string; avg_util: number; gpu_count: number }>;
+            const idleRaw = await apiGet(gateway, '/api/v1/nodes/idle') as any;
+            const idle: Array<{ hostname: string; avg_util: number; gpu_count: number }> = Array.isArray(idleRaw) ? idleRaw : (idleRaw?.idle_nodes ?? []);
             console.log('');
             console.log('  ' + C.teal(C.bold('IDLE NODES')) + C.dim(' (< 10% GPU utilization)'));
             console.log('');
@@ -3835,7 +3843,8 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
             console.log('  ' + C.teal(C.bold('CLUSTER TOP')) + C.dim(' \u2014 refreshing every 3s (Ctrl+C to quit)'));
             console.log('');
             const refreshTop = async () => {
-                const topNodes = await apiGet(gateway, '/api/v1/nodes') as Array<{ id: string; hostname: string; status: string; gpu_count: number; latest_stats?: { gpus: Array<{ temperatureC: number; utilizationPct: number; vramUsedMb: number; vramTotalMb: number; powerDrawW: number }>; cpu: { usage_pct: number }; inference: { loaded_models: string[]; in_flight_requests: number } } }>;
+                const topRaw = await apiGet(gateway, '/api/v1/nodes') as any;
+                const topNodes: Array<{ id: string; hostname: string; status: string; gpu_count: number; latest_stats?: { gpus: Array<{ temperatureC: number; utilizationPct: number; vramUsedMb: number; vramTotalMb: number; powerDrawW: number }>; cpu: { usage_pct: number }; inference: { loaded_models: string[]; in_flight_requests: number } } }> = Array.isArray(topRaw) ? topRaw : (topRaw?.nodes ?? []);
                 process.stdout.write('\x1b[2J\x1b[H'); // clear screen
                 const W = 78;
                 console.log(boxTop('TENTACLAW CLUSTER TOP  ' + new Date().toLocaleTimeString(), W));
@@ -4243,13 +4252,16 @@ async function cmdCapacity(gateway: string): Promise<void> {
     console.log(boxTop('CLUSTER CAPACITY', W));
     console.log(boxEmpty(W));
 
+    const totalGb = data.total_vram_gb ?? Math.round((data.total_vram_mb ?? 0) / 1024);
+    const usedGb  = data.used_vram_gb  ?? Math.round((data.used_vram_mb  ?? 0) / 1024);
+    const freeGb  = data.free_vram_gb  ?? Math.round((data.free_vram_mb  ?? 0) / 1024);
     const utilPct = data.utilization_pct || 0;
-    console.log(boxMid(padRight(C.dim('Total VRAM'), 18) + C.white(C.bold(data.total_vram_gb + ' GB')), W));
-    console.log(boxMid(padRight(C.dim('Used'), 18) + C.yellow(data.used_vram_gb + ' GB'), W));
-    console.log(boxMid(padRight(C.dim('Free'), 18) + C.green(data.free_vram_gb + ' GB'), W));
+    console.log(boxMid(padRight(C.dim('Total VRAM'), 18) + C.white(C.bold(totalGb + ' GB')), W));
+    console.log(boxMid(padRight(C.dim('Used'), 18) + C.yellow(usedGb + ' GB'), W));
+    console.log(boxMid(padRight(C.dim('Free'), 18) + C.green(freeGb + ' GB'), W));
     console.log(boxMid(padRight(C.dim('Utilization'), 18) + progressBar(utilPct, 20) + '  ' + (utilPct > 80 ? C.red : C.white)(utilPct + '%'), W));
     console.log(boxEmpty(W));
-    console.log(boxMid(C.cyan(data.recommendation), W));
+    if (data.recommendation) console.log(boxMid(C.cyan(data.recommendation), W));
 
     if (data.can_still_fit && data.can_still_fit.length > 0) {
         console.log(boxEmpty(W));

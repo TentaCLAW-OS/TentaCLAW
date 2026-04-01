@@ -2,7 +2,7 @@
  * TentaCLAW Gateway — Model Management, Aliases, Pulls, Scheduling
  */
 
-import type { ModelPullProgress, GatewayCommand } from '../../../shared/types';
+import type { ModelPullProgress } from '../../../shared/types';
 import { getDb, generateId } from './init';
 import { getNode, getAllNodes } from './nodes';
 import { getClusterModels } from './stats';

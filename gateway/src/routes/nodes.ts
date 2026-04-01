@@ -188,6 +188,25 @@ routes.get('/api/v1/nodes', (c) => {
     return c.json({ nodes });
 });
 
+routes.get('/api/v1/nodes/hot', (c) => {
+    const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
+    const hot = nodes.filter(n => n.latest_stats!.gpus.some(g => g.temperatureC > 75)).map(n => ({
+        node_id: n.id, hostname: n.hostname,
+        max_temp: Math.max(...n.latest_stats!.gpus.map(g => g.temperatureC)),
+        gpus: n.latest_stats!.gpus.filter(g => g.temperatureC > 75).map(g => ({ name: g.name, temp: g.temperatureC })),
+    }));
+    return c.json({ hot_nodes: hot, count: hot.length });
+});
+
+routes.get('/api/v1/nodes/idle', (c) => {
+    const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
+    const idle = nodes.filter(n => {
+        const avgUtil = n.latest_stats!.gpus.reduce((s, g) => s + g.utilizationPct, 0) / Math.max(n.latest_stats!.gpus.length, 1);
+        return avgUtil < 5;
+    }).map(n => ({ node_id: n.id, hostname: n.hostname, gpu_count: n.gpu_count, models: n.latest_stats!.inference.loaded_models.length }));
+    return c.json({ idle_nodes: idle, count: idle.length });
+});
+
 routes.get('/api/v1/nodes/:nodeId', (c) => {
     const nodeId = c.req.param('nodeId');
     const node = getNode(nodeId);

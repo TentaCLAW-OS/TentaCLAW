@@ -181,7 +181,7 @@ WorkingDirectory=$INSTALL_DIR/gateway
 Environment=TENTACLAW_PORT=$PORT
 Environment=TENTACLAW_HOST=0.0.0.0
 Environment=NODE_ENV=production
-ExecStart=$(which node) dist/index.js
+ExecStart=$(which node) dist/gateway/src/index.js
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

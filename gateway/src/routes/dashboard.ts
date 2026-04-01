@@ -14,7 +14,6 @@ import {
     getClusterPower,
     getFleetReliability,
     getCacheStats,
-    getInferenceAnalytics,
     insertPlaygroundHistory,
     getPlaygroundHistory,
     resolveModelAlias,

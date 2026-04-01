@@ -25,7 +25,6 @@ import {
     markStaleNodes,
     pruneStats,
     queueCommand,
-    getClusterModels,
     getDueSchedules,
     markScheduleRun,
     seedDefaultAlertRules,
@@ -49,7 +48,6 @@ import {
     checkKeyRateLimit,
     log,
     paginate,
-    sseClients,
 } from './shared';
 
 // Import route modules
