@@ -1246,9 +1246,20 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
                 const err = resp.data as Record<string, unknown>;
                 console.log(C.red(String(err['error'] || `HTTP ${resp.status}`)));
             } else {
-                const data = resp.data as { choices?: Array<{ message?: { content?: string } }> };
-                const content = data.choices?.[0]?.message?.content || '(no response)';
-                console.log(C.white(content));
+                const data = resp.data as Record<string, unknown>;
+                // Handle OpenAI format: choices[0].message.content
+                const choices = data['choices'] as Array<Record<string, unknown>> | undefined;
+                const message = choices?.[0]?.['message'] as Record<string, unknown> | undefined;
+                let content = message?.['content'];
+                // content may be a string or an array of parts (multimodal)
+                if (Array.isArray(content)) {
+                    content = (content as Array<Record<string, unknown>>)
+                        .filter(p => p['type'] === 'text')
+                        .map(p => String(p['text'] ?? ''))
+                        .join('');
+                }
+                const text = content ? String(content) : '(no response)';
+                console.log(C.white(text));
             }
         } catch (err) {
             console.log(C.red('Error: ' + (err instanceof Error ? err.message : String(err))));
