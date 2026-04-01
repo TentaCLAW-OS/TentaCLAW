@@ -1,0 +1,103 @@
+#!/bin/bash
+# =============================================================================
+# TentaCLAW OS — Service Setup for pve-vega2 / existing installs
+# =============================================================================
+# Usage: curl -fsSL tentaclaw.io/setup-service | bash
+#
+# What this does:
+#   1. Writes the systemd service file (no heredoc — uses printf)
+#   2. Fixes CLI symlinks to point to correct dist paths
+#   3. Enables and starts the gateway service
+# =============================================================================
+
+set -e
+
+INSTALL_DIR="/opt/tentaclaw"
+SERVICE_FILE="/etc/systemd/system/tentaclaw-gateway.service"
+GATEWAY_BIN="$INSTALL_DIR/gateway/dist/gateway/src/index.js"
+CLI_BIN="$INSTALL_DIR/cli/dist/cli/src/index.js"
+
+# Colors
+T='\033[38;2;0;212;170m'
+P='\033[38;2;139;92;246m'
+R='\033[0;31m'
+B='\033[1m'
+N='\033[0m'
+
+echo ""
+echo -e "${T}${B}TentaCLAW Service Setup${N}"
+echo -e "${P}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
+echo ""
+
+# Check root
+if [ "$EUID" -ne 0 ]; then
+  echo -e "${R}[ERROR]${N} Please run with sudo or as root"
+  exit 1
+fi
+
+# Check install dir
+if [ ! -d "$INSTALL_DIR" ]; then
+  echo -e "${R}[ERROR]${N} TentaCLAW not found at $INSTALL_DIR"
+  echo "  Run: curl -fsSL tentaclaw.io/install | bash"
+  exit 1
+fi
+
+# Build if needed
+if [ ! -f "$GATEWAY_BIN" ]; then
+  echo -e "${T}[BUILD]${N} Building gateway..."
+  cd "$INSTALL_DIR/gateway"
+  npm run build 2>&1 | tail -5
+fi
+
+if [ ! -f "$CLI_BIN" ]; then
+  echo -e "${T}[BUILD]${N} Building CLI..."
+  cd "$INSTALL_DIR/cli"
+  npm run build 2>&1 | tail -5
+fi
+
+# Verify binaries exist
+if [ ! -f "$GATEWAY_BIN" ]; then
+  echo -e "${R}[ERROR]${N} Gateway binary not found: $GATEWAY_BIN"
+  echo "  Check build output in $INSTALL_DIR/gateway/dist/"
+  exit 1
+fi
+
+# Write systemd service file using printf (avoids heredoc terminal issues)
+echo -e "${T}[SERVICE]${N} Writing systemd service..."
+printf '[Unit]\nDescription=TentaCLAW Gateway\nAfter=network.target\n\n[Service]\nType=simple\nWorkingDirectory=%s/gateway\nExecStart=/usr/bin/node %s\nRestart=always\nRestartSec=5\nEnvironment=NODE_ENV=production\nEnvironment=TENTACLAW_HOST=0.0.0.0\n\n[Install]\nWantedBy=multi-user.target\n' \
+  "$INSTALL_DIR" "$GATEWAY_BIN" > "$SERVICE_FILE"
+
+echo -e "  ${N}Written to $SERVICE_FILE"
+
+# Fix symlinks
+echo -e "${T}[SYMLINK]${N} Fixing CLI symlinks..."
+rm -f /usr/local/bin/tentaclaw /usr/local/bin/clawtopus
+ln -sf "$CLI_BIN" /usr/local/bin/tentaclaw
+ln -sf "$CLI_BIN" /usr/local/bin/clawtopus
+chmod +x "$CLI_BIN" 2>/dev/null || true
+echo -e "  ${N}tentaclaw → $CLI_BIN"
+echo -e "  ${N}clawtopus → $CLI_BIN (alias)"
+
+# Enable and start service
+echo -e "${T}[SYSTEMD]${N} Enabling service..."
+systemctl daemon-reload
+systemctl enable tentaclaw-gateway
+systemctl restart tentaclaw-gateway
+
+sleep 2
+STATUS=$(systemctl is-active tentaclaw-gateway 2>/dev/null || echo "unknown")
+
+echo ""
+if [ "$STATUS" = "active" ]; then
+  echo -e "${T}${B}✓ Gateway is running!${N}"
+  echo ""
+  echo -e "  Dashboard: ${P}http://$(hostname -I | awk '{print $1}'):8080/dashboard${N}"
+  echo -e "  Status:    ${T}systemctl status tentaclaw-gateway${N}"
+  echo -e "  Logs:      ${T}journalctl -u tentaclaw-gateway -f${N}"
+else
+  echo -e "${R}[ERROR]${N} Service status: $STATUS"
+  echo ""
+  echo "  Check logs with:"
+  echo "    journalctl -u tentaclaw-gateway -n 30 --no-pager"
+fi
+echo ""

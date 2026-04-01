@@ -440,16 +440,16 @@ clone_repo() {
         (cd "$INSTALL_DIR" && git pull --ff-only 2>/dev/null) || {
             warn "git pull failed — continuing with existing version"
         }
-    elif [ -d "$INSTALL_DIR" ]; then
-        warn "Directory $INSTALL_DIR exists but is not a git repo — clearing it..."
-        rm -rf "$INSTALL_DIR"
-        info "Cloning fresh..."
     else
+        if [ -d "$INSTALL_DIR" ]; then
+            warn "Directory $INSTALL_DIR exists but is not a git repo — clearing it..."
+            rm -rf "$INSTALL_DIR"
+        fi
+
         info "Cloning repository..."
         local parent_dir
         parent_dir=$(dirname "$INSTALL_DIR")
 
-        # Create parent directory with appropriate permissions
         if [ ! -d "$parent_dir" ]; then
             if [ -w "$(dirname "$parent_dir")" ] || [ "$(id -u)" = "0" ]; then
                 mkdir -p "$parent_dir"
@@ -459,7 +459,6 @@ clone_repo() {
             fi
         fi
 
-        # Build clone URL — inject token if provided (for private repo testing)
         local CLONE_URL="$REPO_URL"
         if [ -n "$GITHUB_TOKEN" ]; then
             CLONE_URL="https://${GITHUB_TOKEN}@github.com/TentaCLAW-OS/TentaCLAW.git"
@@ -471,6 +470,9 @@ clone_repo() {
             git clone --depth 1 "$CLONE_URL" "$INSTALL_DIR" 2>&1 || {
                 die "Failed to clone repository.\n  Check your internet connection and try again.\n  Or: git clone $REPO_URL \"$INSTALL_DIR\""
             }
+        fi
+        if [ ! -d "$INSTALL_DIR" ]; then
+            die "Clone failed — $INSTALL_DIR does not exist.\n  Try manually: git clone $REPO_URL \"$INSTALL_DIR\""
         fi
         ok "Repository cloned to $INSTALL_DIR"
     fi
@@ -615,7 +617,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=$INSTALL_DIR/gateway
-ExecStart=$node_bin $INSTALL_DIR/gateway/dist/index.js
+ExecStart=$node_bin $INSTALL_DIR/gateway/dist/gateway/src/index.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
@@ -638,7 +640,7 @@ SERVICE
     fi
 
     # Fall back to dev script if no dist
-    if [ ! -f "$INSTALL_DIR/gateway/dist/index.js" ]; then
+    if [ ! -f "$INSTALL_DIR/gateway/dist/gateway/src/index.js" ]; then
         local npm_bin
         npm_bin=$(command -v npm 2>/dev/null || echo "npm")
         sed -i "s|ExecStart=.*|ExecStart=$npm_bin run dev|" /tmp/tentaclaw-gateway.service
