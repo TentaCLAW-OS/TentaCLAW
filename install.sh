@@ -148,8 +148,9 @@ fi
 # --- build gateway ------------------------------------------------------------
 step "Building gateway..."
 cd "$INSTALL_DIR/gateway"
-npm install --omit=dev --silent
+npm install --silent
 npm run build
+npm prune --omit=dev --silent
 ok "Gateway built"
 
 # --- build dashboard ----------------------------------------------------------
