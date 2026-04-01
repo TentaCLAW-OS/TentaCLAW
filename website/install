@@ -633,8 +633,19 @@ setup_gateway_service() {
     mkdir -p "$HOME/.tentaclaw"
     echo "$GATEWAY_PORT" > "$HOME/.tentaclaw/gateway-port"
 
-    printf '[Unit]\nDescription=TentaCLAW Gateway\nAfter=network.target\n\n[Service]\nType=simple\nWorkingDirectory=%s/gateway\nExecStart=%s %s/gateway/dist/gateway/src/index.js\nRestart=always\nRestartSec=5\nEnvironment=NODE_ENV=production\nEnvironment=TENTACLAW_HOST=0.0.0.0\nEnvironment=TENTACLAW_PORT=%s\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
-        "$INSTALL_DIR" "$node_bin" "$INSTALL_DIR" "$GATEWAY_PORT" > /tmp/tentaclaw-gateway.service
+    # Detect GPU backend for service env vars
+    local gpu_env=""
+    if lspci 2>/dev/null | grep -qiE "VGA|3D" | grep -qiE "AMD|Radeon" 2>/dev/null || \
+       lspci 2>/dev/null | grep -iE "VGA|3D|Display" | grep -qiE "AMD|Radeon"; then
+        if [ -d /opt/rocm ]; then
+            gpu_env="Environment=HSA_OVERRIDE_GFX_VERSION=11.0.0"
+        else
+            gpu_env="Environment=OLLAMA_VULKAN=1"
+        fi
+    fi
+
+    printf '[Unit]\nDescription=TentaCLAW Gateway\nAfter=network.target\n\n[Service]\nType=simple\nWorkingDirectory=%s/gateway\nExecStart=%s %s/gateway/dist/gateway/src/index.js\nRestart=always\nRestartSec=5\nEnvironment=NODE_ENV=production\nEnvironment=TENTACLAW_HOST=0.0.0.0\nEnvironment=TENTACLAW_PORT=%s\n%s\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
+        "$INSTALL_DIR" "$node_bin" "$INSTALL_DIR" "$GATEWAY_PORT" "$gpu_env" > /tmp/tentaclaw-gateway.service
 
     # Build gateway for production
     if [ -f "$INSTALL_DIR/gateway/package.json" ]; then
@@ -733,11 +744,65 @@ setup_ollama() {
     local RAM_MB=0
     local CPU_CORES=0
     local GPU_NAME=""
+    local GPU_BACKEND=""
 
     if command_exists nvidia-smi; then
         VRAM_MB=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ' || echo 0)
         GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo "")
+        GPU_BACKEND="cuda"
     fi
+
+    # AMD GPU detection via lspci (works even without ROCm drivers)
+    if [ "${VRAM_MB:-0}" -eq 0 ] && command_exists lspci; then
+        local amd_gpus
+        amd_gpus=$(lspci 2>/dev/null | grep -iE "VGA|3D|Display" | grep -iE "AMD|Radeon|RDNA" || true)
+        if [ -n "$amd_gpus" ]; then
+            GPU_NAME=$(echo "$amd_gpus" | head -1 | sed 's/.*: //')
+            local amd_count
+            amd_count=$(echo "$amd_gpus" | wc -l)
+
+            # Detect best AMD backend: ROCm > Vulkan > CPU
+            if command_exists rocm-smi 2>/dev/null || [ -d /opt/rocm ]; then
+                GPU_BACKEND="rocm"
+                VRAM_MB=$(rocm-smi --showmeminfo vram 2>/dev/null | grep -oP '\d+(?= MiB used)' | head -1 || echo 0)
+                # Estimate total from used — rocm-smi shows used, try total
+                local vram_total
+                vram_total=$(rocm-smi --showmeminfo vram 2>/dev/null | grep -oP '\d+(?= MiB total)' | head -1 || echo 0)
+                [ "${vram_total:-0}" -gt 0 ] && VRAM_MB=$vram_total
+            fi
+
+            # Vulkan detection (works without ROCm)
+            if [ "$GPU_BACKEND" != "rocm" ]; then
+                if command_exists vulkaninfo 2>/dev/null || [ -f /usr/share/vulkan/icd.d/radeon_icd.x86_64.json ] || \
+                   ls /usr/share/vulkan/icd.d/*radeon* /etc/vulkan/icd.d/*radeon* 2>/dev/null | head -1 &>/dev/null; then
+                    GPU_BACKEND="vulkan"
+                    ok "AMD GPU detected — using Vulkan backend (no ROCm required)"
+                    # Set Ollama to use Vulkan
+                    export OLLAMA_VULKAN=1
+                    export HSA_OVERRIDE_GFX_VERSION=""
+                    # Estimate VRAM from GPU model name if possible
+                    if echo "$GPU_NAME" | grep -qi "RX 7900\|MI300\|W7900"; then
+                        VRAM_MB=24000
+                    elif echo "$GPU_NAME" | grep -qi "RX 7800\|RX 6800\|W6800"; then
+                        VRAM_MB=16000
+                    elif echo "$GPU_NAME" | grep -qi "RX 7700\|RX 6700\|RX 580\|RX 5700"; then
+                        VRAM_MB=8000
+                    elif echo "$GPU_NAME" | grep -qi "RX 6600\|RX 5600"; then
+                        VRAM_MB=8000
+                    else
+                        VRAM_MB=8000  # conservative default for unknown AMD
+                    fi
+                    # Multiply by GPU count
+                    [ "${amd_count:-1}" -gt 1 ] && info "${amd_count}x AMD GPU detected — Vulkan multi-GPU"
+                else
+                    GPU_BACKEND="cpu"
+                    warn "AMD GPU found but no Vulkan/ROCm drivers — falling back to CPU"
+                    info "Install Vulkan: apt install mesa-vulkan-drivers vulkan-tools"
+                fi
+            fi
+        fi
+    fi
+
     RAM_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 0)
     CPU_CORES=$(nproc 2>/dev/null || echo 4)
 
@@ -779,7 +844,14 @@ setup_ollama() {
         MODEL_NOTE="1.5B model — minimal resources"
     fi
 
-    [ -n "$GPU_NAME" ] && info "GPU: $GPU_NAME"
+    if [ -n "$GPU_NAME" ]; then
+        local backend_label=""
+        [ "$GPU_BACKEND" = "vulkan" ] && backend_label=" [Vulkan]"
+        [ "$GPU_BACKEND" = "rocm" ] && backend_label=" [ROCm]"
+        [ "$GPU_BACKEND" = "cuda" ] && backend_label=" [CUDA]"
+        [ "$GPU_BACKEND" = "cpu" ] && backend_label=" [CPU fallback]"
+        info "GPU: $GPU_NAME${backend_label}"
+    fi
     info "Selecting: $MODEL ($MODEL_NOTE)"
     if $PULL_BITNET; then
         info "Also pulling BitNet b1.58 for CPU-native inference"
