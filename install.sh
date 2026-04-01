@@ -59,6 +59,27 @@ cat << 'BANNER'
 BANNER
 echo -e "${DI}  Distributed AI Inference Cluster Management${RS}"
 echo ""
+echo -e "${CY}"
+cat << 'OCTOPUS'
+                          ___
+                       .-'   `'.
+                      /         \
+                      |         ;
+                      |         |           ___.--,
+             _.._     |0) ~ (0) |    _.---'`__.-( (_.
+      __.--'`_.. '.__.\.    '--. \_.-' ,.--'`     `""`
+     ( ,.--'`   ',__/|)  `-. '.  `.   /   _
+     _`) )  .---.__.' /   `. `. \_  `-'  /`.)
+    `)_')  /        /     `.  `\  \ `'  /
+     `'''  |  _    |       `. `. `.  /`
+            ;  \   '.        `. `. `./
+             \  '.   \         `. `.  `-._     _
+              '.  `'. `.         `-. `.    `.__/
+                `'.  `\ `.         `.  `-.
+                   `'  \ `;          `-._`.
+                        ` \               `'
+OCTOPUS
+echo -e "${RS}"
 
 # --- root check ---------------------------------------------------------------
 if [[ "$EUID" -ne 0 ]]; then
@@ -159,9 +180,7 @@ ok "Gateway built"
 # --- build dashboard ----------------------------------------------------------
 step "Building dashboard..."
 npm run build --workspace=dashboard
-mkdir -p "$INSTALL_DIR/gateway/public"
-cp -r "$INSTALL_DIR/dashboard/dist/." "$INSTALL_DIR/gateway/public/"
-ok "Dashboard built and copied to gateway/public/"
+ok "Dashboard built to gateway/public/"
 
 # --- systemd ------------------------------------------------------------------
 if [[ "$INSTALL_SERVICE" == true ]] && command -v systemctl &>/dev/null; then
