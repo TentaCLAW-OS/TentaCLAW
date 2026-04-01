@@ -440,6 +440,10 @@ clone_repo() {
         (cd "$INSTALL_DIR" && git pull --ff-only 2>/dev/null) || {
             warn "git pull failed — continuing with existing version"
         }
+    elif [ -d "$INSTALL_DIR" ]; then
+        warn "Directory $INSTALL_DIR exists but is not a git repo — clearing it..."
+        rm -rf "$INSTALL_DIR"
+        info "Cloning fresh..."
     else
         info "Cloning repository..."
         local parent_dir
