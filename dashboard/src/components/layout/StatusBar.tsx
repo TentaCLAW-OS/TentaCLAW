@@ -1,23 +1,20 @@
 // dashboard/src/components/layout/StatusBar.tsx
+import { useMemo } from 'react';
 import { useClusterStore } from '@/stores/cluster';
 import { useUIStore } from '@/stores/ui';
-import { usePanelsStore } from '@/stores/panels';
 
 export function StatusBar() {
   const nodes = useClusterStore((s) => s.nodes);
   const connected = useClusterStore((s) => s.connected);
   const activeTab = useUIStore((s) => s.activeTab);
   const alerts = useClusterStore((s) => s.alerts);
-  const rightCollapsed = usePanelsStore((s) => s.rightSidebarCollapsed);
 
-  const onlineNodes = nodes.filter((n) => n.status === 'online').length;
-  const totalGpus = nodes.reduce((sum, n) => sum + n.gpu_count, 0);
-  const activeAlerts = alerts.filter((a) => !a.acknowledged).length;
-
-  // Aggregate tok/s across all online nodes
-  const totalToksPerSec = nodes.reduce((sum, n) => {
-    return sum + (n.latest_stats?.toks_per_sec ?? 0);
-  }, 0);
+  const { onlineNodes, totalGpus, activeAlerts, totalToksPerSec } = useMemo(() => ({
+    onlineNodes: nodes.filter((n) => n.status === 'online').length,
+    totalGpus: nodes.reduce((sum, n) => sum + n.gpu_count, 0),
+    activeAlerts: alerts.filter((a) => !a.acknowledged).length,
+    totalToksPerSec: nodes.reduce((sum, n) => sum + (n.latest_stats?.toks_per_sec ?? 0), 0),
+  }), [nodes, alerts]);
 
   return (
     <footer

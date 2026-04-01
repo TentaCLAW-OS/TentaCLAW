@@ -1,12 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react';
-
-interface Keybind {
-  id: string;
-  keys: string; // "ctrl+k", "g s" (sequence), "shift+?"
-  label: string;
-  category: 'navigation' | 'panels' | 'actions' | 'tabs';
-  action: () => void;
-}
+import type { KeybindAction } from '@/lib/types';
 
 function parseKeyCombo(keys: string): string[][] {
   // "g s" → [["g"], ["s"]] (sequence)
@@ -32,7 +25,18 @@ function eventToKey(e: KeyboardEvent): string {
   return parts.join('+');
 }
 
-export function useKeybinds(keybinds: Keybind[]) {
+/**
+ * Registers global keyboard shortcuts.
+ *
+ * IMPORTANT: Callers MUST stabilize the `keybinds` array with `useMemo` or define it
+ * outside the component. An unstable array reference causes the keydown listener to
+ * re-register on every render.
+ *
+ * @example
+ * const keybinds = useMemo(() => [...], [dep1, dep2]);
+ * useKeybinds(keybinds);
+ */
+export function useKeybinds(keybinds: KeybindAction[]) {
   const sequenceBuffer = useRef<string[]>([]);
   const sequenceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -92,5 +96,3 @@ export function useKeybinds(keybinds: Keybind[]) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 }
-
-export type { Keybind };

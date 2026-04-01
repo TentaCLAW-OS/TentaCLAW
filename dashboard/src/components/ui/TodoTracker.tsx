@@ -31,6 +31,8 @@ function TodoItemRow({ item }: { item: TodoItem }) {
       className="flex items-start gap-1.5 py-1 group"
       onMouseEnter={() => setShowDelete(true)}
       onMouseLeave={() => setShowDelete(false)}
+      onFocus={() => setShowDelete(true)}
+      onBlur={() => setShowDelete(false)}
     >
       <button
         onClick={() => updateStatus(item.id, NEXT_STATUS[item.status])}
@@ -79,6 +81,7 @@ export function TodoTracker() {
     if (!text) return;
     addTodo(text);
     setInputValue('');
+    inputRef.current?.focus();
   }
 
   return (
@@ -99,6 +102,7 @@ export function TodoTracker() {
         />
         <button
           type="submit"
+          aria-label="Add task"
           className="text-[9px] px-2 py-1 rounded cursor-pointer"
           style={{
             background: 'rgba(0,255,255,0.08)',
