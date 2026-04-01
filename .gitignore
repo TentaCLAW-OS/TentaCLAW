@@ -97,3 +97,13 @@ logs/
 tentaclaw-secrets.yaml
 node_credentials.txt
 ProtonMail/
+
+# Private planning & research docs
+MASTER-TentaCLAW-PLAN*.md
+RESEARCH-*.md
+LAUNCH-EXECUTION-30DAY.md
+LAUNCH-POSTS-READY.md
+LAUNCH-STRATEGY.md
+V4research.txt
+cephalopod-mythology-research*.txt
+Make your first request.txt
