@@ -633,6 +633,11 @@ setInterval(() => {
 let CLUSTER_SECRET: string | null = null;
 let agentAuthEnabled = false;
 
+/** Returns true when auth is explicitly disabled via TENTACLAW_NO_AUTH=true */
+export function isAuthDisabled(): boolean {
+    return process.env.TENTACLAW_NO_AUTH === 'true';
+}
+
 export function initClusterSecret(): void {
     const envSecret = process.env.TENTACLAW_CLUSTER_SECRET;
     if (envSecret) {

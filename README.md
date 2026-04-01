@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/github/actions/workflow/status/TentaCLAW-OS/TentaCLAW/ci.yml?style=flat-square&label=build&color=00d4aa" alt="Build"></a>
-  <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/badge/tests-1006%20passing-00d4aa?style=flat-square" alt="Tests"></a>
+  <a href="https://github.com/TentaCLAW-OS/TentaCLAW/actions"><img src="https://img.shields.io/github/actions/workflow/status/TentaCLAW-OS/TentaCLAW/ci.yml?style=flat-square&label=tests&color=00d4aa" alt="Tests"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b5cf6?style=flat-square" alt="License"></a>
   <a href="https://github.com/TentaCLAW-OS/TentaCLAW/stargazers"><img src="https://img.shields.io/github/stars/TentaCLAW-OS/TentaCLAW?style=flat-square&color=ffdd00" alt="Stars"></a>
   <a href="https://discord.gg/tentaclaw"><img src="https://img.shields.io/badge/Discord-The%20Tank-5865F2?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
