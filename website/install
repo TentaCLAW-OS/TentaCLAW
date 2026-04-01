@@ -680,6 +680,137 @@ SERVICE
 }
 
 # ──────────────────────────────────────────────────────────────────
+# Install Ollama + pull default coding model
+# ──────────────────────────────────────────────────────────────────
+setup_ollama() {
+    # Skip on macOS ARM — user likely has their own setup
+    echo -e "  ${BOLD}Setting up Ollama + AI model...${RESET}"
+    echo ""
+
+    # ── Install Ollama if missing ──
+    if ! command_exists ollama; then
+        info "Installing Ollama..."
+        if curl -fsSL https://ollama.com/install.sh | sh >/dev/null 2>&1; then
+            ok "Ollama installed"
+        else
+            warn "Ollama install failed — skipping model download"
+            warn "Install manually: curl -fsSL https://ollama.com/install.sh | sh"
+            echo ""
+            return
+        fi
+    else
+        ok "Ollama $(ollama --version 2>/dev/null | head -1)"
+    fi
+
+    # ── Ensure Ollama service is running ──
+    if command_exists systemctl && systemctl is-active --quiet ollama 2>/dev/null; then
+        : # already running
+    elif command_exists ollama; then
+        # Start in background if not already listening
+        if ! curl -sf http://localhost:11434/ >/dev/null 2>&1; then
+            info "Starting Ollama service..."
+            ollama serve >/dev/null 2>&1 &
+            local i=0
+            while [ $i -lt 8 ]; do
+                curl -sf http://localhost:11434/ >/dev/null 2>&1 && break
+                sleep 1
+                i=$((i+1))
+            done
+        fi
+    fi
+
+    # ── Detect hardware ──
+    local VRAM_MB=0
+    local RAM_MB=0
+    local CPU_CORES=0
+    local GPU_NAME=""
+
+    if command_exists nvidia-smi; then
+        VRAM_MB=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ' || echo 0)
+        GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo "")
+    fi
+    RAM_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 0)
+    CPU_CORES=$(nproc 2>/dev/null || echo 4)
+
+    # ── Pick best model based on hardware ──
+    local MODEL=""
+    local MODEL_NOTE=""
+    local PULL_BITNET=false
+
+    if [ "${VRAM_MB:-0}" -ge 20000 ] 2>/dev/null; then
+        # High-end GPU (24GB+): run a big coder
+        MODEL="qwen2.5-coder:32b"
+        MODEL_NOTE="32B model — best quality coding (${VRAM_MB}MB VRAM)"
+    elif [ "${VRAM_MB:-0}" -ge 10000 ] 2>/dev/null; then
+        # Mid-range GPU (10-20GB): 14B sweet spot
+        MODEL="qwen2.5-coder:14b"
+        MODEL_NOTE="14B model — great quality/speed balance (${VRAM_MB}MB VRAM)"
+    elif [ "${VRAM_MB:-0}" -ge 5000 ] 2>/dev/null; then
+        # Entry GPU (5-10GB): 7B
+        MODEL="qwen2.5-coder:7b"
+        MODEL_NOTE="7B model — solid coding, fits GPU (${VRAM_MB}MB VRAM)"
+    elif [ "${VRAM_MB:-0}" -gt 0 ] 2>/dev/null; then
+        # Small GPU: 1.5B on GPU + BitNet on CPU for long context
+        MODEL="qwen2.5-coder:1.5b"
+        MODEL_NOTE="1.5B model — low VRAM (${VRAM_MB}MB), fast inference"
+        if [ "${RAM_MB:-0}" -ge 8000 ] && [ "${CPU_CORES:-0}" -ge 4 ] 2>/dev/null; then
+            PULL_BITNET=true
+        fi
+    elif [ "${RAM_MB:-0}" -ge 16000 ] 2>/dev/null; then
+        # No GPU, good RAM: BitNet runs fast on CPU
+        MODEL="qwen2.5-coder:7b"
+        MODEL_NOTE="7B model — CPU inference (${RAM_MB}MB RAM, ${CPU_CORES} cores)"
+        PULL_BITNET=true
+    elif [ "${RAM_MB:-0}" -ge 8000 ] 2>/dev/null; then
+        MODEL="qwen2.5-coder:3b"
+        MODEL_NOTE="3B model — CPU-friendly (${RAM_MB}MB RAM)"
+        PULL_BITNET=true
+    else
+        MODEL="qwen2.5-coder:1.5b"
+        MODEL_NOTE="1.5B model — minimal resources"
+    fi
+
+    [ -n "$GPU_NAME" ] && info "GPU: $GPU_NAME"
+    info "Selecting: $MODEL ($MODEL_NOTE)"
+    if $PULL_BITNET; then
+        info "Also pulling BitNet b1.58 for CPU-native inference"
+    fi
+
+    # Skip if model already pulled
+    if ollama list 2>/dev/null | grep -q "${MODEL%%:*}"; then
+        ok "Model already downloaded: $MODEL"
+        echo ""
+        return
+    fi
+
+    info "Downloading $MODEL — this may take a few minutes..."
+    info "You can skip with Ctrl+C and run: ollama pull $MODEL"
+    echo ""
+
+    if ollama pull "$MODEL" 2>&1 | grep -E "pulling|verifying|success|error" | sed 's/^/    /'; then
+        echo ""
+        ok "Model ready: $MODEL"
+        info "Test it: ollama run $MODEL 'Write a hello world in Python'"
+    else
+        warn "Model download failed — run manually: ollama pull $MODEL"
+    fi
+
+    # ── BitNet for CPU-native inference ──
+    if $PULL_BITNET; then
+        echo ""
+        info "Pulling BitNet b1.58 (CPU-native 1-bit model — fast on any hardware)..."
+        if ollama pull "bitnet-b1.58-3b" 2>&1 | grep -E "pulling|verifying|success|error" | sed 's/^/    /'; then
+            ok "BitNet ready — ultra-fast CPU inference"
+        else
+            # BitNet model name varies — try alternate
+            ollama pull "smollm2:360m" 2>&1 | grep -E "pulling|verifying|success|error" | sed 's/^/    /' || true
+        fi
+    fi
+
+    echo ""
+}
+
+# ──────────────────────────────────────────────────────────────────
 launch_wizard() {
     if $NO_WIZARD; then
         print_manual_instructions
@@ -748,6 +879,7 @@ main() {
     install_deps
     setup_cli
     setup_gateway_service
+    setup_ollama
     launch_wizard
 }
 
