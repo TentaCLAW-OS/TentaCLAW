@@ -1,0 +1,16 @@
+"use strict";
+/**
+ * TentaCLAW OS — Shared Types
+ *
+ * Types shared between the Agent daemon and the TentaCLAW Gateway.
+ * CLAWtopus says: "One mind. One type system."
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.OVERCLOCK_PROFILES = void 0;
+exports.OVERCLOCK_PROFILES = {
+    stock: { power_limit_pct: 100, core_offset_mhz: 0, mem_offset_mhz: 0, fan_speed_pct: 0 }, // 0 = auto
+    gaming: { power_limit_pct: 110, core_offset_mhz: 100, mem_offset_mhz: 500, fan_speed_pct: 70 },
+    mining: { power_limit_pct: 70, core_offset_mhz: -200, mem_offset_mhz: 1000, fan_speed_pct: 80 },
+    inference: { power_limit_pct: 90, core_offset_mhz: 50, mem_offset_mhz: 200, fan_speed_pct: 60 },
+};
+//# sourceMappingURL=types.js.map

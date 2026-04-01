@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 310" fill="none">
+  <rect width="960" height="310" rx="12" fill="#0a0e14"/>
+  <g transform="translate(55, 30)" fill="none">
+    <ellipse cx="75" cy="48" rx="55" ry="48" fill="#8b5cf6"/>
+    <ellipse cx="55" cy="42" rx="14" ry="16" fill="#0a0e14"/>
+    <ellipse cx="95" cy="42" rx="14" ry="16" fill="#0a0e14"/>
+    <ellipse cx="58" cy="40" rx="7" ry="9" fill="#c4b5fd"/>
+    <ellipse cx="98" cy="40" rx="7" ry="9" fill="#c4b5fd"/>
+    <circle cx="60" cy="38" r="3" fill="#0a0e14"/>
+    <circle cx="100" cy="38" r="3" fill="#0a0e14"/>
+    <circle cx="54" cy="34" r="3" fill="white" opacity="0.8"/>
+    <circle cx="94" cy="34" r="3" fill="white" opacity="0.8"/>
+    <path d="M55 63 Q75 78, 95 63" stroke="#0a0e14" stroke-width="3" stroke-linecap="round"/>
+    <rect x="38" y="32" width="32" height="18" rx="4" fill="#1a1a2e" stroke="#333" stroke-width="1.5"/>
+    <rect x="80" y="32" width="32" height="18" rx="4" fill="#1a1a2e" stroke="#333" stroke-width="1.5"/>
+    <line x1="70" y1="40" x2="80" y2="40" stroke="#333" stroke-width="2"/>
+    <line x1="38" y1="40" x2="28" y2="35" stroke="#333" stroke-width="2"/>
+    <line x1="112" y1="40" x2="122" y2="35" stroke="#333" stroke-width="2"/>
+    <path d="M20 88 Q5 133, 15 163" stroke="#8b5cf6" stroke-width="12" stroke-linecap="round"/>
+    <path d="M35 93 Q25 138, 30 168" stroke="#7c3aed" stroke-width="11" stroke-linecap="round"/>
+    <path d="M50 96 Q45 143, 48 171" stroke="#8b5cf6" stroke-width="10" stroke-linecap="round"/>
+    <path d="M65 98 Q63 145, 65 173" stroke="#7c3aed" stroke-width="10" stroke-linecap="round"/>
+    <path d="M85 98 Q87 145, 85 173" stroke="#8b5cf6" stroke-width="10" stroke-linecap="round"/>
+    <path d="M100 96 Q105 143, 102 171" stroke="#7c3aed" stroke-width="10" stroke-linecap="round"/>
+    <path d="M115 93 Q125 138, 120 168" stroke="#8b5cf6" stroke-width="11" stroke-linecap="round"/>
+    <path d="M130 88 Q145 133, 135 163" stroke="#7c3aed" stroke-width="12" stroke-linecap="round"/>
+  </g>
+  <text font-family="'Courier New', 'Consolas', monospace" font-size="13.5" fill="#00d4aa" xml:space="preserve">
+    <tspan x="310" y="48">████████╗███████╗███╗   ██╗████████╗ █████╗</tspan>
+    <tspan x="310" y="64">╚══██╔══╝██╔════╝████╗  ██║╚══██╔══╝██╔══██╗</tspan>
+    <tspan x="310" y="80">   ██║   █████╗  ██╔██╗ ██║   ██║   ███████║</tspan>
+    <tspan x="310" y="96">   ██║   ██╔══╝  ██║╚██╗██║   ██║   ██╔══██║</tspan>
+    <tspan x="310" y="112">   ██║   ███████╗██║ ╚████║   ██║   ██║  ██║</tspan>
+    <tspan x="310" y="128">   ╚═╝   ╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝</tspan>
+  </text>
+  <text font-family="'Courier New', 'Consolas', monospace" font-size="13.5" fill="#00d4aa" xml:space="preserve">
+    <tspan x="310" y="162">██████╗██╗      █████╗ ██╗    ██╗</tspan>
+    <tspan x="310" y="178">██╔════╝██║     ██╔══██╗██║    ██║</tspan>
+    <tspan x="310" y="194">██║     ██║     ███████║██║ █╗ ██║</tspan>
+    <tspan x="310" y="210">██║     ██║     ██╔══██║██║███╗██║</tspan>
+    <tspan x="310" y="226">╚██████╗███████╗██║  ██║╚███╔███╔╝</tspan>
+    <tspan x="310" y="242"> ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝</tspan>
+  </text>
+  <rect x="40" y="262" width="880" height="1.5" fill="#ffffff" opacity="0.5"/>
+  <text font-family="'Courier New', 'Consolas', monospace" font-size="13" fill="#5a6a82" x="40" y="288">Eight arms. One mind. Zero compromises.</text>
+  <text font-family="'Courier New', 'Consolas', monospace" font-size="13" fill="#00d4aa" x="800" y="288">tentaclaw.io</text>
+</svg>
