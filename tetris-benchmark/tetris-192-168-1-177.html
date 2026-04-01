@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tetris</title>
+<style>
+  body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #000; }
+  canvas { border: 1px solid #fff; }
+  #score, #level, #next { position: absolute; top: 10px; left: 10px; color: #fff; font-family: monospace; }
+</style>
+</head>
+<body>
+<canvas id="tetris" width="300" height="600"></canvas>
+<div id="score">0</div>
+<div id="level">1</div>
+<div id="next"></div>
+<script>
+  const canvas = document.getElementById('tetris');
+  const ctx = canvas.getContext('2d');
+  const scoreDisplay = document.getElementById('score');
+  const levelDisplay = document.getElementById('level');
+  const nextDisplay = document.getElementById('next');
+  const width = 10;
+  const height = 20;
+  const grid = Array.from({ length: height }, () => Array(width).fill(0));
+  const colors = [
+    null, '#FF0D72', '#0DC2FF', '#0DFF72', '#F538FF', '#FF8E0D', '#FFE138', '#3877FF'
+  ];
+
+  const shapes = [
+    [[1, 1, 1, 1]],
+    [[1, 1], [1, 1]],
+    [[1, 1, 0], [0, 1, 1]],
+    [[0, 1, 1], [1, 1, 0]],
+    [[1, 1, 1], [0, 1, 0]],
+    [[1, 1, 1], [1, 0, 0]],
+    [[1, 1, 1], [0, 0, 1]]
+  ];
+
+  function draw() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    grid.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        if (cell) {
+          ctx.fillStyle = colors[cell];
+          ctx.fillRect(x * 30, y * 30, 30, 30);
+        }
+      });
+    });
+  }
+
+  function merge(piece, offset) {
+    piece.forEach((row, y) => {
+      row.forEach((val, x) => {
+        if (val) {
+          grid[y + offset.y][x + offset.x] = val;
+        }
+      });
+    });
+  }
+
+  function clearLines() {
+    let linesCleared = 0;
+    grid.forEach((row, y) => {
+      if (row.every(cell => cell)) {
+        grid.splice(y, 1);
+        grid.unshift(Array(width).fill(0));
+        linesCleared++;
+      }
+    });
+    return linesCleared;
+  }
+
+  function checkCollision(piece, offset) {
+    return piece.some((row, y) => row.some((val, x) => val && (grid[y + offset.y] && grid[y + offset.y][x + offset.x]) !== 0));
+  }
+
+  function newPiece() {
+    const shape = shapes[Math.floor(Math.random() * shapes.length)];
+    const color = Math.floor(Math.random() * colors.length);
+    return { shape, color, x: Math.floor(width / 2) - Math.floor(shape[0].length / 2), y: 0 };
+  }
+
+  function drawPiece(piece) {
+    piece.shape.forEach((row, y) => {
+      row.forEach((val, x) => {
+        if (val) {
+          ctx.fillStyle = colors[piece.color];
+          ctx.fillRect((piece.x + x) * 30, (piece.y + y) * 30, 30, 30);
+        }
+      });
+    });
+  }
+
+  function drawNextPiece(piece) {
+    nextDisplay.innerHTML = '';
+    piece.shape.forEach((row, y) => {
+      row.forEach((val, x) => {
+        if (val) {
+          const div = document.createElement('div');
+          div.style.width = '30px';
+          div.style.height = '30px';
+          div.style.backgroundColor = colors[piece.color];
+          div.style.display = 'inline-block';
+          div.style.margin = '1px';
+          nextDisplay.appendChild(div);
+        }
+      });
+    });
+  }
+
+  function updateScore(linesCleared) {
+    const score = parseInt(scoreDisplay.innerText);
+    scoreDisplay.innerText = score + linesCleared * 10;
+  }
+
+  function updateLevel() {
+    const level = parseInt(levelDisplay.innerText);
+    const score = parseInt(scoreDisplay.innerText);
+    if (score >= level * 100) {
+      levelDisplay.innerText = level + 1;
+    }
+  }
+
+  function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    draw();
+    drawPiece(piece);
+    drawNextPiece(nextPiece);
+    if (checkCollision(piece, { x: 0, y: 1 })) {
+      merge(piece, { x: 0, y: 0 });
+      const linesCleared = clearLines();
+      updateScore(linesCleared);
+      updateLevel();
+      piece = nextPiece;
+      nextPiece = newPiece();
+      if (checkCollision(piece, { x: 0, y: 0 })) {
+        alert('Game Over');
+        document.location.reload();
+      }
+    } else {
+      piece.y++;
+    }
+    requestAnimationFrame(gameLoop);
+  }
+
+  let piece = newPiece();
+  let nextPiece = newPiece();
+  let dropCounter = 0;
+  let dropInterval = 1000;
+  let lastTime = 0;
+
+  function update(time = 0) {
+    const deltaTime = time - lastTime;
+    lastTime = time;
+    dropCounter += deltaTime;
+    if (dropCounter > dropInterval) {
+      piece.y++;
+      dropCounter = 0;
+    }
+    gameLoop();
+  }
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'ArrowLeft') {
+      if (!checkCollision(piece, { x: -1, y: 0 })) piece.x--;
+    } else if (event.key === 'ArrowRight') {
+      if (!checkCollision(piece, { x: 1, y: 0 })) piece.x++;
+    } else if (event.key === 'ArrowDown') {
+      if (!checkCollision(piece, { x: 0, y: 1 })) piece.y++;
+    } else if (event.key === 'ArrowUp') {
+      const rotated = rotate(piece.shape);
+      if (!checkCollision({ shape: rotated, color: piece.color, x: piece.x, y: piece.y }, { x: 0, y: 0 })) piece.shape = rotated;
+    } else if (event.key === ' ') {
+      while (!checkCollision(piece, { x: 0, y: 1 })) piece.y++;
+      merge(piece, { x: 0, y: 0 });
+      const linesCleared = clearLines();
+      updateScore(linesCleared);
+      updateLevel();
+      piece = nextPiece;
+      nextPiece = newPiece();
+      if (checkCollision(piece, { x: 0, y: 0 })) {
+        alert('Game Over');
+        document.location.reload();
+      }
+    } else if (event.key === 'p') {
+      gameLoop = () => {};
+    }
+  });
+
+  function rotate(shape) {
+    return shape[0].map((_, index) => shape.map(row => row[index]).reverse());
+  }
+
+  requestAnimationFrame(update);
+</script>
+</body>
+</html>

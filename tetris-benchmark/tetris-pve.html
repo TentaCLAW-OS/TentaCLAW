@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tetris</title>
+<style>
+  body { margin: 0; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="tetris"></canvas>
+<script>
+  const canvas = document.getElementById('tetris');
+  const context = canvas.getContext('2d');
+  canvas.width = 300;
+  canvas.height = 600;
+
+  const colors = [
+    null,
+    'purple',
+    'blue',
+    'cyan',
+    'orange',
+    'green',
+    'red'
+  ];
+
+  const shapes = [
+    [[1, 1, 1, 1]],
+    [[1, 1], [1, 1]],
+    [[1, 1, 0], [0, 1, 1]],
+    [[0, 1, 1], [1, 1, 0]],
+    [[1, 1, 0], [1, 0, 1]],
+    [[1, 1, 0], [0, 1, 1]],
+    [[1, 1, 1], [0, 1, 0]]
+  ];
+
+  function collide(arena, player) {
+    const m = player.matrix;
+    const o = player.pos;
+    for (let y = 0; y < m.length; y++) {
+      for (let x = 0; x < m[y].length; x++) {
+        if (m[y][x] !== 0 &&
+            (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  function createMatrix(w, h) {
+    const matrix = [];
+    while (h--) {
+      matrix.push(new Array(w).fill(0));
+    }
+    return matrix;
+  }
+
+  function merge(arena, player) {
+    player.matrix.forEach((row, y) => {
+      row.forEach((value, x) => {
+        if (value !== 0) {
+          arena[y + player.pos.y][x + player.pos.x] = value;
+        }
+      });
+    });
+  }
+
+  function playerClear(player) {
+    player.matrix.forEach(row => row.fill(0));
+    player.pos.x = Math.round((canvas.width / 2) - (player.matrix[0].length / 2));
+    player.pos.y = 0;
+  }
+
+  function playerDrop(player, arena, rowsCleared) {
+    player.pos.y++;
+    if (collide(arena, player)) {
+      player.pos.y--;
+      merge(arena, player);
+      const cleared = playerClear(player);
+      if (cleared > 0) {
+        rowsCleared += cleared;
+      }
+      player.pos.x = Math.round((canvas.width / 2) - (player.matrix[0].length / 2));
+      player.pos.y = 0;
+      if (collide(arena, player)) {
+        game.over = true;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function playerMove(player, direction) {
+    player.pos.x += direction;
+    if (collide(arena, player)) {
+      player.pos.x -= direction;
+    }
+  }
+
+  function playerRotate(player) {
+    const pos = player.pos.x;
+    const offset = player.matrix[0].length / 2 - pos;
+    player.pos.x += offset;
+    const rotated = player.matrix[0].map((_, i) => player.matrix.map(row => row[i]).reverse());
+    player.matrix = rotated;
+    if (collide(arena, player)) {
+      player.matrix = rotated[0].map((_, i) => rotated.map(row => row[i]).reverse());
+      player.pos.x = pos;
+    }
+  }
+
+  function draw() {
+    context.fillStyle = '#000';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawMatrix(arena, {

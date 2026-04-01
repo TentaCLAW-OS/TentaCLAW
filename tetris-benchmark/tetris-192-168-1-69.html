@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tetris</title>
+<style>
+  body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #000; }
+  canvas { border: 1px solid #fff; }
+  #score, #level { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); color: #fff; font-family: monospace; }
+  #next { position: absolute; top: 50px; left: 50%; transform: translateX(-50%); color: #fff; font-family: monospace; }
+  #game-over { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; font-family: monospace; font-size: 2em; }
+</style>
+</head>
+<body>
+<canvas id="tetris" width="300" height="600"></canvas>
+<div id="score">0</div>
+<div id="level">1</div>
+<div id="next"></div>
+<div id="game-over">GAME OVER</div>
+
+<script>
+  const canvas = document.getElementById('tetris');
+  const ctx = canvas.getContext('2d');
+  const scoreDisplay = document.getElementById('score');
+  const levelDisplay = document.getElementById('level');
+  const nextDisplay = document.getElementById('next');
+  const gameOverDisplay = document.getElementById('game-over');
+
+  const colors = [
+    null,
+    '#FF0D72',
+    '#0DC2FF',
+    '#0DFF72',
+    '#F538FF',
+    '#FF8E0D',
+    '#FFE138',
+    '#3877FF'
+  ];
+
+  const grid = Array.from({ length: 20 }, () => Array(10).fill(0));
+  const tetrominoes = [
+    [[1, 1, 1, 1]],
+    [[1, 1], [1, 1]],
+    [[1, 1, 0], [0, 1, 1]],
+    [[0, 1, 1], [1, 1, 0]],
+    [[1, 1, 1], [0, 1, 0]],
+    [[1, 1, 1], [1, 0, 0]],
+    [[1, 1, 1], [0, 0, 1]]
+  ];
+
+  function draw() {
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    grid.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        if (cell) {
+          ctx.fillStyle = colors[cell];
+          ctx.fillRect(x * 30, y * 30, 30, 30);
+        }
+      });
+    });
+  }
+
+  function merge(piece, offset) {
+    piece.forEach((row, y) => {
+      row.forEach((val, x) => {
+        if (val) {
+          grid[y + offset.y][x + offset.x] = val;
+        }
+      });
+    });
+  }
+
+  function valid(p, offset) {
+    return p.every((row, y) => {
+      return row.every((val, x) => {
+        const newX = x + offset.x;
+        const newY = y + offset.y;
+        if (val && (newX < 0 || newX >= 10 || newY >= 20 || (newY >= 0 && grid[newY][newX]))) {
+          return false;
+        }
+        return true;
+      });
+    });
+  }
+
+  function clearLines() {
+    let linesCleared = 0;
+    grid.forEach((row, y) => {
+      if (row.every(cell => cell)) {
+        grid.splice(y, 1);
+        grid.unshift(Array(10).fill(0));
+        linesCleared++;
+      }
+    });
+    return linesCleared;
+  }
+
+  function updateScore(linesCleared) {
+    const score = parseInt(scoreDisplay.innerText);
+    const level = parseInt(levelDisplay.innerText);
+    scoreDisplay.innerText = score + linesCleared * 10;
+    levelDisplay.innerText = Math.floor((score + linesCleared * 10) / 100) + 1;
+  }
+
+  function gameLoop() {
+    if (gameOver) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    draw();
+    if (valid(currentPiece, { x: currentX, y: currentY + 1 })) {
+      currentY++;
+    } else {
+      merge(currentPiece, { x: currentX, y: currentY });
+      const linesCleared = clearLines();
+      updateScore(linesCleared);
+      currentPiece = nextPiece;
+      nextPiece = tetrominoes[Math.floor(Math.random() * tetrominoes.length)];
+      currentX = 4;
+      currentY = 0;
+      if (!valid(currentPiece, { x: currentX, y: currentY })) {
+        gameOver = true;
+        gameOverDisplay.style.display = 'block';
+      }
+    }
+    requestAnimationFrame(gameLoop);
+  }
+
+  let currentPiece = tetrominoes[Math.floor(Math.random() * tetrominoes.length)];
+  let nextPiece = tetrominoes[Math.floor(Math.random() * tetrominoes.length)];
+  let currentX = 4;
+  let currentY = 0;
+  let gameOver = false;
+
+  document.addEventListener('keydown', (e) => {
+    if (gameOver) {
+      if (e.key === 'Enter') {
+        location.reload();
+      }
+      return;
+    }
+    if (e.key === 'ArrowLeft') {
+      if (valid(currentPiece, { x: currentX - 1, y: currentY })) currentX--;
+    } else if (e.key === 'ArrowRight') {
+      if (valid(currentPiece, { x: currentX + 1, y: currentY })) currentX++;
+    } else if (e.key === 'ArrowDown') {
+      if (valid(currentPiece, { x: currentX, y: currentY + 1 })) currentY++;
+    } else if (e.key === 'ArrowUp') {
+      const rotated = currentPiece[0].map((_, i) => currentPiece.map(row => row[i]).reverse());
+      if (valid(rotated, { x: currentX, y: currentY })) currentPiece = rotated;
+    } else if (e.key === ' ') {
+      while (valid(currentPiece, { x: currentX, y: currentY + 1 })) currentY++;
+      merge(currentPiece, { x: currentX, y: currentY });
+      const linesCleared = clearLines();
+      updateScore(linesCleared);
+      currentPiece = nextPiece;
+      nextPiece = tetrominoes[Math.floor(Math.random() * tetrominoes.length)];
+      currentX = 4;
+      currentY = 0;
+      if (!valid(currentPiece, { x: currentX, y: currentY })) {
+        gameOver = true;
+        gameOverDisplay.style.display = 'block';
+      }
+    } else if (e.key === 'p') {
+      paused = !paused;
+      if (paused) {
+        cancelAnimationFrame(gameLoop);
+      } else {
+        gameLoop();
+      }
+    }
+  });
+
+  gameLoop();
+</script>
+</body>
+</html>

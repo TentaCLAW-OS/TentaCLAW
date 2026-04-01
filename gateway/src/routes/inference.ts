@@ -108,11 +108,41 @@ routes.post('/v1/chat/completions', async (c) => {
     const hasJsonMode = body.response_format?.type === 'json_object';
     const hasFunctions = body.functions && Array.isArray(body.functions);
 
+    // X-Node-Id header lets callers pin to a specific node (benchmark, testing)
+    const pinnedNodeId = c.req.header('x-node-id');
+
     const resolved = resolveModelAlias(model);
     let resolvedModel = resolved.target;
 
-    let target = findBestNode(resolvedModel);
+    let target: import('../db/stats').InferenceTarget | null = null;
     let usedFallback = false;
+
+    if (pinnedNodeId) {
+        // Try to find the node in the routing table (model loaded)
+        target = findNodesForModel(resolvedModel).find(n => n.node_id === pinnedNodeId) ?? null;
+        // Fallback: build target from node registration even if model not in loaded_models
+        // (Ollama will auto-load from its model store)
+        if (!target) {
+            const { getNode } = await import('../db/nodes');
+            const nodeRow = getNode(pinnedNodeId);
+            if (nodeRow) {
+                // Allow routing to any registered node — even offline ones (benchmark/direct test use)
+                const stats = nodeRow.latest_stats as any;
+                const backend = stats?.backend;
+                target = {
+                    node_id: nodeRow.id,
+                    hostname: nodeRow.hostname,
+                    ip_address: nodeRow.ip_address,
+                    gpu_utilization_avg: 0,
+                    in_flight_requests: 0,
+                    backend_type: backend?.type || 'ollama',
+                    backend_port: backend?.port || 11434,
+                };
+            }
+        }
+    } else {
+        target = findBestNode(resolvedModel);
+    }
 
     if (!target && resolved.fallbacks.length > 0) {
         for (const fallback of resolved.fallbacks) {

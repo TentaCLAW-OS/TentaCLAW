@@ -1530,6 +1530,8 @@ async function executeCodeTool(
 
 async function cmdCode(gateway: string, flags: Record<string, string>): Promise<void> {
     let autoApprove = flags['yes'] === 'true' || flags['y'] === 'true';
+    const taskFlag = flags['task'] || flags['t'] || '';       // --task "..." for non-interactive mode
+    const nodeFlag = flags['node'] || flags['n'] || '';       // --node <id> to pin to specific cluster node
 
     // Resolve model — pick from flag or auto-detect from cluster
     let model = flags['model'] || '';
@@ -1591,11 +1593,6 @@ Approach:
     const messages: AgentMessage[] = [{ role: 'system', content: systemPrompt }];
 
     const readline = await import('readline');
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout,
-        prompt: C.teal('\n  \u276F '),
-    });
 
     const runAgentLoop = async (userMessage: string): Promise<void> => {
         messages.push({ role: 'user', content: userMessage });
@@ -1628,6 +1625,7 @@ Approach:
                     headers: {
                         'Content-Type': 'application/json',
                         'Content-Length': Buffer.byteLength(bodyStr),
+                        ...(nodeFlag ? { 'x-node-id': nodeFlag } : {}),
                     },
                 }, (res) => {
                     let buf = '';
@@ -1729,6 +1727,27 @@ Approach:
 
         console.log('  ' + C.yellow('\u26A0 Reached maximum iterations.'));
     };
+
+    // Non-interactive mode: --task "..." runs once and exits
+    if (taskFlag) {
+        console.log('  ' + C.dim(`Task: ${taskFlag}`));
+        if (nodeFlag) console.log('  ' + C.dim(`Pinned node: ${nodeFlag}`));
+        console.log('');
+        try {
+            await runAgentLoop(taskFlag);
+        } catch (e) {
+            console.error(C.red('  Error: ' + (e instanceof Error ? e.message : String(e))));
+            process.exit(1);
+        }
+        return;
+    }
+
+    // Interactive REPL mode
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+        prompt: C.teal('\n  \u276F '),
+    });
 
     rl.prompt();
 

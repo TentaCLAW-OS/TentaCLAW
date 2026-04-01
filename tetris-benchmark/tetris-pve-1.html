@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Classic Tetris</title>
+<style>
+  body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #000; }
+  canvas { background: #111; border: 1px solid #333; }
+  #controls { color: #fff; margin-top: 10px; }
+</style>
+</head>
+<body>
+<canvas id="tetris"></canvas>
+<div id="controls">Score: <span id="score">0</span> | Level: <span id="level">1</span></div>
+
+<script>
+const canvas = document.getElementById('tetris');
+const context = canvas.getContext('2d');
+const scale = 20;
+canvas.width = scale * 10;
+canvas.height = scale * 20;
+
+const colors = [
+  null, // No color for empty space
+  '#FF0D72', // I
+  '#0DC2FF', // O
+  '#0DFF72', // T
+  '#F538FF', // S
+  '#FF8F0D', // Z
+  '#F5D30D', // J
+  '#FF0DF5'  // L
+];
+
+const matrix = [
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0],
+  [0,0,0,0,0,0,0,0,0,0]
+];
+
+const tetrominoes = [
+  [[1,1,1,1]],
+  [[1,1],[1,1]],
+  [[0,1,0],[1,1,1]],
+  [[1,1,0],[0,1,1]],
+  [[0,1,1],[1,1,0]],
+  [[1,1,1],[0,1,0]],
+  [[1,1,1],[1,0,0]]
+];
+
+let index = 0;
+let time = 0;
+let rowsCleared = 0;
+let level = 1;
+let gameBoard = document.getElementById('tetris');
+let score = document.getElementById('score');
+let levelIndicator = document.getElementById('level');
+
+function updateScore() {
+  score.textContent = rowsCleared;
+  levelIndicator.textContent = level;
+}
+
+function collide(arena, player) {
+  const m = player.matrix;
+  const o = player.pos;
+  for (let y = 0; y < m.length; ++y) {
+    for (let x = 0; x < m[y].length; ++x) {
+      if (m[y][x] !== 0 && (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function draw() {
+  context.fillStyle = '#111';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  drawMatrix(arena, {x: 0, y: 0});
+  drawMatrix(player.matrix, player.pos);
+}
+
+function drawMatrix(matrix, offset) {
+  matrix.forEach((row, y) => {
+    row.forEach((value, x) => {
+      if (value !== 0) {
+        context.fillStyle = colors[value];
+        context.fillRect(x + offset.x, y + offset.y, scale, scale);
+      }
+    });
+  });
+}
+
+function playerDrop() {
+  player.pos.y++;
+  if (collide(arena, player)) {
+    player.pos.y--;
+    merge(arena, player);
+    clearCompleteRows(arena);
+    playerReset();
+    updateScore();
+    if (collide(arena, player)) {
+      arena.forEach(row => row.fill(0));
+      score.textContent = '0';
+      levelIndicator.textContent = '1';
+    }
+  }
+  dropCounter = 0;
+}
+
+function playerMove(dir) {
+  player.pos.x += dir;
+  if (collide(arena, player)) {
+    player.pos.x -= dir;
+  }
+}
+
+function playerRotate(dir) {
+  const pos = player.pos.x;
+  let offset = 1;
+  rotate(player.matrix, dir);
+  while (collide(arena, player)) {
+    player.pos.x += offset;
+    offset = -(offset + (offset > 0 ? 1 : -1));
+    if (offset > player.matrix[0].length) {
+      rotate(player.matrix, -dir);
+      player.pos.x = pos;
+      return;
+    }
+  }
+}
+
+function rotate(matrix, dir) {
+  for (let y = 0; y < matrix.length; y++) {
+    for (let x = 0; x < y; x++) {
+      [
+        matrix[x][y],
+        matrix[y][x],
+      ] = [
+        matrix[y][x],
+        matrix[x][y],
+      ];
+    }
+  }
+  if (dir > 0) {
+    matrix.forEach(row => row.reverse());
+  } else {
+    matrix.reverse();
+  }
+}
+
+function clearCompleteRows(arena) {
+  let clearedRows = 0;
+  arena.forEach((row, y) => {
+    if (row.every(index => index !== 0)) {
+      arena.splice(y, 1);
+      arena.unshift(new Array(arena[0].length).fill(0));
+      y--;
+      clearedRows++;
+    }
+  });
+  if (clearedRows > 0) {
+    rowsCleared += clearedRows;
+    level = Math.floor(rowsCleared / 10) + 1;
+    dropSpeed = 750 - (level - 1) * 75;
+  }
+}
+
+function merge(arena, player) {
+  player.matrix.forEach((row, y) => {
+    row.forEach((value, x) => {
+      if (value !== 0) {
+        arena[y + player.pos.y][x + player.pos.x] = value;
+      }
+    });
+  });
+}
+
+function playerReset() {
+  const piece = tetrominoes[Math.floor(Math.random() * tetrominoes.length)];
+  player.matrix = piece;
+  player.pos = {x: Math.floor(canvas.width / 2 - piece[0].length / 2), y: 0};
+  if (collide(arena, player)) {
+    arena.forEach(row => row.fill(0));
+    updateScore();
+  }
+}
+
+function control(e) {
+  if (e.key === 'ArrowLeft') {
+    playerMove(-1);
+  } else if (e.key === 'ArrowRight') {
+    playerMove(1);
+  } else if (e.key === 'ArrowDown') {
+    playerDrop();
+  } else if (e.key === 'ArrowUp') {
+    playerRotate(1);
+  } else if (e.key === ' ') {
+    playerDrop();
+  } else if (e.key === 'p' || e.key === 'P') {
+    pauseGame();
+  } else if (e.key === 'Enter' && gamePaused) {
+    restartGame();
+  }
+}
+
+function pauseGame() {
+  gamePaused = !gamePaused;
+  if (gamePaused) {
+    clearInterval(dropInterval);
+  } else {
+    dropInterval = setInterval(update, 1000 / dropSpeed);
+  }
+}
+
+function restartGame() {
+  gamePaused = false;
+  arena.forEach(row => row.fill(0));
+  playerReset();
+  rowsCleared = 0;
+  level = 1;
+  dropSpeed = 750;
+  updateScore();
+  dropInterval = setInterval(update, 1000 / dropSpeed);
+}
+
+document.addEventListener('keydown', control);
+let dropCounter = 0;
+let dropSpeed = 750;
+let lastTime = 0;
+let gamePaused = false;
+let gameBoard = gameBoard.getContext('2d');
+let gameArea = null;
+let gamePiece = null;
+let gamePieceShape = null;
+let gamePieceRotation = 0;
+let gamePieceColor = 0;
+let gameScore = 0;
+let gameLevel = 1;
+let gameLevelMultiplier = 1;
+let gameLinesCleared = 0;
+const gameKeys = ['ArrowLeft', 'ArrowRight', 'ArrowDown', 'ArrowUp', ' ', 'p', 'P', 'Enter'];
+
+let gameAreaWidth = 10;
+let gameAreaHeight = 20;
+let gameAreaGrid = new Array(gameAreaWidth * gameAreaHeight).fill(0);
+
+const gameAreaCanvas = document.createElement('canvas');
+gameAreaCanvas.width = gameAreaWidth * scale;
+gameAreaCanvas.height = gameAreaHeight * scale;
+gameArea = gameAreaCanvas.getContext('2d');
+
+function createGamePiece() {
+  gamePieceShape = Math.floor(Math.random() * 7);
+  gamePieceRotation = 0;
+  gamePieceColor = gamePieceShape + 1;
+  gamePiece.x = Math.floor(gameAreaWidth / 2) - 2;
+  gamePiece.y = 0;
+}
+
+function drawGamePiece() {
+  let gamePieceMatrix = tetrominoes[gamePieceShape][gamePieceRotation];
+  gamePieceMatrix.forEach((row, y) => {
+    row.forEach((value, x) => {
+      if (value) {
+        gameArea.fillStyle = colors[gamePieceColor];
+        gameArea.fillRect(x + gamePiece.x, y + gamePiece.y, scale, scale);
+      }
+    });
+  });
+}
+
+function clearGamePiece() {
+  let gamePieceMatrix = tetrominoes[gamePieceShape][gamePieceRotation];
+  gamePieceMatrix.forEach((row, y) => {
+    row.forEach((value, x) => {
+      if (value) {
+        gameArea.fillStyle = '#111';
+        gameArea.fillRect(x + gamePiece.x, y + gamePiece.y, scale, scale);
+      }
+    });
+  });
+}
+
+function moveGamePiece(direction) {
+  gamePiece.x += direction;
+  if (collide(gameAreaGrid, gamePiece)) {
+    gamePiece.x -= direction;
+  }
+}
+
+function rotateGamePiece() {
+  gamePieceRotation = (gamePieceRotation + 1) % tetrominoes[gamePieceShape].length;
+  if (collide(gameAreaGrid, gamePiece)) {
+    gamePieceRotation = (gamePieceRotation - 1 + tetrominoes[gamePieceShape].length) % tetrominoes[gamePieceShape].length;
+  }
+}
+
+function dropGamePiece() {
+  gamePiece.y++;
+  if (collide(gameAreaGrid, gamePiece)) {
+    gamePiece.y--;
+    merge(gameAreaGrid, gamePiece);
+    clearCompleteRows(gameAreaGrid);
+    createGamePiece();
+    if (collide(gameAreaGrid, gamePiece)) {
+      gamePauses = true;
+      gameArea.fillStyle = '#ff0000';
+      gameArea.font = `60px monospace`;
+      gameArea.fillText('GAME OVER', gameArea.width / 2 - 150, gameArea.height / 2);
+    }
+  }
+}
+
+function pauseGame() {
+  gamePaused = !gamePaused;
+  if (gamePaused) {
+    clearInterval(gameDropInterval);
+  } else {
+    gameDropInterval = setInterval(gameLoop, gameDropSpeed);
+  }
+}
+
+function restartGame() {
+  gamePaused = false;
+  gameAreaGrid.forEach((row, index) => gameAreaGrid[index] = new Array(gameAreaWidth).fill(0));
+  createGamePiece();
+  gameScore = 0;
+  gameLevel = 1;
+  gameLevelMultiplier = 1;
+  gameLinesCleared = 0;
+  gameArea.fillStyle = '#111';
+  gameArea.fillRect(0, 0, gameArea.width, gameArea.height);
+  drawGamePiece();
+  gameDropInterval = setInterval(gameLoop, gameDropSpeed);
+}
+
+function gameLoop(time = 0) {
+  if (gamePaused) return;
+  const deltaTime = time - lastTime;
+  lastTime = time;
+  dropCounter += deltaTime;
+  if (dropCounter >= gameDropSpeed) {
+    dropGamePiece();
+  }
+  drawGamePiece();
+  drawGameStats();
+  requestAnimationFrame(gameLoop);
+}
+
+function clearCompleteRows(grid) {
+  let linesCleared = 0;
+  grid.forEach((row, y) => {
+    if (row.every(cell => cell !== 0)) {
+      grid.splice(y, 1);
+      grid.unshift(Array(gameAreaWidth).fill(0));
+      y--;
+      linesCleared++;
+    }
+  });
+  if (linesCleared > 0) {
+    gameLinesCleared += linesCleared;
+    gameLevel = Math.floor(gameLinesCleared / 10) + 1;
+    gameDropSpeed = 750 - (gameLevel - 1) * 75;
+  }
+}
+
+function merge(grid, piece) {
+  let gridPieceMatrix = tetrominoes[piece.Shape][gamePieceRotation];
+  gridPieceMatrix.forEach((row, y) => {
+    row.forEach((value, x) => {
+      if (value) {
+        grid[y + piece.y][x + piece.x] = piece.Color;
+      }
+    });
+  });
+}
+
+function drawGameStats() {
+  gameArea.fillStyle = '#fff';
+  gameArea.font = '14px monospace';
+  gameArea.fillText('Score: ' + gameScore, 10, 20);
+  gameArea.fillText('Level: ' + gameLevel, 10, 40);
+  gameArea.fillText('Lines: ' + gameLinesCleared, 10, 60);
+}
+
+gameDropInterval = setInterval(gameLoop, gameDropSpeed);
+createGamePiece();
+drawGamePiece();
+document.addEventListener('keydown', control);
+</script>
+</body>
+</html>

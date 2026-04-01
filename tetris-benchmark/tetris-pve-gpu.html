@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JavaScript Tetris</title>
+<style>
+  body { margin: 0; font-family: monospace; }
+  #tetris { position: relative; margin: 0 auto; width: 300px; height: 600px; border: 1px solid #000; }
+  #tetris .cell { width: 30px; height: 30px; border: 1px solid #fff; float: left; }
+  #score, #level, #next { position: absolute; }
+  #score { top: 10px; left: 310px; }
+  #level { top: 50px; left: 310px; }
+  #next { bottom: 10px; right: 10px; }
+</style>
+</head>
+<body>
+
+<div id="tetris"></div>
+<div id="score">Score: 0</div>
+<div id="level">Level: 1</div>
+<div id="next">Next: </div>
+
+<script>
+  const tetris = document.getElementById('tetris');
+  let width = 10, height = 20, board = new Array(height).fill().map(() => new Array(width).fill(0));
+  let score = 0, level = 1, nextPiece = Math.floor(Math.random() * 7), paused = false;
+  let dropInterval = 500, dropCounter = 0;
+
+  const tetrominoes = [
+    [[1,1,1,1]],
+    [[2,2],[2,2]],
+    [[0,3,0],[3,3,3]],
+    [[0,4,4],[4,4,0]],
+    [[5,5,0],[0,5,5]],
+    [[6,6],[6,6]],
+    [[7,0],[7,7]]
+  ];
+  const colors = ['red', 'yellow', 'blue', 'green', 'pink', 'cyan', 'white'];
+
+  function draw() {
+    tetris.innerHTML = '';
+    board.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        const div = document.createElement('div');
+        div.className = 'cell';
+        if (cell) {
+          div.style.backgroundColor = colors[board[y][x] - 1];
+        }
+        tetris.appendChild(div);
+      });
+    });
+  }
+
+  function drawScore() {
+    document.getElementById('score').textContent = 'Score: ' + score;
+  }
+
+  function drawLevel() {
+    document.getElementById('level').textContent = 'Level: ' + level;
+  }
+
+  function drawNext() {
+    const next = document.getElementById('next');
+    next.innerHTML = '';
+    tetrominoes[nextPiece].forEach(row => {
+      row.forEach(cell => {
+        const div = document.createElement('div');
+        div.className = 'cell';
+        if (cell) {
+          div.style.backgroundColor = colors[nextPiece];
+        }
+        next.appendChild(div);
+      });
+    });
+  }
+
+  function clearLines() {
+    let fullLines = [];
+    board.forEach((row, y) => {
+      if (row.every(cell => cell)) {
+        fullLines.push(y);
+      }
+    });
+    if (fullLines.length > 0) {
+      board = board.filter((row, y) => !fullLines.includes(y));
+      board.unshift(new Array(width).fill(0));
+      score += fullLines.length * 10;
+      level = Math.floor(score / 1000) + 1;
+      dropInterval = 500 - level * 50;
+      draw();
+      drawScore();
+      drawLevel();
+    }
+  }
+
+  function merge(tetromino, offsetX, offsetY) {
+    tetromino.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        if (cell) {
+          board[offsetY + y][offsetX + x] = nextPiece + 1;
+        }
+      });
+    });
+  }
+
+  function rotate(tetromino) {
+    const centerX = Math.floor(tetromino[0].length / 2);
+    const centerY = Math.floor(tetromino.length / 2);
+    const newTetromino = new Array(tetromino[0].length).fill().map(() => new Array(tetromino.length));
+    tetromino.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        if (cell) {
+          newTetromino[centerX - (y - centerY)][centerY - (x - centerX)] = cell;
+        }
+      });
+    });
+    return newTetromino;
+  }
+
+  function isValidMove(tetromino, offsetX, offsetY) {
+    return tetromino.every((row, y) => {
+      return row.every((cell, x) => {
+        if (cell) {
+          const newX = offsetX + x;
+          const newY = offsetY + y;
+          return newX >= 0 && newX < width && newY >= 0 && newY < height && !board[newY][newX];
+        }
+        return true;
+      });
+    });
+  }
+
+  function handleKeys(event) {
+    if (event.keyCode === 37) { // Left
+      if (isValidMove(currentTetromino, -1, 0)) moveCurrentTetromino(-1, 0);
+    } else if (event.keyCode === 38) { // Up
+      if (isValidMove(rotate(currentTetromino), 0, 0)) currentTetromino = rotate(currentTetromino);
+    } else if (event.keyCode === 39) { // Right
+      if (isValidMove(currentTetromino, 1, 0)) moveCurrentTetromino(1, 0);
+    } else if (event.keyCode === 40) { // Down
+      if (isValidMove(currentTetromino, 0, 1)) moveCurrentTetromino(0, 1);
+    } else if (event.keyCode === 32) { // Space
+      while (isValidMove(currentTetromino, 0, 1)) moveCurrentTetromino(0, 1);
+    } else if (event.keyCode === 80) { // P
+      paused = !paused;
+    }
+  }
+
+  function moveCurrentTetromino(offsetX, offsetY) {
+    currentTetromino.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        if (cell) {
+          board[currentY + y][currentX + x] = 0;
+        }
+      });
+    });
+    currentX += offsetX;
+    currentY += offsetY;
+    currentTetromino.forEach((row, y) => {
+      row.forEach((cell, x) => {
+        if (cell) {
+          board[currentY + y][currentX + x] = nextPiece + 1;
+        }
+      });
+    });
+    if (!isValidMove(currentTetromino, 0, 1)) {
+      currentTetromino.forEach((row, y) => {
+        row.forEach((cell, x) => {
+          if (cell) {
+            board[currentY + y][currentX + x] = 0;
+          }
+        });
+      });
+      currentX = Math.floor(width / 2) - Math.floor(currentTetromino[0].length / 2);
+      currentY = 0;
+      nextPiece = Math.floor(Math.random() * 7);
+      if (!isValidMove(currentTetromino, 0, 0)) {
+        alert('Game Over!');
+        resetGame();
+      } else {
+        draw();
+        drawScore();
+        drawLevel();
+        drawNext();
+      }
+    }
+  }
+
+  function resetGame() {
+    board = new Array(height).fill().map(() => new Array(width).fill(0));
+    score = 0;
+    level = 1;
+    dropInterval = 500;
+    dropCounter = 0;
+    currentTetromino = tetrominoes[nextPiece];
+    currentX = Math.floor(width / 2) - Math.floor(currentTetromino[0].length / 2);
+    currentY = 0;
+    nextPiece = Math.floor(Math.random() * 7);
+    paused = false;
+    moveCurrentTetromino(0, 0);
+  }
+
+  function gameLoop() {
+    if (!paused) {
+      dropCounter++;
+      if (dropCounter % (dropInterval / level) === 0) {
+        moveCurrentTetromino(0, 1);
+      }
+      clearLines();
+      draw();
+    }
+    requestAnimationFrame(gameLoop);
+  }
+
+  let currentTetromino = tetrominoes[nextPiece];
+  let currentX = Math.floor(width / 2) - Math.floor(currentTetromino[0].length / 2);
+  let currentY = 0;
+  document.addEventListener('keydown', handleKeys);
+  resetGame();
+  gameLoop();
+</script>
+
+</body>
+</html>

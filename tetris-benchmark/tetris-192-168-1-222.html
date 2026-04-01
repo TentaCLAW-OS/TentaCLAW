@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris</title>
+    <style>
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        canvas { border: 1px solid black; }
+        .scoreboard { position: absolute; top: 10px; left: 10px; }
+    </style>
+</head>
+<body>
+    <div class="scoreboard">
+        <span id="score">0</span> <span id="level">1</span>
+    </div>
+    <canvas id="tetris"></canvas>
+    <script>
+        const canvas = document.getElementById('tetris');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 300;
+        canvas.height = 600;
+        const colors = ['blue', 'yellow', 'purple', 'cyan', 'red', 'orange', 'green'];
+        const board = Array.from({ length: 22 }, () => Array(10).fill(0));
+        let score = 0;
+        let level = 1;
+        let intervalId;
+        let currentPiece = generatePiece();
+        let nextPiece = generatePiece();
+        let gameover = false;
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBoard();
+            drawPiece(currentPiece, true);
+            drawPiece(nextPiece, false);
+            if (gameover) {
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = 'white';
+                ctx.font = '50px Arial';
+                ctx.fillText('GAME OVER', 50, 300);
+                ctx.font = '20px Arial';
+                ctx.fillText('Press Enter to Restart', 70, 350);
+            }
+        }
+
+        function drawBoard() {
+            ctx.fillStyle = 'grey';
+            ctx.fillRect(0, 200, canvas.width, 400);
+            ctx.fillStyle = 'black';
+            for (let y = 0; y < 20; y++) {
+                for (let x = 0; x < 10; x++) {
+                    if (board[y][x]) {
+                        ctx.fillStyle = colors[board[y][x] - 1];
+                        ctx.fillRect(x * 30 + 1, y * 30 + 200, 30, 30);
+                    }
+                }
+            }
+        }
+
+        function drawPiece(piece, isCurrent) {
+            piece.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        ctx.fillStyle = colors[piece.type - 1];
+                        ctx.fillRect((x + piece.x) * 30 + 1, (y + piece.y) * 30 + 200, 30, 30);
+                    }
+                });
+            });
+        }
+
+        function generatePiece() {
+            const types = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            const piece = {
+                type: type,
+                x: 4,
+                y: 0,
+                rotation: 0,
+                shape: [
+                    [1, 1, 1, 1],
+                    [0, 1, 0, 0],
+                    [0, 0, 0, 0],
+                    [0, 0, 0, 0]
+                ]
+            };
+            switch (type) {
+                case 'O':
+                    piece.shape = [
+                        [1, 1],
+                        [1, 1]
+                    ];
+                    break;
+                case 'I':
+                    piece.shape = [
+                        [0, 0, 0, 0],
+                        [1, 1, 1, 1],
+                        [0, 0, 0, 0],
+                        [0, 0, 0, 0]
+                    ];
+                    break;
+                case 'T':
+                    piece.shape = [
+                        [0, 1, 0],
+                        [1, 1, 1],
+                        [0, 0, 0]
+                    ];
+                    break;
+                case 'S':
+                    piece.shape = [
+                        [0, 1, 1],
+                        [1, 1, 0],
+                        [0, 0, 0]
+                    ];
+                    break;
+                case 'Z':
+                    piece.shape = [
+                        [1, 1, 0],
+                        [0, 1, 1],
+                        [0, 0, 0]
+                    ];
+                    break;
+                case 'J':
+                    piece.shape = [
+                        [1, 0, 0],
+                        [1, 1, 1],
+                        [0, 0, 0]
+                    ];
+                    break;
+                case 'L':
+                    piece.shape = [
+                        [0, 0, 1],
+                        [1, 1, 1],
+                        [0, 0, 0]
+                    ];
+                    break;
+            }
+            return piece;
+        }
+
+        function rotatePiece(piece) {
+            const shape = piece.shape;
+            const width = shape[0].length;
+            const height = shape.length;
+            const newShape = Array.from({ length: width }, () => Array(height).fill(0));
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    newShape[x][height - 1 - y] = shape[y][x];
+                }
+            }
+            return newShape;
+        }
+
+        function checkCollision(piece) {
+            for (let y = 0; y < piece.shape.length; y++) {
+                for (let x = 0; x < piece.shape[y].length; x++) {
+                    if (piece.shape[y][x]) {
+                        const newX = piece.x + x;
+                        const newY = piece.y + y;
+                        if (newX < 0 || newX >= 10 || newY >= 20 || board[newY][newX]) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function clearLines() {
+            for (let y = 19; y > 0; y--) {
+                let clear = true;
+                for (let x = 0; x < 10; x++) {
+                    if (!board[y][x]) {
+                        clear = false;
+                        break;
+                    }
+                }
+                if (clear) {
+                    board.splice(y, 1);
+                    board.unshift(Array(10).fill(0));
+                    score += 10 * level;
+                }
+            }
+        }
+
+        function movePiece(piece, dx, dy) {
+            if (!checkCollision({ ...piece, x: piece.x + dx, y: piece.y + dy })) {
+                piece.x += dx;
+                piece.y += dy;
+            }
+        }
+
+        function hardDrop() {
+            while (!checkCollision({ ...currentPiece, y: currentPiece.y + 1 })) {
+                currentPiece.y++;
+            }
+            clearLines();
+            currentPiece = nextPiece;
+            nextPiece = generatePiece();
+            if (checkCollision(currentPiece)) {
+                gameover = true;
+            }
+        }
+
+        function softDrop() {
+            movePiece(currentPiece, 0, 1);
+            draw();
+        }
+
+        function pause() {
+            clearInterval(intervalId);
+            intervalId = undefined;
+        }
+
+        function resume() {
+            intervalId = setInterval(() => {
+                if (!checkCollision({ ...currentPiece, y: currentPiece.y + 1 })) {
+                    movePiece(currentPiece, 0, 1);
+                } else {
+                    clearLines();
+                    currentPiece = nextPiece;
+                    nextPiece = generatePiece();
+                    if (checkCollision(currentPiece)) {
+                        gameover = true;
+                    }
+                }
+                draw();
+            }, 1000 / (10 + level));
+        }
+
+        function handleKey(event) {
+            if (gameover) {
+                if (event.key === 'Enter') {
+                    location.reload();
+                }
+                return;
+            }
+            switch (event.key) {
+                case 'ArrowLeft':
+                    movePiece(currentPiece, -1, 0);
+                    break;
+                case 'ArrowRight':
+                    movePiece(currentPiece, 1, 0);
+                    break;
+                case 'ArrowDown':
+                    softDrop();
+                    break;
+                case 'ArrowUp':
+                    currentPiece.rotation++;
+                    if (checkCollision(currentPiece)) {
+                        currentPiece.rotation--;
+                    }
+                    break;
+                case ' ':
+                    hardDrop();
+                    break;
+                case 'p':
+                    gameover ? resume() : pause();
+                    break;
+            }
+            draw();
+        }
+
+        document.addEventListener('keydown', handleKey);
+
+        function startGame() {
+            intervalId = setInterval(() => {
+                if (!checkCollision({ ...currentPiece, y: currentPiece.y + 1 })) {
+                    movePiece(currentPiece, 0, 1);
+                } else {
+                    clearLines();
+                    currentPiece = nextPiece;
+                    nextPiece = generatePiece();
+                    if (checkCollision(currentPiece)) {
+                        gameover = true;
+                    }
+                }
+                draw();
+            }, 1000 / (10 + level));
+        }
+
+        startGame();
+    </script>
+</body>
+</html>
