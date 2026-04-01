@@ -450,9 +450,12 @@ clone_repo() {
             fi
         fi
 
-        git clone --depth 1 -b master "$REPO_URL" "$INSTALL_DIR" 2>/dev/null || {
-            die "Failed to clone repository.\n  Check your internet connection and try again.\n  Or: git clone $REPO_URL \"$INSTALL_DIR\""
-        }
+        if ! git clone --depth 1 -b master "$REPO_URL" "$INSTALL_DIR" 2>&1; then
+            warn "Branch-specific clone failed, trying default branch..."
+            git clone --depth 1 "$REPO_URL" "$INSTALL_DIR" 2>&1 || {
+                die "Failed to clone repository.\n  Check your internet connection and try again.\n  Or: git clone $REPO_URL \"$INSTALL_DIR\""
+            }
+        fi
         ok "Repository cloned to $INSTALL_DIR"
     fi
 

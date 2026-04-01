@@ -57,9 +57,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     let tokenCount = 0;
 
     try {
+      const token = localStorage.getItem('tentaclaw_token');
       const res = await fetch('/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           model,
           stream: true,

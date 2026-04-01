@@ -1232,6 +1232,512 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
     });
 }
 
+// =============================================================================
+// Code Agent — Tool Definitions
+// =============================================================================
+
+const CODE_AGENT_TOOLS = [
+    {
+        type: 'function',
+        function: {
+            name: 'read_file',
+            description: 'Read the full contents of a file. Use before editing.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'File path (relative to cwd or absolute)' },
+                },
+                required: ['path'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'write_file',
+            description: 'Write content to a file, creating or overwriting it.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'File path to write' },
+                    content: { type: 'string', description: 'Full file content to write' },
+                },
+                required: ['path', 'content'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'list_dir',
+            description: 'List files and directories.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'Directory path (default: cwd)' },
+                },
+                required: [],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'run_shell',
+            description: 'Execute a shell command. User must approve each command. Use for builds, tests, installs.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    command: { type: 'string', description: 'Shell command to run' },
+                },
+                required: ['command'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'search_files',
+            description: 'Search for a text pattern across files in a directory.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    pattern: { type: 'string', description: 'Text pattern to search for' },
+                    directory: { type: 'string', description: 'Directory to search (default: cwd)' },
+                    file_pattern: { type: 'string', description: 'Glob for file types, e.g. "*.ts"' },
+                },
+                required: ['pattern'],
+            },
+        },
+    },
+];
+
+// =============================================================================
+// Code Agent — Helpers
+// =============================================================================
+
+function summarizeToolArgs(argsJson: string): string {
+    try {
+        const args = JSON.parse(argsJson) as Record<string, unknown>;
+        const vals = Object.values(args).map(v => {
+            const s = String(v);
+            return s.length > 70 ? s.slice(0, 70) + '\u2026' : s;
+        });
+        return C.dim('(' + vals.join(', ') + ')');
+    } catch {
+        return C.dim('(' + argsJson.slice(0, 80) + ')');
+    }
+}
+
+interface AgentToolCall {
+    id: string;
+    name: string;
+    args: string;
+}
+
+async function executeCodeTool(
+    call: AgentToolCall,
+    rl: import('readline').Interface,
+    autoApprove: boolean
+): Promise<string> {
+    let args: Record<string, string>;
+    try {
+        args = JSON.parse(call.args || '{}') as Record<string, string>;
+    } catch {
+        return 'Error: could not parse tool arguments';
+    }
+
+    const { execFileSync } = await import('child_process');
+
+    switch (call.name) {
+        case 'read_file': {
+            const filePath = path.resolve(args['path'] || '');
+            try {
+                const content = fs.readFileSync(filePath, 'utf8');
+                const totalLines = content.split('\n').length;
+                return content.length > 12000
+                    ? content.slice(0, 12000) + `\n...(truncated — ${totalLines} total lines)`
+                    : content;
+            } catch (e) {
+                return `Error reading: ${e instanceof Error ? e.message : String(e)}`;
+            }
+        }
+
+        case 'write_file': {
+            const filePath = path.resolve(args['path'] || '');
+            const content = args['content'] || '';
+            if (!autoApprove) {
+                const existing = fs.existsSync(filePath);
+                console.log('');
+                console.log('  ' + C.yellow(`\u26A1 ${existing ? 'Overwrite' : 'Create'}: ${C.white(filePath)}`));
+                console.log('  ' + C.dim(`   ${content.split('\n').length} lines`));
+                const ok = await new Promise<string>(res => rl.question('  ' + C.dim('  Approve? [y/N] '), res));
+                if (!ok.trim().toLowerCase().startsWith('y')) return 'Write cancelled.';
+            }
+            try {
+                fs.mkdirSync(path.dirname(filePath), { recursive: true });
+                fs.writeFileSync(filePath, content, 'utf8');
+                return `Written: ${filePath} (${content.split('\n').length} lines)`;
+            } catch (e) {
+                return `Error writing: ${e instanceof Error ? e.message : String(e)}`;
+            }
+        }
+
+        case 'list_dir': {
+            const dirPath = path.resolve(args['path'] || '.');
+            try {
+                const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+                const lines = entries
+                    .sort((a, b) => {
+                        if (a.isDirectory() !== b.isDirectory()) return a.isDirectory() ? -1 : 1;
+                        return a.name.localeCompare(b.name);
+                    })
+                    .map(e => (e.isDirectory() ? '\uD83D\uDCC1 ' : '   ') + e.name + (e.isDirectory() ? '/' : ''));
+                return lines.join('\n') || '(empty)';
+            } catch (e) {
+                return `Error: ${e instanceof Error ? e.message : String(e)}`;
+            }
+        }
+
+        case 'run_shell': {
+            // run_shell intentionally uses shell execution — this is the tool's purpose.
+            // User must approve each command before it runs (unless --yes flag is set).
+            const command = args['command'] || '';
+            if (!command) return 'Error: no command provided';
+            if (!autoApprove) {
+                console.log('');
+                console.log('  ' + C.yellow('\u26A1 Run shell command:'));
+                console.log('  ' + C.cyan(`  $ ${command}`));
+                const ok = await new Promise<string>(res => rl.question('  ' + C.dim('  Approve? [y/N] '), res));
+                if (!ok.trim().toLowerCase().startsWith('y')) return 'Command cancelled.';
+            } else {
+                console.log('  ' + C.dim(`  $ ${command}`));
+            }
+            // shell: true is intentional here — run_shell needs pipes, redirects, expansions.
+            // The command is AI-generated and shown to the user for approval.
+            const { execSync } = await import('child_process');
+            try {
+                const out = execSync(command, {
+                    cwd: process.cwd(),
+                    encoding: 'utf8',
+                    timeout: 30000,
+                    maxBuffer: 2 * 1024 * 1024,
+                });
+                return ((out as string) || '(no output)').slice(0, 8000);
+            } catch (e: unknown) {
+                const err = e as { status?: number; stdout?: string; stderr?: string; message?: string };
+                const combined = ((err.stdout || '') + (err.stderr || '')).trim();
+                return combined
+                    ? `Exit ${err.status ?? 1}:\n${combined}`.slice(0, 8000)
+                    : `Failed: ${err.message || 'unknown error'}`;
+            }
+        }
+
+        case 'search_files': {
+            const pattern = args['pattern'] || '';
+            const dir = path.resolve(args['directory'] || '.');
+            const glob = args['file_pattern'] || '*';
+            if (!pattern) return 'Error: pattern required';
+            try {
+                // Use execFileSync with arg arrays to avoid shell injection
+                const filesRaw = execFileSync('grep', ['-rl', pattern, dir, `--include=${glob}`], {
+                    encoding: 'utf8',
+                    timeout: 10000,
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                }).trim();
+                if (!filesRaw) return 'No matches found.';
+                const fileList = filesRaw.split('\n').slice(0, 5);
+                const results: string[] = [];
+                for (const f of fileList) {
+                    const hits = execFileSync('grep', ['-n', pattern, f], {
+                        encoding: 'utf8',
+                        timeout: 5000,
+                        stdio: ['pipe', 'pipe', 'pipe'],
+                    }).trim().split('\n').slice(0, 5).join('\n');
+                    results.push(`${f}:\n${hits}`);
+                }
+                return results.join('\n\n');
+            } catch (e: unknown) {
+                const err = e as { status?: number; stdout?: string };
+                // grep exits 1 when no matches found
+                if (err.status === 1) return 'No matches found.';
+                if (err.stdout) return err.stdout.trim().slice(0, 4000);
+                return `Search error: ${e instanceof Error ? e.message : String(e)}`;
+            }
+        }
+
+        default:
+            return `Unknown tool: ${call.name}`;
+    }
+}
+
+// =============================================================================
+// Code Agent — Main Command
+// =============================================================================
+
+async function cmdCode(gateway: string, flags: Record<string, string>): Promise<void> {
+    let autoApprove = flags['yes'] === 'true' || flags['y'] === 'true';
+
+    // Resolve model — pick from flag or auto-detect from cluster
+    let model = flags['model'] || '';
+    if (!model) {
+        try {
+            const modelsResp = await apiGet(gateway, '/v1/models') as { data?: Array<{ id: string }> };
+            const list = modelsResp?.data || [];
+            const preferred = list.find(m => /instruct|chat|code/i.test(m.id)) || list[0];
+            model = preferred?.id || 'llama3.1:8b';
+        } catch {
+            model = 'llama3.1:8b';
+        }
+    }
+
+    bootSplash();
+    console.log('  ' + C.purple(C.bold('Code Agent')) + C.dim(` \u2014 model: ${model}`));
+    console.log('  ' + C.dim(`cwd: ${process.cwd()}`));
+    console.log('  ' + C.dim('Commands: /quit  /clear  /model <name>  /auto  /help'));
+    console.log('  ' + C.dim(autoApprove ? 'Writes & shell: \u2713 auto-approved' : 'Writes & shell: will ask for approval'));
+    console.log('');
+
+    // Build system prompt
+    let systemPrompt = `You are CLAWtopus Code Agent — an expert AI software engineer running inside TentaCLAW OS.
+
+You have tools to read files, write files, list directories, run shell commands, and search codebases. Use them proactively — don't ask the user to run commands for you.
+
+Current working directory: ${process.cwd()}
+Platform: ${process.platform}
+Node.js: ${process.version}
+
+Approach:
+- Be direct and action-oriented. Read files before editing them.
+- Provide complete file content when writing (not diffs or snippets).
+- Run tests or builds after making changes when appropriate.
+- Briefly explain what you're doing, then do it.`;
+
+    // Load workspace context files if present
+    for (const cf of ['AGENTS.md', 'CLAUDE.md', '.clawcode']) {
+        const cfPath = path.join(process.cwd(), cf);
+        if (fs.existsSync(cfPath)) {
+            try {
+                const c = fs.readFileSync(cfPath, 'utf8');
+                if (c.length < 5000) {
+                    systemPrompt += `\n\n--- ${cf} ---\n${c}`;
+                    console.log('  ' + C.green(`\u2714 Loaded ${cf}`));
+                }
+            } catch { /* skip unreadable */ }
+        }
+    }
+    console.log('');
+
+    type AgentMessage = {
+        role: string;
+        content: string | null;
+        tool_calls?: unknown;
+        tool_call_id?: string;
+        name?: string;
+    };
+    const messages: AgentMessage[] = [{ role: 'system', content: systemPrompt }];
+
+    const readline = await import('readline');
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+        prompt: C.teal('\n  \u276F '),
+    });
+
+    const runAgentLoop = async (userMessage: string): Promise<void> => {
+        messages.push({ role: 'user', content: userMessage });
+
+        for (let iter = 0; iter < 20; iter++) {
+            const url = gateway.replace(/\/+$/, '') + '/v1/chat/completions';
+            const bodyStr = JSON.stringify({
+                model,
+                messages,
+                tools: CODE_AGENT_TOOLS,
+                tool_choice: 'auto',
+                stream: true,
+            });
+
+            let fullContent = '';
+            const tcAcc: Record<number, { id: string; name: string; args: string }> = {};
+
+            process.stdout.write('\n  ' + C.purple('\u25CE '));
+
+            // Stream the completion
+            await new Promise<void>((resolve, reject) => {
+                const parsed = new URL(url);
+                const isHttps = parsed.protocol === 'https:';
+                const lib = isHttps ? https : http;
+                const req = lib.request({
+                    hostname: parsed.hostname,
+                    port: Number(parsed.port) || (isHttps ? 443 : 80),
+                    path: parsed.pathname,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(bodyStr),
+                    },
+                }, (res) => {
+                    let buf = '';
+                    res.on('data', (chunk: Buffer) => {
+                        buf += chunk.toString();
+                        const lines = buf.split('\n');
+                        buf = lines.pop() ?? '';
+                        for (const line of lines) {
+                            if (!line.startsWith('data: ')) continue;
+                            const raw = line.slice(6).trim();
+                            if (raw === '[DONE]') continue;
+                            try {
+                                const ev = JSON.parse(raw) as {
+                                    choices?: Array<{
+                                        delta?: {
+                                            content?: string;
+                                            tool_calls?: Array<{
+                                                index?: number;
+                                                id?: string;
+                                                function?: { name?: string; arguments?: string };
+                                            }>;
+                                        };
+                                    }>;
+                                };
+                                const delta = ev.choices?.[0]?.delta;
+                                if (!delta) continue;
+                                if (delta.content) {
+                                    process.stdout.write(delta.content);
+                                    fullContent += delta.content;
+                                }
+                                if (delta.tool_calls) {
+                                    for (const tc of delta.tool_calls) {
+                                        const idx = tc.index ?? 0;
+                                        if (!tcAcc[idx]) tcAcc[idx] = { id: '', name: '', args: '' };
+                                        if (tc.id) tcAcc[idx].id += tc.id;
+                                        if (tc.function?.name) tcAcc[idx].name += tc.function.name;
+                                        if (tc.function?.arguments) tcAcc[idx].args += tc.function.arguments;
+                                    }
+                                }
+                            } catch { /* skip malformed SSE */ }
+                        }
+                    });
+                    res.on('end', resolve);
+                    res.on('error', reject);
+                });
+                req.on('error', reject);
+                req.write(bodyStr);
+                req.end();
+            });
+
+            const toolCalls = Object.values(tcAcc);
+
+            // No tool calls — final response
+            if (toolCalls.length === 0) {
+                if (fullContent) messages.push({ role: 'assistant', content: fullContent });
+                console.log('');
+                return;
+            }
+
+            // Streamed some text then made tool calls
+            console.log('');
+            messages.push({
+                role: 'assistant',
+                content: fullContent || null,
+                tool_calls: toolCalls.map(tc => ({
+                    id: tc.id || `call_${Date.now()}`,
+                    type: 'function',
+                    function: { name: tc.name, arguments: tc.args },
+                })),
+            });
+
+            // Execute each tool and feed results back
+            for (const tc of toolCalls) {
+                const tcId = tc.id || `call_${Date.now()}`;
+                console.log('');
+                console.log('  ' + C.cyan(`\u2699  ${tc.name}`) + '  ' + summarizeToolArgs(tc.args));
+
+                const result = await executeCodeTool(
+                    { id: tcId, name: tc.name, args: tc.args },
+                    rl,
+                    autoApprove
+                );
+
+                // Show truncated result preview
+                const lines = result.split('\n');
+                const preview = lines.slice(0, 25);
+                for (const l of preview) console.log('  ' + C.dim('\u2502 ') + l);
+                if (lines.length > 25) console.log('  ' + C.dim(`\u2502 \u2026(${lines.length - 25} more lines)`));
+
+                messages.push({
+                    role: 'tool',
+                    tool_call_id: tcId,
+                    name: tc.name,
+                    content: result,
+                });
+            }
+            // Loop continues — model will respond to tool results
+        }
+
+        console.log('  ' + C.yellow('\u26A0 Reached maximum iterations.'));
+    };
+
+    rl.prompt();
+
+    rl.on('line', async (line: string) => {
+        const input = line.trim();
+        if (!input) { rl.prompt(); return; }
+
+        // Slash commands
+        if (input.startsWith('/')) {
+            const parts = input.slice(1).split(' ');
+            const cmd = (parts[0] || '').toLowerCase();
+            if (cmd === 'quit' || cmd === 'exit') {
+                console.log('');
+                console.log(C.dim('  CLAWtopus waves goodbye \uD83D\uDC19'));
+                rl.close();
+                process.exit(0);
+            }
+            if (cmd === 'clear') {
+                messages.splice(1); // keep system prompt
+                console.log('  ' + C.green('\u2714 Cleared.'));
+                rl.prompt(); return;
+            }
+            if (cmd === 'model' && parts[1]) {
+                model = parts[1];
+                console.log('  ' + C.green(`\u2714 Model: ${model}`));
+                rl.prompt(); return;
+            }
+            if (cmd === 'auto') {
+                autoApprove = !autoApprove;
+                console.log('  ' + C.green(`\u2714 Auto-approve: ${autoApprove ? 'ON' : 'OFF'}`));
+                rl.prompt(); return;
+            }
+            if (cmd === 'context') {
+                console.log('  ' + C.purple(`${messages.length} messages in context`));
+                rl.prompt(); return;
+            }
+            if (cmd === 'help') {
+                console.log('');
+                console.log('  ' + C.bold('Slash commands:'));
+                console.log('  ' + padRight(C.cyan('/clear'), 22) + 'Clear conversation');
+                console.log('  ' + padRight(C.cyan('/model <name>'), 22) + 'Switch model');
+                console.log('  ' + padRight(C.cyan('/auto'), 22) + 'Toggle auto-approval for writes & shell');
+                console.log('  ' + padRight(C.cyan('/context'), 22) + 'Show message count');
+                console.log('  ' + padRight(C.cyan('/quit'), 22) + 'Exit');
+                console.log('');
+                rl.prompt(); return;
+            }
+            console.log('  ' + C.dim(`Unknown: /${cmd}. Try /help.`));
+            rl.prompt(); return;
+        }
+
+        rl.pause();
+        try {
+            await runAgentLoop(input);
+        } catch (e) {
+            console.log('\n  ' + C.red('Error: ' + (e instanceof Error ? e.message : String(e))));
+        }
+        rl.resume();
+        rl.prompt();
+    });
+}
+
 async function cmdWatchdog(gateway: string, positional: string[]): Promise<void> {
     const sub = positional[0] || 'status';
 
@@ -2263,8 +2769,9 @@ function cmdHelp(): void {
     cmd('flight-sheets', 'List flight sheets');
     console.log('');
 
-    section('CHAT');
-    cmd('chat [--model <m>]', 'Chat with an AI model');
+    section('AGENT');
+    cmd('code [--model <m>] [--yes]', 'AI coding agent — reads, writes files, runs shell');
+    cmd('chat [--model <m>]', 'Simple chat with a model');
     console.log('');
 
     section('MANAGE');
@@ -2310,8 +2817,6 @@ function cmdHelp(): void {
     cmd('alert-rules', 'View alert rules');
     cmd('analytics', 'Inference analytics');
     cmd('audit', 'Audit log');
-    cmd('verify', 'Verify binary checksum');
-    cmd('share-stats', 'Generate shareable cluster card');
     console.log('');
 
     console.log('  ' + C.dim('Use') + ' ' + C.yellow('--gateway <url>') + ' ' + C.dim('to specify a different gateway.'));
@@ -2395,49 +2900,6 @@ async function main(): Promise<void> {
             break;
         }
 
-        case 'quantize': {
-            // Wave 48: One-command quantization pipeline
-            const qModel = parsed.positional[0];
-            if (!qModel) {
-                console.error('');
-                console.error(C.red('  Missing model name'));
-                console.error(C.dim('  Usage: clawtopus quantize <model> [--method fp8|awq|gptq|gguf_q4|gguf_q6|exl2]'));
-                console.error(C.dim('  Example: clawtopus quantize llama3.1:8b --method awq'));
-                console.error('');
-                process.exit(1);
-            }
-            const qMethod = parsed.flags['method'] || 'fp8';
-            const qSamples = parseInt(parsed.flags['samples'] || '512', 10);
-
-            console.log('');
-            console.log('  ' + C.purple(C.bold('MODEL QUANTIZATION')));
-            console.log('  ' + C.dim(`Model: ${qModel} → ${qMethod.toUpperCase()}`));
-            console.log('');
-
-            try {
-                const result = await apiPost(gateway, '/api/v1/quantize', {
-                    model: qModel,
-                    method: qMethod,
-                    calibration_samples: qSamples,
-                }) as any;
-
-                console.log('  ' + C.green('\u2714') + ' Quantization job queued');
-                console.log('  ' + C.dim('Job ID:     ') + C.white(result.job_id || 'N/A'));
-                console.log('  ' + C.dim('Target:     ') + C.white(result.target_node || 'auto'));
-                console.log('  ' + C.dim('Method:     ') + C.white(qMethod.toUpperCase()));
-                if (result.estimated_size_mb) {
-                    console.log('  ' + C.dim('Est. size:  ') + C.white(result.estimated_size_mb + ' MB'));
-                }
-                console.log('  ' + C.dim('Validation: ') + C.white(result.quality_validation ? 'YES (max ' + result.max_quality_loss_pct + '% loss)' : 'NO'));
-                console.log('');
-                console.log('  ' + C.dim('Monitor progress: clawtopus status'));
-            } catch (e) {
-                console.error('  ' + C.red('Quantization failed: ' + (e as Error).message));
-            }
-            console.log('');
-            break;
-        }
-
         case 'command': {
             const nodeId = parsed.positional[0];
             const action = parsed.positional[1];
@@ -2471,6 +2933,11 @@ async function main(): Promise<void> {
 
         case 'chat':
             await cmdChat(gateway, parsed.flags);
+            break;
+
+        case 'code':
+        case 'agent':
+            await cmdCode(gateway, parsed.flags);
             break;
 
         case 'watchdog':
@@ -3258,71 +3725,6 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
         case '-v':
             console.log('clawtopus-cli v' + CLI_VERSION);
             break;
-
-        case 'verify': {
-            // Phase 24: Verify running binary checksum against published checksums
-            const crypto = require('crypto');
-            const fs = require('fs');
-            const path = require('path');
-
-            console.log('');
-            console.log('  ' + C.teal(C.bold('BINARY VERIFICATION')));
-            console.log('');
-
-            // Hash the currently running CLI binary
-            const selfPath = process.argv[1];
-            if (selfPath && fs.existsSync(selfPath)) {
-                const content = fs.readFileSync(selfPath);
-                const hash = crypto.createHash('sha256').update(content).digest('hex');
-                console.log('  ' + C.dim('Binary:   ') + C.white(path.basename(selfPath)));
-                console.log('  ' + C.dim('SHA-256:  ') + C.white(hash));
-                console.log('  ' + C.dim('Version:  ') + C.white('v' + CLI_VERSION));
-                console.log('');
-                console.log('  ' + C.dim('Compare this hash against the published CHECKSUMS.sha256'));
-                console.log('  ' + C.dim('from the GitHub Release to verify integrity.'));
-                console.log('');
-                console.log('  ' + C.dim('Release: https://github.com/TentaCLAW-OS/TentaCLAW/releases/tag/v' + CLI_VERSION));
-            } else {
-                console.log('  ' + C.red('Could not determine binary path for verification.'));
-            }
-            console.log('');
-            break;
-        }
-
-        case 'share-stats':
-        case 'share': {
-            // Phase 116: Generate shareable cluster stats card
-            try {
-                const summary = await apiGet(gateway, '/api/v1/cluster/summary') as any;
-                const nodes = summary.nodes || 0;
-                const gpus = summary.total_gpus || summary.gpus || 0;
-                const vram = Math.round((summary.total_vram_mb || 0) / 1024);
-                const models = summary.loaded_models?.length || summary.models || 0;
-                const health = summary.health_grade || 'A';
-
-                console.log('');
-                const W = 46;
-                console.log(boxTop('TentaCLAW Cluster Card', W));
-                console.log(boxMid('', W));
-                console.log(boxMid(`  Nodes:   ${C.white(String(nodes))}`, W));
-                console.log(boxMid(`  GPUs:    ${C.white(String(gpus))}`, W));
-                console.log(boxMid(`  VRAM:    ${C.white(vram + ' GB')}`, W));
-                console.log(boxMid(`  Models:  ${C.white(String(models))}`, W));
-                console.log(boxMid(`  Health:  ${C.green(health)}`, W));
-                console.log(boxMid('', W));
-                console.log(boxMid(C.dim('tentaclaw.io | MIT License'), W));
-                console.log(boxBot(W));
-                console.log('');
-                console.log('  ' + C.dim('Share your cluster! Copy the text above or screenshot it.'));
-                console.log('');
-            } catch (e) {
-                console.log('');
-                console.log('  ' + C.yellow('Could not fetch cluster stats. Is the gateway running?'));
-                console.log('  ' + C.dim('Start it: cd gateway && npm start'));
-                console.log('');
-            }
-            break;
-        }
 
         case 'backends': {
             const data = await apiGet(gateway, '/api/v1/inference/backends') as { backends: Array<{ node_id: string; hostname: string; backend: { type: string; port?: number; version?: string }; gpu_count: number; total_vram_mb: number; models: string[] }> };

@@ -19,17 +19,7 @@ import { createHash } from 'crypto';
 import type { StatsPayload, GatewayResponse, CommandAction } from '../../shared/types';
 
 const PORT = parseInt(process.env.TENTACLAW_PORT || '8080');
-
-// Security: bind to localhost by default (single-node safe).
-// For cluster mode, pass --bind 0.0.0.0 or set TENTACLAW_HOST=0.0.0.0
-const bindIdx = process.argv.indexOf('--bind');
-const cliHost = bindIdx !== -1 ? process.argv[bindIdx + 1] : undefined;
-const HOST = cliHost || process.env.TENTACLAW_HOST || '127.0.0.1';
-
-if (HOST === '0.0.0.0') {
-    console.warn('[tentaclaw] WARNING: Binding to 0.0.0.0 — gateway is accessible from all network interfaces.');
-    console.warn('[tentaclaw] Ensure authentication is enabled and firewall rules are configured.');
-}
+const HOST = process.env.TENTACLAW_HOST || '0.0.0.0';
 import {
     getDb,
     registerNode,
@@ -157,10 +147,6 @@ import {
     clearAuthFailures,
     updateUserPassword,
     isInitialAdminPassword,
-    createJoinToken,
-    validateJoinToken,
-    listJoinTokens,
-    deleteJoinToken,
 } from './db';
 import { randomBytes } from 'crypto';
 import { generateWaitComedy } from './comedy';
@@ -258,20 +244,6 @@ function fireWebhooks(eventType: string, data: unknown): void {
 // Webhooks are fired alongside SSE broadcasts via fireWebhooks()
 
 // =============================================================================
-// Input Sanitization — prevent injection in stored strings (Phase 12)
-// =============================================================================
-
-/** Sanitize user-provided strings: strip control chars, limit length, escape HTML entities. */
-export function sanitizeInput(input: string, maxLength: number = 1024): string {
-    if (typeof input !== 'string') return '';
-    return input
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // strip control chars (keep \n \r \t)
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .slice(0, maxLength);
-}
-
-// =============================================================================
 // App Setup
 // =============================================================================
 
@@ -338,18 +310,6 @@ app.use('/*', async (c, next) => {
     c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 });
 
-// Input validation — reject oversized payloads (Phase 12)
-const MAX_BODY_SIZE = parseInt(process.env.TENTACLAW_MAX_BODY_MB || '10') * 1024 * 1024; // 10MB default
-app.use('/api/*', async (c, next) => {
-    const contentLength = c.req.header('content-length');
-    if (contentLength && parseInt(contentLength, 10) > MAX_BODY_SIZE) {
-        return c.json({
-            error: `Payload too large. Maximum ${MAX_BODY_SIZE / (1024 * 1024)}MB allowed.`,
-        }, 413);
-    }
-    await next();
-});
-
 // Request ID tracing — every request gets a unique ID
 app.use('/*', async (c, next) => {
     const requestId = c.req.header('X-Request-ID') || crypto.randomUUID();
@@ -385,17 +345,9 @@ export function paginate<T>(items: T[], page: number, limit: number): { data: T[
 }
 
 // =============================================================================
-// API Key Auth (enabled by default — pass --no-auth to disable)
+// API Key Auth (optional — set TENTACLAW_API_KEY to enable)
 // =============================================================================
 
-export function isAuthDisabled(): boolean {
-    return process.argv.includes('--no-auth') || process.env.TENTACLAW_NO_AUTH === 'true';
-}
-const NO_AUTH = isAuthDisabled();
-if (NO_AUTH) {
-    console.warn('[tentaclaw] WARNING: Authentication is DISABLED (--no-auth). API is open to all.');
-    console.warn('[tentaclaw] This is not recommended for production or network-exposed deployments.');
-}
 const API_KEY = process.env.TENTACLAW_API_KEY || '';
 
 /**
@@ -409,9 +361,9 @@ function methodToPermission(method: string): string {
     return 'write'; // POST, PUT, PATCH, DELETE
 }
 
-if (!NO_AUTH) {
+if (API_KEY) {
     // Protect API routes but leave health, dashboard, and root public.
-    // Auth is ON by default. Supports env-var key AND per-key DB validation.
+    // Supports both the legacy env-var key AND per-key DB validation.
     app.use('/api/*', async (c, next) => {
         const auth = c.req.header('Authorization');
         const key = auth?.startsWith('Bearer ') ? auth.slice(7) : c.req.query('api_key');
@@ -420,7 +372,7 @@ if (!NO_AUTH) {
         }
 
         // Legacy env-var key gets full access (backward compat)
-        if (API_KEY && key === API_KEY) {
+        if (key === API_KEY) {
             await next();
             return;
         }
@@ -471,7 +423,14 @@ if (!NO_AUTH) {
         }
 
         // Legacy env-var key gets full access (backward compat)
-        if (API_KEY && key === API_KEY) {
+        if (key === API_KEY) {
+            await next();
+            return;
+        }
+
+        // Dashboard session tokens also grant full access to /v1/* for logged-in users
+        const session = validateSession(key);
+        if (session) {
             await next();
             return;
         }
@@ -520,37 +479,29 @@ if (!NO_AUTH) {
 // Rate Limiting (simple in-memory, for /v1/* OpenAI-compat endpoints)
 // =============================================================================
 
-// Rate limiting: 60 req/min for unauthenticated, 600 req/min for authenticated.
-// Set TENTACLAW_RATE_LIMIT=0 to disable entirely.
-const RATE_LIMIT_UNAUTH = parseInt(process.env.TENTACLAW_RATE_LIMIT || '60');
-const RATE_LIMIT_AUTH = parseInt(process.env.TENTACLAW_RATE_LIMIT_AUTH || '600');
+const RATE_LIMIT = parseInt(process.env.TENTACLAW_RATE_LIMIT || '0'); // 0 = disabled
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
-if (RATE_LIMIT_UNAUTH > 0) {
+if (RATE_LIMIT > 0) {
     app.use('/v1/*', async (c, next) => {
         const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
-        const authHeader = c.req.header('Authorization');
-        const isAuthenticated = !!(authHeader && authHeader.startsWith('Bearer '));
-        const limit = isAuthenticated ? RATE_LIMIT_AUTH : RATE_LIMIT_UNAUTH;
-
-        const bucketKey = isAuthenticated ? `auth:${authHeader!.slice(7, 15)}` : `ip:${ip}`;
         const now = Date.now();
-        let bucket = rateBuckets.get(bucketKey);
+        let bucket = rateBuckets.get(ip);
 
         if (!bucket || now > bucket.resetAt) {
             bucket = { count: 0, resetAt: now + 60000 };
-            rateBuckets.set(bucketKey, bucket);
+            rateBuckets.set(ip, bucket);
         }
 
         bucket.count++;
-        if (bucket.count > limit) {
+        if (bucket.count > RATE_LIMIT) {
             return c.json({
-                error: { message: `Rate limit exceeded. ${limit} req/min`, type: 'rate_limit_error' },
+                error: { message: 'Rate limit exceeded. ' + RATE_LIMIT + ' req/min', type: 'rate_limit_error' },
             }, 429);
         }
 
-        c.header('X-RateLimit-Limit', String(limit));
-        c.header('X-RateLimit-Remaining', String(Math.max(0, limit - bucket.count)));
+        c.header('X-RateLimit-Limit', String(RATE_LIMIT));
+        c.header('X-RateLimit-Remaining', String(Math.max(0, RATE_LIMIT - bucket.count)));
         c.header('X-RateLimit-Reset', String(Math.ceil(bucket.resetAt / 1000)));
 
         await next();
@@ -758,17 +709,6 @@ app.post('/api/v1/register', async (c) => {
         const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
         recordAuditEvent('agent_auth_failed', 'agent', ip, 'Invalid cluster secret on /api/v1/register');
         return c.json({ error: 'Forbidden. Invalid or missing cluster secret. Set X-Cluster-Secret header.' }, 403);
-    }
-
-    // Optional join token validation (Phase 38) — if X-Join-Token header present, validate it
-    const joinToken = c.req.header('X-Join-Token');
-    if (joinToken) {
-        const jtResult = validateJoinToken(joinToken);
-        if (!jtResult.valid) {
-            const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
-            recordAuditEvent('join_token_failed', 'agent', ip, `Invalid join token: ${jtResult.error}`);
-            return c.json({ error: `Join token validation failed: ${jtResult.error}` }, 403);
-        }
     }
 
     const body = await c.req.json();
@@ -1370,67 +1310,6 @@ app.post('/api/v1/deploy', async (c) => {
 });
 
 // =============================================================================
-// Model Quantization Pipeline (Wave 48, Phases 787-803)
-// =============================================================================
-
-app.post('/api/v1/quantize', async (c) => {
-    const body = await c.req.json();
-    if (!body.model) return c.json({ error: 'Missing required field: model' }, 400);
-
-    const method = body.method || 'fp8';
-    const validMethods = ['fp8', 'awq', 'gptq', 'gguf_q4', 'gguf_q6', 'gguf_q8', 'exl2'];
-    if (!validMethods.includes(method)) {
-        return c.json({ error: `Invalid method. Valid: ${validMethods.join(', ')}` }, 400);
-    }
-
-    const calibrationSamples = body.calibration_samples || 512;
-    const validateQuality = body.validate !== false;
-    const maxQualityLoss = body.max_quality_loss_pct || 3.0;
-
-    // Estimate output size
-    const vramEstimateMb = estimateModelVram(body.model);
-    const sizeReduction: Record<string, number> = {
-        'fp8': 0.5, 'awq': 0.25, 'gptq': 0.25, 'gguf_q4': 0.25,
-        'gguf_q6': 0.375, 'gguf_q8': 0.5, 'exl2': 0.3,
-    };
-
-    const estimatedSizeMb = vramEstimateMb > 0 ? Math.round(vramEstimateMb * (sizeReduction[method] || 0.5)) : null;
-
-    // Queue the quantization job to an available node with the model
-    const modelNode = findBestNodeForModel(body.model);
-    if (!modelNode) {
-        return c.json({
-            error: `No node has model "${body.model}" loaded. Deploy it first, then quantize.`,
-            hint: `Run: tentaclaw deploy ${body.model}`,
-        }, 404);
-    }
-
-    const jobId = queueCommand(modelNode.node_id, 'quantize_model', {
-        model: body.model,
-        method,
-        calibration_samples: calibrationSamples,
-        validate_quality: validateQuality,
-        max_quality_loss_pct: maxQualityLoss,
-        output_format: method.startsWith('gguf') ? 'gguf' : method === 'exl2' ? 'exl2' : 'safetensors',
-    });
-
-    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
-    recordAuditEvent('model_quantize', undefined, ip, `Quantize ${body.model} → ${method} on ${modelNode.hostname}`);
-
-    return c.json({
-        status: 'queued',
-        job_id: jobId,
-        model: body.model,
-        method,
-        target_node: modelNode.hostname,
-        estimated_size_mb: estimatedSizeMb,
-        calibration_samples: calibrationSamples,
-        quality_validation: validateQuality,
-        max_quality_loss_pct: maxQualityLoss,
-    });
-});
-
-// =============================================================================
 // Farm Grouping
 // =============================================================================
 
@@ -1709,24 +1588,6 @@ app.post('/v1/chat/completions', async (c) => {
         }
 
         const result = await proxyReq.json() as Record<string, unknown>;
-
-        // OpenTelemetry gen_ai.* attributes (Wave 17, Phase 273)
-        const usage = (result as any).usage;
-        const inputTokens = usage?.prompt_tokens || 0;
-        const outputTokens = usage?.completion_tokens || 0;
-        const totalTokens = usage?.total_tokens || inputTokens + outputTokens;
-        const finishReason = (result as any).choices?.[0]?.finish_reason || 'unknown';
-        const tokensPerSec = outputTokens > 0 && latencyMs > 0 ? Math.round((outputTokens / latencyMs) * 1000) : 0;
-
-        // Set gen_ai response headers for observability (OTel-compatible)
-        c.header('X-GenAI-Model', resolvedModel);
-        c.header('X-GenAI-Input-Tokens', String(inputTokens));
-        c.header('X-GenAI-Output-Tokens', String(outputTokens));
-        c.header('X-GenAI-Total-Tokens', String(totalTokens));
-        c.header('X-GenAI-Finish-Reason', finishReason);
-        c.header('X-GenAI-Latency-Ms', String(latencyMs));
-        c.header('X-GenAI-Tokens-Per-Sec', String(tokensPerSec));
-
         result._tentaclaw = {
             routed_to: target.node_id,
             hostname: target.hostname,
@@ -1739,17 +1600,6 @@ app.post('/v1/chat/completions', async (c) => {
             cached: false,
             tools_used: hasTools || undefined,
             json_mode: hasJsonMode || undefined,
-            // gen_ai.* semantic conventions
-            gen_ai: {
-                system: 'tentaclaw',
-                request_model: resolvedModel,
-                response_model: (result as any).model || resolvedModel,
-                usage_input_tokens: inputTokens,
-                usage_output_tokens: outputTokens,
-                usage_total_tokens: totalTokens,
-                response_finish_reasons: [finishReason],
-                tokens_per_second: tokensPerSec,
-            },
         };
 
         // Cache the response (non-streaming only)
@@ -2527,10 +2377,9 @@ app.get('/api/v1/config', (c) => {
         version: '0.1.0',
         service: 'tentaclaw-gateway',
         features: {
-            auth_enabled: !NO_AUTH,
-            rate_limiting: RATE_LIMIT_UNAUTH > 0,
-            rate_limit_unauth_rpm: RATE_LIMIT_UNAUTH || null,
-            rate_limit_auth_rpm: RATE_LIMIT_AUTH || null,
+            auth_enabled: !!API_KEY,
+            rate_limiting: RATE_LIMIT > 0,
+            rate_limit_per_min: RATE_LIMIT || null,
             openai_compat: true,
             prometheus_metrics: true,
             sse_streaming: true,
@@ -3940,38 +3789,6 @@ app.delete('/api/v1/apikeys/:id', (c) => {
 });
 
 // =============================================================================
-// Join Tokens — Node Attestation (Wave 3, Phase 38-39)
-// =============================================================================
-
-app.post('/api/v1/join-tokens', async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const label = String(body.label || '');
-    const maxUses = parseInt(body.max_uses, 10) || 1;
-    const hoursValid = parseInt(body.hours_valid, 10) || 24;
-
-    const result = createJoinToken(label, maxUses, hoursValid);
-    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
-    recordAuditEvent('join_token_created', undefined, ip, `Join token created: ${result.prefix}... (max ${maxUses} uses, ${hoursValid}h validity)`);
-
-    return c.json({
-        id: result.id,
-        token: result.token,
-        prefix: result.prefix,
-        expires_at: result.expiresAt,
-        message: 'Save this token — it will not be shown again. Pass as X-Join-Token header when registering new nodes.',
-    });
-});
-
-app.get('/api/v1/join-tokens', (c) => {
-    return c.json(listJoinTokens());
-});
-
-app.delete('/api/v1/join-tokens/:id', (c) => {
-    deleteJoinToken(c.req.param('id'));
-    return c.json({ status: 'deleted' });
-});
-
-// =============================================================================
 // Multi-Tenant Authentication (Wave 8)
 // =============================================================================
 
@@ -4716,23 +4533,6 @@ seedDefaultAlertRules();
 // Initialize cluster secret for agent auth
 initClusterSecret();
 
-// Check file permissions on sensitive files (Phase 11)
-try {
-    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-    const keyPath = require('path').join(homeDir, '.tentaclaw', 'cluster.key');
-    if (require('fs').existsSync(keyPath)) {
-        const stats = require('fs').statSync(keyPath);
-        const mode = stats.mode & 0o777;
-        if (mode & 0o044) {
-            console.error(`[security] CRITICAL: ${keyPath} is world/group-readable (mode ${mode.toString(8)}). Run: chmod 600 ${keyPath}`);
-            if (mode & 0o004) {
-                console.error('[security] Refusing to start with world-readable cluster key. Fix permissions or set TENTACLAW_CLUSTER_SECRET env var.');
-                process.exit(1);
-            }
-        }
-    }
-} catch { /* Windows or permission check not supported — skip */ }
-
 // Log security status
 if (agentAuthEnabled) {
     console.log('[auth] Agent authentication: ENABLED (cluster secret configured)');
@@ -4761,16 +4561,6 @@ const server = serve({
     console.log(`[tentaclaw] Dashboard: http://${HOST}:${info.port}/dashboard`);
     console.log(`[tentaclaw] API: http://${HOST}:${info.port}/api/v1`);
     console.log(`[tentaclaw] Health: http://${HOST}:${info.port}/health`);
-    console.log('');
-
-    // Security checklist (Phase 15)
-    console.log('\x1b[33m  Security Checklist:\x1b[0m');
-    console.log(`    ${!NO_AUTH ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} Authentication: ${!NO_AUTH ? 'ENABLED' : 'DISABLED (--no-auth)'}`);
-    console.log(`    ${agentAuthEnabled ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} Cluster secret: ${agentAuthEnabled ? 'CONFIGURED' : 'NOT SET'}`);
-    console.log(`    ${HOST === '127.0.0.1' ? '\x1b[32m✓\x1b[0m' : '\x1b[33m!\x1b[0m'} Bind address: ${HOST} ${HOST === '0.0.0.0' ? '(all interfaces)' : '(localhost only)'}`);
-    console.log(`    ${RATE_LIMIT_UNAUTH > 0 ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} Rate limiting: ${RATE_LIMIT_UNAUTH > 0 ? RATE_LIMIT_UNAUTH + '/' + RATE_LIMIT_AUTH + ' rpm (unauth/auth)' : 'DISABLED'}`);
-    console.log('    \x1b[33m!\x1b[0m Firewall: Ensure ports 8080, 41337 are protected');
-    console.log('    \x1b[33m!\x1b[0m Updates: Check for new versions at github.com/TentaCLAW-OS/TentaCLAW');
     console.log('');
 
     // Remote shell WebSocket server
@@ -5457,29 +5247,6 @@ app.get('/metrics', (_c) => {
     lines.push('# HELP tentaclaw_inference_queue_depth Current inference queue depth');
     lines.push('# TYPE tentaclaw_inference_queue_depth gauge');
     lines.push(`tentaclaw_inference_queue_depth ${qStats.queued}`);
-    lines.push('');
-
-    // ---- OpenTelemetry gen_ai.* semantic convention metrics (Wave 17, Phase 273-276) ----
-    lines.push('# HELP gen_ai_client_token_usage Token usage by model and direction (OTel GenAI)');
-    lines.push('# TYPE gen_ai_client_token_usage counter');
-    lines.push(`gen_ai_client_token_usage{gen_ai_system="tentaclaw",direction="input"} ${analytics.total_tokens_in}`);
-    lines.push(`gen_ai_client_token_usage{gen_ai_system="tentaclaw",direction="output"} ${analytics.total_tokens_out}`);
-    lines.push('');
-    lines.push('# HELP gen_ai_client_operation_duration_seconds GenAI operation duration (OTel GenAI)');
-    lines.push('# TYPE gen_ai_client_operation_duration_seconds summary');
-    if (totalSuccessful > 0) {
-        lines.push(`gen_ai_client_operation_duration_seconds{gen_ai_system="tentaclaw",gen_ai_operation_name="chat",quantile="0.5"} ${(analytics.p50_latency_ms / 1000).toFixed(4)}`);
-        lines.push(`gen_ai_client_operation_duration_seconds{gen_ai_system="tentaclaw",gen_ai_operation_name="chat",quantile="0.95"} ${(analytics.p95_latency_ms / 1000).toFixed(4)}`);
-        lines.push(`gen_ai_client_operation_duration_seconds{gen_ai_system="tentaclaw",gen_ai_operation_name="chat",quantile="0.99"} ${(analytics.p99_latency_ms / 1000).toFixed(4)}`);
-    }
-    lines.push('');
-    lines.push('# HELP gen_ai_server_request_duration_seconds Server-side GenAI request duration (OTel GenAI)');
-    lines.push('# TYPE gen_ai_server_request_duration_seconds summary');
-    for (const m of analytics.by_model) {
-        if (m.count > 0) {
-            lines.push(`gen_ai_server_request_duration_seconds{gen_ai_system="tentaclaw",gen_ai_request_model="${m.model}"} ${(m.avg_latency_ms / 1000).toFixed(4)}`);
-        }
-    }
     lines.push('');
 
     lines.push('# HELP tentaclaw_inference_batch_size_avg Average batch size');
@@ -6461,107 +6228,6 @@ app.post('/api/v1/profiler/load-test', async (c) => {
 app.delete('/api/v1/profiler', (c) => {
     clearProfiles();
     return c.json({ cleared: true, message: 'All profiles cleared' });
-});
-
-// =============================================================================
-// MCP Server — Model Context Protocol (Wave 93)
-// =============================================================================
-
-import { getMcpTools, handleMcpToolCall } from './mcp-server';
-import { getAgentCard, submitTask, getTask, listTasks } from './a2a';
-import { registerWebhook, listWebhooks, deleteWebhook, fireWebhookEvent, getDeliveries, ALL_WEBHOOK_EVENTS } from './webhooks';
-
-// MCP tool list — used by AI agents to discover available tools
-app.get('/api/v1/mcp/tools', (c) => {
-    return c.json({ tools: getMcpTools() });
-});
-
-// MCP tool execution — AI agents call tools here
-app.post('/api/v1/mcp/tools/:name', async (c) => {
-    const toolName = c.req.param('name');
-    const args = await c.req.json().catch(() => ({}));
-    const result = await handleMcpToolCall(toolName, args);
-    return c.json(result, result.isError ? 400 : 200);
-});
-
-// MCP server info
-app.get('/api/v1/mcp/info', (c) => {
-    return c.json({
-        name: 'tentaclaw-mcp',
-        version: '1.0.0',
-        description: 'TentaCLAW GPU Cluster Management — MCP Tool Server',
-        tools_count: getMcpTools().length,
-        capabilities: ['tools'],
-        documentation: 'https://docs.tentaclaw.io/mcp',
-    });
-});
-
-// =============================================================================
-// A2A Protocol — Agent-to-Agent (Wave 94)
-// =============================================================================
-
-// Agent Card discovery (A2A spec: /.well-known/agent.json)
-app.get('/.well-known/agent.json', (c) => {
-    const proto = c.req.header('x-forwarded-proto') || 'http';
-    const host = c.req.header('host') || 'localhost:8080';
-    return c.json(getAgentCard(`${proto}://${host}`));
-});
-
-// Submit a task (A2A: tasks/send)
-app.post('/api/v1/a2a/tasks', async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    if (!body.capability) return c.json({ error: 'capability is required' }, 400);
-    const task = await submitTask(body.capability, body.input || {});
-    return c.json(task, task.state === 'rejected' ? 400 : 200);
-});
-
-// Get task status (A2A: tasks/get)
-app.get('/api/v1/a2a/tasks/:id', (c) => {
-    const task = getTask(c.req.param('id'));
-    if (!task) return c.json({ error: 'Task not found' }, 404);
-    return c.json(task);
-});
-
-// List recent tasks
-app.get('/api/v1/a2a/tasks', (c) => {
-    return c.json(listTasks());
-});
-
-// =============================================================================
-// Webhooks — Event Notifications (Wave 98)
-// =============================================================================
-
-app.post('/api/v1/webhooks', async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    if (!body.url) return c.json({ error: 'url is required' }, 400);
-    const events = body.events || ALL_WEBHOOK_EVENTS;
-    const wh = registerWebhook(body.url, events, body.description || '');
-    return c.json({
-        ...wh,
-        message: 'Webhook created. Save the secret for signature verification.',
-    }, 201);
-});
-
-app.get('/api/v1/webhooks', (c) => {
-    return c.json(listWebhooks());
-});
-
-app.delete('/api/v1/webhooks/:id', (c) => {
-    if (!deleteWebhook(c.req.param('id'))) return c.json({ error: 'Not found' }, 404);
-    return c.json({ status: 'deleted' });
-});
-
-app.get('/api/v1/webhooks/:id/deliveries', (c) => {
-    return c.json(getDeliveries(c.req.param('id')));
-});
-
-app.post('/api/v1/webhooks/:id/test', async (c) => {
-    const delivered = await fireWebhookEvent('config.changed', { test: true, source: 'manual' });
-    return c.json({ status: 'test_sent', webhooks_notified: delivered });
-});
-
-app.get('/api/v1/webhooks/events', (c) => {
-    return c.json({ events: ALL_WEBHOOK_EVENTS });
 });
 
 // Final endpoint — the "about" page
