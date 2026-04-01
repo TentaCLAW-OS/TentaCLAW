@@ -1,17 +1,14 @@
-import { useUIStore } from '@/stores/ui';
 import { ResourceTree } from '@/components/tree/ResourceTree';
 
-export function Sidebar() {
-  const collapsed = useUIStore((s) => s.sidebarCollapsed);
-
+export function Sidebar({ width }: { width: number }) {
   return (
     <aside
-      className="shrink-0 flex flex-col overflow-hidden transition-all duration-300"
+      className="shrink-0 flex flex-col overflow-hidden"
       style={{
-        width: collapsed ? 0 : 240,
+        width,
         background: 'var(--bg-sidebar)',
         backdropFilter: 'blur(12px)',
-        borderRight: collapsed ? 'none' : '1px solid var(--border)',
+        borderRight: '1px solid var(--border)',
       }}
     >
       {/* Sidebar header */}

@@ -3,6 +3,7 @@ import { useClusterStore } from '@/stores/cluster';
 import { useAuthStore } from '@/stores/auth';
 import { getMood, getPersonalityMessage, getGreeting } from '@/lib/personality';
 import type { Mood } from '@/lib/personality';
+import { usePanelsStore } from '@/stores/panels';
 
 function OctopusLogo({ size = 24 }: { size?: number }) {
   return (
@@ -68,6 +69,8 @@ function SearchIcon() {
 }
 
 export function Header() {
+  const toggleLeft = usePanelsStore((s) => s.toggleLeftSidebar);
+  const toggleRight = usePanelsStore((s) => s.toggleRightSidebar);
   const nodes = useClusterStore((s) => s.nodes);
   const connected = useClusterStore((s) => s.connected);
   const user = useAuthStore((s) => s.user);
@@ -124,7 +127,7 @@ export function Header() {
     <header
       className="flex items-center justify-between px-4 shrink-0 z-30"
       style={{
-        height: 48,
+        height: 40,
         background: 'rgba(8,10,16,0.9)',
         backdropFilter: 'blur(20px)',
         borderBottom: '1px solid var(--border)',
@@ -197,6 +200,26 @@ export function Header() {
 
       {/* Right: Quick stats + controls */}
       <div className="flex items-center gap-4">
+        {/* Sidebar toggle buttons */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={toggleLeft}
+            className="text-[10px] cursor-pointer px-1.5 py-0.5 rounded transition-colors"
+            style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+            title="Toggle sidebar (Ctrl+B)"
+          >
+            ☰
+          </button>
+          <button
+            onClick={toggleRight}
+            className="text-[10px] cursor-pointer px-1.5 py-0.5 rounded transition-colors"
+            style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+            title="Toggle context panel (Ctrl+J)"
+          >
+            ◫
+          </button>
+        </div>
+
         {/* Quick stats */}
         <div className="flex items-center gap-3 text-[9px] font-mono text-[var(--cyan)]">
           <span>{onlineNodes} nodes</span>
