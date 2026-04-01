@@ -507,7 +507,7 @@ install_deps() {
 # Build CLI and symlink to PATH
 # ──────────────────────────────────────────────────────────────────
 setup_cli() {
-    echo -e "  ${BOLD}Setting up CLAWtopus CLI...${RESET}"
+    echo -e "  ${BOLD}Setting up TentaCLAW CLI...${RESET}"
     echo ""
 
     local cli_dir="$INSTALL_DIR/cli"
@@ -518,8 +518,8 @@ setup_cli() {
     fi
 
     # Check if CLI is already set up and on PATH
-    if command_exists clawtopus; then
-        ok "CLAWtopus CLI already on PATH ($(command -v clawtopus))"
+    if command_exists tentaclaw; then
+        ok "TentaCLAW CLI already on PATH ($(command -v clawtopus))"
         return
     fi
 
@@ -565,15 +565,15 @@ WRAPPER
     # Create symlink
     if [ -n "$bin_dir" ] && [ -n "$symlink_target" ]; then
         if [ -w "$bin_dir" ]; then
-            ln -sf "$symlink_target" "$bin_dir/clawtopus" 2>/dev/null || true
             ln -sf "$symlink_target" "$bin_dir/tentaclaw" 2>/dev/null || true
+            ln -sf "$symlink_target" "$bin_dir/clawtopus" 2>/dev/null || true
         elif [ "$(id -u)" = "0" ] || command_exists sudo; then
-            sudo ln -sf "$symlink_target" "$bin_dir/clawtopus" 2>/dev/null || true
             sudo ln -sf "$symlink_target" "$bin_dir/tentaclaw" 2>/dev/null || true
+            sudo ln -sf "$symlink_target" "$bin_dir/clawtopus" 2>/dev/null || true
         fi
 
-        if [ -L "$bin_dir/clawtopus" ]; then
-            ok "clawtopus CLI linked to $bin_dir/clawtopus"
+        if [ -L "$bin_dir/tentaclaw" ]; then
+            ok "tentaclaw CLI linked to $bin_dir/tentaclaw"
 
             # Check if bin_dir is in PATH
             if ! echo "$PATH" | tr ':' '\n' | grep -q "^$bin_dir$"; then

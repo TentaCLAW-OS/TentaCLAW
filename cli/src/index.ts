@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * CLAWtopus CLI — Eight arms. One mind. Zero compromises.
+ * TentaCLAW CLI — Eight arms. One mind. Zero compromises.
  *
  * Inference router + cluster management for TentaCLAW OS.
  * Talks to the TentaCLAW Gateway API. Pure Node.js, zero dependencies.
@@ -200,7 +200,7 @@ function bootSplash(): void {
     ].join('\n')));
     console.log('');
     console.log(`  \u256D${'\u2500'.repeat(w)}\u256E`);
-    console.log(`  \u2502  \uD83D\uDC19 ${C.teal(C.bold('CLAWtopus'))} ${C.dim('v' + CLI_VERSION)}${' '.repeat(w - 23)}\u2502`);
+    console.log(`  \u2502  \uD83D\uDC19 ${C.teal(C.bold('TentaCLAW'))} ${C.dim('v' + CLI_VERSION)}${' '.repeat(w - 23)}\u2502`);
     console.log(`  \u2502  ${C.purple(C.italic('Eight arms. One mind.'))}${' '.repeat(w - 24)}\u2502`);
     console.log(`  \u2570${'\u2500'.repeat(w)}\u256F`);
     console.log('');
@@ -322,7 +322,7 @@ function apiRequest(method: string, url: string, body?: unknown): Promise<ApiRes
             method,
             headers: {
                 'Content-Type': 'application/json',
-                'User-Agent': 'CLAWtopus-CLI/' + CLI_VERSION,
+                'User-Agent': 'TentaCLAW-CLI/' + CLI_VERSION,
                 'Accept': 'application/json',
             },
             timeout: 15000,
@@ -1218,13 +1218,13 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
         if (!input) { rl.prompt(); return; }
         if (input === '/quit' || input === '/exit') {
             console.log('');
-            console.log(C.dim('  CLAWtopus waves goodbye! \ud83d\udc19'));
+            console.log(C.dim('  TentaCLAW waves goodbye! \ud83d\udc19'));
             console.log('');
             rl.close();
             process.exit(0);
         }
 
-        process.stdout.write('  ' + C.purple('CLAWtopus: '));
+        process.stdout.write('  ' + C.purple('TentaCLAW: '));
 
         try {
             const url = gateway.replace(/\/+$/, '') + '/v1/chat/completions';
@@ -1519,7 +1519,7 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
     console.log('');
 
     // Build system prompt
-    let systemPrompt = `You are CLAWtopus Code Agent — an expert AI software engineer running inside TentaCLAW OS.
+    let systemPrompt = `You are TentaCLAW Code Agent — an expert AI software engineer running inside TentaCLAW OS.
 
 You have tools to read files, write files, list directories, run shell commands, and search codebases. Use them proactively — don't ask the user to run commands for you.
 
@@ -1709,7 +1709,7 @@ Approach:
             const cmd = (parts[0] || '').toLowerCase();
             if (cmd === 'quit' || cmd === 'exit') {
                 console.log('');
-                console.log(C.dim('  CLAWtopus waves goodbye \uD83D\uDC19'));
+                console.log(C.dim('  TentaCLAW waves goodbye \uD83D\uDC19'));
                 rl.close();
                 process.exit(0);
             }
@@ -1897,7 +1897,7 @@ async function cmdNotify(gateway: string, positional: string[], flags: Record<st
 
 async function cmdOptimize(gateway: string): Promise<void> {
     console.log('');
-    console.log('  ' + C.purple(C.bold('CLAWtopus Optimize')) + C.dim(' \u2014 ') + C.purple(C.italic(pickPersonality('optimize'))));
+    console.log('  ' + C.purple(C.bold('TentaCLAW Optimize')) + C.dim(' \u2014 ') + C.purple(C.italic(pickPersonality('optimize'))));
     console.log('');
 
     // Step 1: Run doctor with autofix
@@ -1947,7 +1947,7 @@ async function cmdExplain(gateway: string): Promise<void> {
     const gpuWord = summary.total_gpus === 1 ? 'GPU' : 'GPUs';
     const modelWord = dist.length === 1 ? 'model' : 'models';
 
-    console.log('  ' + C.teal('\uD83D\uDC19') + ' ' + C.bold('CLAWtopus says:'));
+    console.log('  ' + C.teal('\uD83D\uDC19') + ' ' + C.bold('TentaCLAW says:'));
     console.log('');
 
     // Nodes — with personality
@@ -2241,7 +2241,7 @@ async function cmdAlias(gateway: string, positional: string[], flags: Record<str
 
 async function cmdAuto(gateway: string): Promise<void> {
     console.log('');
-    console.log('  ' + C.purple(C.bold('CLAWtopus Auto Mode')) + C.dim(' — letting the system decide'));
+    console.log('  ' + C.purple(C.bold('TentaCLAW Auto Mode')) + C.dim(' — letting the system decide'));
     console.log('');
 
     const result = await apiPost(gateway, '/api/v1/auto', {}) as any;
@@ -2390,7 +2390,7 @@ async function cmdDoctor(gateway: string, flags: Record<string, string>): Promis
     const autofix = flags['no-fix'] ? 'false' : 'true';
 
     console.log('');
-    console.log('  ' + C.purple(C.bold('CLAWtopus Doctor')) + C.dim(' — Self-healing diagnostics'));
+    console.log('  ' + C.purple(C.bold('TentaCLAW Doctor')) + C.dim(' — Self-healing diagnostics'));
     console.log('  ' + C.dim(autofix === 'true' ? 'Auto-fix: ENABLED' : 'Auto-fix: DISABLED (dry run)'));
     console.log('');
 
@@ -2436,7 +2436,7 @@ async function cmdDoctor(gateway: string, flags: Record<string, string>): Promis
 
     if (s.auto_fixed > 0) {
         console.log('');
-        console.log('  ' + C.cyan(C.bold(`\u2692 ${s.auto_fixed} issue(s) auto-fixed by CLAWtopus Doctor`)));
+        console.log('  ' + C.cyan(C.bold(`\u2692 ${s.auto_fixed} issue(s) auto-fixed by TentaCLAW Doctor`)));
     }
 
     if (s.critical > 0) {
@@ -2502,7 +2502,7 @@ async function rawHttpsGet(url: string): Promise<string> {
         https.get({
             hostname: parsed.hostname,
             path: parsed.pathname + parsed.search,
-            headers: { 'User-Agent': 'CLAWtopus-CLI/' + CLI_VERSION, 'Accept': 'application/json' },
+            headers: { 'User-Agent': 'TentaCLAW-CLI/' + CLI_VERSION, 'Accept': 'application/json' },
             timeout: 15000,
         }, (res) => {
             let data = '';
@@ -2763,7 +2763,7 @@ async function cmdModelInfo(positional: string[]): Promise<void> {
 
 function cmdHelp(): void {
     console.log('');
-    console.log(`  \uD83D\uDC19 ${C.teal(C.bold('CLAWtopus'))} ${C.dim('v' + CLI_VERSION)} ${C.dim('\u2014')} ${C.purple(C.italic('Eight arms. One mind.'))}`);
+    console.log(`  \uD83D\uDC19 ${C.teal(C.bold('TentaCLAW'))} ${C.dim('v' + CLI_VERSION)} ${C.dim('\u2014')} ${C.purple(C.italic('Eight arms. One mind.'))}`);
     console.log('');
 
     const section = (title: string) => {
@@ -2811,7 +2811,7 @@ function cmdHelp(): void {
     cmd('optimize', 'CLAWtopus optimizes your cluster');
     cmd('explain', 'Plain English cluster summary');
     cmd('fix', 'Auto-fix cluster issues');
-    cmd('auto', 'Full auto mode \u2014 let CLAWtopus decide');
+    cmd('auto', 'Full auto mode \u2014 let TentaCLAW decide');
     cmd('vibe', 'How\'s the cluster doing?');
     console.log('');
 
@@ -2859,7 +2859,7 @@ const TIPS = [
     'Use `clawtopus fortune` for octopus wisdom.',
     'Deploy BitNet models on CPU-only nodes with `clawtopus deploy bitnet-b1.58`.',
     'Model aliases: `gpt-4` can route to any model you want. Try `clawtopus alias`.',
-    'The `clawtopus auto` mode lets CLAWtopus decide everything. Trust the octopus.',
+    'The `tentaclaw auto mode lets TentaCLAW decide everything. Trust the octopus.',
     'Browse CLAWHub with `clawtopus hub trending` — see what the family is building.',
     'Publish to CLAWHub: `clawtopus hub init && clawtopus hub publish`. Join the family.',
 ];
