@@ -185,7 +185,7 @@ jobs:
 
       - name: Upload coverage artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.component }}
           path: ${{ matrix.component }}/coverage/
@@ -227,7 +227,7 @@ jobs:
         run: cd ${{ matrix.component }} && npm run build
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tentaclaw-${{ matrix.component }}-${{ env.VERSION }}
           path: |
@@ -333,7 +333,7 @@ jobs:
           helm package deploy/helm/tentaclaw/ --destination helm-output/
 
       - name: Upload Helm chart artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tentaclaw-helm-${{ env.VERSION }}
           path: helm-output/
@@ -386,7 +386,7 @@ jobs:
           sha256sum TentaCLAW-OS-${{ env.VERSION }}-amd64.iso > TentaCLAW-OS-${{ env.VERSION }}-amd64.iso.sha256
 
       - name: Upload ISO artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: TentaCLAW-OS-${{ env.VERSION }}-amd64.iso
           path: |
