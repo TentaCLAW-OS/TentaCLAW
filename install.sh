@@ -145,21 +145,22 @@ else
   ok "Cloned to $INSTALL_DIR"
 fi
 
+# --- install all workspace deps from root -------------------------------------
+step "Installing dependencies..."
+cd "$INSTALL_DIR"
+npm install --silent
+ok "Dependencies installed"
+
 # --- build gateway ------------------------------------------------------------
 step "Building gateway..."
-cd "$INSTALL_DIR/gateway"
-npm install --silent
-npm run build
-npm prune --omit=dev --silent
+npm run build --workspace=gateway
 ok "Gateway built"
 
 # --- build dashboard ----------------------------------------------------------
 step "Building dashboard..."
-cd "$INSTALL_DIR/dashboard"
-npm install --silent
-npm run build
+npm run build --workspace=dashboard
 mkdir -p "$INSTALL_DIR/gateway/public"
-cp -r dist/. "$INSTALL_DIR/gateway/public/"
+cp -r "$INSTALL_DIR/dashboard/dist/." "$INSTALL_DIR/gateway/public/"
 ok "Dashboard built and copied to gateway/public/"
 
 # --- systemd ------------------------------------------------------------------
