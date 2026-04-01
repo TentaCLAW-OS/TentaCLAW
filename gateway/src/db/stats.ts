@@ -359,6 +359,51 @@ export function findBestNode(model: string): InferenceTarget | null {
 }
 
 /**
+ * Return ALL online nodes that have the model loaded, sorted by score (best first).
+ * Used by the failover loop to try each candidate in order.
+ */
+export function findNodesForModel(model: string): InferenceTarget[] {
+    const nodes = _getAllNodesWithStats();
+    const candidates: (InferenceTarget & { score: number })[] = [];
+
+    for (const node of nodes) {
+        if (node.status !== 'online' || !node.latest_stats) continue;
+        if (isNodeBlocked(node.id)) continue;
+
+        const hasModel = node.latest_stats.inference.loaded_models.some(
+            (m: string) => m === model || m.startsWith(model.split(':')[0])
+        );
+        if (!hasModel) continue;
+
+        const gpuUtils = node.latest_stats.gpus.map((g: any) => g.utilizationPct);
+        const avgUtil = gpuUtils.length > 0 ? gpuUtils.reduce((a: number, b: number) => a + b, 0) / gpuUtils.length : 100;
+        const totalVram = node.latest_stats.gpus.reduce((s: number, g: any) => s + g.vramTotalMb, 0);
+        const usedVram = node.latest_stats.gpus.reduce((s: number, g: any) => s + g.vramUsedMb, 0);
+        const vramHeadroom = totalVram > 0 ? ((totalVram - usedVram) / totalVram) * 100 : 0;
+        const latencyP50 = getNodeLatencyP50(node.id, model);
+        const throughput = getNodeThroughput(node.id, model);
+        const score = (node.latest_stats.inference.in_flight_requests * 40) +
+                      (avgUtil * 0.3) + ((100 - vramHeadroom) * 0.3) +
+                      (latencyP50 * 0.1) - (throughput * 0.05);
+
+        const backend = (node.latest_stats as any).backend;
+        candidates.push({
+            node_id: node.id,
+            hostname: node.hostname,
+            ip_address: node.ip_address,
+            gpu_utilization_avg: avgUtil,
+            in_flight_requests: node.latest_stats.inference.in_flight_requests,
+            backend_type: backend?.type || 'ollama',
+            backend_port: backend?.port || 11434,
+            score: Math.round(score * 10) / 10,
+        });
+    }
+
+    candidates.sort((a, b) => a.score - b.score);
+    return candidates;
+}
+
+/**
  * Get all unique models loaded across the cluster.
  */
 export function getClusterModels(): { model: string; node_count: number; nodes: string[] }[] {

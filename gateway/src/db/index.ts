@@ -45,6 +45,7 @@ export {
     recordRouteThroughput,
     getNodeThroughput,
     findBestNode,
+    findNodesForModel,
     getClusterModels,
     getModelPreloadHints,
 } from './stats';

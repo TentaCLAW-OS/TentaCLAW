@@ -8,6 +8,7 @@ import { createHash } from 'crypto';
 import {
     getClusterModels,
     findBestNode,
+    findNodesForModel,
     resolveModelAlias,
     getAllModelAliases,
     estimateModelVram,
@@ -17,6 +18,17 @@ import {
     cacheResponse,
 } from '../db';
 import { checkChatRateLimit, CHAT_RATE_LIMIT, getQueueStats, MAX_QUEUE_DEPTH } from '../shared';
+
+const INFERENCE_TIMEOUT_MS = 120_000; // 2 min — long enough for slow models
+
+async function fetchWithTimeout(url: string, body: unknown, timeoutMs = INFERENCE_TIMEOUT_MS): Promise<Response> {
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
+    });
+}
 
 const routes = new Hono();
 
@@ -158,95 +170,76 @@ routes.post('/v1/chat/completions', async (c) => {
     if (hasJsonMode) proxyBody.response_format = body.response_format;
     if (body.logprobs !== undefined) proxyBody.logprobs = body.logprobs;
     if (body.top_logprobs !== undefined) proxyBody.top_logprobs = body.top_logprobs;
-    const backendPort = target.backend_port || 11434;
-    const backendUrl = 'http://' + (target.ip_address || target.hostname) + ':' + backendPort + '/v1/chat/completions';
     const startTime = Date.now();
 
-    try {
-        const proxyReq = await fetch(backendUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(proxyBody),
-        });
+    // Failover loop — try all candidates in score order until one succeeds
+    const candidates = [target, ...findNodesForModel(resolvedModel).filter((n: { node_id: string }) => n.node_id !== target.node_id)];
+    let lastErr = '';
 
-        const latencyMs = Date.now() - startTime;
-        recordRouteResult(target.node_id, resolvedModel, latencyMs, proxyReq.ok);
-        logInferenceRequest(target.node_id, resolvedModel, latencyMs, proxyReq.ok);
+    for (const candidate of candidates) {
+        const candidatePort = candidate.backend_port || 11434;
+        const candidateUrl = 'http://' + (candidate.ip_address || candidate.hostname) + ':' + candidatePort + '/v1/chat/completions';
 
-        if (body.stream) {
-            return new Response(proxyReq.body, {
-                status: proxyReq.status,
-                headers: {
-                    'Content-Type': 'text/event-stream',
-                    'Cache-Control': 'no-cache',
-                    'Connection': 'keep-alive',
-                    'X-TentaCLAW-Node': target.node_id,
-                    'X-TentaCLAW-Hostname': target.hostname,
-                    'X-TentaCLAW-Latency': String(latencyMs),
-                },
-            });
-        }
+        try {
+            const proxyReq = await fetchWithTimeout(candidateUrl, proxyBody);
 
-        const result = await proxyReq.json() as Record<string, unknown>;
-        result._tentaclaw = {
-            routed_to: target.node_id,
-            hostname: target.hostname,
-            gpu_utilization: target.gpu_utilization_avg,
-            latency_ms: latencyMs,
-            resolved_model: resolvedModel,
-            alias_used: model !== resolvedModel ? model : undefined,
-            fallback_used: usedFallback ? resolvedModel : undefined,
-            backend: target.backend_type,
-            cached: false,
-            tools_used: hasTools || undefined,
-            json_mode: hasJsonMode || undefined,
-        };
+            const latencyMs = Date.now() - startTime;
+            recordRouteResult(candidate.node_id, resolvedModel, latencyMs, proxyReq.ok);
+            logInferenceRequest(candidate.node_id, resolvedModel, latencyMs, proxyReq.ok);
 
-        if (!body.stream && proxyReq.ok) {
-            const cacheKey = createHash('sha256').update(JSON.stringify({ model: resolvedModel, messages: body.messages })).digest('hex');
-            const usage = (result as any).usage;
-            const tokensSaved = (usage?.total_tokens) || 0;
-            cacheResponse(cacheKey, resolvedModel, JSON.stringify(body.messages).slice(0, 100), JSON.stringify(result), tokensSaved);
-        }
-
-        return c.json(result, proxyReq.status as any);
-
-    } catch (err: any) {
-        recordRouteResult(target.node_id, model, Date.now() - startTime, false);
-        logInferenceRequest(target.node_id, model, Date.now() - startTime, false, 0, 0, err.message);
-
-        const retry = findBestNode(model);
-        if (retry && retry.node_id !== target.node_id) {
-            try {
-                const retryPort = retry.backend_port || 11434;
-                const retryUrl = 'http://' + (retry.ip_address || retry.hostname) + ':' + retryPort + '/v1/chat/completions';
-                const retryReq = await fetch(retryUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body),
+            if (body.stream) {
+                return new Response(proxyReq.body, {
+                    status: proxyReq.status,
+                    headers: {
+                        'Content-Type': 'text/event-stream',
+                        'Cache-Control': 'no-cache',
+                        'Connection': 'keep-alive',
+                        'X-TentaCLAW-Node': candidate.node_id,
+                        'X-TentaCLAW-Hostname': candidate.hostname,
+                        'X-TentaCLAW-Latency': String(latencyMs),
+                    },
                 });
-                const retryLatency = Date.now() - startTime;
-                recordRouteResult(retry.node_id, model, retryLatency, retryReq.ok);
+            }
 
-                const result = await retryReq.json() as Record<string, unknown>;
-                result._tentaclaw = {
-                    routed_to: retry.node_id,
-                    hostname: retry.hostname,
-                    retried_from: target.node_id,
-                    latency_ms: retryLatency,
-                };
-                return c.json(result, retryReq.status as any);
-            } catch {}
+            const result = await proxyReq.json() as Record<string, unknown>;
+            result._tentaclaw = {
+                routed_to: candidate.node_id,
+                hostname: candidate.hostname,
+                gpu_utilization: candidate.gpu_utilization_avg,
+                latency_ms: latencyMs,
+                resolved_model: resolvedModel,
+                alias_used: model !== resolvedModel ? model : undefined,
+                fallback_used: usedFallback ? resolvedModel : undefined,
+                failover_from: candidate.node_id !== target.node_id ? target.node_id : undefined,
+                backend: candidate.backend_type,
+                cached: false,
+                tools_used: hasTools || undefined,
+                json_mode: hasJsonMode || undefined,
+            };
+
+            if (!body.stream && proxyReq.ok) {
+                const cacheKey = createHash('sha256').update(JSON.stringify({ model: resolvedModel, messages: body.messages })).digest('hex');
+                const usage = (result as any).usage;
+                cacheResponse(cacheKey, resolvedModel, JSON.stringify(body.messages).slice(0, 100), JSON.stringify(result), (usage?.total_tokens) || 0);
+            }
+
+            return c.json(result, proxyReq.status as any);
+
+        } catch (err: any) {
+            lastErr = err.message;
+            recordRouteResult(candidate.node_id, resolvedModel, Date.now() - startTime, false);
+            logInferenceRequest(candidate.node_id, resolvedModel, Date.now() - startTime, false, 0, 0, err.message);
+            console.warn(`[failover] Node ${candidate.hostname} failed (${err.message}) — trying next`);
         }
-
-        return c.json({
-            error: {
-                message: 'Failed to proxy to node ' + target.hostname + ': ' + err.message,
-                type: 'proxy_error',
-                node_id: target.node_id,
-            },
-        }, 502);
     }
+
+    return c.json({
+        error: {
+            message: `All ${candidates.length} node(s) with "${resolvedModel}" failed. Last error: ${lastErr}`,
+            type: 'proxy_error',
+            nodes_tried: candidates.map(n => n.node_id),
+        },
+    }, 502);
 });
 
 // =============================================================================
@@ -526,11 +519,7 @@ routes.post('/v1/messages', async (c) => {
         proxyBody.stream = true;
 
         try {
-            const proxyReq = await fetch(backendUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(proxyBody),
-            });
+            const proxyReq = await fetchWithTimeout(backendUrl, proxyBody);
 
             const latencyMs = Date.now() - startTime;
             recordRouteResult(target.node_id, resolvedModel, latencyMs, proxyReq.ok);
@@ -636,70 +625,52 @@ routes.post('/v1/messages', async (c) => {
         }
     }
 
-    // --- Non-streaming path ---
-    try {
-        const proxyReq = await fetch(backendUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(proxyBody),
-        });
+    // --- Non-streaming path — failover loop ---
+    const msgCandidates = [target, ...findNodesForModel(resolvedModel).filter((n: { node_id: string }) => n.node_id !== target.node_id)];
+    let msgLastErr = '';
 
-        const latencyMs = Date.now() - startTime;
-        recordRouteResult(target.node_id, resolvedModel, latencyMs, proxyReq.ok);
-        logInferenceRequest(target.node_id, resolvedModel, latencyMs, proxyReq.ok);
+    for (const candidate of msgCandidates) {
+        const candidatePort = candidate.backend_port || 11434;
+        const candidateUrl = 'http://' + (candidate.ip_address || candidate.hostname) + ':' + candidatePort + '/v1/chat/completions';
 
-        if (!proxyReq.ok) {
-            const errBody = await proxyReq.text();
-            return anthropicError('api_error', 'Backend error: ' + errBody, proxyReq.status);
+        try {
+            const proxyReq = await fetchWithTimeout(candidateUrl, proxyBody);
+
+            const latencyMs = Date.now() - startTime;
+            recordRouteResult(candidate.node_id, resolvedModel, latencyMs, proxyReq.ok);
+            logInferenceRequest(candidate.node_id, resolvedModel, latencyMs, proxyReq.ok);
+
+            if (!proxyReq.ok) {
+                const errBody = await proxyReq.text();
+                return anthropicError('api_error', 'Backend error: ' + errBody, proxyReq.status);
+            }
+
+            const openaiResult = await proxyReq.json() as Record<string, unknown>;
+            const anthropicResult = convertToAnthropicResponse(openaiResult, body.model);
+
+            (anthropicResult as any)._tentaclaw = {
+                routed_to: candidate.node_id,
+                hostname: candidate.hostname,
+                gpu_utilization: candidate.gpu_utilization_avg,
+                latency_ms: latencyMs,
+                resolved_model: resolvedModel,
+                alias_used: body.model !== resolvedModel ? body.model : undefined,
+                fallback_used: usedFallback ? resolvedModel : undefined,
+                failover_from: candidate.node_id !== target.node_id ? target.node_id : undefined,
+                backend: candidate.backend_type,
+            };
+
+            return c.json(anthropicResult);
+
+        } catch (err: any) {
+            msgLastErr = err.message;
+            recordRouteResult(candidate.node_id, resolvedModel, Date.now() - startTime, false);
+            logInferenceRequest(candidate.node_id, resolvedModel, Date.now() - startTime, false, 0, 0, err.message);
+            console.warn(`[failover] Node ${candidate.hostname} failed (${err.message}) — trying next`);
         }
-
-        const openaiResult = await proxyReq.json() as Record<string, unknown>;
-        const anthropicResult = convertToAnthropicResponse(openaiResult, body.model);
-
-        (anthropicResult as any)._tentaclaw = {
-            routed_to: target.node_id,
-            hostname: target.hostname,
-            gpu_utilization: target.gpu_utilization_avg,
-            latency_ms: latencyMs,
-            resolved_model: resolvedModel,
-            alias_used: body.model !== resolvedModel ? body.model : undefined,
-            fallback_used: usedFallback ? resolvedModel : undefined,
-            backend: target.backend_type,
-        };
-
-        return c.json(anthropicResult);
-
-    } catch (err: any) {
-        recordRouteResult(target.node_id, resolvedModel, Date.now() - startTime, false);
-        logInferenceRequest(target.node_id, resolvedModel, Date.now() - startTime, false, 0, 0, err.message);
-
-        const retry = findBestNode(resolvedModel);
-        if (retry && retry.node_id !== target.node_id) {
-            try {
-                const retryPort = retry.backend_port || 11434;
-                const retryUrl = 'http://' + (retry.ip_address || retry.hostname) + ':' + retryPort + '/v1/chat/completions';
-                const retryReq = await fetch(retryUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(proxyBody),
-                });
-                const retryLatency = Date.now() - startTime;
-                recordRouteResult(retry.node_id, resolvedModel, retryLatency, retryReq.ok);
-
-                const retryResult = await retryReq.json() as Record<string, unknown>;
-                const anthropicRetry = convertToAnthropicResponse(retryResult, body.model);
-                (anthropicRetry as any)._tentaclaw = {
-                    routed_to: retry.node_id,
-                    hostname: retry.hostname,
-                    retried_from: target.node_id,
-                    latency_ms: retryLatency,
-                };
-                return c.json(anthropicRetry);
-            } catch {}
-        }
-
-        return anthropicError('api_error', 'Failed to proxy to node ' + target.hostname + ': ' + err.message, 502);
     }
+
+    return anthropicError('api_error', `All ${msgCandidates.length} node(s) failed. Last error: ${msgLastErr}`, 502);
 });
 
 // =============================================================================
@@ -738,11 +709,7 @@ routes.post('/v1/embeddings', async (c) => {
         for (let i = 0; i < inputs.length; i += 32) {
             const batch = inputs.slice(i, i + 32);
             for (const text of batch) {
-                const proxyReq = await fetch(embedUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ model: resolvedModel, input: text }),
-                });
+                const proxyReq = await fetchWithTimeout(embedUrl, { model: resolvedModel, input: text }, 30_000);
                 const result = await proxyReq.json() as any;
                 if (result.data?.[0]) {
                     allEmbeddings.push({
