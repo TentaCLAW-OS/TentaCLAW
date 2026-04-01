@@ -458,6 +458,7 @@ interface ClusterSummary {
     total_toks_per_sec: number;
     loaded_models: string[];
     farm_hashes: string[];
+    uptime_secs?: number;
 }
 
 interface GpuStats {
@@ -549,46 +550,54 @@ async function cmdStatus(gateway: string): Promise<void> {
     const noneOnline = data.online_nodes === 0;
     const mood: keyof typeof personality = noneOnline ? 'error' : allOnline ? 'healthy' : 'warning';
 
-    // Health grade approximation
-    const healthPct = data.total_nodes > 0 ? Math.round((data.online_nodes / data.total_nodes) * 100) : 0;
-    const grade = healthPct >= 90 ? 'A' : healthPct >= 70 ? 'B' : healthPct >= 50 ? 'C' : 'D';
-    const gradeColor = healthPct >= 90 ? C.green : healthPct >= 70 ? C.yellow : C.red;
+    // Status badge
+    const statusBadgeStr = allOnline
+        ? C.green('\u25CF HEALTHY')
+        : noneOnline
+            ? C.red('\u25CF OFFLINE')
+            : C.yellow('\u25CF DEGRADED');
 
-    // VRAM
-    const vramPct = data.total_vram_mb > 0 ? Math.round((data.used_vram_mb / data.total_vram_mb) * 100) : 0;
+    // VRAM (free / total)
     const vramTotalGb = Math.round(data.total_vram_mb / 1024);
-    const vramUsedGb = Math.round(data.used_vram_mb / 1024);
+    const vramFreeGb = Math.round((data.total_vram_mb - data.used_vram_mb) / 1024);
 
     // Throughput
     const toks = formatNumber(Math.round(data.total_toks_per_sec));
 
-    const W = 62;
-    console.log('');
-    console.log(boxTop('CLUSTER STATUS', W));
-    console.log(boxEmpty(W));
-
-    // Row 1: NODES / GPUs / HEALTH
-    const nodesColor = allOnline ? C.green : noneOnline ? C.red : C.yellow;
-    const row1 =
-        C.dim('NODES  ') + nodesColor(C.bold(String(data.online_nodes)) + ' online') + '    ' +
-        C.dim('GPUs  ') + C.cyan(C.bold(String(data.total_gpus)) + ' active') + '    ' +
-        C.dim('HEALTH  ') + gradeColor(C.bold(grade) + ` (${healthPct})`);
-    console.log(boxMid(row1, W));
-
-    // Row 2: VRAM progress bar
-    const vramLabel = C.dim('VRAM   ') + C.white(`${vramUsedGb}/${vramTotalGb} GB`) + '   ' + progressBar(vramPct, 22) + '  ' + C.white(`${vramPct}%`);
-    console.log(boxMid(vramLabel, W));
-
-    // Row 3: Throughput
-    const toksLine = C.dim('TOK/S  ') + C.green(C.bold(toks));
-    console.log(boxMid(toksLine, W));
-
-    // Row 4: Models
+    // Models
     const modelList = data.loaded_models.length > 0
-        ? data.loaded_models.slice(0, 4).join(', ') + (data.loaded_models.length > 4 ? C.dim(` +${data.loaded_models.length - 4} more`) : '')
+        ? data.loaded_models.slice(0, 2).join(', ') +
+          (data.loaded_models.length > 2 ? C.dim(`  +${data.loaded_models.length - 2} more`) : '')
         : C.dim('none');
-    console.log(boxMid(C.dim('MODELS ') + modelList, W));
 
+    // Uptime
+    const uptimeStr = data.uptime_secs != null ? formatUptime(data.uptime_secs) : C.dim('—');
+
+    const W = 55;
+    // Label column width (10 chars) + 2 for "│ " prefix padding handled by boxMid
+    const labelW = 10;
+    const label = (s: string) => C.dim(s.padEnd(labelW));
+
+    // Header: "TENTACLAW CLUSTER" bold teal, version right-aligned
+    const headerTitle = C.bold(C.teal('TENTACLAW CLUSTER'));
+    const headerVer = C.dim('v' + CLI_VERSION);
+    // visible lengths: title = 17, ver = 5+, space between
+    const headerTitleLen = 'TENTACLAW CLUSTER'.length;   // 17
+    const headerVerLen = ('v' + CLI_VERSION).length;      // e.g. 6
+    const headerGap = W - 2 - headerTitleLen - headerVerLen; // W-2 = content width
+    const headerRow = headerTitle + ' '.repeat(Math.max(1, headerGap)) + headerVer;
+
+    console.log('');
+    console.log(boxTop('', W));
+    console.log(boxMid(headerRow, W));
+    console.log(boxSep(W));
+    console.log(boxMid(label('Status') + statusBadgeStr, W));
+    console.log(boxMid(label('Nodes') + C.white(String(data.online_nodes) + ' online') + C.dim('  /  ') + C.white(String(data.total_nodes) + ' total'), W));
+    console.log(boxMid(label('GPUs') + C.cyan(String(data.total_gpus) + ' active'), W));
+    console.log(boxMid(label('VRAM') + C.cyan(String(vramFreeGb) + ' GB free') + C.dim('  /  ') + C.white(String(vramTotalGb) + ' GB total'), W));
+    console.log(boxMid(label('Models') + C.white(modelList), W));
+    console.log(boxMid(label('Tok/s') + C.green(C.bold(toks)), W));
+    console.log(boxMid(label('Uptime') + C.white(uptimeStr), W));
     console.log(boxEmpty(W));
 
     // Personality quote
@@ -613,7 +622,12 @@ async function cmdNodes(gateway: string): Promise<void> {
 
     const W = 72;
     console.log('');
-    console.log(boxTop('NODES', W));
+    console.log(boxTop('', W));
+
+    // Header row: "NODES  (N total)" bold teal + count dim
+    const nodesHeader = C.bold(C.teal('NODES')) + C.dim(`  (${nodes.length} total)`);
+    console.log(boxMid(nodesHeader, W));
+    console.log(boxSep(W));
 
     for (const node of nodes) {
         const stats = node.latest_stats;
