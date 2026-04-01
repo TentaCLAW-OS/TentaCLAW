@@ -390,6 +390,9 @@ start_gateway() {
     while [ $retries -gt 0 ]; do
         if curl -sf "http://localhost:${GATEWAY_PORT}/api/v1/cluster" &>/dev/null; then
             ok "Gateway started on port ${GATEWAY_PORT} (PID $gw_pid)"
+            # Save port so CLI auto-discovers it
+            mkdir -p "$HOME/.tentaclaw"
+            echo "$GATEWAY_PORT" > "$HOME/.tentaclaw/gateway-port"
             return 0
         fi
         sleep 0.5 2>/dev/null || sleep 1
@@ -443,23 +446,36 @@ start_agent() {
     local agent_pid=$!
     echo "$agent_pid" > "$AGENT_PID_FILE"
 
-    # Give agent time to register
-    sleep 2
+    # Wait for agent to actually register with gateway
+    local retries=15
+    while [ $retries -gt 0 ]; do
+        if ! kill -0 "$agent_pid" 2>/dev/null; then
+            fail "Agent process died"
+            info "Check logs: cat $PID_DIR/agent.log"
+            return 1
+        fi
+        local node_count
+        node_count=$(curl -sf "http://localhost:${GATEWAY_PORT}/api/v1/cluster" 2>/dev/null | grep -o '"total":[0-9]*' | grep -o '[0-9]*' || echo "0")
+        if [ "${node_count:-0}" -gt 0 ] 2>/dev/null; then
+            local hostname
+            hostname=$(hostname 2>/dev/null || echo "localhost")
+            ok "Agent registered ($hostname, PID $agent_pid)"
+            return 0
+        fi
+        sleep 1
+        retries=$((retries - 1))
+    done
 
+    # Process alive but not yet showing in cluster — still OK
     if kill -0 "$agent_pid" 2>/dev/null; then
         local hostname
         hostname=$(hostname 2>/dev/null || echo "localhost")
-        if $MOCK_MODE; then
-            ok "Agent registered ($hostname, ${MOCK_GPUS}x mock GPUs, PID $agent_pid)"
-        else
-            ok "Agent registered ($hostname, PID $agent_pid)"
-        fi
+        ok "Agent started ($hostname, PID $agent_pid) — registering..."
         return 0
-    else
-        fail "Agent failed to start"
-        info "Check logs: cat $PID_DIR/agent.log"
-        return 1
     fi
+    fail "Agent failed to start"
+    info "Check logs: cat $PID_DIR/agent.log"
+    return 1
 }
 
 # ──────────────────────────────────────────────────────────────────

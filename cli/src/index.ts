@@ -298,9 +298,16 @@ function parseArgs(argv: string[]): ParsedArgs {
 // =============================================================================
 
 function getGatewayUrl(flags: Record<string, string>): string {
-    return flags['gateway']
-        || process.env['TENTACLAW_GATEWAY']
-        || 'http://localhost:8080';
+    if (flags['gateway']) return flags['gateway'];
+    if (process.env['TENTACLAW_GATEWAY']) return process.env['TENTACLAW_GATEWAY'];
+    // Check saved port from quickstart/install
+    try {
+        const fs = require('fs') as typeof import('fs');
+        const os = require('os') as typeof import('os');
+        const saved = fs.readFileSync(os.homedir() + '/.tentaclaw/gateway-port', 'utf8').trim();
+        if (saved) return `http://localhost:${saved}`;
+    } catch { /* no saved port */ }
+    return 'http://localhost:8080';
 }
 
 // =============================================================================

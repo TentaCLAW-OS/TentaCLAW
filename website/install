@@ -621,6 +621,9 @@ setup_gateway_service() {
     if [ "$GATEWAY_PORT" != "8080" ]; then
         info "Port 8080 in use — using port $GATEWAY_PORT instead"
     fi
+    # Save port for CLI auto-discovery
+    mkdir -p "$HOME/.tentaclaw"
+    echo "$GATEWAY_PORT" > "$HOME/.tentaclaw/gateway-port"
 
     printf '[Unit]\nDescription=TentaCLAW Gateway\nAfter=network.target\n\n[Service]\nType=simple\nWorkingDirectory=%s/gateway\nExecStart=%s %s/gateway/dist/gateway/src/index.js\nRestart=always\nRestartSec=5\nEnvironment=NODE_ENV=production\nEnvironment=TENTACLAW_HOST=0.0.0.0\nEnvironment=TENTACLAW_PORT=%s\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
         "$INSTALL_DIR" "$node_bin" "$INSTALL_DIR" "$GATEWAY_PORT" > /tmp/tentaclaw-gateway.service
