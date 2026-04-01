@@ -73,6 +73,11 @@ export interface StatsPayload {
     };
     toks_per_sec: number;
     requests_completed: number;
+    soul?: {
+        name: string;
+        personality: string;
+        greeting?: string;
+    };
 }
 
 // =============================================================================

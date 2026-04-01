@@ -423,6 +423,11 @@ interface StatsPayload {
     };
     toks_per_sec: number;
     requests_completed: number;
+    soul?: {
+        name: string;
+        personality: string;
+        greeting?: string;
+    };
 }
 
 const MOCK_GPU_PRESETS = [
@@ -1041,6 +1046,57 @@ function getSystemInfo(): any {
     return cachedSystemInfo;
 }
 
+// =============================================================================
+// Soul — agent personality/identity from /etc/tentaclaw/soul.md
+// =============================================================================
+
+interface Soul {
+    name: string;
+    personality: string;
+    greeting?: string;
+}
+
+let cachedSoul: Soul | null | undefined = undefined; // undefined = not read yet
+
+function loadSoul(): Soul | undefined {
+    if (cachedSoul !== undefined) return cachedSoul || undefined;
+
+    const soulPaths = [
+        '/etc/tentaclaw/soul.md',
+        process.env['TENTACLAW_SOUL_PATH'] || '',
+    ].filter(Boolean);
+
+    for (const p of soulPaths) {
+        try {
+            const raw = fs.readFileSync(p, 'utf8');
+            const soul = parseSoulMd(raw);
+            if (soul) { cachedSoul = soul; return soul; }
+        } catch {
+            // not found or unreadable — skip
+        }
+    }
+    cachedSoul = null;
+    return undefined;
+}
+
+function parseSoulMd(content: string): Soul | null {
+    // Expect YAML-style frontmatter between --- delimiters
+    const match = content.match(/^---\n([\s\S]*?)\n---/);
+    if (!match) return null;
+
+    const frontmatter = match[1];
+    const get = (key: string): string | undefined => {
+        const m = frontmatter.match(new RegExp('^' + key + ':\\s*(.+)$', 'm'));
+        return m ? m[1].trim().replace(/^['"]|['"]$/g, '') : undefined;
+    };
+
+    const name = get('name');
+    const personality = get('personality');
+    if (!name || !personality) return null;
+
+    return { name, personality, greeting: get('greeting') };
+}
+
 function collectStats(config: AgentConfig): StatsPayload {
     const gpus = config.mockMode ? getMockGpuStats() : getGpuStats();
     const system = config.mockMode ? getMockSystemStats() : getLinuxSystemStats();
@@ -1066,6 +1122,7 @@ function collectStats(config: AgentConfig): StatsPayload {
         system_info: systemInfo,
         toks_per_sec: config.mockMode ? Math.round(50 + Math.random() * 200) : 0,
         requests_completed: 0,
+        soul: loadSoul(),
     };
 }
 
@@ -1486,6 +1543,11 @@ async function main() {
     console.log('[agent] Hostname:  ' + config.hostname);
     console.log('[agent] Gateway:   ' + (config.gatewayUrl || 'none (standalone)'));
     console.log('[agent] Interval:  ' + config.agentInterval + 's');
+    const soul = loadSoul();
+    if (soul) {
+        console.log('[agent] Soul:      ' + soul.name + ' \u2014 ' + soul.personality);
+        if (soul.greeting) console.log('[agent] Greeting:  ' + soul.greeting);
+    }
     console.log('');
 
     // Start remote shell tunnel

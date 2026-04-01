@@ -219,6 +219,22 @@ NODE_HOSTNAME=${POD_NAME}
 RIGEOF
 ok "Node identity: ${POD_NAME}"
 
+# --- write default soul.md if not present ------------------------------------
+if [ ! -f /etc/tentaclaw/soul.md ]; then
+    cat > /etc/tentaclaw/soul.md <<SOULEOF
+---
+name: ${POD_NAME}
+personality: calm and precise inference node, speaks in short technical observations
+greeting: ${POD_NAME} online. Ready to serve.
+---
+
+# ${POD_NAME}
+
+This node's identity. Edit name/personality/greeting above to customize your agent's soul.
+SOULEOF
+    ok "Soul written: ${POD_NAME}"
+fi
+
 # --- install all workspace deps from root -------------------------------------
 step "Installing dependencies..."
 cd "$INSTALL_DIR"
