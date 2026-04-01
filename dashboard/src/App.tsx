@@ -3,6 +3,7 @@ import { Header } from '@/components/layout/Header';
 import { PanelLayout } from '@/components/layout/PanelLayout';
 import { StatusBar } from '@/components/layout/StatusBar';
 import { CommandPalette } from '@/components/ui/CommandPalette';
+import { KeybindHelp } from '@/components/ui/KeybindHelp';
 import { LoginPage } from '@/components/LoginPage';
 import { useAuthStore } from '@/stores/auth';
 import { usePanelsStore } from '@/stores/panels';
@@ -72,6 +73,7 @@ function Dashboard() {
         style={{ animation: 'scanline 8s linear infinite' }}
       />
       <CommandPalette />
+      <KeybindHelp />
       <Header />
       <PanelLayout />
       <StatusBar />
