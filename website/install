@@ -525,14 +525,6 @@ setup_cli() {
         return
     fi
 
-    # Build TypeScript
-    if [ -f "$cli_dir/tsconfig.json" ]; then
-        info "Building CLI..."
-        (cd "$cli_dir" && npx tsc 2>/dev/null) || {
-            warn "TypeScript build had issues — CLI may work via tsx instead"
-        }
-    fi
-
     # Try to symlink clawtopus to PATH
     local symlink_target=""
     local bin_dir=""
@@ -551,7 +543,15 @@ setup_cli() {
     fi
 
     # Determine the target (compiled JS or tsx wrapper)
-    if [ -f "$cli_dir/dist/index.js" ]; then
+    # Build if not already built
+    if [ ! -f "$cli_dir/dist/cli/src/index.js" ] && [ ! -f "$cli_dir/dist/index.js" ]; then
+        info "Building CLI..."
+        (cd "$cli_dir" && npm install --silent 2>/dev/null && npx tsc 2>/dev/null) || true
+    fi
+
+    if [ -f "$cli_dir/dist/cli/src/index.js" ]; then
+        symlink_target="$cli_dir/dist/cli/src/index.js"
+    elif [ -f "$cli_dir/dist/index.js" ]; then
         symlink_target="$cli_dir/dist/index.js"
     else
         # Create a wrapper script that uses tsx
