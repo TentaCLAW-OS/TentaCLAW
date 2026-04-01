@@ -592,6 +592,94 @@ WRAPPER
 # ──────────────────────────────────────────────────────────────────
 # Launch the setup wizard
 # ──────────────────────────────────────────────────────────────────
+# Install systemd service so gateway starts on boot
+# ──────────────────────────────────────────────────────────────────
+setup_gateway_service() {
+    # Only on Linux with systemd
+    if [ "$OS_TYPE" = "macos" ] || [ "$OS_TYPE" = "windows" ]; then return; fi
+    if ! command_exists systemctl; then return; fi
+
+    echo -e "  ${BOLD}Setting up gateway service...${RESET}"
+    echo ""
+
+    local node_bin
+    node_bin=$(command -v node 2>/dev/null || echo "node")
+
+    local service_file="/etc/systemd/system/tentaclaw-gateway.service"
+
+    cat > /tmp/tentaclaw-gateway.service << SERVICE
+[Unit]
+Description=TentaCLAW Gateway
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$INSTALL_DIR/gateway
+ExecStart=$node_bin $INSTALL_DIR/gateway/dist/index.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=TENTACLAW_HOST=0.0.0.0
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+    # Build gateway for production
+    if [ -f "$INSTALL_DIR/gateway/package.json" ]; then
+        local build_script
+        build_script=$(node -e "const p=require('$INSTALL_DIR/gateway/package.json'); console.log(p.scripts&&p.scripts.build?'build':'')" 2>/dev/null || echo "")
+        if [ -n "$build_script" ]; then
+            info "Building gateway..."
+            (cd "$INSTALL_DIR/gateway" && npm run build 2>/dev/null) || true
+        fi
+    fi
+
+    # Fall back to dev script if no dist
+    if [ ! -f "$INSTALL_DIR/gateway/dist/index.js" ]; then
+        local npm_bin
+        npm_bin=$(command -v npm 2>/dev/null || echo "npm")
+        sed -i "s|ExecStart=.*|ExecStart=$npm_bin run dev|" /tmp/tentaclaw-gateway.service
+        sed -i "/WorkingDirectory/a Environment=PATH=/usr/local/bin:/usr/bin:/bin" /tmp/tentaclaw-gateway.service
+    fi
+
+    if [ "$(id -u)" = "0" ]; then
+        cp /tmp/tentaclaw-gateway.service "$service_file"
+        systemctl daemon-reload
+        systemctl enable tentaclaw-gateway 2>/dev/null
+        systemctl restart tentaclaw-gateway 2>/dev/null
+    elif command_exists sudo; then
+        sudo cp /tmp/tentaclaw-gateway.service "$service_file"
+        sudo systemctl daemon-reload
+        sudo systemctl enable tentaclaw-gateway 2>/dev/null
+        sudo systemctl restart tentaclaw-gateway 2>/dev/null
+    else
+        warn "Cannot install systemd service without sudo"
+        return
+    fi
+
+    # Wait up to 5s for gateway to come up
+    local i=0
+    while [ $i -lt 5 ]; do
+        if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+            ok "Gateway service running (http://localhost:8080)"
+            break
+        fi
+        sleep 1
+        i=$((i+1))
+    done
+
+    if ! curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+        ok "Gateway service installed (starting up...)"
+        info "Check status: systemctl status tentaclaw-gateway"
+    fi
+
+    echo ""
+}
+
+# ──────────────────────────────────────────────────────────────────
 launch_wizard() {
     if $NO_WIZARD; then
         print_manual_instructions
@@ -659,6 +747,7 @@ main() {
     clone_repo
     install_deps
     setup_cli
+    setup_gateway_service
     launch_wizard
 }
 
