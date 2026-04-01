@@ -131,8 +131,8 @@ step "Fetching TentaCLAW OS..."
 
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   CURRENT=$(git -C "$INSTALL_DIR" rev-parse --short HEAD)
-  git -C "$INSTALL_DIR" reset --hard -q
-  git -C "$INSTALL_DIR" pull --ff-only -q
+  git -C "$INSTALL_DIR" fetch origin -q
+  git -C "$INSTALL_DIR" reset --hard origin/master -q
   NEW=$(git -C "$INSTALL_DIR" rev-parse --short HEAD)
   if [[ "$CURRENT" == "$NEW" ]]; then
     ok "Already up to date ($NEW)"
