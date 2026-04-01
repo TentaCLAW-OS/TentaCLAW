@@ -176,9 +176,15 @@
       animation:fadeInUp 0.7s ease-out 0.1s both;
     }
     .hero h1 .gradient-text {
+      color:#00ffff;
       background:linear-gradient(135deg, var(--cyan) 0%, #00d4aa 50%, var(--purple-light) 100%);
-      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
       background-clip:text;
+      display:inline-block;
+    }
+    @supports not (-webkit-background-clip: text) {
+      .hero h1 .gradient-text { color:#00ffff; background:none; -webkit-text-fill-color:unset; }
     }
     .hero-sub {
       font-size:clamp(1.1rem, 2vw, 1.35rem);
