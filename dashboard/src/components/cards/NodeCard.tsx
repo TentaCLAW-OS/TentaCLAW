@@ -83,6 +83,7 @@ export function NodeCard({ node, index = 0 }: NodeCardProps) {
   const isOffline = displayStatus === 'offline';
   const isWarning = displayStatus === 'warning';
   const stats = node.latest_stats;
+  const soul = stats?.soul;
   const toksPerSec = stats?.toks_per_sec ?? 0;
   const isIdle = !isOffline && toksPerSec === 0;
   const gpus = stats?.gpus ?? [];
@@ -145,15 +146,26 @@ export function NodeCard({ node, index = 0 }: NodeCardProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             <StatusDot status={isWarning ? 'warning' : node.status === 'error' ? 'error' : node.status} />
-            <span
-              className="text-xs font-medium truncate"
-              style={{
-                color: 'var(--text-primary)',
-                textDecoration: isOffline ? 'line-through' : 'none',
-              }}
-            >
-              {node.hostname}
-            </span>
+            <div className="flex flex-col min-w-0">
+              <span
+                className="text-xs font-medium truncate"
+                style={{
+                  color: 'var(--text-primary)',
+                  textDecoration: isOffline ? 'line-through' : 'none',
+                }}
+              >
+                {soul?.name ?? node.hostname}
+              </span>
+              {soul && soul.name !== node.hostname && (
+                <span
+                  className="truncate"
+                  style={{ fontSize: 9, color: 'var(--text-dim)', fontStyle: 'italic' }}
+                  title={soul.personality}
+                >
+                  {node.hostname}
+                </span>
+              )}
+            </div>
           </div>
           {!isOffline && (
             <span
