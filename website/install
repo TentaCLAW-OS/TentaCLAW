@@ -609,25 +609,21 @@ setup_gateway_service() {
 
     local service_file="/etc/systemd/system/tentaclaw-gateway.service"
 
-    cat > /tmp/tentaclaw-gateway.service << SERVICE
-[Unit]
-Description=TentaCLAW Gateway
-After=network.target
+    # Smart port selection — find a free port starting at 8080
+    GATEWAY_PORT=8080
+    for try_port in 8080 8081 8082 8083 9080 9090 3080 7080; do
+        if ! ss -tlnp 2>/dev/null | grep -q ":${try_port} " && \
+           ! lsof -i ":${try_port}" >/dev/null 2>&1; then
+            GATEWAY_PORT=$try_port
+            break
+        fi
+    done
+    if [ "$GATEWAY_PORT" != "8080" ]; then
+        info "Port 8080 in use — using port $GATEWAY_PORT instead"
+    fi
 
-[Service]
-Type=simple
-WorkingDirectory=$INSTALL_DIR/gateway
-ExecStart=$node_bin $INSTALL_DIR/gateway/dist/gateway/src/index.js
-Restart=always
-RestartSec=5
-Environment=NODE_ENV=production
-Environment=TENTACLAW_HOST=0.0.0.0
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
+    printf '[Unit]\nDescription=TentaCLAW Gateway\nAfter=network.target\n\n[Service]\nType=simple\nWorkingDirectory=%s/gateway\nExecStart=%s %s/gateway/dist/gateway/src/index.js\nRestart=always\nRestartSec=5\nEnvironment=NODE_ENV=production\nEnvironment=TENTACLAW_HOST=0.0.0.0\nEnvironment=TENTACLAW_PORT=%s\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
+        "$INSTALL_DIR" "$node_bin" "$INSTALL_DIR" "$GATEWAY_PORT" > /tmp/tentaclaw-gateway.service
 
     # Build gateway for production
     if [ -f "$INSTALL_DIR/gateway/package.json" ]; then
@@ -665,15 +661,15 @@ SERVICE
     # Wait up to 5s for gateway to come up
     local i=0
     while [ $i -lt 5 ]; do
-        if curl -sf http://localhost:8080/health >/dev/null 2>&1; then
-            ok "Gateway service running (http://localhost:8080)"
+        if curl -sf "http://localhost:${GATEWAY_PORT}/health" >/dev/null 2>&1; then
+            ok "Gateway service running (http://localhost:${GATEWAY_PORT})"
             break
         fi
         sleep 1
         i=$((i+1))
     done
 
-    if ! curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+    if ! curl -sf "http://localhost:${GATEWAY_PORT}/health" >/dev/null 2>&1; then
         ok "Gateway service installed (starting up...)"
         info "Check status: systemctl status tentaclaw-gateway"
     fi
@@ -858,7 +854,7 @@ print_manual_instructions() {
     echo -e "    cd $INSTALL_DIR/agent && npm run dev"
     echo ""
     echo -e "    ${DIM}# Open dashboard${RESET}"
-    echo -e "    http://localhost:8080/dashboard"
+    echo -e "    http://localhost:${GATEWAY_PORT:-8080}/dashboard"
     echo ""
     echo -e "  ${BOLD}Run the setup wizard later:${RESET}"
     echo -e "    ${CYAN}bash $INSTALL_DIR/scripts/setup-wizard.sh${RESET}"
