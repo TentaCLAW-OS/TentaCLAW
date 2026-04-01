@@ -48,6 +48,7 @@ INSTALL_DIR=""
 NO_WIZARD=false
 WIZARD_FLAGS=""
 REPO_URL="https://github.com/TentaCLAW-OS/TentaCLAW.git"
+GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 OS_TYPE="unknown"
 PKG_MANAGER="unknown"
 IS_WSL=false
@@ -67,6 +68,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --install-dir)
             INSTALL_DIR="$2"
+            shift 2
+            ;;
+        --token)
+            GITHUB_TOKEN="$2"
             shift 2
             ;;
         --help|-h)
@@ -450,9 +455,16 @@ clone_repo() {
             fi
         fi
 
-        if ! git clone --depth 1 -b master "$REPO_URL" "$INSTALL_DIR" 2>&1; then
+        # Build clone URL — inject token if provided (for private repo testing)
+        local CLONE_URL="$REPO_URL"
+        if [ -n "$GITHUB_TOKEN" ]; then
+            CLONE_URL="https://${GITHUB_TOKEN}@github.com/TentaCLAW-OS/TentaCLAW.git"
+            info "Using provided GitHub token for authentication"
+        fi
+
+        if ! git clone --depth 1 -b master "$CLONE_URL" "$INSTALL_DIR" 2>&1; then
             warn "Branch-specific clone failed, trying default branch..."
-            git clone --depth 1 "$REPO_URL" "$INSTALL_DIR" 2>&1 || {
+            git clone --depth 1 "$CLONE_URL" "$INSTALL_DIR" 2>&1 || {
                 die "Failed to clone repository.\n  Check your internet connection and try again.\n  Or: git clone $REPO_URL \"$INSTALL_DIR\""
             }
         fi
