@@ -200,7 +200,7 @@ export function getOptimizedRocmEnv(gpus: AmdGpuInfo[]): Record<string, string> 
 
     if (gpus.length === 0) return env;
 
-    const primaryGpu = gpus[0];
+    const _primaryGpu = gpus[0];
     const hasCdna4 = gpus.some(g => g.family === 'mi350' || g.family === 'mi400' || g.family === 'cdna4');
     const hasCdna3 = gpus.some(g => g.family === 'mi300' || g.family === 'cdna3');
 
