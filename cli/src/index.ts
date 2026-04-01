@@ -179,6 +179,26 @@ function tempColor(temp: number): (s: string) => string {
 function bootSplash(): void {
     const w = 35;
     console.log('');
+    console.log(C.teal([
+        '                          ___',
+        "                       .-'   `'.",
+        '                      /         \\',
+        '                      |         ;',
+        '                      |         |           ___.--,',
+        "             _.._     |0) ~ (0) |    _.---'`__.-( (_.",
+        "      __.--'`_.. '.__.\\.    '--. \\_.-' ,.--'`     `\"\"` ",
+        "     ( ,.--'`   ',__/|)  `-. '.  `.   /   _",
+        "     _`) )  .---.__.' /   `. `. \\_  `-'  /`.)  ",
+        '    `)_\')  /        /     `.  `\\  \\ `\'  /',
+        "     `'''  |  _    |       `. `. `.  /`",
+        '            ;  \\   \'.        `. `. `./',
+        '             \\  \'.   \\         `. `.  `-._     _',
+        "              '.  `'. `.         `-. `.    `.__/",
+        "                `'.  `\\ `.         `.  `-.",
+        "                   `'  \\ `;          `-._`.",
+        "                        ` \\               `'",
+    ].join('\n')));
+    console.log('');
     console.log(`  \u256D${'\u2500'.repeat(w)}\u256E`);
     console.log(`  \u2502  \uD83D\uDC19 ${C.teal(C.bold('CLAWtopus'))} ${C.dim('v' + CLI_VERSION)}${' '.repeat(w - 23)}\u2502`);
     console.log(`  \u2502  ${C.purple(C.italic('Eight arms. One mind.'))}${' '.repeat(w - 24)}\u2502`);
