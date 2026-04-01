@@ -700,6 +700,74 @@ setup_gateway_service() {
 }
 
 # ──────────────────────────────────────────────────────────────────
+# Install agent as systemd service
+# ──────────────────────────────────────────────────────────────────
+setup_agent_service() {
+    if [ "$OS_TYPE" = "macos" ] || [ "$OS_TYPE" = "windows" ]; then return; fi
+    if ! command_exists systemctl; then return; fi
+    if [ ! -f "$INSTALL_DIR/agent/package.json" ]; then
+        warn "Agent package not found — skipping agent service"
+        return
+    fi
+
+    echo -e "  ${BOLD}Setting up agent service...${RESET}"
+    echo ""
+
+    local node_bin
+    node_bin=$(command -v node 2>/dev/null || echo "node")
+    local agent_service="/etc/systemd/system/tentaclaw-agent.service"
+
+    # Build agent
+    if [ -f "$INSTALL_DIR/agent/tsconfig.json" ] && [ ! -f "$INSTALL_DIR/agent/dist/index.js" ]; then
+        info "Building agent..."
+        (cd "$INSTALL_DIR/agent" && npm install --silent 2>/dev/null && npx tsc 2>/dev/null) || true
+    fi
+
+    # Determine agent binary
+    local agent_bin=""
+    if [ -f "$INSTALL_DIR/agent/dist/index.js" ]; then
+        agent_bin="$node_bin $INSTALL_DIR/agent/dist/index.js"
+    else
+        agent_bin="npx --prefix $INSTALL_DIR/agent tsx $INSTALL_DIR/agent/src/index.ts"
+    fi
+
+    # GPU env for AMD Vulkan
+    local gpu_env=""
+    if lspci 2>/dev/null | grep -iE "VGA|3D|Display" | grep -qiE "AMD|Radeon"; then
+        if [ -d /opt/rocm ]; then
+            gpu_env="Environment=HSA_OVERRIDE_GFX_VERSION=11.0.0"
+        else
+            gpu_env="Environment=OLLAMA_VULKAN=1"
+        fi
+    fi
+
+    printf '[Unit]\nDescription=TentaCLAW Agent\nAfter=network.target tentaclaw-gateway.service\nWants=tentaclaw-gateway.service\n\n[Service]\nType=simple\nWorkingDirectory=%s/agent\nExecStart=%s --gateway http://localhost:%s\nRestart=always\nRestartSec=10\nEnvironment=NODE_ENV=production\n%s\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
+        "$INSTALL_DIR" "$agent_bin" "${GATEWAY_PORT:-8080}" "$gpu_env" > /tmp/tentaclaw-agent.service
+
+    if [ "$(id -u)" = "0" ]; then
+        cp /tmp/tentaclaw-agent.service "$agent_service"
+        systemctl daemon-reload
+        systemctl enable tentaclaw-agent 2>/dev/null
+        systemctl restart tentaclaw-agent 2>/dev/null
+    elif command_exists sudo; then
+        sudo cp /tmp/tentaclaw-agent.service "$agent_service"
+        sudo systemctl daemon-reload
+        sudo systemctl enable tentaclaw-agent 2>/dev/null
+        sudo systemctl restart tentaclaw-agent 2>/dev/null
+    fi
+
+    sleep 2
+    if systemctl is-active tentaclaw-agent &>/dev/null; then
+        ok "Agent service running"
+    else
+        ok "Agent service installed (starting up...)"
+        info "Check status: systemctl status tentaclaw-agent"
+    fi
+
+    echo ""
+}
+
+# ──────────────────────────────────────────────────────────────────
 # Install Ollama + pull default coding model
 # ──────────────────────────────────────────────────────────────────
 setup_ollama() {
@@ -960,6 +1028,7 @@ main() {
     install_deps
     setup_cli
     setup_gateway_service
+    setup_agent_service
     setup_ollama
     launch_wizard
 }
