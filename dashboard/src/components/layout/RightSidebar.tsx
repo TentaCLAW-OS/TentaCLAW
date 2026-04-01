@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { usePanelsStore } from '@/stores/panels';
 import { useClusterStore } from '@/stores/cluster';
 import { TodoTracker } from '@/components/ui/TodoTracker';
@@ -18,18 +18,20 @@ function CollapsibleSection({
     <div>
       <button
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
         className="w-full flex items-center justify-between px-3 py-1.5 text-[9px] uppercase tracking-[2px] cursor-pointer"
         style={{ color: 'var(--text-muted)' }}
       >
         <span>{title}</span>
         <span
+          aria-hidden="true"
           className="text-[8px] transition-transform duration-200"
           style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}
         >
           ▾
         </span>
       </button>
-      {open && <div className="px-3 pb-2">{children}</div>}
+      <div className="px-3 pb-2" style={{ display: open ? undefined : 'none' }}>{children}</div>
     </div>
   );
 }
@@ -69,15 +71,17 @@ function HealthSnapshot() {
 
 function ActiveModels() {
   const nodes = useClusterStore((s) => s.nodes);
-  const models = new Set<string>();
-  for (const node of nodes) {
-    if (node.latest_stats?.inference.loaded_models) {
-      for (const m of node.latest_stats.inference.loaded_models) {
-        models.add(m);
+  const modelList = useMemo(() => {
+    const models = new Set<string>();
+    for (const node of nodes) {
+      if (node.latest_stats?.inference.loaded_models) {
+        for (const m of node.latest_stats.inference.loaded_models) {
+          models.add(m);
+        }
       }
     }
-  }
-  const modelList = [...models].slice(0, 8);
+    return [...models].slice(0, 8);
+  }, [nodes]);
 
   if (modelList.length === 0) {
     return (

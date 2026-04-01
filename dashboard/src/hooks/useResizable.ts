@@ -88,7 +88,7 @@ export function useResizable({
       document.body.style.userSelect = prevUserSelect;
       document.body.style.cursor = prevCursor;
     };
-  }, [isResizing, direction, minSize, maxSize]); // onResize removed — read via ref
+  }, [isResizing, direction, minSize, maxSize, invert]); // onResize removed — read via ref
 
   return { size, isResizing, handleMouseDown };
 }

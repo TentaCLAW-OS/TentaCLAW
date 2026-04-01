@@ -81,21 +81,20 @@ export function TaskLog() {
     invert: true,
   });
 
-  // Listen for SSE events via a secondary EventSource for the task log
+  // Derive task rows from the shared SSE event in the cluster store
   useEffect(() => {
-    const es = new EventSource('/api/v1/events');
-    es.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === 'connected') return;
-        const row = sseEventToRow(data.type, data);
-        if (row) {
-          setTasks((prev) => [row, ...prev].slice(0, 50));
-        }
-      } catch { /* ignore */ }
-    };
-    return () => es.close();
-  }, []);
+    if (!lastEvent) return;
+    try {
+      const data = typeof (lastEvent as { data?: unknown }).data === 'string'
+        ? JSON.parse((lastEvent as { data: string }).data)
+        : lastEvent;
+      if ((data as { type?: string }).type === 'connected') return;
+      const row = sseEventToRow((data as { type: string }).type, data as Record<string, unknown>);
+      if (row) {
+        setTasks((prev) => [row, ...prev].slice(0, 50));
+      }
+    } catch { /* ignore */ }
+  }, [lastEvent]);
 
   if (collapsed) {
     return (
