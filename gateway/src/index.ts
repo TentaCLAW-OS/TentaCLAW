@@ -4557,10 +4557,40 @@ const server = serve({
     port: PORT,
     hostname: HOST,
 }, (info) => {
-    console.log(`[tentaclaw] Gateway listening on http://${HOST}:${info.port}`);
-    console.log(`[tentaclaw] Dashboard: http://${HOST}:${info.port}/dashboard`);
-    console.log(`[tentaclaw] API: http://${HOST}:${info.port}/api/v1`);
-    console.log(`[tentaclaw] Health: http://${HOST}:${info.port}/health`);
+    const T = (s: string) => `\x1b[38;2;0;212;170m${s}\x1b[0m`;
+    const P = (s: string) => `\x1b[38;2;139;92;246m${s}\x1b[0m`;
+    const D = (s: string) => `\x1b[2m${s}\x1b[0m`;
+    const B = (s: string) => `\x1b[1m${s}\x1b[0m`;
+    console.log('');
+    console.log(T([
+        '                          ___',
+        "                       .-'   `'.",
+        '                      /         \\',
+        '                      |         ;',
+        '                      |         |           ___.--,',
+        "             _.._     |0) ~ (0) |    _.---'`__.-( (_.",
+        "      __.--'`_.. '.__.\\.    '--. \\_.-' ,.--'`     `\"\"` ",
+        "     ( ,.--'`   ',__/|)  `-. '.  `.   /   _",
+        "     _`) )  .---.__.' /   `. `. \\_  `-'  /`.)  ",
+        '    `)_\')  /        /     `.  `\\  \\ `\'  /',
+        "     `'''  |  _    |       `. `. `.  /`",
+        '            ;  \\   \'.        `. `. `./',
+        '             \\  \'.   \\         `. `.  `-._     _',
+        "              '.  `'. `.         `-. `.    `.__/",
+        "                `'.  `\\ `.         `.  `-.",
+        "                   `'  \\ `;          `-._`.",
+        "                        ` \\               `'",
+    ].join('\n')));
+    console.log('');
+    console.log(`  ${P('╭──────────────────────────────────────────────────────╮')}`);
+    console.log(`  ${P('│')}                                                      ${P('│')}`);
+    console.log(`  ${P('│')}   ${T(B('TentaCLAW Gateway'))}  ${D('v1.0.0')}                          ${P('│')}`);
+    console.log(`  ${P('│')}   ${D('The AI inference cluster operating system')}          ${P('│')}`);
+    console.log(`  ${P('│')}                                                      ${P('│')}`);
+    console.log(`  ${P('│')}   ${D(`Dashboard  →  http://localhost:${info.port}/dashboard`)}      ${P('│')}`);
+    console.log(`  ${P('│')}   ${D(`API        →  http://localhost:${info.port}/api/v1`)}          ${P('│')}`);
+    console.log(`  ${P('│')}                                                      ${P('│')}`);
+    console.log(`  ${P('╰──────────────────────────────────────────────────────╯')}`);
     console.log('');
 
     // Remote shell WebSocket server
