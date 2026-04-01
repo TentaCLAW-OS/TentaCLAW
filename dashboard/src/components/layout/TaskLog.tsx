@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useClusterStore } from '@/stores/cluster';
+import { usePanelsStore } from '@/stores/panels';
+import { useResizable } from '@/hooks/useResizable';
+import { ResizeHandle } from '@/components/layout/ResizeHandle';
 
 type LogTab = 'tasks' | 'cluster-log' | 'alerts';
 
@@ -63,6 +66,21 @@ export function TaskLog() {
   const alerts = useClusterStore((s) => s.alerts);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const bottomHeight = usePanelsStore((s) => s.bottomPanelHeight);
+  const collapsed = usePanelsStore((s) => s.bottomPanelCollapsed);
+  const toggleBottom = usePanelsStore((s) => s.toggleBottomPanel);
+  const setHeight = usePanelsStore((s) => s.setBottomPanelHeight);
+
+  // invert: true so dragging UP increases height (bottom panel grows upward)
+  const { size, isResizing, handleMouseDown: handleResizeMouseDown } = useResizable({
+    direction: 'vertical',
+    initialSize: bottomHeight,
+    minSize: 80,
+    maxSize: 400,
+    onResize: setHeight,
+    invert: true,
+  });
+
   // Listen for SSE events via a secondary EventSource for the task log
   useEffect(() => {
     const es = new EventSource('/api/v1/events');
@@ -79,99 +97,127 @@ export function TaskLog() {
     return () => es.close();
   }, []);
 
-  return (
-    <div
-      className="h-[140px] shrink-0 flex flex-col"
-      style={{
-        background: 'rgba(8,10,16,0.8)',
-        backdropFilter: 'blur(12px)',
-        borderTop: '1px solid var(--border)',
-      }}
-    >
-      {/* Tab bar */}
-      <div className="flex gap-0 px-3 shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
-        {logTabs.map((tab) => {
-          const active = activeLogTab === tab.id;
-          return (
-            <div
-              key={tab.id}
-              className="px-3.5 py-1.5 text-[10px] cursor-pointer border-b-2 transition-colors"
-              style={{
-                borderBottomColor: active ? 'var(--cyan)' : 'transparent',
-                color: active ? 'rgba(0,255,255,0.7)' : 'var(--text-muted)',
-              }}
-              onClick={() => setActiveLogTab(tab.id)}
-            >
-              {tab.label}
-            </div>
-          );
-        })}
+  if (collapsed) {
+    return (
+      <div
+        className="flex items-center px-3 shrink-0 cursor-pointer"
+        style={{
+          height: 28,
+          background: 'rgba(8,10,16,0.8)',
+          borderTop: '1px solid var(--border)',
+        }}
+        onClick={toggleBottom}
+      >
+        <span className="text-[9px]" style={{ color: 'var(--text-dim)' }}>&#9650; Tasks / Cluster Log / Alerts</span>
       </div>
+    );
+  }
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto px-3 py-1.5">
-        {activeLogTab === 'tasks' ? (
-          <div className="flex flex-col gap-px">
-            {tasks.map((task, idx) => (
+  return (
+    <>
+      <ResizeHandle direction="vertical" onMouseDown={handleResizeMouseDown} isResizing={isResizing} />
+      <div
+        className="shrink-0 flex flex-col"
+        style={{
+          height: size,
+          background: 'rgba(8,10,16,0.8)',
+          backdropFilter: 'blur(12px)',
+          borderTop: '1px solid var(--border)',
+        }}
+      >
+        {/* Tab bar */}
+        <div className="flex gap-0 px-3 shrink-0 items-center" style={{ borderBottom: '1px solid var(--border)' }}>
+          {logTabs.map((tab) => {
+            const active = activeLogTab === tab.id;
+            return (
               <div
-                key={idx}
-                className="grid items-center gap-2 py-0.5"
-                style={{ gridTemplateColumns: '90px 100px 80px 1fr 70px' }}
+                key={tab.id}
+                className="px-3.5 py-1.5 text-[10px] cursor-pointer border-b-2 transition-colors"
+                style={{
+                  borderBottomColor: active ? 'var(--cyan)' : 'transparent',
+                  color: active ? 'rgba(0,255,255,0.7)' : 'var(--text-muted)',
+                }}
+                onClick={() => setActiveLogTab(tab.id)}
               >
-                <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                  {task.time}
-                </span>
-                <span className="text-[10px] font-mono truncate" style={{ color: 'var(--cyan)' }}>
-                  {task.node}
-                </span>
-                <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                  {task.user}
-                </span>
-                <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>
-                  {task.description}
-                </span>
-                <span
-                  className="text-[10px] font-mono text-right"
-                  style={{ color: task.statusColor }}
-                >
-                  {task.status}
-                </span>
+                {tab.label}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-px">
-            {activeLogTab === 'alerts' && alerts.length > 0 ? (
-              alerts.slice(0, 20).map((alert, idx) => (
+            );
+          })}
+          <button
+            onClick={toggleBottom}
+            className="ml-auto text-[9px] cursor-pointer px-1.5"
+            style={{ color: 'var(--text-dim)' }}
+            title="Collapse panel (Ctrl+`)"
+          >
+            &#9660;
+          </button>
+        </div>
+
+        {/* Content */}
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-1.5">
+          {activeLogTab === 'tasks' ? (
+            <div className="flex flex-col gap-px">
+              {tasks.map((task, idx) => (
                 <div
-                  key={alert.id ?? idx}
+                  key={idx}
                   className="grid items-center gap-2 py-0.5"
-                  style={{ gridTemplateColumns: '90px 100px 1fr 70px' }}
+                  style={{ gridTemplateColumns: '90px 100px 80px 1fr 70px' }}
                 >
                   <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                    {new Date(alert.created_at).toLocaleTimeString('en-US', { hour12: false })}
+                    {task.time}
                   </span>
-                  <span className="text-[10px] font-mono truncate" style={{ color: alert.severity === 'critical' ? 'var(--red)' : 'var(--yellow)' }}>
-                    {alert.node_id?.split('-').slice(-1)[0] || alert.node_id}
+                  <span className="text-[10px] font-mono truncate" style={{ color: 'var(--cyan)' }}>
+                    {task.node}
+                  </span>
+                  <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                    {task.user}
                   </span>
                   <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>
-                    {alert.message}
+                    {task.description}
                   </span>
-                  <span className="text-[10px] font-mono text-right" style={{ color: alert.severity === 'critical' ? 'var(--red)' : 'var(--yellow)' }}>
-                    {alert.severity === 'critical' ? '\u2717 CRIT' : '\u26A0 WARN'}
+                  <span
+                    className="text-[10px] font-mono text-right"
+                    style={{ color: task.statusColor }}
+                  >
+                    {task.status}
                   </span>
                 </div>
-              ))
-            ) : (
-              <div className="flex items-center justify-center h-full">
-                <span className="text-[10px]" style={{ color: 'var(--text-dim)' }}>
-                  {activeLogTab === 'cluster-log' ? 'Cluster log events will appear here' : 'No active alerts \u2014 cluster is healthy'}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-px">
+              {activeLogTab === 'alerts' && alerts.length > 0 ? (
+                alerts.slice(0, 20).map((alert, idx) => (
+                  <div
+                    key={alert.id ?? idx}
+                    className="grid items-center gap-2 py-0.5"
+                    style={{ gridTemplateColumns: '90px 100px 1fr 70px' }}
+                  >
+                    <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                      {new Date(alert.created_at).toLocaleTimeString('en-US', { hour12: false })}
+                    </span>
+                    <span className="text-[10px] font-mono truncate" style={{ color: alert.severity === 'critical' ? 'var(--red)' : 'var(--yellow)' }}>
+                      {alert.node_id?.split('-').slice(-1)[0] || alert.node_id}
+                    </span>
+                    <span className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>
+                      {alert.message}
+                    </span>
+                    <span className="text-[10px] font-mono text-right" style={{ color: alert.severity === 'critical' ? 'var(--red)' : 'var(--yellow)' }}>
+                      {alert.severity === 'critical' ? '\u2717 CRIT' : '\u26A0 WARN'}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <span className="text-[10px]" style={{ color: 'var(--text-dim)' }}>
+                    {activeLogTab === 'cluster-log' ? 'Cluster log events will appear here' : 'No active alerts \u2014 cluster is healthy'}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -6,6 +6,8 @@ interface UseResizableOptions {
   minSize: number;
   maxSize: number;
   onResize?: (size: number) => void;
+  /** Set true for panels that grow against the drag direction (e.g. bottom panel: drag up = increase height). */
+  invert?: boolean;
 }
 
 interface UseResizableReturn {
@@ -31,6 +33,7 @@ export function useResizable({
   minSize,
   maxSize,
   onResize,
+  invert = false,
 }: UseResizableOptions): UseResizableReturn {
   const [size, setSize] = useState(initialSize);
   const [isResizing, setIsResizing] = useState(false);
@@ -58,7 +61,9 @@ export function useResizable({
 
     const handleMouseMove = (e: MouseEvent) => {
       const currentPos = direction === 'horizontal' ? e.clientX : e.clientY;
-      const delta = currentPos - startPos.current;
+      const delta = invert
+        ? startPos.current - currentPos
+        : currentPos - startPos.current;
       const newSize = Math.min(maxSize, Math.max(minSize, startSize.current + delta));
       setSize(newSize);
       onResizeRef.current?.(newSize); // stable ref call — not in dep array
