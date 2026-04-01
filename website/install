@@ -1,1036 +1,231 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
-# TentaCLAW OS — One-Line Installer
+# TentaCLAW OS — Installer
 # =============================================================================
-# Usage: curl -fsSL tentaclaw.io/install | bash
-#   Or:  curl -fsSL tentaclaw.io/install | bash -s -- --mock
-#   Or:  curl -fsSL tentaclaw.io/install | bash -s -- --no-wizard
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/TentaCLAW-OS/TentaCLAW/master/install.sh | bash
 #
-# What this does:
-#   1. Shows the TentaCLAW splash
-#   2. Detects your OS (Ubuntu/Debian, Fedora, CentOS/RHEL, Arch, Alpine, macOS, WSL2)
-#   3. Installs Node.js if missing (via nvm or system package manager)
-#   4. Clones the TentaCLAW repo
-#   5. Installs dependencies (gateway, agent, cli)
-#   6. Symlinks `tentaclaw` to PATH
-#   7. Launches the interactive setup wizard
-#
-# Flags:
-#   --no-wizard       Skip the setup wizard at the end
-#   --mock            Pass --mock to the setup wizard
-#   --install-dir DIR Set custom install directory
-#   --help            Show this help
-#
-# TentaCLAW says: "One curl. That's all it takes."
+# Or with options:
+#   bash install.sh --port 9090
+#   bash install.sh --dir /opt/tentaclaw
+#   bash install.sh --no-service        # don't install systemd, just build
 # =============================================================================
 
 set -euo pipefail
 
-# Error trap — report the failing line on unexpected errors
-trap 'echo -e "${RED:-}Error on line $LINENO${RESET:-}"; exit 1' ERR
+# --- defaults -----------------------------------------------------------------
+INSTALL_DIR="/opt/tentaclaw"
+PORT=8080
+INSTALL_SERVICE=true
+REPO="https://github.com/TentaCLAW-OS/TentaCLAW.git"
+NODE_MIN=20
 
-# ──────────────────────────────────────────────────────────────────
-# Brand colors (24-bit true color)
-# ──────────────────────────────────────────────────────────────────
-CYAN='\033[38;2;0;212;170m'
-PURPLE='\033[38;2;139;92;246m'
-GREEN='\033[38;2;0;255;136m'
-RED='\033[38;2;255;70;70m'
-YELLOW='\033[38;2;255;220;0m'
-DIM='\033[2m'
-BOLD='\033[1m'
-RESET='\033[0m'
+# --- colors -------------------------------------------------------------------
+CY='\033[38;2;0;255;255m'   # cyan
+PU='\033[38;2;140;0;200m'   # purple
+GR='\033[38;2;0;255;136m'   # green
+YE='\033[38;2;255;220;50m'  # yellow
+RE='\033[38;2;255;70;70m'   # red
+DI='\033[38;2;80;80;100m'   # dim
+RS='\033[0m'
 
-# ──────────────────────────────────────────────────────────────────
-# Defaults
-# ──────────────────────────────────────────────────────────────────
-INSTALL_DIR=""
-NO_WIZARD=false
-WIZARD_FLAGS=""
-REPO_URL="https://github.com/TentaCLAW-OS/TentaCLAW.git"
-GITHUB_TOKEN="${GITHUB_TOKEN:-}"
-OS_TYPE="unknown"
-PKG_MANAGER="unknown"
-IS_WSL=false
+step()  { echo -e "\n${CY}▸ $*${RS}"; }
+ok()    { echo -e "  ${GR}✓${RS} $*"; }
+warn()  { echo -e "  ${YE}⚠${RS} $*"; }
+die()   { echo -e "\n${RE}✗ $*${RS}\n"; exit 1; }
 
-# ──────────────────────────────────────────────────────────────────
-# Parse arguments
-# ──────────────────────────────────────────────────────────────────
+# --- parse args ---------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --no-wizard)
-            NO_WIZARD=true
-            shift
-            ;;
-        --mock)
-            WIZARD_FLAGS="--auto"
-            shift
-            ;;
-        --install-dir)
-            INSTALL_DIR="$2"
-            shift 2
-            ;;
-        --token)
-            GITHUB_TOKEN="$2"
-            shift 2
-            ;;
-        --help|-h)
-            echo "TentaCLAW OS — One-Line Installer"
-            echo ""
-            echo "Usage: curl -fsSL tentaclaw.io/install | bash"
-            echo "       curl -fsSL tentaclaw.io/install | bash -s -- [OPTIONS]"
-            echo ""
-            echo "Options:"
-            echo "  --no-wizard       Skip the interactive setup wizard"
-            echo "  --mock            Run setup wizard in auto mode"
-            echo "  --install-dir DIR Custom install directory"
-            echo "  --help, -h        Show this help"
-            exit 0
-            ;;
-        *)
-            echo "Unknown option: $1 (use --help for usage)"
-            exit 1
-            ;;
-    esac
+  case "$1" in
+    --port)        PORT="$2";        shift 2 ;;
+    --dir)         INSTALL_DIR="$2"; shift 2 ;;
+    --no-service)  INSTALL_SERVICE=false; shift ;;
+    --help|-h)
+      echo "Usage: bash install.sh [--port N] [--dir PATH] [--no-service]"
+      exit 0 ;;
+    *) warn "Unknown option: $1"; shift ;;
+  esac
 done
 
-# ──────────────────────────────────────────────────────────────────
-# Helper functions
-# ──────────────────────────────────────────────────────────────────
-command_exists() { command -v "$1" &>/dev/null; }
+# --- banner -------------------------------------------------------------------
+echo -e "${CY}"
+cat << 'BANNER'
+  ████████╗███████╗███╗   ██╗████████╗ █████╗  ██████╗██╗      █████╗ ██╗    ██╗
+     ██╔══╝██╔════╝████╗  ██║╚══██╔══╝██╔══██╗██╔════╝██║     ██╔══██╗██║    ██║
+     ██║   █████╗  ██╔██╗ ██║   ██║   ███████║██║     ██║     ███████║██║ █╗ ██║
+     ██║   ██╔══╝  ██║╚██╗██║   ██║   ██╔══██║██║     ██║     ██╔══██║██║███╗██║
+     ██║   ███████╗██║ ╚████║   ██║   ██║  ██║╚██████╗███████╗██║  ██║╚███╔███╔╝
+     ╚═╝   ╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝
+BANNER
+echo -e "${DI}  Distributed AI Inference Cluster Management${RS}"
+echo ""
 
-ok()   { echo -e "  ${GREEN}✓${RESET} $1"; }
-fail() { echo -e "  ${RED}✗${RESET} $1"; }
-warn() { echo -e "  ${YELLOW}!${RESET} $1"; }
-info() { echo -e "  ${DIM}  $1${RESET}"; }
+# --- root check ---------------------------------------------------------------
+if [[ "$EUID" -ne 0 ]]; then
+  die "Run as root: sudo bash install.sh"
+fi
 
-die() {
-    echo ""
-    echo -e "  ${RED}${BOLD}Error:${RESET} $1"
-    echo ""
-    exit 1
-}
+# --- detect OS ----------------------------------------------------------------
+step "Detecting system..."
 
-# ──────────────────────────────────────────────────────────────────
-# TentaCLAW splash
-# ──────────────────────────────────────────────────────────────────
-print_splash() {
-    echo ""
-    echo -e "${CYAN}${BOLD}"
-    cat << 'OCTOPUS'
+if [[ -f /etc/os-release ]]; then
+  source /etc/os-release
+  OS_ID="${ID:-unknown}"
+  OS_LIKE="${ID_LIKE:-}"
+else
+  die "Cannot detect OS. Supported: Debian, Ubuntu, RHEL, Rocky, AlmaLinux."
+fi
 
-                          ___
-                       .-'   `'.
-                      /         \
-                      |         ;
-                      |         |           ___.--,
-             _.._     |0) ~ (0) |    _.---'`__.-( (_.
-      __.--'`_.. '.__.\    '--. \_.-' ,.--'`     `""`
-     ( ,.--'`   ',__/|)  `-. '.  `.   /   _
-     _`) )  .---.__.' /   `. `. \_  `-'  /`.)
-    `)_')  /        /     `.  `\  \ `'  /
-     `'''  |  _    |       `. `. `.  /`
-            ;  \   '.        `. `. `./
-             \  '.   \         `. `.  `-._     _
-              '.  `'. `.         `-. `.    `.__/
-                `'.  `\ `.         `.  `-.
-                   `'  \ `;          `-._`.
-                        ` \               `'
-OCTOPUS
-    echo -e "${RESET}"
-    echo ""
-    echo -e "  ${PURPLE}╭──────────────────────────────────────────────────────╮${RESET}"
-    echo -e "  ${PURPLE}│${RESET}                                                      ${PURPLE}│${RESET}"
-    echo -e "  ${PURPLE}│${RESET}   ${CYAN}${BOLD}TentaCLAW OS${RESET}  ${DIM}v1.0.0${RESET}                              ${PURPLE}│${RESET}"
-    echo -e "  ${PURPLE}│${RESET}   ${DIM}The AI inference cluster operating system${RESET}          ${PURPLE}│${RESET}"
-    echo -e "  ${PURPLE}│${RESET}                                                      ${PURPLE}│${RESET}"
-    echo -e "  ${PURPLE}│${RESET}   ${DIM}Eight arms. One mind. Zero compromises.${RESET}           ${PURPLE}│${RESET}"
-    echo -e "  ${PURPLE}│${RESET}                                                      ${PURPLE}│${RESET}"
-    echo -e "  ${PURPLE}╰──────────────────────────────────────────────────────╯${RESET}"
-    echo ""
-}
+is_debian() { [[ "$OS_ID" == "debian" || "$OS_ID" == "ubuntu" || "$OS_LIKE" == *"debian"* ]]; }
+is_rhel()   { [[ "$OS_ID" == "rhel" || "$OS_ID" == "rocky" || "$OS_ID" == "almalinux" || "$OS_LIKE" == *"rhel"* ]]; }
 
-# ──────────────────────────────────────────────────────────────────
-# Detect OS and package manager
-# ──────────────────────────────────────────────────────────────────
-detect_os() {
-    echo -e "  ${BOLD}Detecting system...${RESET}"
-    echo ""
+if is_debian; then
+  ok "Debian/Ubuntu ($PRETTY_NAME)"
+elif is_rhel; then
+  ok "RHEL-compatible ($PRETTY_NAME)"
+else
+  warn "Untested OS: $PRETTY_NAME — attempting anyway"
+fi
 
-    # ── Detect WSL2 early (it reports as Linux but needs special handling) ──
-    IS_WSL=false
-    if [ -f /proc/version ] && grep -qi "microsoft\|wsl" /proc/version 2>/dev/null; then
-        IS_WSL=true
-    elif [ -n "${WSL_DISTRO_NAME:-}" ]; then
-        IS_WSL=true
-    fi
-
-    if [[ "${OSTYPE:-}" == "darwin"* ]]; then
-        OS_TYPE="macos"
-        if command_exists brew; then
-            PKG_MANAGER="brew"
-        else
-            PKG_MANAGER="none"
-        fi
-
-        # Detect architecture
-        local arch
-        arch=$(uname -m 2>/dev/null || echo "unknown")
-        case "$arch" in
-            arm64|aarch64) ok "macOS detected (Apple Silicon / arm64)" ;;
-            x86_64)        ok "macOS detected (Intel / x86_64)" ;;
-            *)             ok "macOS detected ($arch)" ;;
-        esac
-
-        if [ "$PKG_MANAGER" = "none" ]; then
-            warn "Homebrew not found — some features may require manual setup"
-            info "Install Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-        fi
-
-        if [ -z "$INSTALL_DIR" ]; then INSTALL_DIR="$HOME/TentaCLAW"; fi
-
-    elif [ -f /etc/os-release ]; then
-        # shellcheck disable=SC1091
-        . /etc/os-release
-        local wsl_note=""
-        if $IS_WSL; then wsl_note=" (WSL2)"; fi
-
-        case "${ID:-}" in
-            ubuntu|debian|pop|linuxmint|elementary|zorin|neon|kali|raspbian)
-                OS_TYPE="debian"
-                PKG_MANAGER="apt"
-                ok "${PRETTY_NAME}${wsl_note} detected (apt)"
-
-                # Verify supported versions for Ubuntu/Debian
-                case "${ID:-}" in
-                    ubuntu)
-                        local ver="${VERSION_ID:-0}"
-                        case "$ver" in
-                            20.04|22.04|24.04|24.10) ;; # Supported
-                            *) info "Ubuntu $ver — not tested but should work (tested: 20.04, 22.04, 24.04)" ;;
-                        esac
-                        ;;
-                    debian)
-                        local ver="${VERSION_ID:-0}"
-                        case "$ver" in
-                            11|12) ;; # Supported
-                            *) info "Debian $ver — not tested but should work (tested: 11, 12)" ;;
-                        esac
-                        ;;
-                esac
-                ;;
-            fedora)
-                OS_TYPE="fedora"
-                PKG_MANAGER="dnf"
-                ok "${PRETTY_NAME}${wsl_note} detected (dnf)"
-
-                local ver="${VERSION_ID:-0}"
-                case "$ver" in
-                    38|39|40|41) ;; # Supported
-                    *) info "Fedora $ver — not tested but should work (tested: 38, 39, 40)" ;;
-                esac
-                ;;
-            rhel|centos|rocky|alma|ol)
-                OS_TYPE="rhel"
-                if command_exists dnf; then PKG_MANAGER="dnf"
-                else PKG_MANAGER="yum"
-                fi
-                ok "${PRETTY_NAME}${wsl_note} detected ($PKG_MANAGER)"
-
-                # CentOS Stream 9 / RHEL 9 are the recommended targets
-                local ver="${VERSION_ID:-0}"
-                local major_ver="${ver%%.*}"
-                if [ "$major_ver" -lt 8 ] 2>/dev/null; then
-                    warn "RHEL/CentOS $ver is quite old — version 8+ recommended"
-                fi
-                ;;
-            arch|manjaro|endeavouros|garuda|artix)
-                OS_TYPE="arch"
-                PKG_MANAGER="pacman"
-                ok "${PRETTY_NAME}${wsl_note} detected (pacman)"
-                ;;
-            opensuse*|sles)
-                OS_TYPE="suse"
-                PKG_MANAGER="zypper"
-                ok "${PRETTY_NAME}${wsl_note} detected (zypper)"
-                ;;
-            alpine)
-                OS_TYPE="alpine"
-                PKG_MANAGER="apk"
-                ok "${PRETTY_NAME}${wsl_note} detected (apk)"
-                info "Alpine uses musl libc — some Node.js native modules may need --build-from-source"
-                ;;
-            *)
-                OS_TYPE="linux-other"
-                # Probe for package manager
-                if command_exists apt-get;  then PKG_MANAGER="apt"
-                elif command_exists dnf;    then PKG_MANAGER="dnf"
-                elif command_exists yum;    then PKG_MANAGER="yum"
-                elif command_exists pacman; then PKG_MANAGER="pacman"
-                elif command_exists zypper; then PKG_MANAGER="zypper"
-                elif command_exists apk;    then PKG_MANAGER="apk"
-                fi
-                ok "Linux detected${wsl_note} ($PKG_MANAGER)"
-                ;;
-        esac
-
-        if $IS_WSL; then
-            info "Running under WSL2 — GPU passthrough requires NVIDIA WSL drivers"
-            info "See: https://docs.nvidia.com/cuda/wsl-user-guide/"
-        fi
-
-        # Set default install dir for Linux
-        if [ -z "$INSTALL_DIR" ]; then
-            if [ "$(id -u)" = "0" ]; then
-                INSTALL_DIR="/opt/tentaclaw"
-            else
-                INSTALL_DIR="$HOME/TentaCLAW"
-            fi
-        fi
-
-    elif [[ "${OSTYPE:-}" == "msys" || "${OSTYPE:-}" == "cygwin" ]]; then
-        OS_TYPE="windows"
-        PKG_MANAGER="none"
-        ok "Windows (Git Bash/MSYS2) detected"
-        if [ -z "$INSTALL_DIR" ]; then INSTALL_DIR="$HOME/TentaCLAW"; fi
-    else
-        OS_TYPE="unknown"
-        PKG_MANAGER="none"
-        warn "Unknown OS — will attempt generic install"
-        if [ -z "$INSTALL_DIR" ]; then INSTALL_DIR="$HOME/TentaCLAW"; fi
-    fi
-
-    info "Install directory: $INSTALL_DIR"
-    echo ""
-}
-
-# ──────────────────────────────────────────────────────────────────
-# Install Node.js if missing
-# ──────────────────────────────────────────────────────────────────
-ensure_node() {
-    echo -e "  ${BOLD}Checking prerequisites...${RESET}"
-    echo ""
-
-    # ── Git ──
-    if command_exists git; then
-        ok "git $(git --version 2>/dev/null | awk '{print $3}')"
-    else
-        info "Installing git..."
-        case "$PKG_MANAGER" in
-            apt)     sudo apt-get update -qq && sudo apt-get install -y -qq git >/dev/null 2>&1 ;;
-            dnf)     sudo dnf install -y -q git >/dev/null 2>&1 ;;
-            yum)     sudo yum install -y -q git >/dev/null 2>&1 ;;
-            pacman)  sudo pacman -Sy --noconfirm git >/dev/null 2>&1 ;;
-            zypper)  sudo zypper install -y git >/dev/null 2>&1 ;;
-            apk)     sudo apk add --no-cache git >/dev/null 2>&1 ;;
-            brew)    brew install git >/dev/null 2>&1 ;;
-            *)       die "Cannot install git automatically. Install git and try again." ;;
-        esac
-        if command_exists git; then
-            ok "git installed"
-        else
-            die "Failed to install git. Install it manually and re-run."
-        fi
-    fi
-
-    # ── Node.js ──
-    if command_exists node; then
-        local node_ver
-        node_ver=$(node --version 2>/dev/null || echo "v0")
-        local major
-        major=$(echo "$node_ver" | sed 's/v//' | cut -d. -f1)
-
-        if [ "$major" -ge 18 ] 2>/dev/null; then
-            ok "Node.js $node_ver"
-            if [ "$major" -lt 20 ] 2>/dev/null; then
-                warn "Node.js 20+ recommended (current: $node_ver)"
-            fi
-        else
-            warn "Node.js $node_ver is too old (need 18+), upgrading..."
-            install_node
-        fi
-    else
-        info "Node.js not found — installing..."
-        install_node
-    fi
-
-    # ── npm ──
-    if command_exists npm; then
-        ok "npm $(npm --version 2>/dev/null)"
-    else
-        die "npm not found. It should come with Node.js — try reinstalling Node.js."
-    fi
-
-    echo ""
-}
+# --- Node.js ------------------------------------------------------------------
+step "Checking Node.js..."
 
 install_node() {
-    # Strategy 1: Use nvm (preferred — no sudo needed)
-    if command_exists nvm || [ -s "$HOME/.nvm/nvm.sh" ]; then
-        # shellcheck disable=SC1091
-        [ -s "$HOME/.nvm/nvm.sh" ] && . "$HOME/.nvm/nvm.sh"
-        nvm install 22 >/dev/null 2>&1
-        nvm use 22 >/dev/null 2>&1
-        if command_exists node; then
-            ok "Node.js $(node --version) installed via nvm"
-            return
-        fi
-    fi
-
-    # Strategy 2: Use system package manager
-    case "$PKG_MANAGER" in
-        apt)
-            curl -fsSL https://deb.nodesource.com/setup_22.x 2>/dev/null | sudo -E bash - >/dev/null 2>&1
-            sudo apt-get install -y -qq nodejs >/dev/null 2>&1
-            ;;
-        dnf)
-            curl -fsSL https://rpm.nodesource.com/setup_22.x 2>/dev/null | sudo bash - >/dev/null 2>&1
-            sudo dnf install -y -q nodejs >/dev/null 2>&1
-            ;;
-        yum)
-            curl -fsSL https://rpm.nodesource.com/setup_22.x 2>/dev/null | sudo bash - >/dev/null 2>&1
-            sudo yum install -y -q nodejs >/dev/null 2>&1
-            ;;
-        pacman)
-            sudo pacman -Sy --noconfirm nodejs npm >/dev/null 2>&1
-            ;;
-        zypper)
-            sudo zypper install -y nodejs22 npm22 >/dev/null 2>&1 || {
-                curl -fsSL https://rpm.nodesource.com/setup_22.x 2>/dev/null | sudo bash - >/dev/null 2>&1
-                sudo zypper install -y nodejs >/dev/null 2>&1
-            }
-            ;;
-        apk)
-            sudo apk add --no-cache nodejs npm >/dev/null 2>&1
-            ;;
-        brew)
-            brew install node@22 >/dev/null 2>&1 || brew install node >/dev/null 2>&1
-            ;;
-        *)
-            # Strategy 3: Install nvm, then Node
-            info "Installing nvm (Node Version Manager)..."
-            curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh 2>/dev/null | bash >/dev/null 2>&1
-            export NVM_DIR="$HOME/.nvm"
-            # shellcheck disable=SC1091
-            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-            if command_exists nvm; then
-                nvm install 22 >/dev/null 2>&1
-                nvm use 22 >/dev/null 2>&1
-            fi
-            ;;
-    esac
-
-    if command_exists node; then
-        ok "Node.js $(node --version) installed"
-    else
-        die "Could not install Node.js automatically.\n  Install Node.js 20+ from: https://nodejs.org/en/download\n  Or via nvm: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash"
-    fi
+  echo -e "  Installing Node.js $NODE_MIN..."
+  if is_debian; then
+    apt-get update -qq
+    apt-get install -y ca-certificates curl gnupg -qq
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_MIN}.x | bash - >/dev/null 2>&1
+    apt-get install -y nodejs -qq
+  elif is_rhel; then
+    curl -fsSL https://rpm.nodesource.com/setup_${NODE_MIN}.x | bash - >/dev/null 2>&1
+    yum install -y nodejs -q
+  else
+    die "Cannot auto-install Node.js on this OS. Install Node $NODE_MIN+ manually and re-run."
+  fi
 }
 
-# ──────────────────────────────────────────────────────────────────
-# Clone or update the repository
-# ──────────────────────────────────────────────────────────────────
-clone_repo() {
-    echo -e "  ${BOLD}Installing TentaCLAW OS...${RESET}"
-    echo ""
-
-    if [ -d "$INSTALL_DIR/.git" ]; then
-        ok "Existing installation found at $INSTALL_DIR"
-        info "Pulling latest changes..."
-        (cd "$INSTALL_DIR" && git pull --ff-only 2>/dev/null) || {
-            warn "git pull failed — continuing with existing version"
-        }
-    else
-        if [ -d "$INSTALL_DIR" ]; then
-            warn "Directory $INSTALL_DIR exists but is not a git repo — clearing it..."
-            rm -rf "$INSTALL_DIR"
-        fi
-
-        info "Cloning repository..."
-        local parent_dir
-        parent_dir=$(dirname "$INSTALL_DIR")
-
-        if [ ! -d "$parent_dir" ]; then
-            if [ -w "$(dirname "$parent_dir")" ] || [ "$(id -u)" = "0" ]; then
-                mkdir -p "$parent_dir"
-            else
-                sudo mkdir -p "$parent_dir"
-                sudo chown "$(whoami):$(id -gn)" "$parent_dir"
-            fi
-        fi
-
-        local CLONE_URL="$REPO_URL"
-        if [ -n "$GITHUB_TOKEN" ]; then
-            CLONE_URL="https://${GITHUB_TOKEN}@github.com/TentaCLAW-OS/TentaCLAW.git"
-            info "Using provided GitHub token for authentication"
-        fi
-
-        if ! git clone --depth 1 -b master "$CLONE_URL" "$INSTALL_DIR" 2>&1; then
-            warn "Branch-specific clone failed, trying default branch..."
-            git clone --depth 1 "$CLONE_URL" "$INSTALL_DIR" 2>&1 || {
-                die "Failed to clone repository.\n  Check your internet connection and try again.\n  Or: git clone $REPO_URL \"$INSTALL_DIR\""
-            }
-        fi
-        if [ ! -d "$INSTALL_DIR" ]; then
-            die "Clone failed — $INSTALL_DIR does not exist.\n  Try manually: git clone $REPO_URL \"$INSTALL_DIR\""
-        fi
-        ok "Repository cloned to $INSTALL_DIR"
-    fi
-
-    echo ""
-}
-
-# ──────────────────────────────────────────────────────────────────
-# Install npm dependencies for all packages
-# ──────────────────────────────────────────────────────────────────
-install_deps() {
-    echo -e "  ${BOLD}Installing dependencies...${RESET}"
-    echo ""
-
-    for pkg in gateway agent cli; do
-        if [ -d "$INSTALL_DIR/$pkg" ] && [ -f "$INSTALL_DIR/$pkg/package.json" ]; then
-            # Skip if node_modules already exists and looks populated
-            if [ -d "$INSTALL_DIR/$pkg/node_modules" ] && [ "$(ls -A "$INSTALL_DIR/$pkg/node_modules" 2>/dev/null | head -1)" ]; then
-                ok "$pkg dependencies already installed"
-            else
-                info "npm install in $pkg/..."
-                (cd "$INSTALL_DIR/$pkg" && npm install --silent 2>/dev/null) || {
-                    warn "$pkg dependency install had warnings (may still work)"
-                }
-                ok "$pkg dependencies installed"
-            fi
-        fi
-    done
-
-    echo ""
-}
-
-# ──────────────────────────────────────────────────────────────────
-# Build CLI and symlink to PATH
-# ──────────────────────────────────────────────────────────────────
-setup_cli() {
-    echo -e "  ${BOLD}Setting up TentaCLAW CLI...${RESET}"
-    echo ""
-
-    local cli_dir="$INSTALL_DIR/cli"
-
-    if [ ! -f "$cli_dir/package.json" ]; then
-        warn "CLI package not found — skipping"
-        return
-    fi
-
-    # Check if CLI is already set up and on PATH
-    if command_exists tentaclaw; then
-        ok "TentaCLAW CLI already on PATH ($(command -v tentaclaw))"
-        return
-    fi
-
-    # Try to symlink clawtopus to PATH
-    local symlink_target=""
-    local bin_dir=""
-
-    # Determine the best bin directory
-    if [ -d "$HOME/.local/bin" ]; then
-        bin_dir="$HOME/.local/bin"
-    elif [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
-        bin_dir="/usr/local/bin"
-    elif [ "$(id -u)" = "0" ] && [ -d "/usr/local/bin" ]; then
-        bin_dir="/usr/local/bin"
-    else
-        # Create ~/.local/bin if it doesn't exist
-        bin_dir="$HOME/.local/bin"
-        mkdir -p "$bin_dir"
-    fi
-
-    # Determine the target (compiled JS or tsx wrapper)
-    # Build if not already built
-    if [ ! -f "$cli_dir/dist/cli/src/index.js" ] && [ ! -f "$cli_dir/dist/index.js" ]; then
-        info "Building CLI..."
-        (cd "$cli_dir" && npm install --silent 2>/dev/null && npx tsc 2>/dev/null) || true
-    fi
-
-    # Always create a node wrapper so permission/shebang issues don't matter
-    local node_bin
-    node_bin=$(command -v node 2>/dev/null || echo "node")
-    local wrapper="$cli_dir/tentaclaw-bin.sh"
-    if [ -f "$cli_dir/dist/cli/src/index.js" ]; then
-        printf '#!/bin/sh\nexec %s %s/dist/cli/src/index.js "$@"\n' "$node_bin" "$cli_dir" > "$wrapper"
-    elif [ -f "$cli_dir/dist/index.js" ]; then
-        printf '#!/bin/sh\nexec %s %s/dist/index.js "$@"\n' "$node_bin" "$cli_dir" > "$wrapper"
-    fi
-    if [ -f "$wrapper" ]; then
-        chmod +x "$wrapper"
-        symlink_target="$wrapper"
-    else
-        # Create a wrapper script that uses tsx
-        local wrapper="$cli_dir/tentaclaw-wrapper.sh"
-        cat > "$wrapper" << WRAPPER
-#!/bin/bash
-cd "$cli_dir" && exec npx tsx src/index.ts "\$@"
-WRAPPER
-        chmod +x "$wrapper"
-        symlink_target="$wrapper"
-    fi
-
-    # Create symlink
-    if [ -n "$bin_dir" ] && [ -n "$symlink_target" ]; then
-        if [ -w "$bin_dir" ]; then
-            ln -sf "$symlink_target" "$bin_dir/tentaclaw" 2>/dev/null || true
-            ln -sf "$symlink_target" "$bin_dir/clawtopus" 2>/dev/null || true
-        elif [ "$(id -u)" = "0" ] || command_exists sudo; then
-            sudo ln -sf "$symlink_target" "$bin_dir/tentaclaw" 2>/dev/null || true
-            sudo ln -sf "$symlink_target" "$bin_dir/clawtopus" 2>/dev/null || true
-        fi
-
-        if [ -L "$bin_dir/tentaclaw" ]; then
-            ok "tentaclaw CLI linked to $bin_dir/tentaclaw"
-
-            # Check if bin_dir is in PATH
-            if ! echo "$PATH" | tr ':' '\n' | grep -q "^$bin_dir$"; then
-                warn "$bin_dir is not in your PATH"
-                info "Add to your shell config:"
-                info "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
-            fi
-        else
-            warn "Could not symlink CLI (try: npm link in $cli_dir)"
-        fi
-    fi
-
-    echo ""
-}
-
-# ──────────────────────────────────────────────────────────────────
-# Launch the setup wizard
-# ──────────────────────────────────────────────────────────────────
-# Install systemd service so gateway starts on boot
-# ──────────────────────────────────────────────────────────────────
-setup_gateway_service() {
-    # Only on Linux with systemd
-    if [ "$OS_TYPE" = "macos" ] || [ "$OS_TYPE" = "windows" ]; then return; fi
-    if ! command_exists systemctl; then return; fi
-
-    echo -e "  ${BOLD}Setting up gateway service...${RESET}"
-    echo ""
-
-    local node_bin
-    node_bin=$(command -v node 2>/dev/null || echo "node")
-
-    local service_file="/etc/systemd/system/tentaclaw-gateway.service"
-
-    # Smart port selection — find a free port starting at 8080
-    GATEWAY_PORT=8080
-    for try_port in 8080 8081 8082 8083 9080 9090 3080 7080; do
-        if ! ss -tlnp 2>/dev/null | grep -q ":${try_port} " && \
-           ! lsof -i ":${try_port}" >/dev/null 2>&1; then
-            GATEWAY_PORT=$try_port
-            break
-        fi
-    done
-    if [ "$GATEWAY_PORT" != "8080" ]; then
-        info "Port 8080 in use — using port $GATEWAY_PORT instead"
-    fi
-    # Save port for CLI auto-discovery
-    mkdir -p "$HOME/.tentaclaw"
-    echo "$GATEWAY_PORT" > "$HOME/.tentaclaw/gateway-port"
-
-    # Detect GPU backend for service env vars
-    local gpu_env=""
-    if lspci 2>/dev/null | grep -qiE "VGA|3D" | grep -qiE "AMD|Radeon" 2>/dev/null || \
-       lspci 2>/dev/null | grep -iE "VGA|3D|Display" | grep -qiE "AMD|Radeon"; then
-        if [ -d /opt/rocm ]; then
-            gpu_env="Environment=HSA_OVERRIDE_GFX_VERSION=11.0.0"
-        else
-            gpu_env="Environment=OLLAMA_VULKAN=1"
-        fi
-    fi
-
-    printf '[Unit]\nDescription=TentaCLAW Gateway\nAfter=network.target\n\n[Service]\nType=simple\nWorkingDirectory=%s/gateway\nExecStart=%s %s/gateway/dist/gateway/src/index.js\nRestart=always\nRestartSec=5\nEnvironment=NODE_ENV=production\nEnvironment=TENTACLAW_HOST=0.0.0.0\nEnvironment=TENTACLAW_PORT=%s\n%s\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
-        "$INSTALL_DIR" "$node_bin" "$INSTALL_DIR" "$GATEWAY_PORT" "$gpu_env" > /tmp/tentaclaw-gateway.service
-
-    # Build gateway for production
-    if [ -f "$INSTALL_DIR/gateway/package.json" ]; then
-        local build_script
-        build_script=$(node -e "const p=require('$INSTALL_DIR/gateway/package.json'); console.log(p.scripts&&p.scripts.build?'build':'')" 2>/dev/null || echo "")
-        if [ -n "$build_script" ]; then
-            info "Building gateway..."
-            (cd "$INSTALL_DIR/gateway" && npm run build 2>/dev/null) || true
-        fi
-    fi
-
-    # Fall back to dev script if no dist
-    if [ ! -f "$INSTALL_DIR/gateway/dist/gateway/src/index.js" ]; then
-        local npm_bin
-        npm_bin=$(command -v npm 2>/dev/null || echo "npm")
-        sed -i "s|ExecStart=.*|ExecStart=$npm_bin run dev|" /tmp/tentaclaw-gateway.service
-        sed -i "/WorkingDirectory/a Environment=PATH=/usr/local/bin:/usr/bin:/bin" /tmp/tentaclaw-gateway.service
-    fi
-
-    if [ "$(id -u)" = "0" ]; then
-        cp /tmp/tentaclaw-gateway.service "$service_file"
-        systemctl daemon-reload
-        systemctl enable tentaclaw-gateway 2>/dev/null
-        systemctl restart tentaclaw-gateway 2>/dev/null
-    elif command_exists sudo; then
-        sudo cp /tmp/tentaclaw-gateway.service "$service_file"
-        sudo systemctl daemon-reload
-        sudo systemctl enable tentaclaw-gateway 2>/dev/null
-        sudo systemctl restart tentaclaw-gateway 2>/dev/null
-    else
-        warn "Cannot install systemd service without sudo"
-        return
-    fi
-
-    # Wait up to 5s for gateway to come up
-    local i=0
-    while [ $i -lt 5 ]; do
-        if curl -sf "http://localhost:${GATEWAY_PORT}/health" >/dev/null 2>&1; then
-            ok "Gateway service running (http://localhost:${GATEWAY_PORT})"
-            break
-        fi
-        sleep 1
-        i=$((i+1))
-    done
-
-    if ! curl -sf "http://localhost:${GATEWAY_PORT}/health" >/dev/null 2>&1; then
-        ok "Gateway service installed (starting up...)"
-        info "Check status: systemctl status tentaclaw-gateway"
-    fi
-
-    echo ""
-}
-
-# ──────────────────────────────────────────────────────────────────
-# Install agent as systemd service
-# ──────────────────────────────────────────────────────────────────
-setup_agent_service() {
-    if [ "$OS_TYPE" = "macos" ] || [ "$OS_TYPE" = "windows" ]; then return; fi
-    if ! command_exists systemctl; then return; fi
-    if [ ! -f "$INSTALL_DIR/agent/package.json" ]; then
-        warn "Agent package not found — skipping agent service"
-        return
-    fi
-
-    echo -e "  ${BOLD}Setting up agent service...${RESET}"
-    echo ""
-
-    local node_bin
-    node_bin=$(command -v node 2>/dev/null || echo "node")
-    local agent_service="/etc/systemd/system/tentaclaw-agent.service"
-
-    # Build agent
-    if [ -f "$INSTALL_DIR/agent/tsconfig.json" ] && [ ! -f "$INSTALL_DIR/agent/dist/index.js" ]; then
-        info "Building agent..."
-        (cd "$INSTALL_DIR/agent" && npm install --silent 2>/dev/null && npx tsc 2>/dev/null) || true
-    fi
-
-    # Determine agent binary
-    local agent_bin=""
-    if [ -f "$INSTALL_DIR/agent/dist/index.js" ]; then
-        agent_bin="$node_bin $INSTALL_DIR/agent/dist/index.js"
-    else
-        agent_bin="npx --prefix $INSTALL_DIR/agent tsx $INSTALL_DIR/agent/src/index.ts"
-    fi
-
-    # GPU env for AMD Vulkan
-    local gpu_env=""
-    if lspci 2>/dev/null | grep -iE "VGA|3D|Display" | grep -qiE "AMD|Radeon"; then
-        if [ -d /opt/rocm ]; then
-            gpu_env="Environment=HSA_OVERRIDE_GFX_VERSION=11.0.0"
-        else
-            gpu_env="Environment=OLLAMA_VULKAN=1"
-        fi
-    fi
-
-    printf '[Unit]\nDescription=TentaCLAW Agent\nAfter=network.target tentaclaw-gateway.service\nWants=tentaclaw-gateway.service\n\n[Service]\nType=simple\nWorkingDirectory=%s/agent\nExecStart=%s --gateway http://localhost:%s\nRestart=always\nRestartSec=10\nEnvironment=NODE_ENV=production\n%s\nStandardOutput=journal\nStandardError=journal\n\n[Install]\nWantedBy=multi-user.target\n' \
-        "$INSTALL_DIR" "$agent_bin" "${GATEWAY_PORT:-8080}" "$gpu_env" > /tmp/tentaclaw-agent.service
-
-    if [ "$(id -u)" = "0" ]; then
-        cp /tmp/tentaclaw-agent.service "$agent_service"
-        systemctl daemon-reload
-        systemctl enable tentaclaw-agent 2>/dev/null
-        systemctl restart tentaclaw-agent 2>/dev/null
-    elif command_exists sudo; then
-        sudo cp /tmp/tentaclaw-agent.service "$agent_service"
-        sudo systemctl daemon-reload
-        sudo systemctl enable tentaclaw-agent 2>/dev/null
-        sudo systemctl restart tentaclaw-agent 2>/dev/null
-    fi
-
-    sleep 2
-    if systemctl is-active tentaclaw-agent &>/dev/null; then
-        ok "Agent service running"
-    else
-        ok "Agent service installed (starting up...)"
-        info "Check status: systemctl status tentaclaw-agent"
-    fi
-
-    echo ""
-}
-
-# ──────────────────────────────────────────────────────────────────
-# Install Ollama + pull default coding model
-# ──────────────────────────────────────────────────────────────────
-setup_ollama() {
-    # Skip on macOS ARM — user likely has their own setup
-    echo -e "  ${BOLD}Setting up Ollama + AI model...${RESET}"
-    echo ""
-
-    # ── Install Ollama if missing ──
-    if ! command_exists ollama; then
-        info "Installing Ollama..."
-        if curl -fsSL https://ollama.com/install.sh | sh >/dev/null 2>&1; then
-            ok "Ollama installed"
-        else
-            warn "Ollama install failed — skipping model download"
-            warn "Install manually: curl -fsSL https://ollama.com/install.sh | sh"
-            echo ""
-            return
-        fi
-    else
-        ok "Ollama $(ollama --version 2>/dev/null | head -1)"
-    fi
-
-    # ── Ensure Ollama service is running ──
-    if command_exists systemctl && systemctl is-active --quiet ollama 2>/dev/null; then
-        : # already running
-    elif command_exists ollama; then
-        # Start in background if not already listening
-        if ! curl -sf http://localhost:11434/ >/dev/null 2>&1; then
-            info "Starting Ollama service..."
-            ollama serve >/dev/null 2>&1 &
-            local i=0
-            while [ $i -lt 8 ]; do
-                curl -sf http://localhost:11434/ >/dev/null 2>&1 && break
-                sleep 1
-                i=$((i+1))
-            done
-        fi
-    fi
-
-    # ── Detect hardware ──
-    local VRAM_MB=0
-    local RAM_MB=0
-    local CPU_CORES=0
-    local GPU_NAME=""
-    local GPU_BACKEND=""
-
-    if command_exists nvidia-smi; then
-        VRAM_MB=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ' || echo 0)
-        GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo "")
-        GPU_BACKEND="cuda"
-    fi
-
-    # AMD GPU detection via lspci (works even without ROCm drivers)
-    if [ "${VRAM_MB:-0}" -eq 0 ] && command_exists lspci; then
-        local amd_gpus
-        amd_gpus=$(lspci 2>/dev/null | grep -iE "VGA|3D|Display" | grep -iE "AMD|Radeon|RDNA" || true)
-        if [ -n "$amd_gpus" ]; then
-            GPU_NAME=$(echo "$amd_gpus" | head -1 | sed 's/.*: //')
-            local amd_count
-            amd_count=$(echo "$amd_gpus" | wc -l)
-
-            # Detect best AMD backend: ROCm > Vulkan > CPU
-            if command_exists rocm-smi 2>/dev/null || [ -d /opt/rocm ]; then
-                GPU_BACKEND="rocm"
-                VRAM_MB=$(rocm-smi --showmeminfo vram 2>/dev/null | grep -oP '\d+(?= MiB used)' | head -1 || echo 0)
-                # Estimate total from used — rocm-smi shows used, try total
-                local vram_total
-                vram_total=$(rocm-smi --showmeminfo vram 2>/dev/null | grep -oP '\d+(?= MiB total)' | head -1 || echo 0)
-                [ "${vram_total:-0}" -gt 0 ] && VRAM_MB=$vram_total
-            fi
-
-            # Vulkan detection (works without ROCm)
-            if [ "$GPU_BACKEND" != "rocm" ]; then
-                if command_exists vulkaninfo 2>/dev/null || [ -f /usr/share/vulkan/icd.d/radeon_icd.x86_64.json ] || \
-                   ls /usr/share/vulkan/icd.d/*radeon* /etc/vulkan/icd.d/*radeon* 2>/dev/null | head -1 &>/dev/null; then
-                    GPU_BACKEND="vulkan"
-                    ok "AMD GPU detected — using Vulkan backend (no ROCm required)"
-                    # Set Ollama to use Vulkan
-                    export OLLAMA_VULKAN=1
-                    export HSA_OVERRIDE_GFX_VERSION=""
-                    # Estimate VRAM from GPU model name if possible
-                    if echo "$GPU_NAME" | grep -qi "RX 7900\|MI300\|W7900"; then
-                        VRAM_MB=24000
-                    elif echo "$GPU_NAME" | grep -qi "RX 7800\|RX 6800\|W6800"; then
-                        VRAM_MB=16000
-                    elif echo "$GPU_NAME" | grep -qi "RX 7700\|RX 6700\|RX 580\|RX 5700"; then
-                        VRAM_MB=8000
-                    elif echo "$GPU_NAME" | grep -qi "RX 6600\|RX 5600"; then
-                        VRAM_MB=8000
-                    else
-                        VRAM_MB=8000  # conservative default for unknown AMD
-                    fi
-                    # Multiply by GPU count
-                    [ "${amd_count:-1}" -gt 1 ] && info "${amd_count}x AMD GPU detected — Vulkan multi-GPU"
-                else
-                    GPU_BACKEND="cpu"
-                    warn "AMD GPU found but no Vulkan/ROCm drivers — falling back to CPU"
-                    info "Install Vulkan: apt install mesa-vulkan-drivers vulkan-tools"
-                fi
-            fi
-        fi
-    fi
-
-    RAM_MB=$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 0)
-    CPU_CORES=$(nproc 2>/dev/null || echo 4)
-
-    # ── Pick best model based on hardware ──
-    local MODEL=""
-    local MODEL_NOTE=""
-    local PULL_BITNET=false
-
-    if [ "${VRAM_MB:-0}" -ge 20000 ] 2>/dev/null; then
-        # High-end GPU (24GB+): run a big coder
-        MODEL="qwen2.5-coder:32b"
-        MODEL_NOTE="32B model — best quality coding (${VRAM_MB}MB VRAM)"
-    elif [ "${VRAM_MB:-0}" -ge 10000 ] 2>/dev/null; then
-        # Mid-range GPU (10-20GB): 14B sweet spot
-        MODEL="qwen2.5-coder:14b"
-        MODEL_NOTE="14B model — great quality/speed balance (${VRAM_MB}MB VRAM)"
-    elif [ "${VRAM_MB:-0}" -ge 5000 ] 2>/dev/null; then
-        # Entry GPU (5-10GB): 7B
-        MODEL="qwen2.5-coder:7b"
-        MODEL_NOTE="7B model — solid coding, fits GPU (${VRAM_MB}MB VRAM)"
-    elif [ "${VRAM_MB:-0}" -gt 0 ] 2>/dev/null; then
-        # Small GPU: 1.5B on GPU + BitNet on CPU for long context
-        MODEL="qwen2.5-coder:1.5b"
-        MODEL_NOTE="1.5B model — low VRAM (${VRAM_MB}MB), fast inference"
-        if [ "${RAM_MB:-0}" -ge 8000 ] && [ "${CPU_CORES:-0}" -ge 4 ] 2>/dev/null; then
-            PULL_BITNET=true
-        fi
-    elif [ "${RAM_MB:-0}" -ge 16000 ] 2>/dev/null; then
-        # No GPU, good RAM: BitNet runs fast on CPU
-        MODEL="qwen2.5-coder:7b"
-        MODEL_NOTE="7B model — CPU inference (${RAM_MB}MB RAM, ${CPU_CORES} cores)"
-        PULL_BITNET=true
-    elif [ "${RAM_MB:-0}" -ge 8000 ] 2>/dev/null; then
-        MODEL="qwen2.5-coder:3b"
-        MODEL_NOTE="3B model — CPU-friendly (${RAM_MB}MB RAM)"
-        PULL_BITNET=true
-    else
-        MODEL="qwen2.5-coder:1.5b"
-        MODEL_NOTE="1.5B model — minimal resources"
-    fi
-
-    if [ -n "$GPU_NAME" ]; then
-        local backend_label=""
-        [ "$GPU_BACKEND" = "vulkan" ] && backend_label=" [Vulkan]"
-        [ "$GPU_BACKEND" = "rocm" ] && backend_label=" [ROCm]"
-        [ "$GPU_BACKEND" = "cuda" ] && backend_label=" [CUDA]"
-        [ "$GPU_BACKEND" = "cpu" ] && backend_label=" [CPU fallback]"
-        info "GPU: $GPU_NAME${backend_label}"
-    fi
-    info "Selecting: $MODEL ($MODEL_NOTE)"
-    if $PULL_BITNET; then
-        info "Also pulling BitNet b1.58 for CPU-native inference"
-    fi
-
-    # Skip if model already pulled
-    if ollama list 2>/dev/null | grep -q "${MODEL%%:*}"; then
-        ok "Model already downloaded: $MODEL"
-        echo ""
-        return
-    fi
-
-    info "Downloading $MODEL — this may take a few minutes..."
-    info "You can skip with Ctrl+C and run: ollama pull $MODEL"
-    echo ""
-
-    if ollama pull "$MODEL" 2>&1 | grep -E "pulling|verifying|success|error" | sed 's/^/    /'; then
-        echo ""
-        ok "Model ready: $MODEL"
-        info "Test it: ollama run $MODEL 'Write a hello world in Python'"
-    else
-        warn "Model download failed — run manually: ollama pull $MODEL"
-    fi
-
-    # ── BitNet for CPU-native inference ──
-    if $PULL_BITNET; then
-        echo ""
-        info "Pulling BitNet b1.58 (CPU-native 1-bit model — fast on any hardware)..."
-        if ollama pull "bitnet-b1.58-3b" 2>&1 | grep -E "pulling|verifying|success|error" | sed 's/^/    /'; then
-            ok "BitNet ready — ultra-fast CPU inference"
-        else
-            # BitNet model name varies — try alternate
-            ollama pull "smollm2:360m" 2>&1 | grep -E "pulling|verifying|success|error" | sed 's/^/    /' || true
-        fi
-    fi
-
-    echo ""
-}
-
-# ──────────────────────────────────────────────────────────────────
-launch_wizard() {
-    if $NO_WIZARD; then
-        print_manual_instructions
-        return
-    fi
-
-    local wizard="$INSTALL_DIR/scripts/setup-wizard.sh"
-
-    if [ -f "$wizard" ]; then
-        chmod +x "$wizard"
-        echo ""
-        echo -e "  ${PURPLE}${BOLD}Launching setup wizard...${RESET}"
-        echo ""
-        # shellcheck disable=SC2086
-        bash "$wizard" $WIZARD_FLAGS
-    else
-        warn "Setup wizard not found at $wizard"
-        print_manual_instructions
-    fi
-}
-
-# ──────────────────────────────────────────────────────────────────
-# Manual instructions (if wizard is skipped)
-# ──────────────────────────────────────────────────────────────────
-print_manual_instructions() {
-    echo ""
-    echo -e "  ${PURPLE}╭──────────────────────────────────────────────────────╮${RESET}"
-    echo -e "  ${PURPLE}│${RESET}                                                      ${PURPLE}│${RESET}"
-    echo -e "  ${PURPLE}│${RESET}   ${GREEN}${BOLD}TentaCLAW OS installed successfully!${RESET}                ${PURPLE}│${RESET}"
-    echo -e "  ${PURPLE}│${RESET}                                                      ${PURPLE}│${RESET}"
-    echo -e "  ${PURPLE}╰──────────────────────────────────────────────────────╯${RESET}"
-    echo ""
-    echo -e "  ${BOLD}Location:${RESET}  $INSTALL_DIR"
-    echo ""
-    echo -e "  ${BOLD}Quick start:${RESET}"
-    echo -e "    ${CYAN}cd $INSTALL_DIR && bash scripts/quickstart.sh${RESET}"
-    echo ""
-    echo -e "  ${BOLD}Or start manually:${RESET}"
-    echo -e "    ${DIM}# Terminal 1: Gateway${RESET}"
-    echo -e "    cd $INSTALL_DIR/gateway && npm run dev"
-    echo ""
-    echo -e "    ${DIM}# Terminal 2: Agent${RESET}"
-    echo -e "    cd $INSTALL_DIR/agent && npm run dev"
-    echo ""
-    echo -e "    ${DIM}# Open dashboard${RESET}"
-    echo -e "    http://localhost:${GATEWAY_PORT:-8080}/dashboard"
-    echo ""
-    echo -e "  ${BOLD}Run the setup wizard later:${RESET}"
-    echo -e "    ${CYAN}bash $INSTALL_DIR/scripts/setup-wizard.sh${RESET}"
-    echo ""
-    echo -e "  ${DIM}Docs: https://tentaclaw.io/docs${RESET}"
-    echo -e "  ${DIM}GitHub: https://github.com/TentaCLAW-OS/TentaCLAW${RESET}"
-    echo ""
-    echo -e "  ${DIM}TentaCLAW says: \"Welcome aboard. I've got arms for that.\"${RESET}"
-    echo ""
-}
-
-# ══════════════════════════════════════════════════════════════════
-# Main
-# ══════════════════════════════════════════════════════════════════
-main() {
-    print_splash
-    detect_os
-    ensure_node
-    clone_repo
-    install_deps
-    setup_cli
-    setup_gateway_service
-    setup_agent_service
-    setup_ollama
-    launch_wizard
-}
-
-main "$@"
+if command -v node &>/dev/null; then
+  NODE_VER=$(node -e 'process.stdout.write(process.version.slice(1).split(".")[0])')
+  if [[ "$NODE_VER" -ge "$NODE_MIN" ]]; then
+    ok "Node.js $(node --version)"
+  else
+    warn "Node.js v$NODE_VER is too old (need v$NODE_MIN+), upgrading..."
+    install_node
+    ok "Node.js $(node --version)"
+  fi
+else
+  install_node
+  ok "Node.js $(node --version)"
+fi
+
+# --- git ----------------------------------------------------------------------
+if ! command -v git &>/dev/null; then
+  step "Installing git..."
+  is_debian && apt-get install -y git -qq || yum install -y git -q
+fi
+ok "git $(git --version | awk '{print $3}')"
+
+# --- clone / update -----------------------------------------------------------
+step "Fetching TentaCLAW OS..."
+
+if [[ -d "$INSTALL_DIR/.git" ]]; then
+  CURRENT=$(git -C "$INSTALL_DIR" rev-parse --short HEAD)
+  git -C "$INSTALL_DIR" fetch origin -q
+  git -C "$INSTALL_DIR" reset --hard origin/master -q
+  NEW=$(git -C "$INSTALL_DIR" rev-parse --short HEAD)
+  if [[ "$CURRENT" == "$NEW" ]]; then
+    ok "Already up to date ($NEW)"
+  else
+    ok "Updated $CURRENT → $NEW"
+  fi
+else
+  mkdir -p "$(dirname "$INSTALL_DIR")"
+  git clone "$REPO" "$INSTALL_DIR" -q
+  ok "Cloned to $INSTALL_DIR"
+fi
+
+# --- install all workspace deps from root -------------------------------------
+step "Installing dependencies..."
+cd "$INSTALL_DIR"
+npm install --silent
+ok "Dependencies installed"
+
+# --- build gateway ------------------------------------------------------------
+step "Building gateway..."
+npm run build --workspace=gateway
+ok "Gateway built"
+
+# --- build dashboard ----------------------------------------------------------
+step "Building dashboard..."
+npm run build --workspace=dashboard
+mkdir -p "$INSTALL_DIR/gateway/public"
+cp -r "$INSTALL_DIR/dashboard/dist/." "$INSTALL_DIR/gateway/public/"
+ok "Dashboard built and copied to gateway/public/"
+
+# --- systemd ------------------------------------------------------------------
+if [[ "$INSTALL_SERVICE" == true ]] && command -v systemctl &>/dev/null; then
+  step "Installing systemd service..."
+
+  cat > /etc/systemd/system/tentaclaw.service <<EOF
+[Unit]
+Description=TentaCLAW OS Gateway
+Documentation=https://tentaclaw.io/docs
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=$INSTALL_DIR/gateway
+Environment=TENTACLAW_PORT=$PORT
+Environment=TENTACLAW_HOST=0.0.0.0
+Environment=NODE_ENV=production
+ExecStart=$(which node) dist/index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tentaclaw
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload
+  systemctl enable tentaclaw -q
+  systemctl restart tentaclaw
+
+  # wait up to 5s for it to start
+  for i in {1..10}; do
+    sleep 0.5
+    systemctl is-active tentaclaw -q && break
+  done
+
+  if systemctl is-active tentaclaw -q; then
+    ok "Service running (systemctl status tentaclaw)"
+  else
+    warn "Service may not have started — check: journalctl -fu tentaclaw"
+  fi
+else
+  step "Skipping systemd (--no-service or systemd not available)"
+  warn "Start manually: cd $INSTALL_DIR/gateway && TENTACLAW_PORT=$PORT node dist/index.js"
+fi
+
+# --- done ---------------------------------------------------------------------
+IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "localhost")
+
+echo ""
+echo -e "${CY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RS}"
+echo -e "${GR}  TentaCLAW OS installed successfully!${RS}"
+echo -e "${CY}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RS}"
+echo ""
+echo -e "  Dashboard   ${YE}http://$IP:$PORT/dashboard${RS}"
+echo -e "  API         ${YE}http://$IP:$PORT/api/v1${RS}"
+echo ""
+echo -e "  ${DI}Logs:    journalctl -fu tentaclaw${RS}"
+echo -e "  ${DI}Stop:    systemctl stop tentaclaw${RS}"
+echo -e "  ${DI}Update:  bash $INSTALL_DIR/install.sh${RS}"
+echo ""
+echo -e "  ${PU}Point your cluster agents at: http://$IP:$PORT${RS}"
+echo ""

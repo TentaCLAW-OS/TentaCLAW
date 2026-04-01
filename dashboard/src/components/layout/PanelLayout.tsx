@@ -9,7 +9,6 @@ import { usePanelsStore } from '@/stores/panels';
 import { useResizable } from '@/hooks/useResizable';
 
 export function PanelLayout() {
-  const leftWidth = usePanelsStore((s) => s.leftSidebarWidth);
   const leftCollapsed = usePanelsStore((s) => s.leftSidebarCollapsed);
   const rightCollapsed = usePanelsStore((s) => s.rightSidebarCollapsed);
   const setLeftWidth = usePanelsStore((s) => s.setLeftSidebarWidth);
@@ -17,7 +16,7 @@ export function PanelLayout() {
 
   const leftResize = useResizable({
     direction: 'horizontal',
-    initialSize: leftWidth,
+    initialSize: usePanelsStore.getState().leftSidebarWidth,
     minSize: 160,
     maxSize: 400,
     onResize: setLeftWidth,
