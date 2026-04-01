@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useClusterStore } from '@/stores/cluster';
 import { useUIStore } from '@/stores/ui';
+import { useThemeStore } from '@/stores/theme';
+import { THEMES } from '@/lib/themes';
 import { fuzzyFilter } from '@/lib/fuzzy';
 import type { TabId } from '@/lib/types';
 
@@ -36,11 +38,14 @@ export function CommandPalette() {
   const nodes = useClusterStore((s) => s.nodes);
   const setActiveTab = useUIStore((s) => s.setActiveTab);
   const selectResource = useUIStore((s) => s.selectResource);
+  const { activeThemeId, setTheme } = useThemeStore();
 
   const triggerConfetti = useCallback(() => {
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 2000);
   }, []);
+
+  const [themePickerOpen, setThemePickerOpen] = useState(false);
 
   // Slash commands — only shown when query starts with /
   const SLASH_COMMANDS = useMemo<Command[]>(() => [
@@ -49,6 +54,7 @@ export function CommandPalette() {
     { id: 'slash:alerts', label: '/alerts — Jump to alerts', category: 'action', shortcut: '/alerts', action: () => setActiveTab('alerts') },
     { id: 'slash:flight', label: '/flight — Jump to flight sheets', category: 'action', shortcut: '/flight', action: () => setActiveTab('flight-sheets') },
     { id: 'slash:terminal', label: '/terminal — Jump to terminal', category: 'action', shortcut: '/terminal', action: () => setActiveTab('terminal') },
+    { id: 'slash:theme', label: '/theme — Switch dashboard theme', category: 'action', shortcut: '/theme', action: () => { setQuery(''); setThemePickerOpen(true); } },
   ], [setActiveTab]);
 
   // Build command list
@@ -155,6 +161,7 @@ export function CommandPalette() {
       setQuery('');
       setSelectedIdx(0);
       setEasterEggResult(null);
+      setThemePickerOpen(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open]);
@@ -224,7 +231,46 @@ export function CommandPalette() {
 
         {/* Results */}
         <div className="max-h-[300px] overflow-y-auto py-1">
-          {easterEggResult ? (
+          {themePickerOpen ? (
+            <div className="p-3">
+              <div className="text-[10px] uppercase tracking-widest mb-3 px-1" style={{ color: 'var(--text-dim)' }}>
+                Select theme
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                {THEMES.map((theme, i) => {
+                  const active = theme.id === activeThemeId;
+                  const accent = theme.colors['--cyan'] || theme.colors['--purple'] || '#0ff';
+                  const bg = theme.colors['--bg-base'] || '#0e121c';
+                  return (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      onClick={() => { setTheme(theme.id); setOpen(false); }}
+                      onMouseEnter={() => setSelectedIdx(i)}
+                      style={{
+                        background: bg,
+                        border: `2px solid ${active ? accent : i === selectedIdx ? 'rgba(0,255,255,0.25)' : 'rgba(255,255,255,0.06)'}`,
+                        borderRadius: 8,
+                        padding: '8px 10px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'border-color 0.12s',
+                        boxShadow: active ? `0 0 8px ${accent}33` : 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                        {(['--cyan', '--purple', '--green', '--yellow'] as const).map((k) => (
+                          <div key={k} style={{ width: 10, height: 10, borderRadius: '50%', background: theme.colors[k] || 'transparent', opacity: theme.colors[k] ? 1 : 0 }} />
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: accent }}>{theme.name}</div>
+                      {active && <div style={{ fontSize: 9, color: accent, opacity: 0.7, marginTop: 2 }}>active</div>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : easterEggResult ? (
             <div
               className="px-4 py-8 text-center"
               style={{

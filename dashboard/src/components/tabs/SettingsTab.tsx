@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useClusterStore } from '@/stores/cluster';
+import { useThemeStore } from '@/stores/theme';
+import { THEMES } from '@/lib/themes';
 
 /* ── shared style constants ── */
 
@@ -190,6 +192,7 @@ function OutlineButton({
 
 export function SettingsTab() {
   const { nodes, summary } = useClusterStore();
+  const { activeThemeId, setTheme } = useThemeStore();
 
   /* Local form state */
   const [clusterName, setClusterName] = useState('TentaCLAW Cluster');
@@ -340,6 +343,79 @@ export function SettingsTab() {
               style={{ maxWidth: 80 }}
             />
           </div>
+        </div>
+      </div>
+
+      {/* ────────── Section 3b: Appearance ────────── */}
+      <div style={cardStyle}>
+        <div style={accentLine} />
+        <h3 style={sectionHeadingStyle}>Appearance</h3>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+            gap: 10,
+          }}
+        >
+          {THEMES.map((theme) => {
+            const active = theme.id === activeThemeId;
+            const accent = theme.colors['--cyan'] || theme.colors['--purple'] || '#0ff';
+            const bg = theme.colors['--bg-base'] || '#0e121c';
+            return (
+              <button
+                key={theme.id}
+                type="button"
+                onClick={() => setTheme(theme.id)}
+                style={{
+                  background: bg,
+                  border: `2px solid ${active ? accent : 'rgba(255,255,255,0.06)'}`,
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'border-color 0.15s, box-shadow 0.15s',
+                  boxShadow: active ? `0 0 10px ${accent}44` : 'none',
+                  position: 'relative',
+                }}
+              >
+                {/* Color swatches */}
+                <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                  {(['--cyan', '--purple', '--green', '--yellow'] as const).map((k) => (
+                    <div
+                      key={k}
+                      style={{
+                        width: 12,
+                        height: 12,
+                        borderRadius: '50%',
+                        background: theme.colors[k] || 'transparent',
+                        opacity: theme.colors[k] ? 1 : 0,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: accent, marginBottom: 2 }}>
+                  {theme.name}
+                </div>
+                {active && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      right: 8,
+                      fontSize: 9,
+                      color: accent,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                    }}
+                  >
+                    active
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
