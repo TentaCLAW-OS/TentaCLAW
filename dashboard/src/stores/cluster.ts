@@ -10,6 +10,7 @@ interface ClusterState {
   power: PowerStats | null;
   connected: boolean;
   lastEvent: number;
+  lastRawEvent: SSEEvent | null;
 
   loadInitial: () => Promise<void>;
   handleSSE: (event: SSEEvent) => void;
@@ -24,6 +25,7 @@ export const useClusterStore = create<ClusterState>((set, get) => ({
   power: null,
   connected: false,
   lastEvent: 0,
+  lastRawEvent: null,
 
   loadInitial: async () => {
     const [summary, nodes, health, power, alerts] = await Promise.all([
@@ -38,7 +40,7 @@ export const useClusterStore = create<ClusterState>((set, get) => ({
 
   handleSSE: (event) => {
     const state = get();
-    set({ lastEvent: Date.now() });
+    set({ lastEvent: Date.now(), lastRawEvent: event });
 
     switch (event.type) {
       case 'stats_update': {

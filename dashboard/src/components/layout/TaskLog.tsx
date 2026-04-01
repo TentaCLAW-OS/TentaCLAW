@@ -62,7 +62,7 @@ const logTabs: { id: LogTab; label: string }[] = [
 export function TaskLog() {
   const [activeLogTab, setActiveLogTab] = useState<LogTab>('tasks');
   const [tasks, setTasks] = useState<TaskRow[]>(seedTasks);
-  const lastEvent = useClusterStore((s) => s.lastEvent);
+  const lastRawEvent = useClusterStore((s) => s.lastRawEvent);
   const alerts = useClusterStore((s) => s.alerts);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -81,20 +81,14 @@ export function TaskLog() {
     invert: true,
   });
 
-  // Derive task rows from the shared SSE event in the cluster store
+  // Add new SSE events to the cluster log
   useEffect(() => {
-    if (!lastEvent) return;
-    try {
-      const data = typeof (lastEvent as { data?: unknown }).data === 'string'
-        ? JSON.parse((lastEvent as { data: string }).data)
-        : lastEvent;
-      if ((data as { type?: string }).type === 'connected') return;
-      const row = sseEventToRow((data as { type: string }).type, data as Record<string, unknown>);
-      if (row) {
-        setTasks((prev) => [row, ...prev].slice(0, 50));
-      }
-    } catch { /* ignore */ }
-  }, [lastEvent]);
+    if (!lastRawEvent) return;
+    const row = sseEventToRow(lastRawEvent.type, lastRawEvent as unknown as Record<string, unknown>);
+    if (row) {
+      setTasks((prev) => [row, ...prev].slice(0, 50));
+    }
+  }, [lastRawEvent]);
 
   if (collapsed) {
     return (
