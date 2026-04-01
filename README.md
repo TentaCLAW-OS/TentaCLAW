@@ -29,6 +29,12 @@
 
 ---
 
+<p align="center">
+  <img src="assets/terminal-screenshot.png" alt="CLAWtopus terminal" width="600">
+</p>
+
+---
+
 ## Install in 60 Seconds
 
 ```bash
