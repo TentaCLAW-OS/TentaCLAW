@@ -549,10 +549,18 @@ setup_cli() {
         (cd "$cli_dir" && npm install --silent 2>/dev/null && npx tsc 2>/dev/null) || true
     fi
 
+    # Always create a node wrapper so permission/shebang issues don't matter
+    local node_bin
+    node_bin=$(command -v node 2>/dev/null || echo "node")
+    local wrapper="$cli_dir/tentaclaw-bin.sh"
     if [ -f "$cli_dir/dist/cli/src/index.js" ]; then
-        symlink_target="$cli_dir/dist/cli/src/index.js"
+        printf '#!/bin/sh\nexec %s %s/dist/cli/src/index.js "$@"\n' "$node_bin" "$cli_dir" > "$wrapper"
     elif [ -f "$cli_dir/dist/index.js" ]; then
-        symlink_target="$cli_dir/dist/index.js"
+        printf '#!/bin/sh\nexec %s %s/dist/index.js "$@"\n' "$node_bin" "$cli_dir" > "$wrapper"
+    fi
+    if [ -f "$wrapper" ]; then
+        chmod +x "$wrapper"
+        symlink_target="$wrapper"
     else
         # Create a wrapper script that uses tsx
         local wrapper="$cli_dir/clawtopus-wrapper.sh"
