@@ -695,8 +695,17 @@ step_start_services() {
                 (cd "$INSTALL_DIR/gateway" && npm install --silent 2>/dev/null) || true
             fi
 
-            # Start gateway in background
-            (cd "$INSTALL_DIR/gateway" && npx tsx src/index.ts &>/dev/null &)
+            # Start gateway in background — use compiled dist, fall back to tsx
+            local gw_cmd
+            if [ -f "$INSTALL_DIR/gateway/dist/gateway/src/index.js" ]; then
+                gw_cmd="node $INSTALL_DIR/gateway/dist/gateway/src/index.js"
+            elif [ -f "$INSTALL_DIR/gateway/dist/index.js" ]; then
+                gw_cmd="node $INSTALL_DIR/gateway/dist/index.js"
+            else
+                (cd "$INSTALL_DIR/gateway" && npm run build &>/dev/null) || true
+                gw_cmd="npx --prefix $INSTALL_DIR/gateway tsx $INSTALL_DIR/gateway/src/index.ts"
+            fi
+            TENTACLAW_PORT="${GATEWAY_PORT:-8080}" $gw_cmd &>/dev/null &
             local gw_pid=$!
 
             # Wait for gateway to be ready
@@ -739,8 +748,15 @@ step_start_services() {
             agent_desc="${GPU_COUNT}x ${GPU_VENDOR} GPU"
         fi
 
-        # Start agent in background
-        (cd "$INSTALL_DIR/agent" && npx tsx src/index.ts $agent_flags --gateway "http://localhost:${GATEWAY_PORT}" &>/dev/null &)
+        # Start agent in background — use compiled dist, fall back to tsx
+        local agent_bin
+        if [ -f "$INSTALL_DIR/agent/dist/index.js" ]; then
+            agent_bin="node $INSTALL_DIR/agent/dist/index.js"
+        else
+            agent_bin="npx --prefix $INSTALL_DIR/agent tsx $INSTALL_DIR/agent/src/index.ts"
+        fi
+        # shellcheck disable=SC2086
+        $agent_bin $agent_flags --gateway "http://localhost:${GATEWAY_PORT}" &>/dev/null &
 
         # Give agent a moment to register
         sleep 2
@@ -788,8 +804,8 @@ step_complete() {
             cli_cmd="node $INSTALL_DIR/cli/dist/index.js status"
             chat_cmd="node $INSTALL_DIR/cli/dist/index.js chat \"What can you do?\""
         elif [ -f "$INSTALL_DIR/cli/src/index.ts" ]; then
-            cli_cmd="cd $INSTALL_DIR/cli && npx tsx src/index.ts status"
-            chat_cmd="cd $INSTALL_DIR/cli && npx tsx src/index.ts chat \"What can you do?\""
+            cli_cmd="tentaclaw status"
+            chat_cmd="tentaclaw chat \"What can you do?\""
         fi
     fi
 
