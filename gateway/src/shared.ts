@@ -125,6 +125,7 @@ export function initClusterSecret(): void {
 }
 
 export function validateClusterSecret(headerSecret: string | undefined): boolean {
+    if (isAuthDisabled()) return true;
     if (!agentAuthEnabled) return true;
     if (!headerSecret) return false;
     return headerSecret === CLUSTER_SECRET;
