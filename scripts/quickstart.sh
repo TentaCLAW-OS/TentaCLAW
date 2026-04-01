@@ -310,36 +310,35 @@ preflight() {
 # ──────────────────────────────────────────────────────────────────
 # Port conflict detection
 # ──────────────────────────────────────────────────────────────────
+is_port_free() {
+    local port="$1"
+    if command_exists lsof; then
+        ! lsof -i ":${port}" > /dev/null 2>&1
+    elif command_exists ss; then
+        ! ss -tlnp 2>/dev/null | grep -q ":${port} "
+    else
+        ! (echo >/dev/tcp/127.0.0.1/"${port}") 2>/dev/null
+    fi
+}
+
+find_free_port() {
+    local start="$1"
+    for try_port in $start 8081 8082 8083 9080 9090 3080 7080; do
+        if is_port_free "$try_port"; then
+            echo "$try_port"
+            return
+        fi
+    done
+    echo "$start"
+}
+
 check_port_available() {
     local port="$1"
-
-    # Try lsof first (macOS + most Linux)
-    if command_exists lsof; then
-        if lsof -i ":${port}" > /dev/null 2>&1; then
-            local occupant
-            occupant=$(lsof -i ":${port}" -t 2>/dev/null | head -1 || echo "unknown")
-            fail "Port ${port} already in use (PID: ${occupant})"
-            info "Is TentaCLAW already running?"
-            info "Run: $0 --stop"
-            info "Or use a different port: $0 --port <PORT>"
-            exit 1
-        fi
-    # Fall back to ss (minimal Linux / Alpine)
-    elif command_exists ss; then
-        if ss -tln "sport = :${port}" 2>/dev/null | grep -q ":${port}"; then
-            fail "Port ${port} already in use"
-            info "Is TentaCLAW already running?"
-            info "Run: $0 --stop"
-            info "Or use a different port: $0 --port <PORT>"
-            exit 1
-        fi
-    # Fall back to /dev/tcp probe (bash built-in)
-    elif (echo >/dev/tcp/127.0.0.1/"${port}") 2>/dev/null; then
-        fail "Port ${port} already in use"
-        info "Is TentaCLAW already running?"
-        info "Run: $0 --stop"
-        info "Or use a different port: $0 --port <PORT>"
-        exit 1
+    if ! is_port_free "$port"; then
+        local new_port
+        new_port=$(find_free_port "$((port + 1))")
+        warn "Port ${port} already in use — switching to port ${new_port}"
+        GATEWAY_PORT="$new_port"
     fi
 }
 
