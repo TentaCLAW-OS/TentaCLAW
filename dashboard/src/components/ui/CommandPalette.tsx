@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useClusterStore } from '@/stores/cluster';
 import { useUIStore } from '@/stores/ui';
+import { fuzzyFilter } from '@/lib/fuzzy';
 import type { TabId } from '@/lib/types';
 
 interface Command {
@@ -12,6 +13,18 @@ interface Command {
   /** If set, displays this as a static result instead of running an action */
   displayResult?: string;
 }
+
+// Map from tab id to leader key sequence
+const TAB_SHORTCUTS: Partial<Record<string, string>> = {
+  summary: 'g s',
+  gpus: 'g g',
+  models: 'g m',
+  inference: 'g i',
+  terminal: 'g t',
+  chat: 'g c',
+  alerts: 'g a',
+  settings: 'g x',
+};
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
@@ -28,6 +41,15 @@ export function CommandPalette() {
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 2000);
   }, []);
+
+  // Slash commands — only shown when query starts with /
+  const SLASH_COMMANDS = useMemo<Command[]>(() => [
+    { id: 'slash:models', label: '/models — Jump to models tab', category: 'action', shortcut: '/models', action: () => setActiveTab('models') },
+    { id: 'slash:nodes', label: '/nodes — Jump to summary', category: 'action', shortcut: '/nodes', action: () => setActiveTab('summary') },
+    { id: 'slash:alerts', label: '/alerts — Jump to alerts', category: 'action', shortcut: '/alerts', action: () => setActiveTab('alerts') },
+    { id: 'slash:flight', label: '/flight — Jump to flight sheets', category: 'action', shortcut: '/flight', action: () => setActiveTab('flight-sheets') },
+    { id: 'slash:terminal', label: '/terminal — Jump to terminal', category: 'action', shortcut: '/terminal', action: () => setActiveTab('terminal') },
+  ], [setActiveTab]);
 
   // Build command list
   const commands = useMemo<Command[]>(() => {
@@ -51,6 +73,7 @@ export function CommandPalette() {
       label: `Go to ${t.label}`,
       category: 'tab' as const,
       action: () => setActiveTab(t.id),
+      shortcut: TAB_SHORTCUTS[t.id],
     }));
 
     for (const node of nodes) {
@@ -102,10 +125,16 @@ export function CommandPalette() {
     return cmds;
   }, [nodes, setActiveTab, selectResource, triggerConfetti]);
 
-  // Filter — hide easter eggs from default list, only show when query matches
-  const filtered = query
-    ? commands.filter((c) => c.label.toLowerCase().includes(query.toLowerCase()))
-    : commands.filter((c) => c.category !== 'easter-egg');
+  // Filter with fuzzy search — slash commands take over when query starts with /
+  const filtered = useMemo(() => {
+    if (query.startsWith('/')) {
+      return fuzzyFilter(query, SLASH_COMMANDS, (c) => c.label);
+    }
+    const base = query
+      ? commands
+      : commands.filter((c) => c.category !== 'easter-egg');
+    return fuzzyFilter(query, base, (c) => c.label);
+  }, [query, commands, SLASH_COMMANDS]);
 
   // Keyboard shortcut to open
   useEffect(() => {
@@ -139,7 +168,7 @@ export function CommandPalette() {
       e.preventDefault();
       setSelectedIdx((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter' && filtered[selectedIdx]) {
-      const cmd = filtered[selectedIdx];
+      const cmd = filtered[selectedIdx].item;
       cmd.action();
       // Easter eggs: show result inline, don't close (except confetti which closes)
       if (cmd.displayResult) {
@@ -213,7 +242,7 @@ export function CommandPalette() {
               No matching commands
             </div>
           ) : (
-            filtered.slice(0, 15).map((cmd, i) => {
+            filtered.slice(0, 15).map(({ item: cmd }, i) => {
               const categoryColor =
                 cmd.category === 'tab'
                   ? 'var(--cyan)'
@@ -260,6 +289,18 @@ export function CommandPalette() {
                   <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                     {cmd.label}
                   </span>
+                  {cmd.shortcut && (
+                    <span
+                      className="text-[8px] font-mono px-1 py-0.5 rounded ml-auto shrink-0"
+                      style={{
+                        background: 'rgba(255,255,255,0.04)',
+                        color: 'var(--text-dim)',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                      }}
+                    >
+                      {cmd.shortcut}
+                    </span>
+                  )}
                 </div>
               );
             })
