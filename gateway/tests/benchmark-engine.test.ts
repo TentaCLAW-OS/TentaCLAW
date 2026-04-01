@@ -117,9 +117,9 @@ import {
     getLeaderboard,
     exportResults,
     runBenchmark,
-} from '../src/benchmark-engine';
+} from '../src/experimental/benchmark-engine';
 
-import type { BenchmarkRun, BenchmarkSuite } from '../src/benchmark-engine';
+import type { BenchmarkRun, BenchmarkSuite } from '../src/experimental/benchmark-engine';
 
 // ---------------------------------------------------------------------------
 // Helpers

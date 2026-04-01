@@ -16,7 +16,7 @@ import {
     formatSSE,
     formatWS,
     _resetClients,
-} from '../src/realtime';
+} from '../src/experimental/realtime';
 
 beforeEach(() => {
     _resetClients();

@@ -8,7 +8,7 @@ import {
     registerSchema, getSchema, listSchemas, deleteSchema,
     validateAgainstSchema, jsonSchemaToGbnf, selectConstraintMethod,
     registerBuiltinSchemas, _resetStructuredOutput,
-} from '../src/structured-output';
+} from '../src/experimental/structured-output';
 
 import {
     setAutonomyLevel, getAutonomyLevel, AUTONOMY_DESCRIPTIONS,
@@ -16,7 +16,7 @@ import {
     shouldExecute, queueAction, approveAction, rejectAction,
     getActionHistory, getPendingApprovals, triggerPlaybook,
     _resetAutonomousOps,
-} from '../src/autonomous-ops';
+} from '../src/experimental/autonomous-ops';
 
 // =============================================================================
 // Structured Output

@@ -39,7 +39,7 @@ import {
     setModelMinReplicas,
     stopAutoscaler,
     executeScaleAction,
-} from '../src/autoscaler';
+} from '../src/experimental/autoscaler';
 
 // ---------------------------------------------------------------------------
 // Helpers

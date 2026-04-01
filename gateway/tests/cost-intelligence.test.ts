@@ -68,7 +68,7 @@ import {
     getBudgetStatus,
     shouldThrottle,
     getCostDashboard,
-} from '../src/cost-intelligence';
+} from '../src/experimental/cost-intelligence';
 
 // =============================================================================
 // Power Monitoring

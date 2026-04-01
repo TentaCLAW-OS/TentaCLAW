@@ -58,7 +58,7 @@ import {
     getCloudSavingsReport,
     getBurstHistory,
     type CloudProvider,
-} from '../src/cloud-burst';
+} from '../src/experimental/cloud-burst';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -41,7 +41,7 @@ import {
     routeRequest,
     getAutoscaleRecommendations,
     analyzeCapacity,
-} from '../src/scheduler';
+} from '../src/experimental/scheduler';
 
 // ---------------------------------------------------------------------------
 // Helpers

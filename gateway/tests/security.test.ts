@@ -30,12 +30,12 @@ import {
     getSecurityRecommendations,
     generateComplianceReport,
     getCertStatus,
-} from '../src/security';
+} from '../src/experimental/security';
 
 import type {
     NetworkPolicy,
     NetworkRule,
-} from '../src/security';
+} from '../src/experimental/security';
 
 // ---------------------------------------------------------------------------
 // Helpers — clean security tables between tests

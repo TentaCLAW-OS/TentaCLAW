@@ -7,9 +7,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 process.env.TENTACLAW_DB_PATH = ':memory:';
 process.env.TENTACLAW_CLUSTER_SECRET = 'test-secret';
 
-import { getAgentCard, submitTask, getTask, listTasks, _resetA2A } from '../src/a2a';
-import { registerWebhook, listWebhooks, deleteWebhook, verifySignature, ALL_WEBHOOK_EVENTS, _resetWebhooks } from '../src/webhooks';
-import { app } from '../src/index';
+import { getAgentCard, submitTask, getTask, listTasks, _resetA2A } from '../src/experimental/a2a';
+import { registerWebhook, listWebhooks, deleteWebhook, verifySignature, ALL_WEBHOOK_EVENTS, _resetWebhooks } from '../src/experimental/webhooks';
+import { app } from '../src/experimental/index';
 
 beforeEach(() => {
     _resetA2A();

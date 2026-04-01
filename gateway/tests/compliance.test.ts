@@ -11,7 +11,7 @@ import {
     classifyModelRisk, getModelRiskLevel, getAllRiskClassifications,
     recordHumanOverride, getHumanOverrides,
     generateComplianceReport, _resetCompliance,
-} from '../src/compliance';
+} from '../src/experimental/compliance';
 import { getDb } from '../src/db';
 
 beforeEach(() => {

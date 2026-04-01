@@ -7,8 +7,8 @@ import { describe, it, expect } from 'vitest';
 process.env.TENTACLAW_DB_PATH = ':memory:';
 process.env.TENTACLAW_CLUSTER_SECRET = 'test-secret';
 
-import { getMcpTools, executeMcpTool } from '../src/mcp-server';
-import { app } from '../src/index';
+import { getMcpTools, executeMcpTool } from '../src/experimental/mcp-server';
+import { app } from '../src/experimental/index';
 
 describe('MCP Tool Definitions', () => {
     it('exposes 12 tools', () => {

@@ -241,7 +241,7 @@ import {
     deleteAdapter,
     updateAdapterBenchmarks,
     getFineTuneSummary,
-} from '../src/finetune';
+} from '../src/experimental/finetune';
 
 // ---------------------------------------------------------------------------
 // Helpers

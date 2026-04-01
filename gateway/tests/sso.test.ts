@@ -55,9 +55,9 @@ import {
     deleteAllUserSessions,
     cleanExpiredSessions,
     _resetSSOState,
-} from '../src/sso';
+} from '../src/experimental/sso';
 
-import type { Permission } from '../src/sso';
+import type { Permission } from '../src/experimental/sso';
 
 // ---------------------------------------------------------------------------
 // Setup

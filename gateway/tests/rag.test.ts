@@ -20,7 +20,7 @@ import {
     ingestText,
     clearDocuments,
     getStoreStats,
-} from '../src/rag';
+} from '../src/experimental/rag';
 
 // ---------------------------------------------------------------------------
 // Reset store between tests

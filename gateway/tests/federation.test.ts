@@ -24,11 +24,11 @@ import {
     getReplicationStatus,
     reconcileFederation,
     _resetFederation,
-} from '../src/federation';
+} from '../src/experimental/federation';
 
 import type {
     FederatedClusterConfig,
-} from '../src/federation';
+} from '../src/experimental/federation';
 
 // ---------------------------------------------------------------------------
 // Mock global fetch so registerCluster's network calls don't actually fire.

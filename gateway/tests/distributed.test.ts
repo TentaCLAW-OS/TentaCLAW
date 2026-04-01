@@ -49,7 +49,7 @@ import {
     getBoundaryCrossings,
     getLayerAssignments,
     recordDistributedLatency,
-} from '../src/distributed';
+} from '../src/experimental/distributed';
 
 import { getAllNodes } from '../src/db';
 

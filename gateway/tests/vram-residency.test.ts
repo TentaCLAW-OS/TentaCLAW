@@ -6,12 +6,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 process.env.TENTACLAW_DB_PATH = ':memory:';
 
-import { estimateVram, estimateByModelName, getKnownModels, getQuantizationLevels } from '../src/vram-estimator';
+import { estimateVram, estimateByModelName, getKnownModels, getQuantizationLevels } from '../src/experimental/vram-estimator';
 import {
     tagNodeRegion, getNodeRegion, listRegionTags, removeNodeRegion,
     setResidencyPolicy, getResidencyPolicy, isNodeAllowedForNamespace,
     filterNodesByResidency, verifyResidency, _resetResidency,
-} from '../src/data-residency';
+} from '../src/experimental/data-residency';
 
 // =============================================================================
 // VRAM Estimator

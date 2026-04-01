@@ -132,10 +132,10 @@ jobs:
         run: cd cli && npx tsc --noEmit
 
   # ---------------------------------------------------------------------------
-  # Test — Run gateway tests
+  # Test — Run gateway tests (Vitest)
   # ---------------------------------------------------------------------------
   test:
-    name: Test
+    name: Gateway Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -156,12 +156,42 @@ jobs:
           restore-keys: gateway-deps-
 
       - name: Install gateway dependencies
-        run: cd gateway && npm ci
+        run: cd gateway && npm install
 
       - name: Run gateway tests
-        run: cd gateway && npm test
+        id: tests
+        run: |
+          cd gateway
+          npx vitest run --reporter=verbose 2>&1 | tee test-output.txt
+          exit_code=${PIPESTATUS[0]}
+          # Parse test counts from Vitest output
+          passing=$(grep -oP 'Tests\s+\K\d+(?=\s+passed)' test-output.txt || echo "0")
+          failing=$(grep -oP 'Tests\s+\K\d+(?=\s+failed)' test-output.txt || echo "0")
+          total=$((passing + failing))
+          test_files=$(grep -oP 'Test Files\s+\K\d+' test-output.txt | head -1 || echo "0")
+          echo "passing=$passing" >> "$GITHUB_OUTPUT"
+          echo "failing=$failing" >> "$GITHUB_OUTPUT"
+          echo "total=$total" >> "$GITHUB_OUTPUT"
+          echo "test_files=$test_files" >> "$GITHUB_OUTPUT"
+          exit $exit_code
         env:
           CI: true
+        continue-on-error: true
+
+      - name: Report test count in job summary
+        run: |
+          echo "## Gateway Test Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Count |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Passing | ${{ steps.tests.outputs.passing }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Failing | ${{ steps.tests.outputs.failing }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Total | ${{ steps.tests.outputs.total }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Test Files | ${{ steps.tests.outputs.test_files }} |" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail if tests failed
+        if: steps.tests.outcome == 'failure'
+        run: exit 1
 
   # ---------------------------------------------------------------------------
   # Build Dashboard — Build the React dashboard

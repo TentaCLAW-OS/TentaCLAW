@@ -44,11 +44,11 @@ import {
     TIER_LIMITS,
     _resetSchemaFlag,
     _resetKeyPairCache,
-} from '../src/licensing';
+} from '../src/experimental/licensing';
 
 import type {
     License,
-} from '../src/licensing';
+} from '../src/experimental/licensing';
 
 // ---------------------------------------------------------------------------
 // Helpers

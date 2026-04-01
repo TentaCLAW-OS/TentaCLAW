@@ -9,7 +9,7 @@ import {
     startSession, recordTurn, endSession, getSession,
     estimatePipelineLatency, getVoiceAgentTemplates,
     _resetVoiceAgents,
-} from '../src/voice-agent';
+} from '../src/experimental/voice-agent';
 
 beforeEach(() => _resetVoiceAgents());
 

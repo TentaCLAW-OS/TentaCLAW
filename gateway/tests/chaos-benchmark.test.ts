@@ -6,8 +6,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 process.env.TENTACLAW_DB_PATH = ':memory:';
 
-import { detectRegressions, generateCiReport } from '../src/benchmark-engine';
-import { createExperiment, injectChaos, listExperiments, listActions, clearExperiments, _resetChaos } from '../src/chaos';
+import { detectRegressions, generateCiReport } from '../src/experimental/benchmark-engine';
+import { createExperiment, injectChaos, listExperiments, listActions, clearExperiments, _resetChaos } from '../src/experimental/chaos';
 
 // =============================================================================
 // Wave 60: Regression Detection

@@ -11,7 +11,7 @@ import {
     setTrustPolicy, getTrustPolicy, checkTrustPolicy,
     generateAiSbom, getProvenanceEvents, logDeployment,
     _resetProvenance,
-} from '../src/model-provenance';
+} from '../src/experimental/model-provenance';
 
 beforeEach(() => _resetProvenance());
 
