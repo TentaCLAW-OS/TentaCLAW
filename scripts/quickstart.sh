@@ -365,8 +365,22 @@ start_gateway() {
     # Create PID directory
     mkdir -p "$PID_DIR"
 
-    # Start gateway in background
-    TENTACLAW_PORT="$GATEWAY_PORT" nohup npx tsx "$PROJECT_DIR/gateway/src/index.ts" \
+    # Start gateway in background — prefer compiled dist, fall back to tsx
+    local gw_cmd
+    if [ -f "$PROJECT_DIR/gateway/dist/gateway/src/index.js" ]; then
+        gw_cmd="node $PROJECT_DIR/gateway/dist/gateway/src/index.js"
+    elif [ -f "$PROJECT_DIR/gateway/dist/index.js" ]; then
+        gw_cmd="node $PROJECT_DIR/gateway/dist/index.js"
+    else
+        # Build first
+        (cd "$PROJECT_DIR/gateway" && npm run build 2>/dev/null) || true
+        if [ -f "$PROJECT_DIR/gateway/dist/gateway/src/index.js" ]; then
+            gw_cmd="node $PROJECT_DIR/gateway/dist/gateway/src/index.js"
+        else
+            gw_cmd="npx --prefix $PROJECT_DIR/gateway tsx $PROJECT_DIR/gateway/src/index.ts"
+        fi
+    fi
+    TENTACLAW_PORT="$GATEWAY_PORT" nohup sh -c "$gw_cmd" \
         > "$PID_DIR/gateway.log" 2>&1 &
     local gw_pid=$!
     echo "$gw_pid" > "$GATEWAY_PID_FILE"
@@ -416,9 +430,15 @@ start_agent() {
     # Create PID directory
     mkdir -p "$PID_DIR"
 
-    # Start agent in background
+    # Start agent — prefer compiled dist, fall back to tsx
+    local agent_cmd
+    if [ -f "$PROJECT_DIR/agent/dist/index.js" ]; then
+        agent_cmd="node $PROJECT_DIR/agent/dist/index.js $AGENT_FLAGS"
+    else
+        agent_cmd="npx --prefix $PROJECT_DIR/agent tsx $PROJECT_DIR/agent/src/index.ts $AGENT_FLAGS"
+    fi
     # shellcheck disable=SC2086
-    nohup npx tsx "$PROJECT_DIR/agent/src/index.ts" $AGENT_FLAGS \
+    nohup sh -c "$agent_cmd" \
         > "$PID_DIR/agent.log" 2>&1 &
     local agent_pid=$!
     echo "$agent_pid" > "$AGENT_PID_FILE"
