@@ -50,21 +50,21 @@ jobs:
 
       # -- Cache all package node_modules --
       - name: Cache gateway node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: gateway/node_modules
           key: gateway-deps-${{ hashFiles('gateway/package-lock.json') }}
           restore-keys: gateway-deps-
 
       - name: Cache dashboard node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: dashboard/node_modules
           key: dashboard-deps-${{ hashFiles('dashboard/package-lock.json') }}
           restore-keys: dashboard-deps-
 
       - name: Cache cli node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: cli/node_modules
           key: cli-deps-${{ hashFiles('cli/package-lock.json') }}
