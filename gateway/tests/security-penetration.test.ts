@@ -16,6 +16,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { createHash, randomBytes } from 'crypto';
 
 process.env.TENTACLAW_DB_PATH = ':memory:';
+process.env.TENTACLAW_NO_AUTH = 'false'; // Override vitest config — security tests need auth active
 process.env.TENTACLAW_CLUSTER_SECRET = 'test-secret';
 
 import { app } from '../src/index';

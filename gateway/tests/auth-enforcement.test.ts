@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 
 process.env.TENTACLAW_DB_PATH = ':memory:';
+process.env.TENTACLAW_NO_AUTH = 'false'; // Override vitest config — these tests need auth active
 // Cluster secret is set in vitest.config.ts env: 'test-secret'
 
 import { app, isAuthDisabled } from '../src/index';
