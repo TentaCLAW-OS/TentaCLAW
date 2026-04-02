@@ -36,6 +36,7 @@ import * as https from 'https';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { execSync, execFileSync } from 'child_process';
 
 // =============================================================================
 // Brand Colors (ANSI true-color escape sequences)
@@ -90,7 +91,12 @@ function loadConfig(): TentaclawConfig | null {
 function saveConfig(config: TentaclawConfig): void {
     const dir = getConfigDir();
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(getConfigPath(), JSON.stringify(config, null, 2) + '\n', 'utf8');
+    const cfgPath = getConfigPath();
+    // Backup before write
+    if (fs.existsSync(cfgPath)) {
+        try { fs.copyFileSync(cfgPath, cfgPath + '.bak'); } catch { /* ok */ }
+    }
+    fs.writeFileSync(cfgPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
 }
 
 /** Resolve inference endpoint + auth headers from config */
@@ -2090,8 +2096,6 @@ async function executeCodeTool(
         return 'Error: could not parse tool arguments';
     }
 
-    const { execFileSync } = await import('child_process');
-
     switch (call.name) {
         case 'read_file': {
             const filePath = resolvePath(args['path'] || '');
@@ -2160,7 +2164,6 @@ async function executeCodeTool(
             }
             // shell: true is intentional here — run_shell needs pipes, redirects, expansions.
             // The command is AI-generated and shown to the user for approval.
-            const { execSync } = await import('child_process');
             try {
                 const out = execSync(command, {
                     cwd: process.cwd(),
@@ -2335,6 +2338,49 @@ async function executeCodeTool(
 // Code Agent — Main Command
 // =============================================================================
 
+/** Check GitHub for latest release; notify user if update available. Cached 24h. */
+async function checkForUpdate(): Promise<void> {
+    if (Math.random() > 0.05) return;   // 5% of runs
+    try {
+        const cacheFile = path.join(getConfigDir(), 'update-check.json');
+        // Check cache (valid for 24h)
+        if (fs.existsSync(cacheFile)) {
+            const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8')) as { checkedAt: string; latestVersion: string };
+            const age = Date.now() - new Date(cached.checkedAt).getTime();
+            if (age < 86_400_000) {
+                if (cached.latestVersion && cached.latestVersion !== `v${CLI_VERSION}`) {
+                    console.log('  ' + C.yellow(`\u2605 Update available: ${cached.latestVersion}`) + C.dim('  \u2192  tentaclaw update'));
+                }
+                return;
+            }
+        }
+        // Fetch from GitHub
+        const data = await new Promise<string>((resolve, reject) => {
+            const req = https.request({
+                hostname: 'api.github.com',
+                path: '/repos/TentaCLAW-OS/tentaclaw-os/releases/latest',
+                method: 'GET',
+                headers: { 'User-Agent': `tentaclaw-cli/${CLI_VERSION}`, 'Accept': 'application/vnd.github.v3+json' },
+                timeout: 3000,
+            }, (res) => {
+                let body = '';
+                res.on('data', (c: Buffer) => { body += c.toString(); });
+                res.on('end', () => resolve(body));
+            });
+            req.on('error', reject);
+            req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+            req.end();
+        });
+        const release = JSON.parse(data) as { tag_name?: string };
+        const latest = release.tag_name || `v${CLI_VERSION}`;
+        fs.mkdirSync(getConfigDir(), { recursive: true });
+        fs.writeFileSync(cacheFile, JSON.stringify({ checkedAt: new Date().toISOString(), latestVersion: latest }), 'utf8');
+        if (latest !== `v${CLI_VERSION}`) {
+            console.log('  ' + C.yellow(`\u2605 Update available: ${latest}`) + C.dim('  \u2192  tentaclaw update'));
+        }
+    } catch { /* silent — never break startup */ }
+}
+
 async function cmdCode(gateway: string, flags: Record<string, string>): Promise<void> {
     let autoApprove = flags['yes'] === 'true' || flags['y'] === 'true';
     const taskFlag = flags['task'] || flags['t'] || '';       // --task "..." for non-interactive mode
@@ -2405,6 +2451,7 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
     let sessionId = resumeId || generateSessionId();
     const sessionUsage = newUsageStats();
 
+    void checkForUpdate();   // background — never blocks startup
     bootSplash();
     console.log('  ' + C.purple(C.bold('Code Agent')) + C.dim(` \u2014 model: ${model}`) + C.dim(' via ') + backendLabel);
     console.log('  ' + C.dim(`cwd: ${process.cwd()}`) + C.dim(`  session: ${sessionId}`));
@@ -2516,8 +2563,9 @@ Long-term memory: You can and should write to ${getWorkspaceDir()}/MEMORY.md whe
 
             process.stdout.write('\n  ' + C.purple('\u25CE '));
 
-            // Stream the completion
-            await new Promise<void>((resolve, reject) => {
+            // Stream the completion — with error recovery
+            const streamState = { error: '' };
+            await new Promise<void>((resolve) => {
                 const parsed = new URL(url);
                 const isHttps = parsed.protocol === 'https:';
                 const lib = isHttps ? https : http;
@@ -2581,12 +2629,30 @@ Long-term memory: You can and should write to ${getWorkspaceDir()}/MEMORY.md whe
                         }
                     });
                     res.on('end', resolve);
-                    res.on('error', reject);
+                    res.on('error', (e) => { streamState.error = e.message; resolve(); });
                 });
-                req.on('error', reject);
+                req.on('error', (e) => { streamState.error = e.message; resolve(); });
                 req.write(bodyStr);
                 req.end();
             });
+
+            // Error recovery: save partial content if stream broke
+            if (streamState.error) {
+                console.log('\n');
+                console.log('  ' + C.red('\u26A0 Stream interrupted: ' + streamState.error));
+                if (fullContent) {
+                    messages.push({ role: 'assistant', content: fullContent + ' [stream interrupted]' });
+                    appendSessionEvent(sessionId, {
+                        type: 'message', timestamp: new Date().toISOString(), sessionId,
+                        role: 'assistant', content: fullContent, model, metadata: { interrupted: true },
+                    });
+                    console.log('  ' + C.dim('  Partial response saved. Type to retry.'));
+                } else {
+                    console.log('  ' + C.dim('  No partial content. Type to retry.'));
+                }
+                console.log('');
+                return;
+            }
 
             const toolCalls = Object.values(tcAcc);
 
@@ -2600,6 +2666,11 @@ Long-term memory: You can and should write to ${getWorkspaceDir()}/MEMORY.md whe
                     });
                 }
                 sessionUsage.requestCount++;
+                appendSessionEvent(sessionId, {
+                    type: 'usage', timestamp: new Date().toISOString(), sessionId,
+                    usage: { inputTokens: sessionUsage.inputTokens, outputTokens: sessionUsage.outputTokens, totalTokens: sessionUsage.totalTokens },
+                    metadata: { model, requestCount: sessionUsage.requestCount },
+                });
                 const msgCount = messages.filter(m => m.role === 'user').length;
                 updateSessionMeta(sessionId, { model, messageCount: msgCount, tokenCount: sessionUsage.totalTokens });
                 console.log('');
@@ -2707,8 +2778,7 @@ Long-term memory: You can and should write to ${getWorkspaceDir()}/MEMORY.md whe
             const shellCmd = input.slice(1).trim();
             if (shellCmd) {
                 try {
-                    const { execSync } = await import('child_process');
-                    const out = execSync(shellCmd, { cwd: process.cwd(), encoding: 'utf8', timeout: 30000, maxBuffer: 2 * 1024 * 1024 });
+                    const out = execSync(shellCmd, { shell: process.platform === 'win32' ? 'cmd.exe' : '/bin/sh', cwd: process.cwd(), encoding: 'utf8', timeout: 30000, maxBuffer: 2 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
                     if (out) process.stdout.write(C.dim(out));
                 } catch (e: unknown) {
                     const err = e as { stdout?: string; stderr?: string; status?: number };
@@ -2777,6 +2847,42 @@ Long-term memory: You can and should write to ${getWorkspaceDir()}/MEMORY.md whe
                     console.log('  ' + padRight(C.dim('Tokens'), 18) + C.white(`${formatTokens(sessionUsage.inputTokens)} in / ${formatTokens(sessionUsage.outputTokens)} out`));
                     console.log('  ' + padRight(C.dim('CWD'), 18) + C.dim(process.cwd()));
                     console.log('  ' + padRight(C.dim('Auto-approve'), 18) + (autoApprove ? C.green('ON') : C.yellow('OFF')));
+                    console.log('');
+                    rl!.prompt(); return;
+                }
+                case 'usage': {
+                    const cfg = loadConfig();
+                    const provider = cfg?.provider || 'ollama';
+                    // Cost per 1M tokens by provider+model (input/output)
+                    const costTable: Record<string, { in: number; out: number }> = {
+                        'gpt-4o':           { in: 2.50,  out: 10.00 },
+                        'gpt-4o-mini':      { in: 0.15,  out: 0.60  },
+                        'gpt-4-turbo':      { in: 10.00, out: 30.00 },
+                        'gpt-3.5-turbo':    { in: 0.50,  out: 1.50  },
+                        'claude-3-5-sonnet':{ in: 3.00,  out: 15.00 },
+                        'claude-3-haiku':   { in: 0.25,  out: 1.25  },
+                    };
+                    const rates = Object.entries(costTable).find(([k]) => model.toLowerCase().includes(k.toLowerCase()))?.[1];
+                    const isOllama = provider === 'ollama' || inferenceUrl.includes('localhost');
+                    const inputCost  = isOllama ? 0 : (rates ? (sessionUsage.inputTokens  / 1_000_000) * rates.in  : null);
+                    const outputCost = isOllama ? 0 : (rates ? (sessionUsage.outputTokens / 1_000_000) * rates.out : null);
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('USAGE')));
+                    console.log('  ' + padRight(C.dim('Model'), 22) + C.white(model));
+                    console.log('  ' + padRight(C.dim('Provider'), 22) + C.white(provider));
+                    console.log('  ' + padRight(C.dim('Requests'), 22) + C.white(String(sessionUsage.requestCount)));
+                    console.log('  ' + padRight(C.dim('Input tokens'), 22) + C.white(formatTokens(sessionUsage.inputTokens)));
+                    console.log('  ' + padRight(C.dim('Output tokens'), 22) + C.white(formatTokens(sessionUsage.outputTokens)));
+                    console.log('  ' + padRight(C.dim('Total tokens'), 22) + C.white(formatTokens(sessionUsage.totalTokens)));
+                    if (isOllama) {
+                        console.log('  ' + padRight(C.dim('Cost'), 22) + C.green('FREE  (local Ollama)'));
+                    } else if (inputCost !== null && outputCost !== null) {
+                        console.log('  ' + padRight(C.dim('Est. cost'), 22) + C.yellow(`$${(inputCost + outputCost).toFixed(4)}`));
+                        console.log('  ' + padRight(C.dim('  input'), 22) + C.dim(`$${inputCost.toFixed(4)}  @ $${rates!.in}/1M`));
+                        console.log('  ' + padRight(C.dim('  output'), 22) + C.dim(`$${outputCost.toFixed(4)}  @ $${rates!.out}/1M`));
+                    } else {
+                        console.log('  ' + padRight(C.dim('Est. cost'), 22) + C.dim('unknown — model not in cost table'));
+                    }
                     console.log('');
                     rl!.prompt(); return;
                 }
@@ -4605,8 +4711,6 @@ async function cmdUpdate(): Promise<void> {
     console.log('');
     console.log('  ' + C.teal(C.bold('UPDATE')) + C.dim(' \u2014 updating TentaCLAW CLI'));
     console.log('');
-
-    const { execFileSync } = await import('child_process');
 
     // Find git root from script location
     const scriptDir = path.resolve(__dirname, '..', '..', '..');
