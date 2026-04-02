@@ -359,7 +359,7 @@ if (-not $GatewayOnly) {
     Write-Host "  ${Bold}Start the agent:$Reset"
     if ($Mock) {
         Write-Host "    cd `"$InstallDir\agent`""
-        Write-Host "    $($env:TENTACLAW_MOCK ? 'set ' : '$env:')TENTACLAW_MOCK=true; npm run dev"
+        Write-Host "    `$env:TENTACLAW_MOCK='true'; npm run dev"
     } else {
         Write-Host "    cd `"$InstallDir\agent`""
         Write-Host "    npm run dev"
