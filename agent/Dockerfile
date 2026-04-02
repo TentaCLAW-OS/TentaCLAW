@@ -8,7 +8,7 @@ COPY shared/ ./shared/
 # Copy agent source
 COPY agent/package*.json ./agent/
 WORKDIR /app/agent
-RUN npm ci
+RUN npm install
 
 COPY agent/ ./
 RUN npm run build
@@ -19,8 +19,8 @@ FROM node:22-slim
 WORKDIR /app/agent
 
 # Install production deps only
-COPY agent/package*.json ./
-RUN npm ci --omit=dev
+COPY agent/package.json ./
+RUN npm install --omit=dev
 
 # Copy built output
 COPY --from=builder /app/agent/dist ./dist
@@ -29,4 +29,4 @@ COPY --from=builder /app/shared ../shared
 ENV TENTACLAW_MOCK=true
 ENV TENTACLAW_GATEWAY_URL=http://gateway:8080
 
-CMD ["node", "dist/index.js", "--mock"]
+CMD ["node", "dist/agent/src/index.js"]

@@ -14,17 +14,18 @@ services:
     environment:
       - TENTACLAW_PORT=8080
       - TENTACLAW_HOST=0.0.0.0
+      - TENTACLAW_NO_AUTH=true
       - TENTACLAW_LOG_FORMAT=json
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:8080/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
 
-  # Mock agent — generates fake GPU stats for testing
-  mock-agent:
+  # Mock agent 1 — simulates a multi-GPU rig
+  mock-agent-1:
     build:
       context: .
       dockerfile: agent/Dockerfile
@@ -34,21 +35,24 @@ services:
     environment:
       - TENTACLAW_GATEWAY_URL=http://gateway:8080
       - TENTACLAW_MOCK=true
-      - TENTACLAW_HOSTNAME=mock-rig-01
+      - TENTACLAW_HOSTNAME=Kraken-01
+      - TENTACLAW_INTERVAL=5
     restart: unless-stopped
 
-  # Second mock agent (optional — uncomment to simulate multi-node)
-  # mock-agent-2:
-  #   build:
-  #     context: .
-  #     dockerfile: agent/Dockerfile
-  #   depends_on:
-  #     gateway:
-  #       condition: service_healthy
-  #   environment:
-  #     - TENTACLAW_GATEWAY_URL=http://gateway:8080
-  #     - TENTACLAW_MOCK=true
-  #     - TENTACLAW_HOSTNAME=mock-rig-02
+  # Mock agent 2 — second rig
+  mock-agent-2:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      - TENTACLAW_GATEWAY_URL=http://gateway:8080
+      - TENTACLAW_MOCK=true
+      - TENTACLAW_HOSTNAME=Octopod-02
+      - TENTACLAW_INTERVAL=5
+    restart: unless-stopped
 
 volumes:
   gateway-data:

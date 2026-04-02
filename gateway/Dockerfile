@@ -5,12 +5,19 @@ WORKDIR /app
 # Copy shared types
 COPY shared/ ./shared/
 
-# Copy gateway source
+# Copy and build gateway
 COPY gateway/package*.json ./gateway/
 WORKDIR /app/gateway
-RUN npm ci
-
+RUN npm install
 COPY gateway/ ./
+RUN npm run build
+
+# Copy and build dashboard (outputs to gateway/public)
+WORKDIR /app
+COPY dashboard/package*.json ./dashboard/
+WORKDIR /app/dashboard
+RUN npm install
+COPY dashboard/ ./
 RUN npm run build
 
 # Production image
@@ -19,8 +26,8 @@ FROM node:22-slim
 WORKDIR /app/gateway
 
 # Install production deps only
-COPY gateway/package*.json ./
-RUN npm ci --omit=dev
+COPY gateway/package.json ./
+RUN npm install --omit=dev
 
 # Copy built output + public dashboard
 COPY --from=builder /app/gateway/dist ./dist
@@ -34,4 +41,4 @@ ENV TENTACLAW_PORT=8080
 ENV TENTACLAW_HOST=0.0.0.0
 EXPOSE 8080
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/gateway/src/index.js"]
