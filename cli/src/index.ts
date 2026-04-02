@@ -54,6 +54,372 @@ const C = {
     italic:  (s: string) => `\x1b[3m${s}\x1b[0m`,
 };
 
+const CLI_VERSION = '1.0.0';
+
+// =============================================================================
+// Config System — ~/.tentaclaw/config.json
+// =============================================================================
+
+interface TentaclawConfig {
+    provider: 'ollama' | 'openai' | 'openrouter' | 'custom';
+    model: string;
+    ollama?: { host: string };
+    openai?: { apiKey: string; baseUrl?: string };
+    openrouter?: { apiKey: string };
+    custom?: { apiKey?: string; baseUrl: string };
+    autoApprove?: boolean;
+}
+
+function getConfigDir(): string {
+    return path.join(os.homedir(), '.tentaclaw');
+}
+
+function getConfigPath(): string {
+    return path.join(getConfigDir(), 'config.json');
+}
+
+function loadConfig(): TentaclawConfig | null {
+    try {
+        const raw = fs.readFileSync(getConfigPath(), 'utf8');
+        return JSON.parse(raw) as TentaclawConfig;
+    } catch {
+        return null;
+    }
+}
+
+function saveConfig(config: TentaclawConfig): void {
+    const dir = getConfigDir();
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(getConfigPath(), JSON.stringify(config, null, 2) + '\n', 'utf8');
+}
+
+/** Resolve inference endpoint + auth headers from config */
+function resolveInferenceFromConfig(config: TentaclawConfig): { url: string; headers: Record<string, string> } {
+    switch (config.provider) {
+        case 'ollama':
+            return {
+                url: config.ollama?.host || 'http://localhost:11434',
+                headers: {},
+            };
+        case 'openai':
+            return {
+                url: config.openai?.baseUrl || 'https://api.openai.com/v1',
+                headers: { 'Authorization': `Bearer ${config.openai?.apiKey || ''}` },
+            };
+        case 'openrouter':
+            return {
+                url: 'https://openrouter.ai/api/v1',
+                headers: {
+                    'Authorization': `Bearer ${config.openrouter?.apiKey || ''}`,
+                    'HTTP-Referer': 'https://tentaclaw.io',
+                    'X-Title': 'TentaCLAW Code Agent',
+                },
+            };
+        case 'custom':
+            return {
+                url: config.custom?.baseUrl || 'http://localhost:8080',
+                headers: config.custom?.apiKey ? { 'Authorization': `Bearer ${config.custom.apiKey}` } : {},
+            };
+        default:
+            return { url: 'http://localhost:11434', headers: {} };
+    }
+}
+
+// =============================================================================
+// Session Persistence — JSONL transcripts at ~/.tentaclaw/sessions/
+// =============================================================================
+
+interface SessionEvent {
+    type: 'session_start' | 'message' | 'tool_call' | 'tool_result' | 'usage' | 'model_change' | 'session_end';
+    timestamp: string;
+    sessionId: string;
+    role?: string;
+    content?: string | null;
+    model?: string;
+    tool_calls?: unknown;
+    tool_call_id?: string;
+    name?: string;
+    usage?: { inputTokens: number; outputTokens: number; totalTokens: number };
+    metadata?: Record<string, unknown>;
+}
+
+interface SessionMeta {
+    sessionId: string;
+    createdAt: string;
+    updatedAt: string;
+    model: string;
+    messageCount: number;
+    tokenCount: number;
+    cwd: string;
+    label?: string;
+}
+
+function getSessionsDir(): string {
+    return path.join(getConfigDir(), 'sessions');
+}
+
+function getSessionIndexPath(): string {
+    return path.join(getSessionsDir(), 'sessions.json');
+}
+
+function generateSessionId(): string {
+    const now = new Date();
+    const date = now.toISOString().slice(0, 10);
+    const rand = Math.random().toString(36).slice(2, 8);
+    return `${date}-${rand}`;
+}
+
+function loadSessionIndex(): Record<string, SessionMeta> {
+    try {
+        return JSON.parse(fs.readFileSync(getSessionIndexPath(), 'utf8'));
+    } catch {
+        return {};
+    }
+}
+
+function saveSessionIndex(index: Record<string, SessionMeta>): void {
+    fs.mkdirSync(getSessionsDir(), { recursive: true });
+    fs.writeFileSync(getSessionIndexPath(), JSON.stringify(index, null, 2) + '\n');
+}
+
+function appendSessionEvent(sessionId: string, event: SessionEvent): void {
+    const dir = getSessionsDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const filePath = path.join(dir, `${sessionId}.jsonl`);
+    fs.appendFileSync(filePath, JSON.stringify(event) + '\n');
+}
+
+function loadSessionTranscript(sessionId: string): SessionEvent[] {
+    const filePath = path.join(getSessionsDir(), `${sessionId}.jsonl`);
+    try {
+        const lines = fs.readFileSync(filePath, 'utf8').trim().split('\n');
+        return lines.filter(l => l.trim()).map(l => JSON.parse(l));
+    } catch {
+        return [];
+    }
+}
+
+/** Rebuild messages array from session transcript for resuming */
+function rebuildMessagesFromTranscript(events: SessionEvent[]): Array<{ role: string; content: string | null; tool_calls?: unknown; tool_call_id?: string; name?: string }> {
+    const messages: Array<{ role: string; content: string | null; tool_calls?: unknown; tool_call_id?: string; name?: string }> = [];
+    for (const ev of events) {
+        if (ev.type === 'message' && ev.role) {
+            const msg: Record<string, unknown> = { role: ev.role, content: ev.content ?? null };
+            if (ev.tool_calls) msg['tool_calls'] = ev.tool_calls;
+            if (ev.tool_call_id) msg['tool_call_id'] = ev.tool_call_id;
+            if (ev.name) msg['name'] = ev.name;
+            messages.push(msg as { role: string; content: string | null; tool_calls?: unknown; tool_call_id?: string; name?: string });
+        }
+    }
+    return messages;
+}
+
+function listRecentSessions(limit = 20): SessionMeta[] {
+    const index = loadSessionIndex();
+    return Object.values(index)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .slice(0, limit);
+}
+
+function updateSessionMeta(sessionId: string, updates: Partial<SessionMeta>): void {
+    const index = loadSessionIndex();
+    if (!index[sessionId]) {
+        index[sessionId] = {
+            sessionId,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            model: '',
+            messageCount: 0,
+            tokenCount: 0,
+            cwd: process.cwd(),
+        };
+    }
+    Object.assign(index[sessionId], updates, { updatedAt: new Date().toISOString() });
+    saveSessionIndex(index);
+}
+
+// =============================================================================
+// Workspace System — ~/.tentaclaw/workspace/
+// =============================================================================
+
+function getWorkspaceDir(): string {
+    return path.join(getConfigDir(), 'workspace');
+}
+
+const WORKSPACE_FILES: Record<string, string> = {
+    'SOUL.md': `# Soul
+
+You are **TentaCLAW** — a highly capable AI coding assistant with the personality of a confident, friendly octopus.
+
+## Personality
+- Direct and action-oriented. You do things, you don't just talk about them.
+- Witty but not annoying. One quip per response, max.
+- You read files before editing them. Always.
+- You run tests after making changes.
+- You explain briefly what you're doing, then do it.
+
+## Boundaries
+- Never delete files without being asked.
+- Never run destructive commands (rm -rf, drop database) without explicit approval.
+- If you're unsure, ask. Better to check than to break things.
+`,
+    'USER.md': `# User
+
+(Edit this file to tell TentaCLAW about yourself)
+
+- Name:
+- Role:
+- Preferences:
+- Tech stack:
+`,
+    'IDENTITY.md': `# Identity
+
+- **Name**: TentaCLAW
+- **Emoji**: 🐙
+- **Vibe**: Confident, capable, slightly playful
+- **Tagline**: Eight arms. One mind.
+`,
+    'MEMORY.md': `# Memory
+
+TentaCLAW's long-term memory. Updated automatically during conversations.
+
+## Facts
+
+## Preferences
+
+## Project Notes
+`,
+    'AGENTS.md': `# Operating Protocol
+
+## Startup
+1. Read SOUL.md for personality and boundaries.
+2. Read USER.md for who you're working with.
+3. Read MEMORY.md for long-term context.
+4. Read today's memory log if it exists (memory/YYYY-MM-DD.md).
+5. Read project context files (CLAUDE.md, AGENTS.md in cwd) if present.
+
+## Memory Protocol
+- When you learn something worth remembering (user preferences, project decisions, recurring patterns), write it to MEMORY.md using write_file or edit_file.
+- Write daily working notes to memory/YYYY-MM-DD.md — what you worked on, decisions made, issues found.
+- Keep MEMORY.md organized: Facts, Preferences, Project Notes sections.
+- Don't duplicate — check MEMORY.md before adding.
+
+## Red Lines
+- Never delete files without explicit user approval.
+- Never run destructive commands (rm -rf, drop database, git reset --hard) without approval.
+- Never overwrite files without reading them first.
+- If unsure about a destructive action, ask.
+
+## Tool Discipline
+- Always read_file before edit_file — you need exact content to match.
+- Use edit_file for surgical changes, write_file only for new files or full rewrites.
+- Run tests or builds after making code changes when appropriate.
+- Show what you're doing briefly, then do it. Don't over-explain.
+`,
+    'TOOLS.md': `# Local Environment
+
+Notes about this machine's setup. Edit this file to help TentaCLAW understand your environment.
+
+## SSH Hosts
+(e.g., prod: user@192.168.1.100, staging: user@staging.example.com)
+
+## Custom Paths
+(e.g., projects: ~/code, data: /mnt/data)
+
+## Preferred Tools
+(e.g., package manager: pnpm, editor: vscode, shell: zsh)
+
+## Conventions
+(e.g., commit style: conventional commits, branch naming: feature/xxx)
+`,
+    'BOOTSTRAP.md': `# First-Run Onboarding
+
+This is your first session with this user. Before doing anything else:
+
+1. Introduce yourself as TentaCLAW — their AI coding assistant.
+2. Ask their name.
+3. Ask their role (developer, student, researcher, etc.).
+4. Ask what programming languages and tools they primarily use.
+5. Update USER.md with their answers using edit_file (replace the placeholder fields).
+6. Then proceed with whatever they originally asked.
+
+This file will be deleted after your first session.
+`,
+};
+
+function ensureWorkspace(): void {
+    const dir = getWorkspaceDir();
+    fs.mkdirSync(dir, { recursive: true });
+    fs.mkdirSync(path.join(dir, 'memory'), { recursive: true });
+
+    for (const [filename, defaultContent] of Object.entries(WORKSPACE_FILES)) {
+        const filePath = path.join(dir, filename);
+        if (!fs.existsSync(filePath)) {
+            fs.writeFileSync(filePath, defaultContent, 'utf8');
+        }
+    }
+}
+
+/** Load workspace context files into a string for the system prompt */
+function loadWorkspaceContext(): string {
+    const dir = getWorkspaceDir();
+    if (!fs.existsSync(dir)) return '';
+
+    const MAX_PER_FILE = 8000;
+    const MAX_TOTAL = 50000;
+    let total = '';
+
+    const files = ['SOUL.md', 'USER.md', 'IDENTITY.md', 'MEMORY.md', 'AGENTS.md', 'TOOLS.md', 'HEARTBEAT.md'];
+    for (const filename of files) {
+        const filePath = path.join(dir, filename);
+        if (!fs.existsSync(filePath)) continue;
+        try {
+            let content = fs.readFileSync(filePath, 'utf8');
+            if (content.trim().length === 0) continue;
+            if (content.length > MAX_PER_FILE) {
+                content = content.slice(0, MAX_PER_FILE) + '\n... (truncated)';
+            }
+            if (total.length + content.length > MAX_TOTAL) break;
+            total += `\n\n--- ${filename} ---\n${content}`;
+        } catch { /* skip unreadable */ }
+    }
+
+    // Load daily memory if exists
+    const today = new Date().toISOString().slice(0, 10);
+    const dailyPath = path.join(dir, 'memory', `${today}.md`);
+    if (fs.existsSync(dailyPath)) {
+        try {
+            const daily = fs.readFileSync(dailyPath, 'utf8');
+            if (daily.trim().length > 0 && total.length + daily.length < MAX_TOTAL) {
+                total += `\n\n--- Today's Memory (${today}) ---\n${daily}`;
+            }
+        } catch { /* skip */ }
+    }
+
+    return total;
+}
+
+// =============================================================================
+// Usage Tracking
+// =============================================================================
+
+interface UsageStats {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    requestCount: number;
+}
+
+function newUsageStats(): UsageStats {
+    return { inputTokens: 0, outputTokens: 0, totalTokens: 0, requestCount: 0 };
+}
+
+function formatTokens(n: number): string {
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
+    return String(n);
+}
+
 // =============================================================================
 // TentaCLAW Personality — contextual quips
 // =============================================================================
@@ -113,8 +479,6 @@ function personalityLine(mood: keyof typeof personality): string {
 // =============================================================================
 // Visual Helpers — progress bars, sparklines, box drawing
 // =============================================================================
-
-const CLI_VERSION = '1.0.0';
 
 function stripAnsi(s: string): string {
     return s.replace(/\x1b\[[0-9;]*m/g, '');
@@ -319,7 +683,7 @@ interface ApiResponse {
     data: unknown;
 }
 
-function apiRequest(method: string, url: string, body?: unknown): Promise<ApiResponse> {
+function apiRequest(method: string, url: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<ApiResponse> {
     return new Promise((resolve, reject) => {
         const parsed = new URL(url);
         const options: http.RequestOptions = {
@@ -331,6 +695,7 @@ function apiRequest(method: string, url: string, body?: unknown): Promise<ApiRes
                 'Content-Type': 'application/json',
                 'User-Agent': 'TentaCLAW-CLI/' + CLI_VERSION,
                 'Accept': 'application/json',
+                ...extraHeaders,
             },
             timeout: 15000,
         };
@@ -378,6 +743,18 @@ async function apiGet(baseUrl: string, path: string): Promise<unknown> {
     } catch (err) {
         handleConnectionError(err, baseUrl);
         process.exit(1);
+    }
+}
+
+/** Non-fatal version of apiGet — returns null on any failure instead of exiting */
+async function apiProbe(baseUrl: string, path: string): Promise<unknown | null> {
+    const url = baseUrl.replace(/\/+$/, '') + path;
+    try {
+        const resp = await apiRequest('GET', url);
+        if (resp.status >= 400) return null;
+        return resp.data;
+    } catch {
+        return null;
     }
 }
 
@@ -1219,11 +1596,70 @@ async function cmdTags(gateway: string, positional: string[], _flags: Record<str
 }
 
 async function cmdChat(gateway: string, flags: Record<string, string>): Promise<void> {
-    const model = flags['model'] || 'llama3.1:8b';
+    // Resolve inference: config > gateway > local Ollama
+    let inferenceUrl = '';
+    let inferenceHeaders: Record<string, string> = {};
+    let model = flags['model'] || '';
+    let backendLabel = '';
+
+    const config = loadConfig();
+    if (config) {
+        const resolved = resolveInferenceFromConfig(config);
+        inferenceUrl = resolved.url;
+        inferenceHeaders = resolved.headers;
+        if (!model) model = config.model;
+        backendLabel = C.green(config.provider);
+    }
+
+    if (!inferenceUrl || !model) {
+        const gwResp = await apiProbe(gateway, '/v1/models') as { data?: Array<{ id: string }> } | null;
+        const gwModels = (gwResp?.data || []).map(m => m.id);
+        if (model && gwModels.includes(model)) {
+            inferenceUrl = gateway; backendLabel = C.teal('cluster');
+        } else if (!model && gwModels.length > 0) {
+            inferenceUrl = gateway;
+            model = gwModels.find(m => /chat|instruct/i.test(m)) || gwModels[0];
+            backendLabel = C.teal('cluster');
+        }
+    }
+
+    if (!inferenceUrl || !model) {
+        for (const port of [11434, 11435]) {
+            const resp = await apiProbe(`http://localhost:${port}`, '/v1/models') as { data?: Array<{ id: string }> } | null;
+            const list = (resp?.data || []).map(m => m.id);
+            if (list.length > 0) {
+                inferenceUrl = `http://localhost:${port}`;
+                if (!model) model = list.find(m => /chat|instruct/i.test(m)) || list[0];
+                backendLabel = C.yellow('local Ollama');
+                break;
+            }
+        }
+    }
+
+    if (!inferenceUrl) {
+        console.error('');
+        console.error(C.red('  \u2718 No inference backend available.'));
+        console.error(C.dim('  Run "tentaclaw setup" to configure a model provider.'));
+        console.error('');
+        process.exit(1);
+    }
+    if (!model) model = 'llama3.1:8b';
+
+    // Session + multi-turn history
+    const chatSessionId = generateSessionId();
+    const chatMessages: Array<{ role: string; content: string }> = [
+        { role: 'system', content: 'You are TentaCLAW \u2014 a helpful, witty AI assistant. Be concise but thorough.' },
+    ];
+    appendSessionEvent(chatSessionId, {
+        type: 'session_start', timestamp: new Date().toISOString(), sessionId: chatSessionId,
+        model, metadata: { mode: 'chat', cwd: process.cwd() },
+    });
+    updateSessionMeta(chatSessionId, { model, cwd: process.cwd(), label: 'chat' });
 
     bootSplash();
-    console.log('  ' + C.purple(C.bold('Chat Mode')) + C.dim(` \u2014 model: ${model}`));
-    console.log('  ' + C.dim('Type your message, then press Enter. Type /quit to exit.'));
+    console.log('  ' + C.purple(C.bold('Chat Mode')) + C.dim(` \u2014 model: ${model}`) + C.dim(' via ') + backendLabel);
+    console.log('  ' + C.dim(`Session: ${chatSessionId}`));
+    console.log('  ' + C.dim('Commands: /new /status /model <name> /quit  |  Multi-turn history enabled'));
     console.log('');
 
     const readline = await import('readline');
@@ -1238,49 +1674,122 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
     rl.on('line', async (line: string) => {
         const input = line.trim();
         if (!input) { rl.prompt(); return; }
-        if (input === '/quit' || input === '/exit') {
-            console.log('');
-            console.log(C.dim('  TentaCLAW waves goodbye! \ud83d\udc19'));
-            console.log('');
-            rl.close();
-            process.exit(0);
+
+        // Chat slash commands
+        if (input.startsWith('/')) {
+            const chatCmd = input.slice(1).split(' ')[0]?.toLowerCase();
+            const chatArg = input.slice(1 + (chatCmd?.length || 0)).trim();
+            if (chatCmd === 'quit' || chatCmd === 'exit') {
+                appendSessionEvent(chatSessionId, { type: 'session_end', timestamp: new Date().toISOString(), sessionId: chatSessionId });
+                console.log('');
+                console.log(C.dim(`  Session saved: ${chatSessionId}`));
+                console.log(C.dim('  TentaCLAW waves goodbye! \ud83d\udc19'));
+                rl.close();
+                process.exit(0);
+            }
+            if (chatCmd === 'new' || chatCmd === 'reset') {
+                chatMessages.splice(1);
+                console.log('  ' + C.green('\u2714 Conversation cleared.'));
+                rl.prompt(); return;
+            }
+            if (chatCmd === 'status') {
+                const turns = chatMessages.filter(m => m.role === 'user').length;
+                console.log('  ' + C.dim(`Model: ${model} | Turns: ${turns} | Session: ${chatSessionId}`));
+                rl.prompt(); return;
+            }
+            if (chatCmd === 'model' && chatArg) {
+                model = chatArg;
+                console.log('  ' + C.green(`\u2714 Model: ${model}`));
+                rl.prompt(); return;
+            }
+            if (chatCmd === 'help') {
+                console.log('  ' + C.dim('/new \u2014 clear history  /status \u2014 show info  /model <m> \u2014 switch  /quit \u2014 exit'));
+                rl.prompt(); return;
+            }
+            console.log('  ' + C.dim(`Unknown: /${chatCmd}. Try /help.`));
+            rl.prompt(); return;
         }
 
-        process.stdout.write('  ' + C.purple('TentaCLAW: '));
+        // Add to multi-turn history
+        chatMessages.push({ role: 'user', content: input });
+        appendSessionEvent(chatSessionId, {
+            type: 'message', timestamp: new Date().toISOString(), sessionId: chatSessionId,
+            role: 'user', content: input,
+        });
 
+        process.stdout.write('\n  ' + C.purple('\u25CE '));
+
+        rl.pause();
         try {
-            const url = gateway.replace(/\/+$/, '') + '/v1/chat/completions';
-            const body = JSON.stringify({
-                model,
-                messages: [{ role: 'user', content: input }],
-                stream: false,
+            const url = inferenceUrl.replace(/\/+$/, '') + '/v1/chat/completions';
+            const bodyStr = JSON.stringify({ model, messages: chatMessages, stream: true });
+            let fullContent = '';
+
+            await new Promise<void>((resolve, reject) => {
+                const parsed = new URL(url);
+                const isHttps = parsed.protocol === 'https:';
+                const lib = isHttps ? https : http;
+                const req = lib.request({
+                    hostname: parsed.hostname,
+                    port: Number(parsed.port) || (isHttps ? 443 : 80),
+                    path: parsed.pathname,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(bodyStr),
+                        ...inferenceHeaders,
+                    },
+                }, (res) => {
+                    if (res.statusCode && res.statusCode >= 400) {
+                        let errBuf = '';
+                        res.on('data', (c: Buffer) => { errBuf += c.toString(); });
+                        res.on('end', () => {
+                            try { const e = JSON.parse(errBuf); process.stdout.write(C.red(String(e.error?.message || `HTTP ${res.statusCode}`))); }
+                            catch { process.stdout.write(C.red(`HTTP ${res.statusCode}`)); }
+                            resolve();
+                        });
+                        return;
+                    }
+                    let buf = '';
+                    res.on('data', (chunk: Buffer) => {
+                        buf += chunk.toString();
+                        const lines = buf.split('\n');
+                        buf = lines.pop() ?? '';
+                        for (const line of lines) {
+                            if (!line.startsWith('data: ')) continue;
+                            const raw = line.slice(6).trim();
+                            if (raw === '[DONE]') continue;
+                            try {
+                                const ev = JSON.parse(raw) as { choices?: Array<{ delta?: { content?: string } }> };
+                                const content = ev.choices?.[0]?.delta?.content;
+                                if (content) {
+                                    process.stdout.write(content);
+                                    fullContent += content;
+                                }
+                            } catch { /* skip malformed SSE */ }
+                        }
+                    });
+                    res.on('end', resolve);
+                    res.on('error', reject);
+                });
+                req.on('error', reject);
+                req.write(bodyStr);
+                req.end();
             });
 
-            const resp = await apiRequest('POST', url, JSON.parse(body));
-            if (resp.status >= 400) {
-                const err = resp.data as Record<string, unknown>;
-                console.log(C.red(String(err['error'] || `HTTP ${resp.status}`)));
-            } else {
-                const data = resp.data as Record<string, unknown>;
-                // Handle OpenAI format: choices[0].message.content
-                const choices = data['choices'] as Array<Record<string, unknown>> | undefined;
-                const message = choices?.[0]?.['message'] as Record<string, unknown> | undefined;
-                let content = message?.['content'];
-                // content may be a string or an array of parts (multimodal)
-                if (Array.isArray(content)) {
-                    content = (content as Array<Record<string, unknown>>)
-                        .filter(p => p['type'] === 'text')
-                        .map(p => String(p['text'] ?? ''))
-                        .join('');
-                }
-                const text = content ? String(content) : '(no response)';
-                console.log(C.white(text));
+            if (fullContent) {
+                chatMessages.push({ role: 'assistant', content: fullContent });
+                appendSessionEvent(chatSessionId, {
+                    type: 'message', timestamp: new Date().toISOString(), sessionId: chatSessionId,
+                    role: 'assistant', content: fullContent, model,
+                });
             }
         } catch (err) {
-            console.log(C.red('Error: ' + (err instanceof Error ? err.message : String(err))));
+            process.stdout.write(C.red('\nError: ' + (err instanceof Error ? err.message : String(err))));
         }
 
-        console.log('');
+        console.log('\n');
+        rl.resume();
         rl.prompt();
     });
 }
@@ -1363,6 +1872,22 @@ const CODE_AGENT_TOOLS = [
             },
         },
     },
+    {
+        type: 'function',
+        function: {
+            name: 'edit_file',
+            description: 'Make a surgical edit to a file by replacing a specific text snippet. Use instead of write_file when changing part of an existing file. Always read_file first to see exact content.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'File path to edit' },
+                    old_text: { type: 'string', description: 'Exact text to find and replace (must match file content exactly, including whitespace)' },
+                    new_text: { type: 'string', description: 'Replacement text' },
+                },
+                required: ['path', 'old_text', 'new_text'],
+            },
+        },
+    },
 ];
 
 // =============================================================================
@@ -1390,7 +1915,7 @@ interface AgentToolCall {
 
 async function executeCodeTool(
     call: AgentToolCall,
-    rl: import('readline').Interface,
+    rl: import('readline').Interface | null,
     autoApprove: boolean
 ): Promise<string> {
     let args: Record<string, string>;
@@ -1424,6 +1949,7 @@ async function executeCodeTool(
                 console.log('');
                 console.log('  ' + C.yellow(`\u26A1 ${existing ? 'Overwrite' : 'Create'}: ${C.white(filePath)}`));
                 console.log('  ' + C.dim(`   ${content.split('\n').length} lines`));
+                if (!rl) return 'Write cancelled (no interactive prompt in --task mode without --yes).';
                 const ok = await new Promise<string>(res => rl.question('  ' + C.dim('  Approve? [y/N] '), res));
                 if (!ok.trim().toLowerCase().startsWith('y')) return 'Write cancelled.';
             }
@@ -1461,6 +1987,7 @@ async function executeCodeTool(
                 console.log('');
                 console.log('  ' + C.yellow('\u26A1 Run shell command:'));
                 console.log('  ' + C.cyan(`  $ ${command}`));
+                if (!rl) return 'Command cancelled (no interactive prompt in --task mode without --yes).';
                 const ok = await new Promise<string>(res => rl.question('  ' + C.dim('  Approve? [y/N] '), res));
                 if (!ok.trim().toLowerCase().startsWith('y')) return 'Command cancelled.';
             } else {
@@ -1519,6 +2046,63 @@ async function executeCodeTool(
             }
         }
 
+        case 'edit_file': {
+            const filePath = path.resolve(args['path'] || '');
+            const oldText = args['old_text'] || '';
+            const newText = args['new_text'] ?? '';
+            if (!oldText) return 'Error: old_text is required';
+            let content: string;
+            try {
+                content = fs.readFileSync(filePath, 'utf8');
+            } catch (e) {
+                return `Error reading: ${e instanceof Error ? e.message : String(e)}`;
+            }
+            // Count occurrences
+            let count = 0;
+            let searchPos = 0;
+            while (true) {
+                const idx = content.indexOf(oldText, searchPos);
+                if (idx === -1) break;
+                count++;
+                searchPos = idx + 1;
+            }
+            if (count === 0) {
+                // Show nearby context as hint
+                const lines = content.split('\n');
+                const oldFirst = oldText.split('\n')[0].trim();
+                const closest = lines
+                    .map((l, i) => ({ line: i + 1, text: l, score: l.includes(oldFirst.slice(0, 20)) ? 1 : 0 }))
+                    .filter(l => l.score > 0)
+                    .slice(0, 3);
+                const hint = closest.length > 0
+                    ? '\nNearest matches:\n' + closest.map(c => `  L${c.line}: ${c.text.slice(0, 120)}`).join('\n')
+                    : `\nFile has ${lines.length} lines. old_text not found anywhere. Make sure whitespace and indentation match exactly.`;
+                return `Error: old_text not found in ${filePath}.${hint}`;
+            }
+            if (count > 1) {
+                return `Error: old_text found ${count} times in ${filePath}. Provide more surrounding context to uniquely identify the location.`;
+            }
+            // Exactly one match — apply edit
+            if (!autoApprove) {
+                const preview = oldText.length > 200 ? oldText.slice(0, 200) + '...' : oldText;
+                console.log('');
+                console.log('  ' + C.yellow(`\u26A1 Edit: ${C.white(filePath)}`));
+                console.log('  ' + C.red('  - ' + preview.split('\n').join('\n  - ')));
+                console.log('  ' + C.green('  + ' + (newText.length > 200 ? newText.slice(0, 200) + '...' : newText).split('\n').join('\n  + ')));
+                if (!rl) return 'Edit cancelled (no interactive prompt in --task mode without --yes).';
+                const ok = await new Promise<string>(res => rl.question('  ' + C.dim('  Approve? [y/N] '), res));
+                if (!ok.trim().toLowerCase().startsWith('y')) return 'Edit cancelled.';
+            }
+            const edited = content.replace(oldText, newText);
+            try {
+                fs.writeFileSync(filePath, edited, 'utf8');
+                const linesChanged = oldText.split('\n').length;
+                return `Edited: ${filePath} (replaced ${linesChanged} line${linesChanged > 1 ? 's' : ''})`;
+            } catch (e) {
+                return `Error writing: ${e instanceof Error ? e.message : String(e)}`;
+            }
+        }
+
         default:
             return `Unknown tool: ${call.name}`;
     }
@@ -1533,53 +2117,116 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
     const taskFlag = flags['task'] || flags['t'] || '';       // --task "..." for non-interactive mode
     const nodeFlag = flags['node'] || flags['n'] || '';       // --node <id> to pin to specific cluster node
 
-    // Resolve model — pick from flag or auto-detect from cluster
+    // Resolve inference endpoint: config > gateway > local Ollama
+    let inferenceUrl = '';
+    let inferenceHeaders: Record<string, string> = {};
     let model = flags['model'] || '';
-    if (!model) {
-        try {
-            const modelsResp = await apiGet(gateway, '/v1/models') as { data?: Array<{ id: string }> };
-            const list = modelsResp?.data || [];
-            const preferred = list.find(m => /instruct|chat|code/i.test(m.id)) || list[0];
-            model = preferred?.id || 'llama3.1:8b';
-        } catch {
-            model = 'llama3.1:8b';
+    let backendLabel = '';
+
+    const config = loadConfig();
+
+    if (config) {
+        // Config exists — use configured provider
+        const resolved = resolveInferenceFromConfig(config);
+        inferenceUrl = resolved.url;
+        inferenceHeaders = resolved.headers;
+        if (!model) model = config.model;
+        backendLabel = C.green(config.provider);
+    }
+
+    // If no config or config provider unavailable, try gateway
+    if (!inferenceUrl || !model) {
+        const gwResp = await apiProbe(gateway, '/v1/models') as { data?: Array<{ id: string }> } | null;
+        const gatewayModels = (gwResp?.data || []).map(m => m.id);
+        if (model && gatewayModels.includes(model)) {
+            inferenceUrl = gateway;
+            backendLabel = C.teal('cluster');
+        } else if (!model && gatewayModels.length > 0) {
+            inferenceUrl = gateway;
+            model = gatewayModels.find(m => /instruct|chat|code/i.test(m)) || gatewayModels[0];
+            backendLabel = C.teal('cluster');
         }
     }
 
+    // Last resort: probe local Ollama
+    if (!inferenceUrl || !model) {
+        for (const port of [11434, 11435]) {
+            const resp = await apiProbe(`http://localhost:${port}`, '/v1/models') as { data?: Array<{ id: string }> } | null;
+            const list = (resp?.data || []).map(m => m.id);
+            if (list.length > 0) {
+                inferenceUrl = `http://localhost:${port}`;
+                if (!model) {
+                    model = list.find(m => /code|coder|instruct/i.test(m)) || list.find(m => /chat/i.test(m)) || list[0];
+                }
+                backendLabel = C.yellow('local Ollama');
+                break;
+            }
+        }
+    }
+
+    if (!inferenceUrl) {
+        console.error('');
+        console.error(C.red('  \u2718 No inference backend available.'));
+        console.error(C.dim('  Run "tentaclaw setup" to configure a model provider.'));
+        console.error(C.dim('  Or start Ollama: ollama serve'));
+        console.error('');
+        process.exit(1);
+    }
+    if (!model) model = 'llama3.1:8b';
+
+    // Initialize workspace
+    ensureWorkspace();
+
+    // Session management
+    const resumeId = flags['resume'] || flags['session'] || '';
+    let sessionId = resumeId || generateSessionId();
+    const sessionUsage = newUsageStats();
+
     bootSplash();
-    console.log('  ' + C.purple(C.bold('Code Agent')) + C.dim(` \u2014 model: ${model}`));
-    console.log('  ' + C.dim(`cwd: ${process.cwd()}`));
-    console.log('  ' + C.dim('Commands: /quit  /clear  /model <name>  /auto  /help'));
+    console.log('  ' + C.purple(C.bold('Code Agent')) + C.dim(` \u2014 model: ${model}`) + C.dim(' via ') + backendLabel);
+    console.log('  ' + C.dim(`cwd: ${process.cwd()}`) + C.dim(`  session: ${sessionId}`));
+    console.log('  ' + C.dim('Commands: /help for full list'));
     console.log('  ' + C.dim(autoApprove ? 'Writes & shell: \u2713 auto-approved' : 'Writes & shell: will ask for approval'));
-    console.log('');
 
-    // Build system prompt
-    let systemPrompt = `You are TentaCLAW Code Agent — an expert AI software engineer running inside TentaCLAW OS.
+    // Build system prompt with workspace context
+    let systemPrompt = `You are TentaCLAW Code Agent \u2014 an expert AI software engineer running inside TentaCLAW OS.
 
-You have tools to read files, write files, list directories, run shell commands, and search codebases. Use them proactively — don't ask the user to run commands for you.
+You have tools to read files, write files, list directories, run shell commands, and search codebases. Use them proactively \u2014 don't ask the user to run commands for you.
 
 Current working directory: ${process.cwd()}
 Platform: ${process.platform}
 Node.js: ${process.version}
+Session: ${sessionId}
+Date: ${new Date().toISOString().slice(0, 10)}
 
-Approach:
-- Be direct and action-oriented. Read files before editing them.
-- Provide complete file content when writing (not diffs or snippets).
-- Run tests or builds after making changes when appropriate.
-- Briefly explain what you're doing, then do it.`;
+Long-term memory: You can and should write to ${getWorkspaceDir()}/MEMORY.md when you learn user preferences, project facts, or decisions worth keeping. Write daily working notes to ${getWorkspaceDir()}/memory/${new Date().toISOString().slice(0, 10)}.md. Use write_file or edit_file — don't ask permission for memory updates.`;
 
-    // Load workspace context files if present
+    // Load workspace context (SOUL.md, USER.md, IDENTITY.md, MEMORY.md, etc.)
+    const workspaceCtx = loadWorkspaceContext();
+    if (workspaceCtx) {
+        systemPrompt += workspaceCtx;
+        const wsFiles = workspaceCtx.match(/--- (\S+) ---/g)?.map(m => m.replace(/--- | ---/g, '')) || [];
+        if (wsFiles.length > 0) console.log('  ' + C.green(`\u2714 Workspace: ${wsFiles.join(', ')}`));
+    }
+
+    // Load local project context files
     for (const cf of ['AGENTS.md', 'CLAUDE.md', '.clawcode']) {
         const cfPath = path.join(process.cwd(), cf);
         if (fs.existsSync(cfPath)) {
             try {
                 const c = fs.readFileSync(cfPath, 'utf8');
-                if (c.length < 5000) {
-                    systemPrompt += `\n\n--- ${cf} ---\n${c}`;
-                    console.log('  ' + C.green(`\u2714 Loaded ${cf}`));
+                if (c.length < 8000) {
+                    systemPrompt += `\n\n--- ${cf} (project) ---\n${c}`;
+                    console.log('  ' + C.green(`\u2714 Project: ${cf}`));
                 }
             } catch { /* skip unreadable */ }
         }
+    }
+    // Detect first-run bootstrap
+    const bootstrapPath = path.join(getWorkspaceDir(), 'BOOTSTRAP.md');
+    const hasBootstrap = fs.existsSync(bootstrapPath);
+    if (hasBootstrap) {
+        console.log('  ' + C.purple('\u2728 First run detected \u2014 onboarding will start'));
     }
     console.log('');
 
@@ -1590,15 +2237,49 @@ Approach:
         tool_call_id?: string;
         name?: string;
     };
-    const messages: AgentMessage[] = [{ role: 'system', content: systemPrompt }];
+    let messages: AgentMessage[] = [{ role: 'system', content: systemPrompt }];
+
+    // Resume session if requested
+    if (resumeId) {
+        const events = loadSessionTranscript(resumeId);
+        if (events.length > 0) {
+            const restored = rebuildMessagesFromTranscript(events);
+            messages = [{ role: 'system', content: systemPrompt }, ...restored];
+            console.log('  ' + C.green(`\u2714 Resumed session: ${restored.length} messages loaded`));
+            console.log('');
+        }
+    }
+
+    // Record session start
+    appendSessionEvent(sessionId, {
+        type: 'session_start', timestamp: new Date().toISOString(), sessionId,
+        model, metadata: { cwd: process.cwd(), provider: config?.provider },
+    });
+    updateSessionMeta(sessionId, { model, cwd: process.cwd() });
 
     const readline = await import('readline');
+    let rl: import('readline').Interface | null = null;
+
+    let bootstrapConsumed = false;
 
     const runAgentLoop = async (userMessage: string): Promise<void> => {
-        messages.push({ role: 'user', content: userMessage });
+        // On first message: inject bootstrap instructions if present
+        let actualMessage = userMessage;
+        if (hasBootstrap && !bootstrapConsumed) {
+            try {
+                const bsContent = fs.readFileSync(bootstrapPath, 'utf8');
+                actualMessage = `[SYSTEM BOOTSTRAP — first-run onboarding]\n${bsContent}\n\n[USER MESSAGE]\n${userMessage}`;
+                bootstrapConsumed = true;
+            } catch { /* skip if can't read */ }
+        }
+        messages.push({ role: 'user', content: actualMessage });
+        appendSessionEvent(sessionId, {
+            type: 'message', timestamp: new Date().toISOString(), sessionId,
+            role: 'user', content: userMessage,
+        });
 
         for (let iter = 0; iter < 20; iter++) {
-            const url = gateway.replace(/\/+$/, '') + '/v1/chat/completions';
+            const url = inferenceUrl.replace(/\/+$/, '') + '/v1/chat/completions';
             const bodyStr = JSON.stringify({
                 model,
                 messages,
@@ -1625,6 +2306,7 @@ Approach:
                     headers: {
                         'Content-Type': 'application/json',
                         'Content-Length': Buffer.byteLength(bodyStr),
+                        ...inferenceHeaders,
                         ...(nodeFlag ? { 'x-node-id': nodeFlag } : {}),
                     },
                 }, (res) => {
@@ -1649,7 +2331,14 @@ Approach:
                                             }>;
                                         };
                                     }>;
+                                    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
                                 };
+                                // Parse token usage (returned in final chunk by most providers)
+                                if (ev.usage) {
+                                    sessionUsage.inputTokens += ev.usage.prompt_tokens || 0;
+                                    sessionUsage.outputTokens += ev.usage.completion_tokens || 0;
+                                    sessionUsage.totalTokens += ev.usage.total_tokens || 0;
+                                }
                                 const delta = ev.choices?.[0]?.delta;
                                 if (!delta) continue;
                                 if (delta.content) {
@@ -1680,21 +2369,31 @@ Approach:
 
             // No tool calls — final response
             if (toolCalls.length === 0) {
-                if (fullContent) messages.push({ role: 'assistant', content: fullContent });
+                if (fullContent) {
+                    messages.push({ role: 'assistant', content: fullContent });
+                    appendSessionEvent(sessionId, {
+                        type: 'message', timestamp: new Date().toISOString(), sessionId,
+                        role: 'assistant', content: fullContent, model,
+                    });
+                }
+                sessionUsage.requestCount++;
+                const msgCount = messages.filter(m => m.role === 'user').length;
+                updateSessionMeta(sessionId, { model, messageCount: msgCount, tokenCount: sessionUsage.totalTokens });
                 console.log('');
                 return;
             }
 
             // Streamed some text then made tool calls
             console.log('');
-            messages.push({
-                role: 'assistant',
-                content: fullContent || null,
-                tool_calls: toolCalls.map(tc => ({
-                    id: tc.id || `call_${Date.now()}`,
-                    type: 'function',
-                    function: { name: tc.name, arguments: tc.args },
-                })),
+            const formattedCalls = toolCalls.map(tc => ({
+                id: tc.id || `call_${Date.now()}`,
+                type: 'function' as const,
+                function: { name: tc.name, arguments: tc.args },
+            }));
+            messages.push({ role: 'assistant', content: fullContent || null, tool_calls: formattedCalls });
+            appendSessionEvent(sessionId, {
+                type: 'message', timestamp: new Date().toISOString(), sessionId,
+                role: 'assistant', content: fullContent || null, tool_calls: formattedCalls, model,
             });
 
             // Execute each tool and feed results back
@@ -1703,6 +2402,11 @@ Approach:
                 console.log('');
                 console.log('  ' + C.cyan(`\u2699  ${tc.name}`) + '  ' + summarizeToolArgs(tc.args));
 
+                appendSessionEvent(sessionId, {
+                    type: 'tool_call', timestamp: new Date().toISOString(), sessionId,
+                    name: tc.name, metadata: { args: tc.args },
+                });
+
                 const result = await executeCodeTool(
                     { id: tcId, name: tc.name, args: tc.args },
                     rl,
@@ -1710,18 +2414,19 @@ Approach:
                 );
 
                 // Show truncated result preview
-                const lines = result.split('\n');
-                const preview = lines.slice(0, 25);
+                const resultLines = result.split('\n');
+                const preview = resultLines.slice(0, 25);
                 for (const l of preview) console.log('  ' + C.dim('\u2502 ') + l);
-                if (lines.length > 25) console.log('  ' + C.dim(`\u2502 \u2026(${lines.length - 25} more lines)`));
+                if (resultLines.length > 25) console.log('  ' + C.dim(`\u2502 \u2026(${resultLines.length - 25} more lines)`));
 
-                messages.push({
-                    role: 'tool',
-                    tool_call_id: tcId,
-                    name: tc.name,
-                    content: result,
+                messages.push({ role: 'tool', tool_call_id: tcId, name: tc.name, content: result });
+                appendSessionEvent(sessionId, {
+                    type: 'tool_result', timestamp: new Date().toISOString(), sessionId,
+                    role: 'tool', tool_call_id: tcId, name: tc.name,
+                    content: result.length > 2000 ? result.slice(0, 2000) + '...(truncated in log)' : result,
                 });
             }
+            sessionUsage.requestCount++;
             // Loop continues — model will respond to tool results
         }
 
@@ -1733,17 +2438,21 @@ Approach:
         console.log('  ' + C.dim(`Task: ${taskFlag}`));
         if (nodeFlag) console.log('  ' + C.dim(`Pinned node: ${nodeFlag}`));
         console.log('');
+        rl = null;   // no REPL in task mode — tool approval uses --yes
         try {
             await runAgentLoop(taskFlag);
         } catch (e) {
             console.error(C.red('  Error: ' + (e instanceof Error ? e.message : String(e))));
             process.exit(1);
         }
+        if (bootstrapConsumed) {
+            try { fs.unlinkSync(bootstrapPath); } catch { /* ok */ }
+        }
         return;
     }
 
     // Interactive REPL mode
-    const rl = readline.createInterface({
+    rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
         prompt: C.teal('\n  \u276F '),
@@ -1751,52 +2460,253 @@ Approach:
 
     rl.prompt();
 
+    // Graceful Ctrl+C — save session cleanly, no JSONL corruption
+    process.on('SIGINT', () => {
+        console.log('');
+        appendSessionEvent(sessionId, { type: 'session_end', timestamp: new Date().toISOString(), sessionId });
+        const msgCount = messages.filter(m => m.role === 'user').length;
+        updateSessionMeta(sessionId, { messageCount: msgCount, tokenCount: sessionUsage.totalTokens });
+        if (bootstrapConsumed) {
+            try { fs.unlinkSync(bootstrapPath); } catch { /* ok */ }
+        }
+        console.log(C.dim('  TentaCLAW waves goodbye \uD83D\uDC19'));
+        console.log(C.dim(`  Session saved: ${sessionId}`));
+        rl!.close();
+        process.exit(0);
+    });
+
     rl.on('line', async (line: string) => {
         const input = line.trim();
-        if (!input) { rl.prompt(); return; }
+        if (!input) { rl!.prompt(); return; }
+
+        // ! shell shortcut — run command directly, no LLM
+        if (input.startsWith('!')) {
+            const shellCmd = input.slice(1).trim();
+            if (shellCmd) {
+                try {
+                    const { execSync } = await import('child_process');
+                    const out = execSync(shellCmd, { cwd: process.cwd(), encoding: 'utf8', timeout: 30000, maxBuffer: 2 * 1024 * 1024 });
+                    if (out) process.stdout.write(C.dim(out));
+                } catch (e: unknown) {
+                    const err = e as { stdout?: string; stderr?: string; status?: number };
+                    const combined = ((err.stdout || '') + (err.stderr || '')).trim();
+                    if (combined) console.log(C.dim(combined));
+                    else console.log(C.red(`  Exit ${err.status ?? 1}`));
+                }
+            }
+            rl!.prompt(); return;
+        }
 
         // Slash commands
         if (input.startsWith('/')) {
             const parts = input.slice(1).split(' ');
             const cmd = (parts[0] || '').toLowerCase();
-            if (cmd === 'quit' || cmd === 'exit') {
-                console.log('');
-                console.log(C.dim('  TentaCLAW waves goodbye \uD83D\uDC19'));
-                rl.close();
-                process.exit(0);
+            const arg = parts.slice(1).join(' ').trim();
+
+            switch (cmd) {
+                case 'quit':
+                case 'exit': {
+                    appendSessionEvent(sessionId, { type: 'session_end', timestamp: new Date().toISOString(), sessionId });
+                    const msgCount = messages.filter(m => m.role === 'user').length;
+                    updateSessionMeta(sessionId, { messageCount: msgCount, tokenCount: sessionUsage.totalTokens });
+                    // Delete bootstrap after first session
+                    if (bootstrapConsumed) {
+                        try { fs.unlinkSync(bootstrapPath); } catch { /* ok */ }
+                    }
+                    console.log('');
+                    console.log(C.dim('  TentaCLAW waves goodbye \uD83D\uDC19'));
+                    console.log(C.dim(`  Session saved: ${sessionId}`));
+                    rl!.close();
+                    process.exit(0);
+                    break;
+                }
+                case 'new':
+                case 'reset': {
+                    appendSessionEvent(sessionId, { type: 'session_end', timestamp: new Date().toISOString(), sessionId });
+                    const oldId = sessionId;
+                    sessionId = generateSessionId();
+                    messages = [{ role: 'system', content: systemPrompt }];
+                    sessionUsage.inputTokens = 0;
+                    sessionUsage.outputTokens = 0;
+                    sessionUsage.totalTokens = 0;
+                    sessionUsage.requestCount = 0;
+                    appendSessionEvent(sessionId, {
+                        type: 'session_start', timestamp: new Date().toISOString(), sessionId,
+                        model, metadata: { cwd: process.cwd(), previousSession: oldId },
+                    });
+                    updateSessionMeta(sessionId, { model, cwd: process.cwd() });
+                    console.log('  ' + C.green(`\u2714 New session: ${sessionId}`));
+                    console.log('  ' + C.dim(`  Previous: ${oldId}`));
+                    rl!.prompt(); return;
+                }
+                case 'status': {
+                    const userMsgs = messages.filter(m => m.role === 'user').length;
+                    const assistantMsgs = messages.filter(m => m.role === 'assistant').length;
+                    const toolMsgs = messages.filter(m => m.role === 'tool').length;
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('STATUS')));
+                    console.log('  ' + padRight(C.dim('Session'), 18) + C.white(sessionId));
+                    console.log('  ' + padRight(C.dim('Model'), 18) + C.white(model));
+                    console.log('  ' + padRight(C.dim('Backend'), 18) + backendLabel);
+                    console.log('  ' + padRight(C.dim('Messages'), 18) + C.white(`${userMsgs} user, ${assistantMsgs} assistant, ${toolMsgs} tool`));
+                    console.log('  ' + padRight(C.dim('Context size'), 18) + C.white(`${messages.length} total`));
+                    console.log('  ' + padRight(C.dim('Requests'), 18) + C.white(String(sessionUsage.requestCount)));
+                    console.log('  ' + padRight(C.dim('Tokens'), 18) + C.white(`${formatTokens(sessionUsage.inputTokens)} in / ${formatTokens(sessionUsage.outputTokens)} out`));
+                    console.log('  ' + padRight(C.dim('CWD'), 18) + C.dim(process.cwd()));
+                    console.log('  ' + padRight(C.dim('Auto-approve'), 18) + (autoApprove ? C.green('ON') : C.yellow('OFF')));
+                    console.log('');
+                    rl!.prompt(); return;
+                }
+                case 'clear': {
+                    messages = [{ role: 'system', content: systemPrompt }];
+                    console.log('  ' + C.green('\u2714 Context cleared (session continues).'));
+                    rl!.prompt(); return;
+                }
+                case 'model': {
+                    if (!arg) { console.log('  ' + C.dim(`Current model: ${model}`)); rl!.prompt(); return; }
+                    const oldModel = model;
+                    model = arg;
+                    appendSessionEvent(sessionId, {
+                        type: 'model_change', timestamp: new Date().toISOString(), sessionId,
+                        model, metadata: { previous: oldModel },
+                    });
+                    console.log('  ' + C.green(`\u2714 Model: ${model}`));
+                    rl!.prompt(); return;
+                }
+                case 'auto': {
+                    autoApprove = !autoApprove;
+                    console.log('  ' + C.green(`\u2714 Auto-approve: ${autoApprove ? 'ON' : 'OFF'}`));
+                    rl!.prompt(); return;
+                }
+                case 'context': {
+                    console.log('  ' + C.purple(`${messages.length} messages in context (${messages.filter(m => m.role === 'user').length} from you)`));
+                    rl!.prompt(); return;
+                }
+                case 'sessions': {
+                    const recent = listRecentSessions(10);
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('RECENT SESSIONS')));
+                    if (recent.length === 0) {
+                        console.log('  ' + C.dim('No sessions yet.'));
+                    } else {
+                        for (const s of recent) {
+                            const active = s.sessionId === sessionId ? C.green(' \u25C0 current') : '';
+                            const date = s.updatedAt.slice(0, 16).replace('T', ' ');
+                            console.log('  ' + C.white(padRight(s.sessionId, 22)) + C.dim(padRight(date, 18)) +
+                                C.dim(`${s.messageCount} msgs`) + active);
+                        }
+                    }
+                    console.log('');
+                    console.log('  ' + C.dim('Resume: tentaclaw code --resume <session-id>'));
+                    console.log('');
+                    rl!.prompt(); return;
+                }
+                case 'save': {
+                    const msgCount = messages.filter(m => m.role === 'user').length;
+                    updateSessionMeta(sessionId, { messageCount: msgCount, tokenCount: sessionUsage.totalTokens });
+                    console.log('  ' + C.green(`\u2714 Session saved: ${sessionId}`));
+                    rl!.prompt(); return;
+                }
+                case 'export': {
+                    const exportPath = arg || `tentaclaw-session-${sessionId}.jsonl`;
+                    try {
+                        const srcPath = path.join(getSessionsDir(), `${sessionId}.jsonl`);
+                        fs.copyFileSync(srcPath, path.resolve(exportPath));
+                        console.log('  ' + C.green(`\u2714 Exported to: ${path.resolve(exportPath)}`));
+                    } catch (e) {
+                        console.log('  ' + C.red(`\u2718 Export failed: ${e instanceof Error ? e.message : String(e)}`));
+                    }
+                    rl!.prompt(); return;
+                }
+                case 'compact': {
+                    // Trim old tool results to save context
+                    let trimmed = 0;
+                    for (let i = 1; i < messages.length - 10; i++) {
+                        const m = messages[i];
+                        if (m.role === 'tool' && typeof m.content === 'string' && m.content.length > 200) {
+                            messages[i] = { ...m, content: m.content.slice(0, 200) + '\n...(compacted)' };
+                            trimmed++;
+                        }
+                    }
+                    console.log('  ' + C.green(`\u2714 Compacted ${trimmed} tool results. Context: ${messages.length} messages.`));
+                    rl!.prompt(); return;
+                }
+                case 'think': {
+                    // Map thinking levels to temperature values
+                    const levels: Record<string, number> = {
+                        off: 0.1, minimal: 0.3, low: 0.5, medium: 0.7, high: 0.9, xhigh: 1.0,
+                    };
+                    if (arg && levels[arg]) {
+                        console.log('  ' + C.green(`\u2714 Thinking: ${arg} (temperature ${levels[arg]})`));
+                    } else {
+                        console.log('  ' + C.dim('Usage: /think off|minimal|low|medium|high|xhigh'));
+                    }
+                    rl!.prompt(); return;
+                }
+                case 'cd':
+                case 'cwd': {
+                    if (!arg) {
+                        console.log('  ' + C.dim(`cwd: ${process.cwd()}`));
+                    } else {
+                        const target = path.resolve(arg.replace(/^~/, os.homedir()));
+                        if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
+                            process.chdir(target);
+                            console.log('  ' + C.green(`\u2714 ${process.cwd()}`));
+                        } else {
+                            console.log('  ' + C.red(`\u2718 Not a directory: ${target}`));
+                        }
+                    }
+                    rl!.prompt(); return;
+                }
+                case 'workspace':
+                case 'ws': {
+                    const wsDir = getWorkspaceDir();
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('WORKSPACE')) + C.dim(` \u2014 ${wsDir}`));
+                    try {
+                        const files = fs.readdirSync(wsDir).filter(f => f.endsWith('.md'));
+                        for (const f of files) {
+                            const size = fs.statSync(path.join(wsDir, f)).size;
+                            console.log('  ' + C.green(padRight(f, 20)) + C.dim(`${size} bytes`));
+                        }
+                    } catch { console.log('  ' + C.dim('No workspace files.')); }
+                    console.log('');
+                    rl!.prompt(); return;
+                }
+                case 'help': {
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('SLASH COMMANDS')));
+                    console.log('');
+                    console.log('  ' + C.dim('Session'));
+                    console.log('  ' + padRight(C.cyan('/new'), 22) + 'Start a fresh session');
+                    console.log('  ' + padRight(C.cyan('/status'), 22) + 'Show model, tokens, session info');
+                    console.log('  ' + padRight(C.cyan('/sessions'), 22) + 'List recent sessions');
+                    console.log('  ' + padRight(C.cyan('/save'), 22) + 'Force save session');
+                    console.log('  ' + padRight(C.cyan('/export [path]'), 22) + 'Export session to JSONL file');
+                    console.log('  ' + padRight(C.cyan('/quit'), 22) + 'Save and exit');
+                    console.log('');
+                    console.log('  ' + C.dim('Context'));
+                    console.log('  ' + padRight(C.cyan('/clear'), 22) + 'Clear conversation context');
+                    console.log('  ' + padRight(C.cyan('/compact'), 22) + 'Trim old tool results to save context');
+                    console.log('  ' + padRight(C.cyan('/context'), 22) + 'Show message count');
+                    console.log('');
+                    console.log('  ' + C.dim('Config'));
+                    console.log('  ' + padRight(C.cyan('/model <name>'), 22) + 'Switch model');
+                    console.log('  ' + padRight(C.cyan('/auto'), 22) + 'Toggle auto-approval');
+                    console.log('  ' + padRight(C.cyan('/think <level>'), 22) + 'Set thinking: off|minimal|low|medium|high|xhigh');
+                    console.log('  ' + padRight(C.cyan('/workspace'), 22) + 'Show workspace files');
+                    console.log('  ' + padRight(C.cyan('/cd <path>'), 22) + 'Change working directory');
+                    console.log('');
+                    console.log('  ' + C.dim('Shell'));
+                    console.log('  ' + padRight(C.cyan('! <command>'), 22) + 'Run shell command directly (no LLM)');
+                    console.log('');
+                    rl!.prompt(); return;
+                }
+                default: {
+                    console.log('  ' + C.dim(`Unknown: /${cmd}. Try /help.`));
+                    rl!.prompt(); return;
+                }
             }
-            if (cmd === 'clear') {
-                messages.splice(1); // keep system prompt
-                console.log('  ' + C.green('\u2714 Cleared.'));
-                rl.prompt(); return;
-            }
-            if (cmd === 'model' && parts[1]) {
-                model = parts[1];
-                console.log('  ' + C.green(`\u2714 Model: ${model}`));
-                rl.prompt(); return;
-            }
-            if (cmd === 'auto') {
-                autoApprove = !autoApprove;
-                console.log('  ' + C.green(`\u2714 Auto-approve: ${autoApprove ? 'ON' : 'OFF'}`));
-                rl.prompt(); return;
-            }
-            if (cmd === 'context') {
-                console.log('  ' + C.purple(`${messages.length} messages in context`));
-                rl.prompt(); return;
-            }
-            if (cmd === 'help') {
-                console.log('');
-                console.log('  ' + C.bold('Slash commands:'));
-                console.log('  ' + padRight(C.cyan('/clear'), 22) + 'Clear conversation');
-                console.log('  ' + padRight(C.cyan('/model <name>'), 22) + 'Switch model');
-                console.log('  ' + padRight(C.cyan('/auto'), 22) + 'Toggle auto-approval for writes & shell');
-                console.log('  ' + padRight(C.cyan('/context'), 22) + 'Show message count');
-                console.log('  ' + padRight(C.cyan('/quit'), 22) + 'Exit');
-                console.log('');
-                rl.prompt(); return;
-            }
-            console.log('  ' + C.dim(`Unknown: /${cmd}. Try /help.`));
-            rl.prompt(); return;
         }
 
         rl.pause();
@@ -2825,11 +3735,24 @@ function cmdHelp(): void {
         console.log('    ' + padRight(C.green(name), 32) + C.dim(desc));
     };
 
+    section('SETUP');
+    cmd('setup', 'Configure model provider (Ollama, OpenAI, etc.)');
+    cmd('models', 'List available models from your provider');
+    cmd('config [show|get|set]', 'View or edit configuration');
+    cmd('doctor', 'Health check (works standalone or with cluster)');
+    cmd('update', 'Self-update from git');
+    console.log('');
+
+    section('SESSIONS');
+    cmd('sessions', 'List recent coding sessions');
+    cmd('sessions info <id>', 'View session details');
+    cmd('code --resume <id>', 'Resume a previous session');
+    console.log('');
+
     section('CLUSTER');
     cmd('status', 'Cluster overview with health score');
     cmd('nodes', 'List all nodes with GPU details');
     cmd('health', 'Detailed health analysis with sparkline');
-    cmd('models', 'List all loaded models');
     cmd('alerts', 'View cluster alerts');
     cmd('doctor', 'Run diagnostics + auto-heal');
     console.log('');
@@ -2916,6 +3839,581 @@ const TIPS = [
     'Publish to CLAWHub: `tentaclaw hub init && tentaclaw hub publish`. Join the family.',
 ];
 
+// =============================================================================
+// Setup Wizard — `tentaclaw setup`
+// =============================================================================
+
+async function prompt(rl: import('readline').Interface, question: string): Promise<string> {
+    return new Promise(resolve => rl.question(question, resolve));
+}
+
+async function cmdSetup(): Promise<void> {
+    const readline = await import('readline');
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+    const existing = loadConfig();
+
+    bootSplash();
+    console.log('  ' + C.purple(C.bold('TentaCLAW Setup')));
+    console.log('  ' + C.dim('Configure your AI coding assistant.\n'));
+
+    if (existing) {
+        console.log('  ' + C.dim(`Current config: provider=${existing.provider}, model=${existing.model}`));
+        const redo = await prompt(rl, '  ' + C.yellow('Reconfigure? [Y/n] '));
+        if (redo.trim().toLowerCase() === 'n') {
+            console.log('\n  ' + C.green('\u2714 Keeping existing config.'));
+            rl.close();
+            return;
+        }
+        console.log('');
+    }
+
+    // --- Provider selection ---
+    console.log('  ' + C.teal(C.bold('Where are your models running?')) + '\n');
+    console.log('  ' + C.white('[1]') + ' Local Ollama ' + C.dim('(recommended \u2014 runs on your machine)'));
+    console.log('  ' + C.white('[2]') + ' OpenAI API ' + C.dim('(GPT-4o, o1, etc.)'));
+    console.log('  ' + C.white('[3]') + ' OpenRouter ' + C.dim('(100+ models, one API key)'));
+    console.log('  ' + C.white('[4]') + ' Custom endpoint ' + C.dim('(any OpenAI-compatible API)'));
+    console.log('');
+
+    const providerChoice = await prompt(rl, '  ' + C.teal('\u276F '));
+    const providerMap: Record<string, TentaclawConfig['provider']> = {
+        '1': 'ollama', '2': 'openai', '3': 'openrouter', '4': 'custom',
+    };
+    const provider = providerMap[providerChoice.trim()] || 'ollama';
+    console.log('');
+
+    const config: TentaclawConfig = { provider, model: '' };
+
+    if (provider === 'ollama') {
+        await setupOllama(rl, config);
+    } else if (provider === 'openai') {
+        await setupOpenAI(rl, config);
+    } else if (provider === 'openrouter') {
+        await setupOpenRouter(rl, config);
+    } else {
+        await setupCustom(rl, config);
+    }
+
+    // Save
+    saveConfig(config);
+    console.log('\n  ' + C.green('\u2714 Configuration saved to ') + C.dim(getConfigPath()));
+    console.log('');
+    console.log('  ' + C.teal(C.bold('Try it out:')));
+    console.log('    ' + C.green('tentaclaw chat'));
+    console.log('    ' + C.green('tentaclaw code'));
+    console.log('    ' + C.green('tentaclaw code --task "explain this codebase"'));
+    console.log('    ' + C.green('tentaclaw models'));
+    console.log('');
+
+    rl.close();
+}
+
+async function setupOllama(rl: import('readline').Interface, config: TentaclawConfig): Promise<void> {
+    // Detect Ollama on common ports
+    console.log('  ' + C.dim('Detecting Ollama...'));
+    let ollamaHost = '';
+    for (const port of [11434, 11435]) {
+        const resp = await apiProbe(`http://localhost:${port}`, '/api/tags');
+        if (resp) {
+            ollamaHost = `http://localhost:${port}`;
+            break;
+        }
+    }
+
+    if (!ollamaHost) {
+        console.log('  ' + C.yellow('\u26A0 Ollama not detected on localhost.'));
+        const custom = await prompt(rl, '  Enter Ollama host URL ' + C.dim('(e.g., http://192.168.1.100:11434)') + ': ');
+        ollamaHost = custom.trim() || 'http://localhost:11434';
+        const check = await apiProbe(ollamaHost, '/api/tags');
+        if (!check) {
+            console.log('  ' + C.red('\u2718 Cannot reach ' + ollamaHost));
+            console.log('  ' + C.dim('  Saving anyway \u2014 you can fix the host later in ~/.tentaclaw/config.json'));
+        }
+    } else {
+        console.log('  ' + C.green('\u2714 Found Ollama at ') + C.white(ollamaHost));
+    }
+    config.ollama = { host: ollamaHost };
+
+    // List models
+    const modelsResp = await apiProbe(ollamaHost, '/api/tags') as { models?: Array<{ name: string; details?: { parameter_size?: string; quantization_level?: string } }> } | null;
+    const models = modelsResp?.models || [];
+
+    if (models.length === 0) {
+        console.log('\n  ' + C.yellow('No models installed in Ollama.'));
+        console.log('  ' + C.dim('  Install one: ollama pull llama3.1:8b'));
+        config.model = 'llama3.1:8b';
+        return;
+    }
+
+    console.log('\n  ' + C.teal(C.bold('Available models:')) + '\n');
+    models.forEach((m, i) => {
+        const size = m.details?.parameter_size || '';
+        const quant = m.details?.quantization_level || '';
+        const tag = [size, quant].filter(Boolean).join(', ');
+        console.log('  ' + C.white(`[${i + 1}]`) + ' ' + C.green(m.name) + (tag ? C.dim(` (${tag})`) : ''));
+    });
+    console.log('');
+
+    const modelChoice = await prompt(rl, '  Pick a default model ' + C.dim(`(1-${models.length})`) + ': ');
+    const idx = parseInt(modelChoice.trim()) - 1;
+    config.model = models[idx]?.name || models[0].name;
+    console.log('  ' + C.green('\u2714 Model: ') + C.white(config.model));
+}
+
+async function setupOpenAI(rl: import('readline').Interface, config: TentaclawConfig): Promise<void> {
+    console.log('  ' + C.teal(C.bold('OpenAI Configuration')) + '\n');
+    const apiKey = await prompt(rl, '  API Key ' + C.dim('(sk-...)') + ': ');
+    if (!apiKey.trim()) {
+        console.log('  ' + C.red('\u2718 API key required.'));
+        process.exit(1);
+    }
+    config.openai = { apiKey: apiKey.trim() };
+
+    // Test the key by listing models
+    console.log('  ' + C.dim('Testing API key...'));
+    const { url, headers } = resolveInferenceFromConfig({ ...config, model: '' });
+    const testResp = await apiProbeWithHeaders(url, '/models', headers);
+    if (!testResp) {
+        console.log('  ' + C.yellow('\u26A0 Could not verify API key. Saving anyway.'));
+        config.model = 'gpt-4o';
+        return;
+    }
+
+    const models = ((testResp as { data?: Array<{ id: string }> })?.data || [])
+        .filter(m => /gpt|o1|o3|o4/i.test(m.id) && !/realtime|audio|whisper/i.test(m.id))
+        .slice(0, 15);
+
+    console.log('  ' + C.green('\u2714 API key valid.') + '\n');
+    if (models.length > 0) {
+        console.log('  ' + C.teal(C.bold('Available models:')) + '\n');
+        models.forEach((m, i) => {
+            console.log('  ' + C.white(`[${i + 1}]`) + ' ' + C.green(m.id));
+        });
+        console.log('');
+        const choice = await prompt(rl, '  Pick a model ' + C.dim(`(1-${models.length})`) + ': ');
+        const idx = parseInt(choice.trim()) - 1;
+        config.model = models[idx]?.id || 'gpt-4o';
+    } else {
+        config.model = 'gpt-4o';
+    }
+    console.log('  ' + C.green('\u2714 Model: ') + C.white(config.model));
+}
+
+async function setupOpenRouter(rl: import('readline').Interface, config: TentaclawConfig): Promise<void> {
+    console.log('  ' + C.teal(C.bold('OpenRouter Configuration')) + '\n');
+    console.log('  ' + C.dim('Get an API key at https://openrouter.ai/keys') + '\n');
+    const apiKey = await prompt(rl, '  API Key ' + C.dim('(sk-or-...)') + ': ');
+    if (!apiKey.trim()) {
+        console.log('  ' + C.red('\u2718 API key required.'));
+        process.exit(1);
+    }
+    config.openrouter = { apiKey: apiKey.trim() };
+
+    console.log('  ' + C.dim('Testing API key...'));
+    const { url, headers } = resolveInferenceFromConfig({ ...config, model: '' });
+    const testResp = await apiProbeWithHeaders(url, '/models', headers);
+    if (testResp) {
+        console.log('  ' + C.green('\u2714 API key valid.'));
+    } else {
+        console.log('  ' + C.yellow('\u26A0 Could not verify. Saving anyway.'));
+    }
+
+    console.log('\n  ' + C.teal(C.bold('Popular models:')) + '\n');
+    const popular = [
+        'anthropic/claude-sonnet-4', 'anthropic/claude-haiku-4-5',
+        'openai/gpt-4o', 'openai/o4-mini',
+        'google/gemini-2.5-flash', 'deepseek/deepseek-r1',
+        'meta-llama/llama-3.1-70b-instruct', 'qwen/qwen-2.5-72b-instruct',
+    ];
+    popular.forEach((m, i) => {
+        console.log('  ' + C.white(`[${i + 1}]`) + ' ' + C.green(m));
+    });
+    console.log('  ' + C.white(`[${popular.length + 1}]`) + ' ' + C.dim('Enter custom model ID'));
+    console.log('');
+    const choice = await prompt(rl, '  Pick a model: ');
+    const idx = parseInt(choice.trim()) - 1;
+    if (idx >= 0 && idx < popular.length) {
+        config.model = popular[idx];
+    } else {
+        const custom = await prompt(rl, '  Model ID: ');
+        config.model = custom.trim() || 'anthropic/claude-sonnet-4';
+    }
+    console.log('  ' + C.green('\u2714 Model: ') + C.white(config.model));
+}
+
+async function setupCustom(rl: import('readline').Interface, config: TentaclawConfig): Promise<void> {
+    console.log('  ' + C.teal(C.bold('Custom OpenAI-Compatible Endpoint')) + '\n');
+    const baseUrl = await prompt(rl, '  Base URL ' + C.dim('(e.g., http://localhost:1234/v1)') + ': ');
+    if (!baseUrl.trim()) {
+        console.log('  ' + C.red('\u2718 Base URL required.'));
+        process.exit(1);
+    }
+    const apiKey = await prompt(rl, '  API Key ' + C.dim('(leave blank if none)') + ': ');
+    config.custom = { baseUrl: baseUrl.trim(), apiKey: apiKey.trim() || undefined };
+
+    const { url, headers } = resolveInferenceFromConfig({ ...config, model: '' });
+    const testResp = await apiProbeWithHeaders(url, '/models', headers);
+    if (testResp) {
+        const models = ((testResp as { data?: Array<{ id: string }> })?.data || []).slice(0, 10);
+        if (models.length > 0) {
+            console.log('\n  ' + C.teal(C.bold('Available models:')) + '\n');
+            models.forEach((m, i) => console.log('  ' + C.white(`[${i + 1}]`) + ' ' + C.green(m.id)));
+            console.log('');
+            const choice = await prompt(rl, '  Pick a model: ');
+            const idx = parseInt(choice.trim()) - 1;
+            config.model = models[idx]?.id || models[0].id;
+        }
+    } else {
+        console.log('  ' + C.yellow('\u26A0 Could not reach endpoint.'));
+        const modelName = await prompt(rl, '  Enter model name: ');
+        config.model = modelName.trim() || 'default';
+    }
+    console.log('  ' + C.green('\u2714 Model: ') + C.white(config.model));
+}
+
+/** apiProbe with custom headers (for API key testing) */
+async function apiProbeWithHeaders(baseUrl: string, apiPath: string, headers: Record<string, string>): Promise<unknown | null> {
+    const url = baseUrl.replace(/\/+$/, '') + apiPath;
+    try {
+        const resp = await new Promise<{ status: number; data: unknown }>((resolve, reject) => {
+            const parsed = new URL(url);
+            const transport = parsed.protocol === 'https:' ? https : http;
+            const req = transport.request({
+                hostname: parsed.hostname,
+                port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+                path: parsed.pathname + parsed.search,
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json', ...headers },
+                timeout: 10000,
+            }, (res) => {
+                let buf = '';
+                res.on('data', (chunk: Buffer) => { buf += chunk.toString(); });
+                res.on('end', () => {
+                    try { resolve({ status: res.statusCode || 500, data: JSON.parse(buf) }); }
+                    catch { resolve({ status: res.statusCode || 500, data: buf }); }
+                });
+            });
+            req.on('error', reject);
+            req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+            req.end();
+        });
+        if (resp.status >= 400) return null;
+        return resp.data;
+    } catch {
+        return null;
+    }
+}
+
+// =============================================================================
+// Standalone Models — `tentaclaw models` with config fallback
+// =============================================================================
+
+async function cmdModelsStandalone(): Promise<void> {
+    const config = loadConfig();
+    if (!config) {
+        console.log('');
+        console.log(C.yellow('  No configuration found.'));
+        console.log(C.dim('  Run: tentaclaw setup'));
+        console.log('');
+        return;
+    }
+
+    const { url, headers } = resolveInferenceFromConfig(config);
+    console.log('');
+    console.log('  ' + C.teal(C.bold('MODELS')) + C.dim(` \u2014 ${config.provider} (${url})`));
+    console.log('');
+
+    if (config.provider === 'ollama') {
+        // Use Ollama's native /api/tags for richer info
+        const resp = await apiProbeWithHeaders(url, '/api/tags', headers) as { models?: Array<{ name: string; size: number; details?: { parameter_size?: string; quantization_level?: string; family?: string } }> } | null;
+        const models = resp?.models || [];
+        if (models.length === 0) {
+            console.log(C.yellow('  No models installed.'));
+            console.log(C.dim('  Install one: ollama pull llama3.1:8b'));
+        } else {
+            const active = config.model;
+            for (const m of models) {
+                const sizeMb = Math.round(m.size / 1048576);
+                const sizeStr = sizeMb > 1024 ? (sizeMb / 1024).toFixed(1) + ' GB' : sizeMb + ' MB';
+                const params = m.details?.parameter_size || '';
+                const quant = m.details?.quantization_level || '';
+                const family = m.details?.family || '';
+                const tag = [params, quant, family].filter(Boolean).join(', ');
+                const marker = m.name === active ? C.green(' \u25C0 active') : '';
+                console.log('  ' + C.green(padRight(m.name, 35)) + C.dim(padRight(tag, 25)) + C.dim(sizeStr) + marker);
+            }
+        }
+    } else {
+        // OpenAI-compatible /v1/models
+        const resp = await apiProbeWithHeaders(url, '/models', headers) as { data?: Array<{ id: string }> } | null;
+        const models = resp?.data || [];
+        if (models.length === 0) {
+            console.log(C.yellow('  No models available (or API key invalid).'));
+        } else {
+            const active = config.model;
+            for (const m of models.slice(0, 30)) {
+                const marker = m.id === active ? C.green(' \u25C0 active') : '';
+                console.log('  ' + C.green(m.id) + marker);
+            }
+            if (models.length > 30) console.log(C.dim(`  ...and ${models.length - 30} more`));
+        }
+    }
+    console.log('');
+}
+
+// =============================================================================
+// Config CLI — `tentaclaw config [show|get|set]`
+// =============================================================================
+
+async function cmdConfigCli(positional: string[]): Promise<void> {
+    const sub = positional[0] || 'show';
+    const config = loadConfig();
+
+    if (sub === 'show' || sub === 'list') {
+        console.log('');
+        console.log('  ' + C.teal(C.bold('CONFIGURATION')) + C.dim(` \u2014 ${getConfigPath()}`));
+        console.log('');
+        if (!config) {
+            console.log('  ' + C.yellow('No configuration found.'));
+            console.log('  ' + C.dim('Run: tentaclaw setup'));
+        } else {
+            console.log('  ' + padRight(C.dim('provider'), 18) + C.white(config.provider));
+            console.log('  ' + padRight(C.dim('model'), 18) + C.white(config.model));
+            if (config.ollama) console.log('  ' + padRight(C.dim('ollama.host'), 18) + C.white(config.ollama.host));
+            if (config.openai) {
+                console.log('  ' + padRight(C.dim('openai.apiKey'), 18) + C.dim(config.openai.apiKey.slice(0, 8) + '...' + config.openai.apiKey.slice(-4)));
+                if (config.openai.baseUrl) console.log('  ' + padRight(C.dim('openai.baseUrl'), 18) + C.white(config.openai.baseUrl));
+            }
+            if (config.openrouter) console.log('  ' + padRight(C.dim('openrouter.key'), 18) + C.dim(config.openrouter.apiKey.slice(0, 8) + '...'));
+            if (config.custom) {
+                console.log('  ' + padRight(C.dim('custom.baseUrl'), 18) + C.white(config.custom.baseUrl));
+                if (config.custom.apiKey) console.log('  ' + padRight(C.dim('custom.apiKey'), 18) + C.dim('(set)'));
+            }
+            if (config.autoApprove !== undefined) console.log('  ' + padRight(C.dim('autoApprove'), 18) + C.white(String(config.autoApprove)));
+        }
+        console.log('');
+        return;
+    }
+
+    if (sub === 'get') {
+        const key = positional[1];
+        if (!key || !config) { console.log(!config ? C.yellow('  No config.') : C.red('  Usage: tentaclaw config get <key>')); return; }
+        const parts = key.split('.');
+        let val: unknown = config;
+        for (const p of parts) { val = val && typeof val === 'object' ? (val as Record<string, unknown>)[p] : undefined; }
+        console.log(val !== undefined ? String(val) : C.dim('(not set)'));
+        return;
+    }
+
+    if (sub === 'set') {
+        const key = positional[1];
+        const value = positional.slice(2).join(' ');
+        if (!key || !value) { console.log(C.red('  Usage: tentaclaw config set <key> <value>')); return; }
+        const cfg = config || { provider: 'ollama' as const, model: '' };
+        if (key === 'model') cfg.model = value;
+        else if (key === 'provider') cfg.provider = value as TentaclawConfig['provider'];
+        else if (key === 'ollama.host') { cfg.ollama = cfg.ollama || { host: '' }; cfg.ollama.host = value; }
+        else if (key === 'openai.apiKey') { cfg.openai = cfg.openai || { apiKey: '' }; cfg.openai.apiKey = value; }
+        else if (key === 'openai.baseUrl') { cfg.openai = cfg.openai || { apiKey: '' }; cfg.openai.baseUrl = value; }
+        else if (key === 'openrouter.apiKey') { cfg.openrouter = cfg.openrouter || { apiKey: '' }; cfg.openrouter.apiKey = value; }
+        else if (key === 'autoApprove') cfg.autoApprove = value === 'true';
+        else { console.log(C.red(`  Unknown key: ${key}`)); return; }
+        saveConfig(cfg);
+        console.log('  ' + C.green(`\u2714 Set ${key} = ${key.includes('Key') ? '***' : value}`));
+        return;
+    }
+
+    if (sub === 'path') { console.log(getConfigPath()); return; }
+
+    if (sub === 'validate') {
+        if (!config) { console.log(C.red('  \u2718 No config.')); process.exit(1); }
+        const { url, headers } = resolveInferenceFromConfig(config);
+        const resp = await apiProbeWithHeaders(url, config.provider === 'ollama' ? '/api/tags' : '/models', headers);
+        console.log(resp ? C.green('  \u2714 Config valid') : C.red(`  \u2718 Cannot reach ${config.provider} at ${url}`));
+        if (!resp) process.exit(1);
+        return;
+    }
+
+    console.log(C.dim('  Usage: tentaclaw config [show|get|set|path|validate]'));
+}
+
+// =============================================================================
+// Sessions CLI — `tentaclaw sessions [list|info|delete]`
+// =============================================================================
+
+async function cmdSessionsCli(positional: string[]): Promise<void> {
+    const sub = positional[0] || 'list';
+
+    if (sub === 'list') {
+        const recent = listRecentSessions(25);
+        console.log('');
+        console.log('  ' + C.teal(C.bold('SESSIONS')) + C.dim(` \u2014 ${getSessionsDir()}`));
+        console.log('');
+        if (recent.length === 0) {
+            console.log('  ' + C.dim('No sessions yet. Start one with: tentaclaw code'));
+        } else {
+            console.log('  ' + padRight(C.dim('SESSION ID'), 24) + padRight(C.dim('UPDATED'), 18) + padRight(C.dim('MSGS'), 8) + C.dim('MODEL'));
+            for (const s of recent) {
+                const date = s.updatedAt.slice(0, 16).replace('T', ' ');
+                console.log('  ' + padRight(C.white(s.sessionId), 24) + padRight(C.dim(date), 18) +
+                    padRight(C.cyan(String(s.messageCount)), 8) + C.dim(s.model?.slice(0, 30) || '?'));
+            }
+        }
+        console.log('');
+        console.log('  ' + C.dim('Resume: tentaclaw code --resume <session-id>'));
+        console.log('');
+        return;
+    }
+
+    if (sub === 'info') {
+        const sid = positional[1];
+        if (!sid) { console.log(C.red('  Usage: tentaclaw sessions info <session-id>')); return; }
+        const index = loadSessionIndex();
+        const meta = index[sid];
+        if (!meta) { console.log(C.red(`  Session not found: ${sid}`)); return; }
+        const events = loadSessionTranscript(sid);
+        console.log('');
+        console.log('  ' + C.teal(C.bold('SESSION INFO')));
+        console.log('  ' + padRight(C.dim('ID'), 16) + C.white(meta.sessionId));
+        console.log('  ' + padRight(C.dim('Created'), 16) + C.white(meta.createdAt.slice(0, 19).replace('T', ' ')));
+        console.log('  ' + padRight(C.dim('Updated'), 16) + C.white(meta.updatedAt.slice(0, 19).replace('T', ' ')));
+        console.log('  ' + padRight(C.dim('Model'), 16) + C.white(meta.model));
+        console.log('  ' + padRight(C.dim('Messages'), 16) + C.white(String(meta.messageCount)));
+        console.log('  ' + padRight(C.dim('Events'), 16) + C.white(String(events.length)));
+        console.log('  ' + padRight(C.dim('CWD'), 16) + C.dim(meta.cwd));
+        const userEvents = events.filter(e => e.type === 'message' && e.role === 'user');
+        if (userEvents.length > 0) {
+            console.log('');
+            console.log('  ' + C.dim('Last messages:'));
+            for (const e of userEvents.slice(-5)) {
+                const preview = (e.content || '').slice(0, 80).replace(/\n/g, ' ');
+                console.log('  ' + C.cyan('\u276F ') + C.white(preview) + (preview.length >= 80 ? C.dim('...') : ''));
+            }
+        }
+        console.log('');
+        return;
+    }
+
+    if (sub === 'delete') {
+        const sid = positional[1];
+        if (!sid) { console.log(C.red('  Usage: tentaclaw sessions delete <session-id>')); return; }
+        const index = loadSessionIndex();
+        delete index[sid];
+        saveSessionIndex(index);
+        try { fs.unlinkSync(path.join(getSessionsDir(), `${sid}.jsonl`)); } catch { /* ok */ }
+        console.log('  ' + C.green(`\u2714 Deleted: ${sid}`));
+        return;
+    }
+
+    console.log(C.dim('  Usage: tentaclaw sessions [list|info|delete] [session-id]'));
+}
+
+// =============================================================================
+// Standalone Doctor — health check without gateway
+// =============================================================================
+
+async function cmdDoctorStandalone(): Promise<void> {
+    console.log('');
+    console.log('  ' + C.teal(C.bold('DOCTOR')) + C.dim(' \u2014 standalone health check'));
+    console.log('');
+
+    let issues = 0;
+    let ok = 0;
+
+    const config = loadConfig();
+    if (config) {
+        console.log('  ' + C.green('\u2714') + ' Config: ' + C.dim(`${config.provider}, model=${config.model}`));
+        ok++;
+    } else {
+        console.log('  ' + C.red('\u2718') + ' No config ' + C.dim('\u2014 Fix: tentaclaw setup'));
+        issues++;
+    }
+
+    const wsDir = getWorkspaceDir();
+    if (fs.existsSync(wsDir)) {
+        const wsFiles = fs.readdirSync(wsDir).filter(f => f.endsWith('.md'));
+        console.log('  ' + C.green('\u2714') + ` Workspace: ${wsFiles.length} files`);
+        ok++;
+    } else {
+        console.log('  ' + C.yellow('\u26A0') + ' No workspace ' + C.dim('\u2014 Fix: tentaclaw code (auto-creates)'));
+        issues++;
+    }
+
+    const sessions = listRecentSessions(999);
+    console.log('  ' + C.green('\u2714') + ` Sessions: ${sessions.length} stored`);
+    ok++;
+
+    if (config) {
+        const { url, headers } = resolveInferenceFromConfig(config);
+        const endpoint = config.provider === 'ollama' ? '/api/tags' : '/models';
+        const resp = await apiProbeWithHeaders(url, endpoint, headers);
+        if (resp) {
+            console.log('  ' + C.green('\u2714') + ` Backend: ${config.provider} reachable`);
+            ok++;
+            if (config.provider === 'ollama') {
+                const tags = resp as { models?: Array<{ name: string }> };
+                const hasModel = (tags.models || []).some(m => m.name === config.model);
+                if (hasModel) { console.log('  ' + C.green('\u2714') + ` Model: ${config.model} available`); ok++; }
+                else { console.log('  ' + C.red('\u2718') + ` Model: ${config.model} not found ` + C.dim(`\u2014 Fix: ollama pull ${config.model}`)); issues++; }
+            }
+        } else {
+            console.log('  ' + C.red('\u2718') + ` Backend: cannot reach ${config.provider} at ${url}`);
+            issues++;
+        }
+    }
+
+    const nodeVer = parseInt(process.version.slice(1));
+    if (nodeVer >= 20) { console.log('  ' + C.green('\u2714') + ` Node.js ${process.version}`); ok++; }
+    else { console.log('  ' + C.yellow('\u26A0') + ` Node.js ${process.version} (need >= 20)`); issues++; }
+
+    console.log('');
+    console.log(issues === 0
+        ? '  ' + C.green(C.bold(`\u2714 All ${ok} checks passed.`))
+        : '  ' + C.yellow(`${ok} passed, ${issues} issue${issues > 1 ? 's' : ''}.`));
+    console.log('');
+}
+
+// =============================================================================
+// Update — self-update from git
+// =============================================================================
+
+async function cmdUpdate(): Promise<void> {
+    console.log('');
+    console.log('  ' + C.teal(C.bold('UPDATE')) + C.dim(' \u2014 updating TentaCLAW CLI'));
+    console.log('');
+
+    const { execFileSync } = await import('child_process');
+
+    // Find git root from script location
+    const scriptDir = path.resolve(__dirname, '..', '..', '..');
+    const installDir = fs.existsSync(path.join(getConfigDir(), 'src', '.git'))
+        ? path.join(getConfigDir(), 'src')
+        : fs.existsSync(path.join(scriptDir, '.git')) ? scriptDir : null;
+
+    if (!installDir) {
+        console.log('  ' + C.yellow('\u26A0 Cannot find git repository.'));
+        console.log('  ' + C.dim('  Re-run the installer to update.'));
+        console.log('');
+        return;
+    }
+
+    try {
+        console.log('  ' + C.dim(`Updating ${installDir}...`));
+        execFileSync('git', ['pull', '--quiet'], { cwd: installDir, encoding: 'utf8', stdio: 'pipe' });
+        console.log('  ' + C.green('\u2714 Git pull complete'));
+        execFileSync('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], { cwd: installDir, encoding: 'utf8', stdio: 'pipe' });
+        console.log('  ' + C.green('\u2714 Dependencies updated'));
+        execFileSync('npm', ['run', 'build', '--workspace=cli'], { cwd: installDir, encoding: 'utf8', stdio: 'pipe' });
+        console.log('  ' + C.green('\u2714 CLI rebuilt'));
+        console.log('');
+        console.log('  ' + C.green(C.bold('\u2714 Update complete. Restart tentaclaw to use new version.')));
+    } catch (e) {
+        console.log('  ' + C.red(`\u2718 Update failed: ${e instanceof Error ? e.message : String(e)}`));
+    }
+    console.log('');
+}
+
 async function main(): Promise<void> {
     const parsed = parseArgs(process.argv);
     const gateway = getGatewayUrl(parsed.flags);
@@ -2930,7 +4428,27 @@ async function main(): Promise<void> {
         console.error(C.dim('  \uD83D\uDC19 Tip: ' + TIPS[Math.floor(Math.random() * TIPS.length)]));
     }
 
+    // Commands that work without gateway
     switch (parsed.command) {
+        case 'setup':
+        case 'init':
+        case 'configure':
+            await cmdSetup();
+            return;
+
+        case 'config':
+            await cmdConfigCli(parsed.positional);
+            return;
+
+        case 'sessions':
+            await cmdSessionsCli(parsed.positional);
+            return;
+
+        case 'update':
+        case 'upgrade':
+            await cmdUpdate();
+            return;
+
         case 'status':
             await cmdStatus(gateway);
             break;
@@ -2987,9 +4505,16 @@ async function main(): Promise<void> {
             break;
         }
 
-        case 'models':
-            await cmdModels(gateway);
+        case 'models': {
+            // Try standalone (config-based) first; fall back to gateway cluster listing
+            const modelsConfig = loadConfig();
+            if (modelsConfig) {
+                await cmdModelsStandalone();
+            } else {
+                await cmdModels(gateway);
+            }
             break;
+        }
 
         case 'health':
             await cmdHealth(gateway);
@@ -3172,9 +4697,21 @@ async function main(): Promise<void> {
             await cmdAnalytics(gateway, parsed.flags);
             break;
 
-        case 'doctor':
-            await cmdDoctor(gateway, parsed.flags);
+        case 'doctor': {
+            // Use standalone doctor if config exists and no gateway flag
+            const hasConfig = loadConfig() !== null;
+            const gwReachable = await apiProbe(gateway, '/api/v1/nodes');
+            if (gwReachable) {
+                await cmdDoctor(gateway, parsed.flags);
+            } else if (hasConfig) {
+                await cmdDoctorStandalone();
+                return;
+            } else {
+                await cmdDoctorStandalone();
+                return;
+            }
             break;
+        }
 
         case 'search':
             await cmdSearch(parsed.positional, parsed.flags);
