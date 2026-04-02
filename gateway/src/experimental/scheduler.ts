@@ -2,7 +2,7 @@
  * TentaCLAW Gateway — Intelligent Model Placement Scheduler
  *
  * Self-hosted. No SaaS. Your data stays on your hardware.
- * CLAWtopus says: "I decide where everything goes. Eight arms. One brain. Perfect placement."
+ * TentaCLAW says: "I decide where everything goes. Eight arms. One brain. Perfect placement."
  */
 
 import {

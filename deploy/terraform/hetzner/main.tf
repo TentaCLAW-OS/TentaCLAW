@@ -15,7 +15,7 @@
 #   terraform plan
 #   terraform apply
 #
-# CLAWtopus says: "Eight arms in the cloud. Still self-hosted."
+# TentaCLAW says: "Eight arms in the cloud. Still self-hosted."
 # =============================================================================
 
 terraform {

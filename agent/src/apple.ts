@@ -1,6 +1,6 @@
 /**
  * Apple Silicon Detection & Management
- * CLAWtopus says: "Apple arms? I've got eight of my own."
+ * TentaCLAW says: "Apple arms? I've got eight of my own."
  *
  * Consolidated Apple Silicon functionality for TentaCLAW agent nodes:
  *   - Chip detection (M1/M2/M3/M4 and Pro/Max/Ultra variants)

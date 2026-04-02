@@ -31,7 +31,7 @@
 #   - SSH restricted to specified CIDR blocks.
 #   - Workers are not directly accessible from the internet (ALB only).
 #
-# CLAWtopus says: "Eight arms in the cloud. Enterprise-grade grip."
+# TentaCLAW says: "Eight arms in the cloud. Enterprise-grade grip."
 # =============================================================================
 
 terraform {

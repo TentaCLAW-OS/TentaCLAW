@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\huggingface.ts
 // HuggingFace Model Hub Integration
-// CLAWtopus says: "135,000 models. I know which ones you need."
+// TentaCLAW says: "135,000 models. I know which ones you need."
 
 import { estimateVramDetailed } from './models';
 

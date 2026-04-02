@@ -8,7 +8,7 @@
  *   - Retry with constrained decoding on validation failure
  *   - Schema registry for reusable schemas
  *
- * CLAWtopus says: "Free-form text is fine. Structured data is divine."
+ * TentaCLAW says: "Free-form text is fine. Structured data is divine."
  */
 
 // =============================================================================

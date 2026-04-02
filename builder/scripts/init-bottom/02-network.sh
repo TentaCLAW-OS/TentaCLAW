@@ -5,7 +5,7 @@
 # Runs inside initrd during early boot, BEFORE switchroot.
 # Brings up networking via DHCP and discovers the TentaCLAW gateway.
 #
-# CLAWtopus says: "I need to reach out to my other arms."
+# TentaCLAW says: "I need to reach out to my other arms."
 # =============================================================================
 
 set -euo pipefail
@@ -280,12 +280,12 @@ EOF
 
 echo ""
 echo -e "${BOLD}${CYAN}  ═══════════════════════════════════════════════════════${RESET}"
-echo -e "${BOLD}${CYAN}  ║        ${PURPLE}CLAWtopus Network Bring-Up${CYAN}              ${RESET}"
+echo -e "${BOLD}${CYAN}  ║        ${PURPLE}TentaCLAW Network Bring-Up${CYAN}              ${RESET}"
 echo -e "${BOLD}${CYAN}  ═══════════════════════════════════════════════════════${RESET}"
 echo ""
 
 log "Starting network bring-up..."
-log "CLAWtopus says: \"I need to reach out to my other arms.\""
+log "TentaCLAW says: \"I need to reach out to my other arms.\""
 
 parse_cmdline
 wait_for_interface || true

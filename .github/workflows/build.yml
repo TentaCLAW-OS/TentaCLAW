@@ -465,7 +465,7 @@ jobs:
             | `TentaCLAW-OS-${{ env.VERSION }}-amd64.iso.sha256` | ISO checksum |
             | `tentaclaw-gateway-${{ env.VERSION }}` | TentaCLAW Gateway |
             | `tentaclaw-agent-${{ env.VERSION }}` | Node Agent |
-            | `tentaclaw-cli-${{ env.VERSION }}` | CLAWtopus CLI |
+            | `tentaclaw-cli-${{ env.VERSION }}` | TentaCLAW CLI |
             | `tentaclaw-helm-${{ env.VERSION }}` | Helm chart |
 
             ### Docker Images

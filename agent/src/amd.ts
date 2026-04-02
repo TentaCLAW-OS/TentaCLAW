@@ -1,6 +1,6 @@
 /**
  * AMD GPU Detection & Management
- * CLAWtopus says: "Red team? I've got arms for that."
+ * TentaCLAW says: "Red team? I've got arms for that."
  *
  * Consolidated AMD GPU functionality for TentaCLAW agent nodes:
  *   - Architecture detection with fuzzy matching

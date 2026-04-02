@@ -1,11 +1,10 @@
 {
-  "name": "clawtopus-cli",
+  "name": "tentaclaw-cli",
   "version": "1.0.0",
-  "description": "CLAWtopus CLI — Eight arms. One mind. Zero compromises. Inference router + cluster management for TentaCLAW OS.",
-  "main": "dist/index.js",
+  "description": "TentaCLAW CLI — Distributed AI inference cluster management for TentaCLAW OS.",
+  "main": "dist/cli/src/index.js",
   "bin": {
-    "clawtopus": "./dist/index.js",
-    "tentaclaw": "./dist/index.js"
+    "tentaclaw": "./dist/cli/src/index.js"
   },
   "scripts": {
     "build": "tsc",

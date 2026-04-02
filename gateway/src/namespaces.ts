@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\namespaces.ts
 // Namespace & Multi-Tenancy System
-// CLAWtopus says: "Every family has territories. Every territory has a boss."
+// TentaCLAW says: "Every family has territories. Every territory has a boss."
 
 import { getDb } from './db';
 

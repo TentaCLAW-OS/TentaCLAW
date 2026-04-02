@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\licensing.ts
 // License Key System — Free Forever, Pro When Ready
-// CLAWtopus says: "Free for the family. Pro for the business. Enterprise for the empire."
+// TentaCLAW says: "Free for the family. Pro for the business. Enterprise for the empire."
 
 /**
  * TentaCLAW Gateway — Licensing Module
@@ -12,7 +12,7 @@
  * Tier hierarchy: community -> pro -> enterprise -> enterprise-plus
  *
  * Self-hosted. No SaaS. Your data stays on your hardware.
- * CLAWtopus says: "Free for the family. Pro for the business. Enterprise for the empire."
+ * TentaCLAW says: "Free for the family. Pro for the business. Enterprise for the empire."
  */
 
 import { getDb } from './db';
@@ -806,7 +806,7 @@ export function getCheckoutUrl(tier: LicenseTier): string {
 
 /**
  * Export license data formatted for CLI display.
- * Used by: `clawtopus license status`
+ * Used by: `tentaclaw license status`
  */
 export function getLicenseCLIData(): LicenseCLIData {
     const license = getCurrentLicense();

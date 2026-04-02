@@ -6,7 +6,7 @@
 # runtime is installed, starts it in the background, and waits for it to
 # become healthy before handing off to downstream scripts.
 #
-# CLAWtopus says: "Warming up the neurons."
+# TentaCLAW says: "Warming up the neurons."
 # =============================================================================
 
 set -euo pipefail
@@ -23,12 +23,12 @@ RESET='\x1b[0m'
 BOLD='\x1b[1m'
 
 # =============================================================================
-# CLAWtopus ASCII Art Library (optional)
+# TentaCLAW ASCII Art Library (optional)
 # =============================================================================
-CLAWTOPUS_LIB="/opt/tentaclaw/scripts/clawtopus.sh"
-if [ -f "$CLAWTOPUS_LIB" ]; then
+TENTACLAW_LIB="/opt/tentaclaw/scripts/tentaclaw.sh"
+if [ -f "$TENTACLAW_LIB" ]; then
     # shellcheck source=/dev/null
-    source "$CLAWTOPUS_LIB"
+    source "$TENTACLAW_LIB"
 fi
 
 # =============================================================================
@@ -228,12 +228,12 @@ log_status() {
 
 echo ""
 echo -e "${BOLD}${CYAN}  =======================================================${RESET}"
-echo -e "${BOLD}${CYAN}  ||        ${PURPLE}CLAWtopus Inference Runtime${CYAN}              ${RESET}"
+echo -e "${BOLD}${CYAN}  ||        ${PURPLE}TentaCLAW Inference Runtime${CYAN}              ${RESET}"
 echo -e "${BOLD}${CYAN}  =======================================================${RESET}"
 echo ""
 
 log "Initializing inference runtime..."
-log "CLAWtopus says: \"Warming up the neurons.\""
+log "TentaCLAW says: \"Warming up the neurons.\""
 
 # Ensure Ollama is installed
 ensure_ollama_installed || {
@@ -258,8 +258,8 @@ log_status
 
 echo ""
 log_success "Inference runtime is up and running"
-if type clawtopus_status &>/dev/null; then
-    clawtopus_status "ok" "Ollama inference engine online"
+if type tentaclaw_status &>/dev/null; then
+    tentaclaw_status "ok" "Ollama inference engine online"
 fi
 echo ""
 

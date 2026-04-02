@@ -5,7 +5,7 @@
 # Runs inside initrd during early boot, BEFORE switchroot.
 # Detects NVIDIA and AMD GPUs, loads drivers, writes /tmp/gpu-info.json
 #
-# CLAWtopus says: "Eight arms need GPUs to wave around."
+# TentaCLAW says: "Eight arms need GPUs to wave around."
 # =============================================================================
 
 set -euo pipefail
@@ -278,12 +278,12 @@ EOF
 
 echo ""
 echo -e "${BOLD}${CYAN}  ═══════════════════════════════════════════════════════${RESET}"
-echo -e "${BOLD}${CYAN}  ║        ${PURPLE}CLAWtopus GPU Detection${CYAN}                   ${RESET}"
+echo -e "${BOLD}${CYAN}  ║        ${PURPLE}TentaCLAW GPU Detection${CYAN}                   ${RESET}"
 echo -e "${BOLD}${CYAN}  ═══════════════════════════════════════════════════════${RESET}"
 echo ""
 
 log "Starting GPU detection..."
-log "CLAWtopus says: \"Let's see what arms we're working with.\""
+log "TentaCLAW says: \"Let's see what arms we're working with.\""
 
 # Execute detection steps
 wait_for_pci

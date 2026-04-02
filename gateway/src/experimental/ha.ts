@@ -4,7 +4,7 @@
  * Enables multiple gateway instances to form a cluster for redundancy.
  * Uses heartbeats, leader election, and state sync to keep the cluster healthy.
  *
- * CLAWtopus says: "One brain is good. Two brains are better. Eight arms either way."
+ * TentaCLAW says: "One brain is good. Two brains are better. Eight arms either way."
  */
 
 // ---------------------------------------------------------------------------

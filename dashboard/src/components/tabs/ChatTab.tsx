@@ -106,7 +106,7 @@ function MessageBubble({ message, streaming }: { message: ChatMessage; streaming
               marginBottom: 4,
             }}
           >
-            CLAWtopus
+            TentaCLAW
           </div>
         )}
         <div
@@ -230,7 +230,7 @@ function ChatInput() {
         value={text}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        placeholder="Ask CLAWtopus anything..."
+        placeholder="Ask TentaCLAW anything..."
         disabled={streaming}
         rows={1}
         style={{
@@ -332,7 +332,7 @@ export function ChatTab() {
               color: 'var(--text-primary)',
             }}
           >
-            CLAWtopus Chat
+            TentaCLAW Chat
           </span>
           {messages.length > 0 && (
             <button

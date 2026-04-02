@@ -19,9 +19,9 @@
 #   3. install-backend  — Install inference backend (Ollama or BitNet)
 #   4. configure-net    — Configure networking and mDNS
 #   5. start-agent      — Create config and start TentaCLAW agent
-#   6. boot-summary     — Print summary with CLAWtopus art
+#   6. boot-summary     — Print summary with TentaCLAW art
 #
-# CLAWtopus says: "First boot? Let's make this tentacular."
+# TentaCLAW says: "First boot? Let's make this tentacular."
 # =============================================================================
 
 set -euo pipefail
@@ -874,7 +874,7 @@ CONF
 step_boot_summary() {
     section "6/6" "Boot Summary"
 
-    # --- CLAWtopus ASCII Art ---
+    # --- TentaCLAW ASCII Art ---
     echo -e "${CYAN}"
     cat << 'OCTOPUS'
                          ___
@@ -991,7 +991,7 @@ OCTOPUS
     echo -e "    ${WHITE}5.${RESET} Join a cluster:     ${CYAN}tentaclaw-setup${RESET}"
     echo ""
 
-    # --- CLAWtopus quote ---
+    # --- TentaCLAW quote ---
     local quotes=(
         "Eight arms. One mind. Zero compromises."
         "Per-token is a scam. Run local."
@@ -1001,7 +1001,7 @@ OCTOPUS
         "Welcome to the swarm."
     )
     local quote="${quotes[$((RANDOM % ${#quotes[@]}))]}"
-    echo -e "  ${DIM}CLAWtopus says: \"${quote}\"${RESET}"
+    echo -e "  ${DIM}TentaCLAW says: \"${quote}\"${RESET}"
     echo ""
 
     # --- Mark first boot as complete ---
@@ -1052,7 +1052,7 @@ usage() {
     echo "  3. install-backend  Install Ollama (GPU) or BitNet (CPU)"
     echo "  4. configure-net    Enable DHCP, set hostname, start mDNS"
     echo "  5. start-agent      Create rig.conf and start tentaclaw-agent"
-    echo "  6. boot-summary     Print summary and CLAWtopus art"
+    echo "  6. boot-summary     Print summary and TentaCLAW art"
 }
 
 main() {

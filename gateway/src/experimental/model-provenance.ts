@@ -7,7 +7,7 @@
  *   - Trust policies (allow_all, warn_unsigned, reject_unsigned, require_signed)
  *   - AI SBOM generation per model (CycloneDX 1.6)
  *
- * CLAWtopus says: "Trust but verify. Every model. Every weight. Every time."
+ * TentaCLAW says: "Trust but verify. Every model. Every weight. Every time."
  */
 
 import { createHash } from 'crypto';

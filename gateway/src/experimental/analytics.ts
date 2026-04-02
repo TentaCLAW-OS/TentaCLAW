@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\analytics.ts
 // Platform Analytics — Track Everything That Matters
-// CLAWtopus says: "I count every star, every download, every user."
+// TentaCLAW says: "I count every star, every download, every user."
 
 import {
     getDb,

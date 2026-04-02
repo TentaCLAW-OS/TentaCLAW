@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\profiler.ts
 // Performance Profiler for TentaCLAW Gateway
-// CLAWtopus says: "I time everything. Eight arms, eight stopwatches."
+// TentaCLAW says: "I time everything. Eight arms, eight stopwatches."
 
 /**
  * Request timing middleware data

@@ -18,7 +18,7 @@
 #   5. Runs 03-hive-registration.sh → writes rig.conf
 #   6. Validates all output files
 #
-# CLAWtopus says: "Testing all eight arms without getting wet."
+# TentaCLAW says: "Testing all eight arms without getting wet."
 # =============================================================================
 
 set -euo pipefail

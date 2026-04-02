@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\compression.ts
 // Model Compression Service — Every Quantization, One Command
-// CLAWtopus says: "Why waste VRAM on full precision when Q4 is 95% as good?"
+// TentaCLAW says: "Why waste VRAM on full precision when Q4 is 95% as good?"
 
 import { getDb } from './db';
 import { estimateVramDetailed, parseParamCount } from './models';

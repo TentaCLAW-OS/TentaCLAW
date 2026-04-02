@@ -18,7 +18,7 @@
  *  11. tentaclaw_compliance_report — Generate EU AI Act compliance report
  *  12. tentaclaw_chaos_test — Run chaos engineering experiment
  *
- * CLAWtopus says: "MCP? Model Context Protocol? More like My Cluster, Perfectly managed."
+ * TentaCLAW says: "MCP? Model Context Protocol? More like My Cluster, Perfectly managed."
  */
 
 import {

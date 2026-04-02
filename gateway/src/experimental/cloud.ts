@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\cloud.ts
 // TentaCLAW Cloud — Managed Gateway as a Service
-// CLAWtopus says: "Your GPUs, my brain in the cloud. Best of both worlds."
+// TentaCLAW says: "Your GPUs, my brain in the cloud. Best of both worlds."
 
 /**
  * TentaCLAW Gateway — Cloud-Hosted Gateway Management Layer

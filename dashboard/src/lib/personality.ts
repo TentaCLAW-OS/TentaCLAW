@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
- * CLAWtopus Personality Engine
+ * TentaCLAW Personality Engine
  * Contextual messages based on cluster mood — the soul of the dashboard.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -86,7 +86,7 @@ export function getPersonalityMessage(mood: Mood): string {
 }
 
 /**
- * Time-based greeting from CLAWtopus.
+ * Time-based greeting from TentaCLAW.
  */
 export function getGreeting(): string {
   const hour = new Date().getHours();

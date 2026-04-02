@@ -1,6 +1,6 @@
 /**
  * Windows Native Agent Module
- * CLAWtopus says: "Windows? I've got arms for panes too."
+ * TentaCLAW says: "Windows? I've got arms for panes too."
  *
  * Windows-native functionality for TentaCLAW agent nodes running on gaming
  * PCs with NVIDIA GPUs:

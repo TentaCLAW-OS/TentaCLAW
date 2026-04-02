@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\agent\src\edge.ts
 // Edge Inference Platform — Every Device is a Node
-// CLAWtopus says: "From datacenter to Pi. I run everywhere."
+// TentaCLAW says: "From datacenter to Pi. I run everywhere."
 
 /**
  * Edge Inference Module — Lightweight Inference on Edge Hardware

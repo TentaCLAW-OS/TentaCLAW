@@ -9,7 +9,7 @@
  *   - Backend crash simulation
  *   - Automatic healing verification
  *
- * CLAWtopus says: "Break it in testing so it doesn't break in production."
+ * TentaCLAW says: "Break it in testing so it doesn't break in production."
  */
 
 // =============================================================================

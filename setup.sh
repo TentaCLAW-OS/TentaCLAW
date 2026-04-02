@@ -10,7 +10,7 @@
 #   bash setup.sh --deps-only  # Just install dependencies
 #   bash setup.sh --start      # Skip deps, just start services
 #
-# CLAWtopus says: "Let me stretch my arms..."
+# TentaCLAW says: "Let me stretch my arms..."
 # =============================================================================
 
 set -euo pipefail

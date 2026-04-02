@@ -7,7 +7,7 @@
 #   export TF_VAR_ssh_key_name="my-key"
 #   export TF_VAR_worker_count=5
 #
-# CLAWtopus says: "Variables are like tentacles -- flexible and far-reaching."
+# TentaCLAW says: "Variables are like tentacles -- flexible and far-reaching."
 # =============================================================================
 
 # -----------------------------------------------------------------------------

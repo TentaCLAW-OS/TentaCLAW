@@ -2,7 +2,7 @@
 # =============================================================================
 # TentaCLAW Status — Fun System Info Display
 # =============================================================================
-# Display system status with CLAWtopus flair.
+# Display system status with TentaCLAW flair.
 #
 # Usage:
 #   tentaclaw-status            # Full status
@@ -11,7 +11,7 @@
 #   tentaclaw-status cluster  # Cluster info
 #   tentaclaw-status --fun    # Fun facts mode
 #
-# CLAWtopus says: "Let me tell you about your cluster."
+# TentaCLAW says: "Let me tell you about your cluster."
 # =============================================================================
 
 set -euo pipefail
@@ -281,14 +281,14 @@ status_fun() {
             facts+=("You could run multiple models at once with this VRAM.")
         fi
     else
-        facts+=("No GPU? CLAWtopus feels your pain. CPU inference is still valid.")
+        facts+=("No GPU? TentaCLAW feels your pain. CPU inference is still valid.")
     fi
     
     if [ "$model_count" -gt 0 ]; then
         facts+=("You have $model_count AI model(s) ready to party!")
         
         if [ "$model_count" -gt 5 ]; then
-            facts+=("That's a lot of models. CLAWtopus approves.")
+            facts+=("That's a lot of models. TentaCLAW approves.")
         fi
     fi
     
@@ -303,7 +303,7 @@ status_fun() {
         "Per-token is a scam. Run local.",
         "Eight arms. One mind. Zero regrets.",
         "Your cluster is only as strong as your weakest GPU. (Just kidding, they're all great.)",
-        "CLAWtopus has seen things you wouldn't believe.",
+        "TentaCLAW has seen things you wouldn't believe.",
         "I've been waiting for you, human.",
         "Let's run some local AI and make OpenAI sweat.",
         "My tentacles are longer than your patience for cloud bills.",
@@ -312,7 +312,7 @@ status_fun() {
     
     local quote="${quotes[$((RANDOM % ${#quotes[@]}))]}"
     
-    echo -e "  ${DIM}— CLAWtopus${RESET}"
+    echo -e "  ${DIM}— TentaCLAW${RESET}"
     echo -e "  ${DIM}  \"$quote\"${RESET}"
     echo ""
 }

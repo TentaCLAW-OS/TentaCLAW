@@ -206,7 +206,7 @@ jobs:
             |---------|-------------|
             | `tentaclaw-gateway-${{ github.ref_name }}.tar.gz` | Gateway server (Hono + SQLite) |
             | `tentaclaw-dashboard-${{ github.ref_name }}.tar.gz` | React dashboard (Vite build) |
-            | `tentaclaw-cli-${{ github.ref_name }}.tar.gz` | CLAWtopus CLI |
+            | `tentaclaw-cli-${{ github.ref_name }}.tar.gz` | TentaCLAW CLI |
             | `CHECKSUMS.sha256` | SHA-256 checksums for all artifacts |
             | `sbom-gateway.json` | CycloneDX SBOM for gateway dependencies |
             | `sbom-cli.json` | CycloneDX SBOM for CLI dependencies |

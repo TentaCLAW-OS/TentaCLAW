@@ -6,7 +6,7 @@
  * scaling decisions across the cluster.
  *
  * Self-hosted. No SaaS. Your data stays on your hardware.
- * CLAWtopus says: "Why waste VRAM on models nobody's asking for?"
+ * TentaCLAW says: "Why waste VRAM on models nobody's asking for?"
  */
 
 import { getAllNodes, getClusterModels, queueCommand } from './db';

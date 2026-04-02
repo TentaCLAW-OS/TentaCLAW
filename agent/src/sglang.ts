@@ -15,7 +15,7 @@
  * workloads (RAG, multi-turn chat) thanks to RadixAttention — a radix tree
  * that reuses KV caches across requests sharing common prefixes.
  *
- * CLAWtopus says: "RadixAttention? That's like remembering every conversation
+ * TentaCLAW says: "RadixAttention? That's like remembering every conversation
  *   with all eight arms at once."
  */
 

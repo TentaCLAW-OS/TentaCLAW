@@ -7,7 +7,7 @@
  *
  * Imported by both `agent/` and `gateway/` packages.
  *
- * CLAWtopus says: "Speak the same language, or get tangled."
+ * TentaCLAW says: "Speak the same language, or get tangled."
  *
  * @module protocol
  * @version 1.0

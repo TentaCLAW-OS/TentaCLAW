@@ -1,6 +1,6 @@
 /**
  * NVIDIA GPU Advanced Management
- * CLAWtopus says: "Green team? I've got arms for that too."
+ * TentaCLAW says: "Green team? I've got arms for that too."
  *
  * Consolidated NVIDIA GPU advanced functionality for TentaCLAW agent nodes:
  *   - MIG (Multi-Instance GPU) detection

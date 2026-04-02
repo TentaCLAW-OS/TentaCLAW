@@ -6,7 +6,7 @@
  * engine reconciles the cluster to match.
  *
  * Self-hosted. No SaaS. Your data stays on your hardware.
- * CLAWtopus says: "You declare. I reconcile. That's how the family works."
+ * TentaCLAW says: "You declare. I reconcile. That's how the family works."
  */
 
 import {

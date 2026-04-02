@@ -6,7 +6,7 @@
  * can be sharded across 2-8 machines, each handling a slice of the layers.
  *
  * Self-hosted. No SaaS. Your data stays on your hardware.
- * CLAWtopus says: "One model. Eight arms. Spread across the cluster."
+ * TentaCLAW says: "One model. Eight arms. Spread across the cluster."
  */
 
 import type { NodeWithStats, GpuStats } from '../../shared/types';

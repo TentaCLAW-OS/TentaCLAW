@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\observability.ts
 // AI Observability — Trace Every Inference Request
-// CLAWtopus says: "I see everything. Every token. Every millisecond."
+// TentaCLAW says: "I see everything. Every token. Every millisecond."
 
 import { getDb } from './db';
 import { percentile } from './profiler';

@@ -117,8 +117,8 @@ export function CommandPalette() {
       id: 'egg:who',
       label: 'who are you',
       category: 'easter-egg' as const,
-      action: () => setEasterEggResult("I'm CLAWtopus. 8 arms. impeccable vibes. 🐙"),
-      displayResult: "I'm CLAWtopus. 8 arms. impeccable vibes. 🐙",
+      action: () => setEasterEggResult("I'm TentaCLAW. 8 arms. impeccable vibes. 🐙"),
+      displayResult: "I'm TentaCLAW. 8 arms. impeccable vibes. 🐙",
     });
     cmds.push({
       id: 'egg:meaning',

@@ -5,7 +5,7 @@
 # Runs inside initrd during early boot, AFTER network is up.
 # Generates Farm Hash from hardware, registers with TentaCLAW gateway.
 #
-# CLAWtopus says: "Let me wrap an arm around this node."
+# TentaCLAW says: "Let me wrap an arm around this node."
 # =============================================================================
 
 set -euo pipefail
@@ -264,7 +264,7 @@ write_config() {
 
     cat > "$REG_CONF" << EOF
 # TentaCLAW Node Configuration
-# Auto-generated on first boot. CLAWtopus says: "This is mine now."
+# Auto-generated on first boot. TentaCLAW says: "This is mine now."
 # Edit at your own risk. She'll know.
 
 FARM_HASH=$FARM_HASH
@@ -303,12 +303,12 @@ EOF
 
 echo ""
 echo -e "${BOLD}${CYAN}  ═══════════════════════════════════════════════════════${RESET}"
-echo -e "${BOLD}${CYAN}  ║        ${PURPLE}CLAWtopus TentaCLAW Registration${CYAN}         ${RESET}"
+echo -e "${BOLD}${CYAN}  ║        ${PURPLE}TentaCLAW TentaCLAW Registration${CYAN}         ${RESET}"
 echo -e "${BOLD}${CYAN}  ═══════════════════════════════════════════════════════${RESET}"
 echo ""
 
 log "Starting registration..."
-log "CLAWtopus says: \"Let me wrap an arm around this node.\""
+log "TentaCLAW says: \"Let me wrap an arm around this node.\""
 
 # Check if already registered
 if load_info; then
@@ -354,7 +354,7 @@ if [ -n "$GATEWAY_URL" ]; then
     echo -e "  ${GREEN}✓ All arms accounted for.${RESET}"
 else
     log_warn "No gateway found. Node will operate in standalone mode."
-    echo -e "  ${YELLOW}⚠ CLAWtopus is flying solo.${RESET}"
+    echo -e "  ${YELLOW}⚠ TentaCLAW is flying solo.${RESET}"
 fi
 
 echo ""

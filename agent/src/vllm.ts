@@ -9,7 +9,7 @@
  *   - HuggingFace model support (GPTQ, AWQ, SafeTensors, FP16)
  *   - Configuration via environment variables + auto-detection
  *
- * CLAWtopus says: "PagedAttention? I've got eight arms for that."
+ * TentaCLAW says: "PagedAttention? I've got eight arms for that."
  */
 
 import { execFileSync, spawn, ChildProcess } from 'child_process';

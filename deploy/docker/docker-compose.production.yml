@@ -14,7 +14,7 @@
 #   docker compose -f docker-compose.production.yml logs -f gateway
 #   docker compose -f docker-compose.production.yml down
 #
-# CLAWtopus says: "Containers are just smaller aquariums."
+# TentaCLAW says: "Containers are just smaller aquariums."
 # =============================================================================
 
 name: tentaclaw-production

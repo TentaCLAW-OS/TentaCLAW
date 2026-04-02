@@ -82,7 +82,7 @@ export function Header() {
   const onlineNodes = nodes.filter((n) => n.status === 'online').length;
   const totalGpus = nodes.reduce((sum, n) => sum + n.gpu_count, 0);
 
-  // CLAWtopus personality state
+  // TentaCLAW personality state
   const hasWarning = alerts.some((a) => a.severity === 'warning' && !a.acknowledged);
   const hasError = alerts.some((a) => a.severity === 'critical' && !a.acknowledged);
   const currentMood: Mood = getMood(onlineNodes, nodes.length, hasWarning, hasError);
@@ -164,7 +164,7 @@ export function Header() {
         </span>
       </div>
 
-      {/* Center: Search + CLAWtopus status */}
+      {/* Center: Search + TentaCLAW status */}
       <div className="flex items-center gap-4">
         <div
           className="flex items-center gap-2 w-[280px] h-7 px-3 rounded-lg border"

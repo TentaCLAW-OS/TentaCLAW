@@ -1,10 +1,10 @@
 /**
- * CLAWtopus ASCII Art Collection
+ * TentaCLAW ASCII Art Collection
  * 20 poses for different moods and situations.
- * CLAWtopus says: "I look good in every frame."
+ * TentaCLAW says: "I look good in every frame."
  */
 
-export const CLAWTOPUS_POSES: Record<string, string[]> = {
+export const TENTACLAW_POSES: Record<string, string[]> = {
     // Default — cool and confident
     default: [
         '        ,---.',
@@ -196,15 +196,15 @@ export const CLAWTOPUS_POSES: Record<string, string[]> = {
 /**
  * Get ASCII art for current mood
  */
-export function getAsciiArt(pose: keyof typeof CLAWTOPUS_POSES = 'default'): string[] {
-    return CLAWTOPUS_POSES[pose] || CLAWTOPUS_POSES.default;
+export function getAsciiArt(pose: keyof typeof TENTACLAW_POSES = 'default'): string[] {
+    return TENTACLAW_POSES[pose] || TENTACLAW_POSES.default;
 }
 
 /**
  * Get a random pose
  */
 export function getRandomPose(): string[] {
-    const poses = Object.keys(CLAWTOPUS_POSES);
+    const poses = Object.keys(TENTACLAW_POSES);
     const key = poses[Math.floor(Math.random() * poses.length)];
-    return CLAWTOPUS_POSES[key];
+    return TENTACLAW_POSES[key];
 }

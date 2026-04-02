@@ -11,7 +11,7 @@
  *   tentaclaw-agent --mock --gpus 4     # Mock with 4 fake GPUs
  *   tentaclaw-agent --gateway http://localhost:8080  # Override gateway URL
  *
- * CLAWtopus says: "I'm the arm that never sleeps."
+ * TentaCLAW says: "I'm the arm that never sleeps."
  */
 
 import * as fs from 'fs';

@@ -1,14 +1,14 @@
 "use strict";
 /**
- * CLAWtopus ASCII Art Collection
+ * TentaCLAW ASCII Art Collection
  * 20 poses for different moods and situations.
- * CLAWtopus says: "I look good in every frame."
+ * TentaCLAW says: "I look good in every frame."
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CLAWTOPUS_POSES = void 0;
+exports.TENTACLAW_POSES = void 0;
 exports.getAsciiArt = getAsciiArt;
 exports.getRandomPose = getRandomPose;
-exports.CLAWTOPUS_POSES = {
+exports.TENTACLAW_POSES = {
     // Default — cool and confident
     default: [
         '        ,---.',
@@ -185,14 +185,14 @@ exports.CLAWTOPUS_POSES = {
  * Get ASCII art for current mood
  */
 function getAsciiArt(pose = 'default') {
-    return exports.CLAWTOPUS_POSES[pose] || exports.CLAWTOPUS_POSES.default;
+    return exports.TENTACLAW_POSES[pose] || exports.TENTACLAW_POSES.default;
 }
 /**
  * Get a random pose
  */
 function getRandomPose() {
-    const poses = Object.keys(exports.CLAWTOPUS_POSES);
+    const poses = Object.keys(exports.TENTACLAW_POSES);
     const key = poses[Math.floor(Math.random() * poses.length)];
-    return exports.CLAWTOPUS_POSES[key];
+    return exports.TENTACLAW_POSES[key];
 }
 //# sourceMappingURL=ascii-art.js.map

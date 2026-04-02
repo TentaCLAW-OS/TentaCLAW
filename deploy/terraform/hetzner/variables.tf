@@ -6,7 +6,7 @@
 #   export TF_VAR_hcloud_token="your-token"
 #   export TF_VAR_ssh_key_name="my-key"
 #
-# CLAWtopus says: "Variables are like tentacles — flexible and far-reaching."
+# TentaCLAW says: "Variables are like tentacles — flexible and far-reaching."
 # =============================================================================
 
 # -----------------------------------------------------------------------------

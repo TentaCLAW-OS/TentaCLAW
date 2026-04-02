@@ -4,7 +4,7 @@
  * Manage your GPU inference cluster from n8n workflows.
  * Deploy models, run inference, monitor health, respond to alerts.
  *
- * CLAWtopus says: "n8n builds the workflows. I provide the GPUs."
+ * TentaCLAW says: "n8n builds the workflows. I provide the GPUs."
  *
  * Installation:
  *   npm install n8n-nodes-tentaclaw

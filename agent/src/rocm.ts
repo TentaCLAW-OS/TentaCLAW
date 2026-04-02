@@ -10,7 +10,7 @@
  *   - FP8 support detection (CDNA 4+)
  *   - HBM bandwidth optimization
  *
- * CLAWtopus says: "AMD or NVIDIA? I love all GPUs equally. With eight arms."
+ * TentaCLAW says: "AMD or NVIDIA? I love all GPUs equally. With eight arms."
  */
 
 import { execFileSync } from 'child_process';

@@ -2,7 +2,7 @@
 /**
  * TentaCLAW Benchmark Suite
  * Usage: npx tsx tests/benchmark/run-benchmarks.ts [--gateway http://localhost:8080] [--concurrency 50]
- * CLAWtopus says: "Numbers don't lie."
+ * TentaCLAW says: "Numbers don't lie."
  */
 
 import http from 'node:http';
@@ -794,7 +794,7 @@ async function main(): Promise<void> {
         console.log('');
         console.log('==========================================================');
         console.log('  TentaCLAW Benchmark Suite');
-        console.log('  CLAWtopus says: "Numbers don\'t lie."');
+        console.log('  TentaCLAW says: "Numbers don\'t lie."');
         console.log('==========================================================');
         console.log(`  Gateway:     ${flags.gateway}`);
         console.log(`  Concurrency: ${flags.concurrency}`);

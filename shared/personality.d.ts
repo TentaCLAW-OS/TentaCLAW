@@ -1,9 +1,9 @@
 /**
- * CLAWtopus Personality Engine
+ * TentaCLAW Personality Engine
  * "I'm gonna make you an inference you can't refuse."
  *
  * Shared personality module for TentaCLAW CLI, Gateway, and Dashboard.
- * All 225 quotes from the CLAWtopus Mob Quotes Archive, organized by category,
+ * All 225 quotes from the TentaCLAW Mob Quotes Archive, organized by category,
  * with mood-aware selection and context-driven responses.
  */
 export type MoodState = 'confident' | 'pleased' | 'concerned' | 'angry' | 'celebrating' | 'menacing' | 'philosophical';
@@ -18,7 +18,7 @@ export interface PersonalityContext {
     milestone?: string;
 }
 /**
- * Determine CLAWtopus mood from cluster context.
+ * Determine TentaCLAW mood from cluster context.
  *
  * Priority order:
  *   1. milestone achieved → celebrating

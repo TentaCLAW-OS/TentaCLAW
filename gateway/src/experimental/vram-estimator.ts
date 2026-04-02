@@ -10,7 +10,7 @@
  *   activation_buffer = ~10% of model weights for inference
  *   overhead = ~300MB CUDA/ROCm runtime + ~200MB per loaded model
  *
- * CLAWtopus says: "Measure twice, load once. VRAM isn't free."
+ * TentaCLAW says: "Measure twice, load once. VRAM isn't free."
  */
 
 // =============================================================================

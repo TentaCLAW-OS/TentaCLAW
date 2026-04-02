@@ -202,7 +202,7 @@ function buildTemplateCandidates(req: NormalizedRequest): Candidate[] {
         { primary, secondary: 'The reef is quiet. For now.', mechanic: 'deadpan' },
         { primary, secondary: 'No node has breached the surface yet.', mechanic: 'faux_epic' },
         { primary, secondary: 'Listening for movement below the waterline.', mechanic: 'overqualified_diagnostic' },
-        { primary, secondary: 'CLAWtopus is pretending not to stare at the gateway.', mechanic: 'tiny_reversal' },
+        { primary, secondary: 'TentaCLAW is pretending not to stare at the gateway.', mechanic: 'tiny_reversal' },
         { primary, secondary: 'Still water. Pending tentacles.', mechanic: 'misdirection' },
       ];
     case 'error':

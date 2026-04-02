@@ -7,7 +7,7 @@
  *
  * Zero dependencies — pure Node.js HTTP server + fetch().
  *
- * CLAWtopus says: "Eight arms, infinite tool calls."
+ * TentaCLAW says: "Eight arms, infinite tool calls."
  */
 
 import http from 'http';

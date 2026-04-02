@@ -2,7 +2,7 @@
  * @tentaclaw/sdk — TentaCLAW OS TypeScript SDK
  *
  * Manage your GPU inference cluster programmatically.
- * CLAWtopus says: "Eight arms. One SDK. Zero hassle."
+ * TentaCLAW says: "Eight arms. One SDK. Zero hassle."
  *
  * Usage:
  *   import { TentaCLAW } from '@tentaclaw/sdk';

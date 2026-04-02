@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\rag.ts
 // RAG Engine for TentaCLAW — cluster-local knowledge retrieval
-// CLAWtopus says: "I remember everything. Eight arms, infinite memory."
+// TentaCLAW says: "I remember everything. Eight arms, infinite memory."
 
 import { randomUUID } from 'crypto';
 

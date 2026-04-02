@@ -12,7 +12,7 @@
 #   bash builder/test-qemu.sh --serial                 # Serial console (no GUI)
 #   bash builder/test-qemu.sh --gateway 10.0.0.1:8080  # Set gateway IP for node
 #
-# CLAWtopus says: "Virtual arms are still arms."
+# TentaCLAW says: "Virtual arms are still arms."
 # =============================================================================
 
 set -euo pipefail

@@ -10,7 +10,7 @@
  * Tracks multiple known gateways with health checks and latency measurement.
  * Zero external dependencies — uses only Node.js built-in modules.
  *
- * CLAWtopus says: "Eight arms, eight ways to find you."
+ * TentaCLAW says: "Eight arms, eight ways to find you."
  */
 
 import * as dgram from 'dgram';

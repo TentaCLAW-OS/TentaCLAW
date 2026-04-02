@@ -41,4 +41,4 @@ See `config.json` in this directory for a complete configuration.
 
 ---
 
-*CLAWtopus says: "Your code editor. My GPUs. Zero API fees. Forever."*
+*TentaCLAW says: "Your code editor. My GPUs. Zero API fees. Forever."*

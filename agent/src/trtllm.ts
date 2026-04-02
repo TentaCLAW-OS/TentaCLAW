@@ -9,7 +9,7 @@
  *   - Speculative decoding integration
  *   - Paged KV cache with configurable memory fraction
  *
- * CLAWtopus says: "TensorRT goes brrr. Like a jet-propelled octopus."
+ * TentaCLAW says: "TensorRT goes brrr. Like a jet-propelled octopus."
  */
 
 import { execFileSync, spawn, ChildProcess } from 'child_process';

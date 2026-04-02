@@ -4,7 +4,7 @@
  * Event-driven notifications with HMAC-SHA256 signed payloads,
  * retry with exponential backoff, and delivery logging.
  *
- * CLAWtopus says: "I push, you catch. That is how eight arms delegate."
+ * TentaCLAW says: "I push, you catch. That is how eight arms delegate."
  */
 
 import { createHmac, randomBytes } from 'crypto';

@@ -301,6 +301,8 @@ export function getSessionUser(c: any): ReturnType<typeof validateSession> {
 }
 
 export function requireRole(c: any, ...roles: string[]): ReturnType<typeof validateSession> {
+    // When auth is disabled, grant admin access to all requests
+    if (isAuthDisabled()) return { id: 0, username: 'admin', role: 'admin' } as any;
     const user = getSessionUser(c);
     if (!user) return null;
     if (roles.length > 0 && !roles.includes(user.role)) return null;

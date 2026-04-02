@@ -4,7 +4,7 @@
  * Manages WebSocket client tracking, event subscriptions,
  * and message formatting for SSE / WS delivery.
  *
- * CLAWtopus says: "Every tentacle stays connected — no signal lost at sea."
+ * TentaCLAW says: "Every tentacle stays connected — no signal lost at sea."
  */
 
 export interface RealtimeClient {

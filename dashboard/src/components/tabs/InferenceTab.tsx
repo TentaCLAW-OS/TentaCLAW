@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useClusterStore } from '@/stores/cluster';
 import { Sparkline } from '@/components/ui/Sparkline';
-import { CLAWtopusTips } from '@/components/ui/CLAWtopusTips';
+import { TentaCLAWTips } from '@/components/ui/TentaCLAWTips';
 import { emptyStateTips } from '@/lib/personality';
 
 /* ---------- data ---------- */
@@ -79,7 +79,7 @@ export function InferenceTab() {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-2" style={{ animation: 'slideUp 0.4s ease-out both' }}>
         <span className="text-2xl opacity-20">&#x26A1;</span>
-        <CLAWtopusTips tip={emptyStateTips.inference} />
+        <TentaCLAWTips tip={emptyStateTips.inference} />
       </div>
     );
   }

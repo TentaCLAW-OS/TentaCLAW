@@ -1,6 +1,6 @@
 /**
  * TentaCLAW Billing — Stripe Integration
- * CLAWtopus says: "Free for the community. Pro for teams. Enterprise for scale."
+ * TentaCLAW says: "Free for the community. Pro for teams. Enterprise for scale."
  *
  * This module handles Stripe Checkout, subscriptions, and usage metering.
  * Requires: STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET env vars.

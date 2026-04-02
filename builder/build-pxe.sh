@@ -13,7 +13,7 @@
 #   - Linux with: xorriso, gzip, cpio, wget
 #   - iPXE source or prebuilt binaries (optional)
 #
-# CLAWtopus says: "Network boot? Now we're talking."
+# TentaCLAW says: "Network boot? Now we're talking."
 # =============================================================================
 
 set -euo pipefail
@@ -146,7 +146,7 @@ create_boot_script() {
 #!ipxe
 
 # TentaCLAW OS — iPXE Boot Script
-# CLAWtopus says: "Time to boot from the network."
+# TentaCLAW says: "Time to boot from the network."
 
 set gateway ${gateway}
 set arch ${ARCH}
@@ -230,13 +230,13 @@ build_pxe_initrd() {
     # Copy init-bottom scripts
     mkdir -p "$BUILD_ROOT/initrd/scripts"
     cp "${SCRIPT_DIR}/scripts/init-bottom/"*.sh "$BUILD_ROOT/initrd/scripts/" 2>/dev/null || true
-    cp "${SCRIPT_DIR}/scripts/clawtopus.sh" "$BUILD_ROOT/initrd/scripts/" 2>/dev/null || true
+    cp "${SCRIPT_DIR}/scripts/tentaclaw.sh" "$BUILD_ROOT/initrd/scripts/" 2>/dev/null || true
 
     # Create minimal init
     cat > "$BUILD_ROOT/initrd/init" << 'INITEOF'
 #!/bin/bash
 # TentaCLAW OS — PXE Init
-# CLAWtopus says: "Waking up from the network."
+# TentaCLAW says: "Waking up from the network."
 
 set -e
 
@@ -244,18 +244,18 @@ mount -t proc proc /proc
 mount -t sysfs sys /sys
 mount -t devtmpfs dev /dev 2>/dev/null || mount -t devpts devpts /dev/pts
 
-# Source CLAWtopus
-. /scripts/clawtopus.sh
+# Source TentaCLAW
+. /scripts/tentaclaw.sh
 clear
-clawtopus_splash
+tentaclaw_splash
 
 echo ""
-echo -e "${CYAN}[init] CLAWtopus is waking up from the network...${RESET}"
+echo -e "${CYAN}[init] TentaCLAW is waking up from the network...${RESET}"
 echo ""
 
 # Run init scripts
 for script in /scripts/*.sh; do
-    if [ -f "$script" ] && [ "$(basename "$script")" != "clawtopus.sh" ]; then
+    if [ -f "$script" ] && [ "$(basename "$script")" != "tentaclaw.sh" ]; then
         echo -e "${CYAN}[init] Running: $(basename $script)${RESET}"
         bash "$script"
     fi
@@ -432,7 +432,7 @@ sudo systemctl restart nginx
 3. iPXE loads and executes boot.ipxe from TFTP/HTTP
 4. Kernel and initrd are downloaded (HTTP recommended)
 5. TentaCLAW OS boots and runs init scripts
-6. CLAWtopus registers with TentaCLAW gateway
+6. TentaCLAW registers with TentaCLAW gateway
 
 ## Troubleshooting
 
@@ -451,7 +451,7 @@ sudo systemctl restart nginx
 ## Notes
 
 - For 100+ nodes, use HTTP for kernel/initrd delivery (TFTP is slow)
-- CLAWtopus will register automatically once the gateway is reachable
+- TentaCLAW will register automatically once the gateway is reachable
 - Nodes can also boot from USB ISO for initial setup, then switch to PXE
 EOF
 

@@ -10,7 +10,7 @@
  * A2A enables inter-agent communication: monitoring agents can delegate
  * inference tasks to TentaCLAW, orchestration agents can request deployments.
  *
- * CLAWtopus says: "Agent-to-agent? More like arm-to-arm coordination."
+ * TentaCLAW says: "Agent-to-agent? More like arm-to-arm coordination."
  */
 
 import { getClusterSummary, getClusterModels, findBestNodeForModel } from './db';

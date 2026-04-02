@@ -5,7 +5,7 @@
  * The central coordinator for your AI inference cluster.
  * Receives stats from agents, dispatches commands, serves the dashboard.
  *
- * CLAWtopus says: "One mind to rule them all. Eight arms to manage them."
+ * TentaCLAW says: "One mind to rule them all. Eight arms to manage them."
  */
 
 import { Hono } from 'hono';

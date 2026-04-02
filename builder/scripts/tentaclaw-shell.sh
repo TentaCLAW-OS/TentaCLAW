@@ -1,9 +1,9 @@
 #!/bin/bash
 # =============================================================================
-# TentaCLAW Shell — Interactive CLI with CLAWtopus Personality
+# TentaCLAW Shell — Interactive CLI with TentaCLAW Personality
 # =============================================================================
 # A fun, interactive shell for managing your TentaCLAW cluster.
-# CLAWtopus is always watching... and responding.
+# TentaCLAW is always watching... and responding.
 #
 # Usage:
 #   tentaclaw-shell           # Interactive mode
@@ -14,7 +14,7 @@
 #   tentaclaw-shell bench     # Run benchmark
 #   tentaclaw-shell help      # Show help
 #
-# CLAWtopus says: "Type 'help' if you're lost. Or don't. I'm an octopus, not a mind reader."
+# TentaCLAW says: "Type 'help' if you're lost. Or don't. I'm an octopus, not a mind reader."
 # =============================================================================
 
 set -euo pipefail
@@ -32,10 +32,10 @@ BOLD='\x1b[1m'
 DIM='\x1b[2m'
 
 # =============================================================================
-# CLAWtopus ASCII Art
+# TentaCLAW ASCII Art
 # =============================================================================
 
-clawtopus_face() {
+tentaclaw_face() {
     cat << 'EOF'
 
     ${PURPLE}     ,---.
@@ -50,7 +50,7 @@ clawtopus_face() {
 EOF
 }
 
-clawtopus_banner() {
+tentaclaw_banner() {
     cat << 'EOF'
 
     ${CYAN}██╗   ██╗ ██████╗ ████████╗ ██████╗ ███╗   ██╗${RESET}
@@ -63,7 +63,7 @@ clawtopus_banner() {
 EOF
 }
 
-clawtopus_loading() {
+tentaclaw_loading() {
     cat << 'EOF'
 
     ${CYAN}     ,---.
@@ -78,7 +78,7 @@ clawtopus_loading() {
 EOF
 }
 
-clawtopus_sad() {
+tentaclaw_sad() {
     cat << 'EOF'
 
     ${RED}     ,---.
@@ -127,7 +127,7 @@ ask() {
 print_banner() {
     clear
     echo -e "${BOLD}"
-    clawtopus_banner
+    tentaclaw_banner
     echo -e "${RESET}"
     echo -e "  ${BOLD}${WHITE}TentaCLAW Shell — Interactive Cluster Management${RESET}"
     echo -e "  ${DIM}Type 'help' for commands. Type 'exit' to quit.${RESET}"
@@ -357,9 +357,9 @@ cmd_help() {
       logs          View agent logs
 
     ${CYAN}Fun${RESET}
-      ascii         Display random CLAWtopus art
-      joke          Get a CLAWtopus joke
-      fortune       CLAWtopus fortune cookie
+      ascii         Display random TentaCLAW art
+      joke          Get a TentaCLAW joke
+      fortune       TentaCLAW fortune cookie
 
     ${CYAN}Other${RESET}
       help          Show this help
@@ -471,7 +471,7 @@ cmd_joke() {
         "How many GPUs does an octopus need? All of them."
         "What do you call an octopus that runs AI? Tentacurls."
         "Why was the octopus so bad at keeping secrets? Too many arms to cover its mouth."
-        "How does CLAWtopus send messages? Tentacle-net."
+        "How does TentaCLAW send messages? Tentacle-net."
     )
     
     local joke="${jokes[$((RANDOM % ${#jokes[@]}))]}"
@@ -489,14 +489,14 @@ cmd_fortune() {
         "A wise octopus once said: 'Per-token is a scam.'"
         "Your VRAM will multiply like tentacles."
         "Expect a breakthrough in your inference pipeline."
-        "CLAWtopus sees all. CLAWtopus knows all."
+        "TentaCLAW sees all. TentaCLAW knows all."
     )
     
     local fortune="${fortunes[$((RANDOM % ${#fortunes[@]}))]}"
     echo ""
     echo -e "  ${CYAN}✮${RESET} ${WHITE}$fortune${RESET}"
     echo ""
-    echo -e "  ${DIM}— CLAWtopus${RESET}"
+    echo -e "  ${DIM}— TentaCLAW${RESET}"
     echo ""
 }
 
@@ -563,7 +563,7 @@ interactive_mode() {
             exit|quit|q)
                 echo ""
                 echo -e "  ${CYAN}See you later!${RESET}"
-                echo -e "  ${YELLOW}CLAWtopus says: \"Don't go squidding out on me.\"${RESET}"
+                echo -e "  ${YELLOW}TentaCLAW says: \"Don't go squidding out on me.\"${RESET}"
                 echo ""
                 break
                 ;;

@@ -18,7 +18,7 @@
 #     "recommended_backend": "ollama|bitnet|vllm"
 #   }
 #
-# CLAWtopus says: "Let me feel around for GPUs with my tentacles..."
+# TentaCLAW says: "Let me feel around for GPUs with my tentacles..."
 # =============================================================================
 
 set -euo pipefail

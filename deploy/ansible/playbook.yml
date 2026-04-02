@@ -13,7 +13,7 @@
 #   ansible-playbook -i inventory.ini playbook.yml --tags agent
 #   ansible-playbook -i inventory.ini playbook.yml --limit workers
 #
-# CLAWtopus says: "Ansible: because octopuses automate everything."
+# TentaCLAW says: "Ansible: because octopuses automate everything."
 # =============================================================================
 
 - name: Common setup for all TentaCLAW nodes

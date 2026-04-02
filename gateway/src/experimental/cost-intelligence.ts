@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\cost-intelligence.ts
 // Cost Intelligence — Know What Your Cluster Actually Costs
-// CLAWtopus says: "Every watt. Every token. Every dollar. I track it all."
+// TentaCLAW says: "Every watt. Every token. Every dollar. I track it all."
 
 import {
     getAllNodes,

@@ -6,7 +6,7 @@
 #   terraform output gateway_ip
 #   terraform output -json worker_ips
 #
-# CLAWtopus says: "Output everything. Hide nothing. Octopuses are transparent."
+# TentaCLAW says: "Output everything. Hide nothing. Octopuses are transparent."
 # =============================================================================
 
 # -----------------------------------------------------------------------------

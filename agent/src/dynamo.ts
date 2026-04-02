@@ -11,7 +11,7 @@
  * Dynamo is the inference OS adopted by AWS, Azure, and GCP.
  * This backend integrates TentaCLAW's orchestration with Dynamo's execution.
  *
- * CLAWtopus says: "Disaggregated? I've been doing that with 8 arms since birth."
+ * TentaCLAW says: "Disaggregated? I've been doing that with 8 arms since birth."
  */
 
 import { execFileSync, spawn, ChildProcess } from 'child_process';

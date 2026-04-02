@@ -6,7 +6,7 @@
 # tentaclaw-agent.service. Sources rig.conf, validates the environment,
 # and starts the TentaCLAW agent with proper logging.
 #
-# CLAWtopus says: "All arms report for duty."
+# TentaCLAW says: "All arms report for duty."
 # =============================================================================
 
 set -euo pipefail
@@ -23,12 +23,12 @@ RESET='\x1b[0m'
 BOLD='\x1b[1m'
 
 # =============================================================================
-# CLAWtopus ASCII Art Library (optional)
+# TentaCLAW ASCII Art Library (optional)
 # =============================================================================
-CLAWTOPUS_LIB="/opt/tentaclaw/scripts/clawtopus.sh"
-if [ -f "$CLAWTOPUS_LIB" ]; then
+TENTACLAW_LIB="/opt/tentaclaw/scripts/tentaclaw.sh"
+if [ -f "$TENTACLAW_LIB" ]; then
     # shellcheck source=/dev/null
-    source "$CLAWTOPUS_LIB"
+    source "$TENTACLAW_LIB"
 fi
 
 # =============================================================================
@@ -179,7 +179,7 @@ start_agent() {
 
 echo ""
 echo -e "${BOLD}${CYAN}  =======================================================${RESET}"
-echo -e "${BOLD}${CYAN}  ||        ${PURPLE}CLAWtopus Agent Daemon${CYAN}                   ${RESET}"
+echo -e "${BOLD}${CYAN}  ||        ${PURPLE}TentaCLAW Agent Daemon${CYAN}                   ${RESET}"
 echo -e "${BOLD}${CYAN}  =======================================================${RESET}"
 echo ""
 
@@ -206,8 +206,8 @@ export_environment
 
 echo ""
 log_success "All preflight checks passed"
-if type clawtopus_quote &>/dev/null; then
-    echo -e "  $(clawtopus_quote)"
+if type tentaclaw_quote &>/dev/null; then
+    echo -e "  $(tentaclaw_quote)"
 fi
 echo ""
 

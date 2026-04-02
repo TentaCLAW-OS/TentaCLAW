@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\agent\src\backends.ts
 // Unified Inference Backend Abstraction
-// CLAWtopus says: "Ollama, vLLM, SGLang, BitNet — I run 'em all. Eight arms, remember?"
+// TentaCLAW says: "Ollama, vLLM, SGLang, BitNet — I run 'em all. Eight arms, remember?"
 
 import { execFileSync, execSync } from 'child_process';
 import * as fs from 'fs';
@@ -1523,7 +1523,7 @@ export class MlxBackend implements InferenceBackend {
  * BackendRegistry manages all known inference backends.
  * Register backends, query their status, and pick the best one for a workload.
  *
- * CLAWtopus says: "I know where every tentacle is at all times."
+ * TentaCLAW says: "I know where every tentacle is at all times."
  */
 export class BackendRegistry {
     private backends = new Map<BackendType, InferenceBackend>();

@@ -1,10 +1,10 @@
 # =============================================================================
-# TentaCLAW OS — CLAWtopus Bashrc
+# TentaCLAW OS — TentaCLAW Bashrc
 # =============================================================================
-# Custom bash configuration with CLAWtopus personality.
+# Custom bash configuration with TentaCLAW personality.
 # Source this file or copy to /etc/skel/.bashrc for new users.
 #
-# CLAWtopus says: "Your terminal looks boring. Let me fix that."
+# TentaCLAW says: "Your terminal looks boring. Let me fix that."
 # =============================================================================
 
 # Colors
@@ -113,8 +113,8 @@ cluster() {
     models
 }
 
-# CLAWtopus greeting
-clawtopus_greet() {
+# TentaCLAW greeting
+tentaclaw_greet() {
     # Only on interactive shells
     if [ -z "$CLAWTOUS_SILENT" ] && [ -t 0 ]; then
         local greetings=(
@@ -189,7 +189,7 @@ fi
 # =============================================================================
 
 # Show greeting on new terminal
-clawtopus_greet
+tentaclaw_greet
 
 # =============================================================================
 # Completion

@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\agents.ts
 // AI Agent Runtime for TentaCLAW
-// CLAWtopus says: "Agents? I'll orchestrate those with my eight arms."
+// TentaCLAW says: "Agents? I'll orchestrate those with my eight arms."
 
 import {
     getAllNodes,

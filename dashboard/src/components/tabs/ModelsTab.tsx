@@ -3,7 +3,7 @@ import { useClusterStore } from '@/stores/cluster';
 import { useDragStore } from '@/hooks/useDragDrop';
 import { api } from '@/lib/api';
 import type { ModelDistribution } from '@/lib/types';
-import { CLAWtopusTips } from '@/components/ui/CLAWtopusTips';
+import { TentaCLAWTips } from '@/components/ui/TentaCLAWTips';
 import { emptyStateTips } from '@/lib/personality';
 
 /* ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-12 gap-2">
       <span className="text-2xl opacity-20">🧠</span>
-      <CLAWtopusTips tip={emptyStateTips.models} />
+      <TentaCLAWTips tip={emptyStateTips.models} />
     </div>
   );
 }

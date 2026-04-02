@@ -8,7 +8,7 @@
  *   - YAML-based operational playbooks
  *   - 5 autonomy levels (manual → fully autonomous)
  *
- * CLAWtopus says: "Eight arms, zero human intervention required."
+ * TentaCLAW says: "Eight arms, zero human intervention required."
  */
 
 // =============================================================================

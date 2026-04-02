@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\benchmark-engine.ts
 // Built-In Model Benchmarking Engine
-// CLAWtopus says: "Numbers don't lie. Show me what your cluster can do."
+// TentaCLAW says: "Numbers don't lie. Show me what your cluster can do."
 
 import { getDb } from './db';
 import { percentile } from './profiler';

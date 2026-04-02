@@ -9,7 +9,7 @@
  *
  * Required for: EU GDPR, EU AI Act, China data localization, HIPAA data residency.
  *
- * CLAWtopus says: "Your data stays where you tell it to. No tentacle crosses borders without permission."
+ * TentaCLAW says: "Your data stays where you tell it to. No tentacle crosses borders without permission."
  */
 
 import { getAllNodes } from './db';

@@ -55,7 +55,7 @@ function Write-Banner {
     Write-Host ""
     Write-Host "$Purple$Bold          Eight arms. One mind. Zero compromises.$Reset"
     Write-Host ""
-    Write-Host "$Dim          CLAWtopus ASCII mascot:$Reset"
+    Write-Host "$Dim          TentaCLAW ASCII mascot:$Reset"
     Write-Host "$Teal"
     Write-Host "                      ,--."
     Write-Host "                     {    }"

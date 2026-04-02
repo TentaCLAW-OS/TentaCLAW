@@ -7,7 +7,7 @@
 #   export TF_VAR_aws_region="us-west-2"
 #   export TF_VAR_worker_count=5
 #
-# CLAWtopus says: "Variables are like tentacles -- flexible and far-reaching."
+# TentaCLAW says: "Variables are like tentacles -- flexible and far-reaching."
 # =============================================================================
 
 # -----------------------------------------------------------------------------

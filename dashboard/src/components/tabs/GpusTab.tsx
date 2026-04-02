@@ -1,7 +1,7 @@
 import { useClusterStore } from '@/stores/cluster';
 import type { GpuStats, ClusterNode } from '@/lib/types';
 import { formatTemp } from '@/lib/format';
-import { CLAWtopusTips } from '@/components/ui/CLAWtopusTips';
+import { TentaCLAWTips } from '@/components/ui/TentaCLAWTips';
 import { emptyStateTips } from '@/lib/personality';
 
 /* ── temperature colour mapping (matches GpuChip) ── */
@@ -111,7 +111,7 @@ export function GpusTab() {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-2" style={{ animation: 'slideUp 0.4s ease-out both' }}>
         <span className="text-2xl opacity-20">🖥️</span>
-        <CLAWtopusTips tip={emptyStateTips.gpus} />
+        <TentaCLAWTips tip={emptyStateTips.gpus} />
       </div>
     );
   }

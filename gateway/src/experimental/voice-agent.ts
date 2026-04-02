@@ -9,7 +9,7 @@
  *   - Conversation memory
  *   - Voice activity detection
  *
- * CLAWtopus says: "I speak with all eight arms. Sub-300ms. Per arm."
+ * TentaCLAW says: "I speak with all eight arms. Sub-300ms. Per arm."
  */
 
 // =============================================================================
@@ -236,9 +236,9 @@ export function getVoiceAgentTemplates(): Array<{ name: string; description: str
             name: 'Cluster Monitor',
             description: 'Voice interface for cluster health queries',
             config: {
-                name: 'CLAWtopus Voice',
+                name: 'TentaCLAW Voice',
                 stt: { backend: 'whisper-v3-turbo', streaming: true },
-                llm: { model: 'phi-4-mini', system_prompt: 'You are CLAWtopus, the TentaCLAW cluster assistant. Report GPU health, model status, and cluster metrics conversationally.', temperature: 0.5, max_tokens: 200 },
+                llm: { model: 'phi-4-mini', system_prompt: 'You are TentaCLAW, the TentaCLAW cluster assistant. Report GPU health, model status, and cluster metrics conversationally.', temperature: 0.5, max_tokens: 200 },
                 tts: { backend: 'kokoro', emotion: 'neutral', streaming: true },
                 pipeline: { target_latency_ms: 250, enable_interruption: true, enable_vad: true, conversation_memory_turns: 5, silence_timeout_ms: 5000 },
             },

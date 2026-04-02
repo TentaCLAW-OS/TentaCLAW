@@ -6,29 +6,29 @@
  * Talks to the TentaCLAW Gateway API. Pure Node.js, zero dependencies.
  *
  * Usage:
- *   clawtopus status                                  # Cluster overview
- *   clawtopus nodes                                   # List all nodes
- *   clawtopus models                                  # List cluster models
- *   clawtopus health                                  # Cluster health score
- *   clawtopus chat --model llama3.1:8b                # Interactive chat
- *   clawtopus deploy <model>                          # Deploy model to all nodes
- *   clawtopus deploy <model> <nodeId>                 # Deploy to specific node
- *   clawtopus alerts                                  # View cluster alerts
- *   clawtopus benchmarks                              # View benchmarks
- *   clawtopus tags list                               # List all tags
- *   clawtopus tags add <nodeId> <tag>                 # Tag a node
- *   clawtopus command <nodeId> <action> [--model m]   # Send command
- *   clawtopus flight-sheets                           # List flight sheets
- *   clawtopus apply <flightSheetId>                   # Apply a flight sheet
- *   clawtopus hub search <query>                      # Search CLAWHub registry
- *   clawtopus hub install @ns/pkg[@ver]               # Install a package
- *   clawtopus hub list                                # List installed packages
- *   clawtopus hub info @ns/pkg                        # Package details
- *   clawtopus hub publish                             # Publish from clawhub.yaml
- *   clawtopus hub trending                            # Trending packages
- *   clawtopus hub star @ns/pkg                        # Star a package
- *   clawtopus hub init --type agent                   # Create clawhub.yaml
- *   clawtopus help                                    # Show help
+ *   tentaclaw status                                  # Cluster overview
+ *   tentaclaw nodes                                   # List all nodes
+ *   tentaclaw models                                  # List cluster models
+ *   tentaclaw health                                  # Cluster health score
+ *   tentaclaw chat --model llama3.1:8b                # Interactive chat
+ *   tentaclaw deploy <model>                          # Deploy model to all nodes
+ *   tentaclaw deploy <model> <nodeId>                 # Deploy to specific node
+ *   tentaclaw alerts                                  # View cluster alerts
+ *   tentaclaw benchmarks                              # View benchmarks
+ *   tentaclaw tags list                               # List all tags
+ *   tentaclaw tags add <nodeId> <tag>                 # Tag a node
+ *   tentaclaw command <nodeId> <action> [--model m]   # Send command
+ *   tentaclaw flight-sheets                           # List flight sheets
+ *   tentaclaw apply <flightSheetId>                   # Apply a flight sheet
+ *   tentaclaw hub search <query>                      # Search CLAWHub registry
+ *   tentaclaw hub install @ns/pkg[@ver]               # Install a package
+ *   tentaclaw hub list                                # List installed packages
+ *   tentaclaw hub info @ns/pkg                        # Package details
+ *   tentaclaw hub publish                             # Publish from clawhub.yaml
+ *   tentaclaw hub trending                            # Trending packages
+ *   tentaclaw hub star @ns/pkg                        # Star a package
+ *   tentaclaw hub init --type agent                   # Create clawhub.yaml
+ *   tentaclaw help                                    # Show help
  */
 
 import * as http from 'http';
@@ -55,7 +55,7 @@ const C = {
 };
 
 // =============================================================================
-// CLAWtopus Personality — contextual quips
+// TentaCLAW Personality — contextual quips
 // =============================================================================
 
 const personality = {
@@ -426,8 +426,8 @@ function handleConnectionError(err: unknown, baseUrl: string): void {
             console.error(C.dim('      cd gateway && npm run dev'));
             console.error('');
             console.error('    Or specify a different gateway:');
-            console.error(C.dim('      clawtopus status --gateway http://192.168.1.100:8080'));
-            console.error(C.dim('      TENTACLAW_GATEWAY=http://host:port clawtopus status'));
+            console.error(C.dim('      tentaclaw status --gateway http://192.168.1.100:8080'));
+            console.error(C.dim('      TENTACLAW_GATEWAY=http://host:port tentaclaw status'));
             console.error('');
             return;
         }
@@ -528,7 +528,7 @@ interface FlightSheet {
 // ASCII Art
 // =============================================================================
 
-const CLAWTOPUS_FACE = [
+const MASCOT_FACE = [
     C.cyan('       .-\'"\'-.      '),
     C.cyan('      /       \\     '),
     C.purple('     |  ') + C.green('O') + C.purple('   ') + C.green('O') + C.purple('  |    '),
@@ -941,7 +941,7 @@ async function cmdApply(gateway: string, flightSheetId: string): Promise<void> {
 }
 
 // =============================================================================
-// New Commands — v0.2.0 CLAWtopus
+// New Commands — v0.2.0 TentaCLAW
 // =============================================================================
 
 async function cmdModels(gateway: string): Promise<void> {
@@ -951,7 +951,7 @@ async function cmdModels(gateway: string): Promise<void> {
     if (models.length === 0) {
         console.log('');
         console.log(C.yellow('  No models loaded on the cluster.'));
-        console.log(C.dim('  Deploy one: clawtopus deploy llama3.1:8b'));
+        console.log(C.dim('  Deploy one: tentaclaw deploy llama3.1:8b'));
         console.log('');
         console.log(personalityLine('idle'));
         console.log('');
@@ -1126,7 +1126,7 @@ async function cmdBenchmarks(gateway: string): Promise<void> {
     if (data.length === 0) {
         console.log('');
         console.log(C.yellow('  No benchmarks recorded yet.'));
-        console.log(C.dim('  Run one: clawtopus command <nodeId> benchmark --model llama3.1:8b'));
+        console.log(C.dim('  Run one: tentaclaw command <nodeId> benchmark --model llama3.1:8b'));
         console.log('');
         return;
     }
@@ -1170,7 +1170,7 @@ async function cmdTags(gateway: string, positional: string[], _flags: Record<str
         if (data.length === 0) {
             console.log('');
             console.log(C.yellow('  No tags defined.'));
-            console.log(C.dim('  Add one: clawtopus tags add <nodeId> <tag>'));
+            console.log(C.dim('  Add one: tentaclaw tags add <nodeId> <tag>'));
             console.log('');
             return;
         }
@@ -1189,7 +1189,7 @@ async function cmdTags(gateway: string, positional: string[], _flags: Record<str
         const nodeId = positional[1];
         const tag = positional[2];
         if (!nodeId || !tag) {
-            console.error(C.red('  \u2718 Usage: clawtopus tags add <nodeId> <tag>'));
+            console.error(C.red('  \u2718 Usage: tentaclaw tags add <nodeId> <tag>'));
             process.exit(1);
         }
         await apiPost(gateway, `/api/v1/nodes/${encodeURIComponent(nodeId)}/tags`, { tags: [tag] });
@@ -1200,7 +1200,7 @@ async function cmdTags(gateway: string, positional: string[], _flags: Record<str
     if (sub === 'nodes') {
         const tag = positional[1];
         if (!tag) {
-            console.error(C.red('  \u2718 Usage: clawtopus tags nodes <tag>'));
+            console.error(C.red('  \u2718 Usage: tentaclaw tags nodes <tag>'));
             process.exit(1);
         }
         const nodes = await apiGet(gateway, `/api/v1/tags/${encodeURIComponent(tag)}/nodes`) as NodeWithStats[];
@@ -1840,7 +1840,7 @@ async function cmdWatchdog(gateway: string, positional: string[]): Promise<void>
     if (sub === 'node') {
         const nodeId = positional[1];
         if (!nodeId) {
-            console.error(C.red('  Usage: clawtopus watchdog node <nodeId>'));
+            console.error(C.red('  Usage: tentaclaw watchdog node <nodeId>'));
             process.exit(1);
         }
         const data = await apiGet(gateway, `/api/v1/nodes/${encodeURIComponent(nodeId)}/watchdog`) as any[];
@@ -1862,7 +1862,7 @@ async function cmdWatchdog(gateway: string, positional: string[]): Promise<void>
         return;
     }
 
-    console.error(C.red('  Usage: clawtopus watchdog [status|events|node <id>]'));
+    console.error(C.red('  Usage: tentaclaw watchdog [status|events|node <id>]'));
 }
 
 async function cmdNotify(gateway: string, positional: string[], flags: Record<string, string>): Promise<void> {
@@ -1874,8 +1874,8 @@ async function cmdNotify(gateway: string, positional: string[], flags: Record<st
         if (data.length === 0) {
             console.log(C.yellow('  No notification channels configured.'));
             console.log(C.dim('  Add one:'));
-            console.log(C.dim('    clawtopus notify add telegram --name alerts --bot-token TOKEN --chat-id CHATID'));
-            console.log(C.dim('    clawtopus notify add discord --name alerts --webhook URL'));
+            console.log(C.dim('    tentaclaw notify add telegram --name alerts --bot-token TOKEN --chat-id CHATID'));
+            console.log(C.dim('    tentaclaw notify add discord --name alerts --webhook URL'));
         } else {
             console.log('  ' + C.purple(C.bold('Notification Channels')));
             console.log('');
@@ -1892,7 +1892,7 @@ async function cmdNotify(gateway: string, positional: string[], flags: Record<st
         const type = positional[1];
         const name = flags['name'] || type || 'default';
         if (!type || !['telegram', 'discord', 'webhook'].includes(type)) {
-            console.error(C.red('  Usage: clawtopus notify add <telegram|discord|webhook> --name NAME [options]'));
+            console.error(C.red('  Usage: tentaclaw notify add <telegram|discord|webhook> --name NAME [options]'));
             process.exit(1);
         }
         let config: Record<string, unknown> = {};
@@ -1923,7 +1923,7 @@ async function cmdNotify(gateway: string, positional: string[], flags: Record<st
     if (sub === 'test') {
         const channelId = positional[1];
         if (!channelId) {
-            console.error(C.red('  Usage: clawtopus notify test <channelId>'));
+            console.error(C.red('  Usage: tentaclaw notify test <channelId>'));
             process.exit(1);
         }
         const result = await apiPost(gateway, '/api/v1/notifications/test', { channel_id: channelId }) as { status: string };
@@ -1934,7 +1934,7 @@ async function cmdNotify(gateway: string, positional: string[], flags: Record<st
     if (sub === 'remove') {
         const channelId = positional[1];
         if (!channelId) {
-            console.error(C.red('  Usage: clawtopus notify remove <channelId>'));
+            console.error(C.red('  Usage: tentaclaw notify remove <channelId>'));
             process.exit(1);
         }
         await apiGet(gateway, ''); // dummy - need apiDelete
@@ -2050,7 +2050,7 @@ async function cmdExplain(gateway: string): Promise<void> {
         console.log('  ' + C.yellow('Tip: ') + 'Some nodes are offline. Check their power and network.');
     }
     if (stats.error_rate_pct > 5) {
-        console.log('  ' + C.yellow('Tip: ') + 'Error rate is high. Run `clawtopus doctor` to diagnose.');
+        console.log('  ' + C.yellow('Tip: ') + 'Error rate is high. Run `tentaclaw doctor` to diagnose.');
     }
     console.log('');
 }
@@ -2095,7 +2095,7 @@ async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
 
     if (!check.fits_anywhere) {
         console.log('  ' + C.red('\u2718') + ` ${model} needs ~${check.estimated_vram_mb}MB VRAM but no node has enough free.`);
-        console.log('  ' + C.dim('Try removing unused models first: clawtopus optimize'));
+        console.log('  ' + C.dim('Try removing unused models first: tentaclaw optimize'));
         console.log('');
         return;
     }
@@ -2120,7 +2120,7 @@ async function cmdSmartDeploy(gateway: string, model: string): Promise<void> {
             console.log('  ' + C.green('\u2714') + ` Queued on ${C.white(d.hostname)}`);
         }
         console.log('');
-        console.log('  ' + C.dim('Model will start downloading. Check progress: clawtopus models'));
+        console.log('  ' + C.dim('Model will start downloading. Check progress: tentaclaw models'));
         console.log('');
         console.log(personalityLine('deploy'));
     } else {
@@ -2191,7 +2191,7 @@ async function cmdMaintenance(gateway: string, positional: string[]): Promise<vo
     const action = positional[1] || 'on';
 
     if (!nodeId) {
-        console.error(C.red('  Usage: clawtopus maintenance <nodeId> [on|off]'));
+        console.error(C.red('  Usage: tentaclaw maintenance <nodeId> [on|off]'));
         process.exit(1);
     }
 
@@ -2281,7 +2281,7 @@ async function cmdAlias(gateway: string, positional: string[], flags: Record<str
         const alias = positional[1];
         const target = positional[2];
         if (!alias || !target) {
-            console.error(C.red('  Usage: clawtopus alias set <alias> <target> [--fallback model1,model2]'));
+            console.error(C.red('  Usage: tentaclaw alias set <alias> <target> [--fallback model1,model2]'));
             process.exit(1);
         }
         const fallbacks = (flags['fallback'] || '').split(',').filter(Boolean);
@@ -2328,7 +2328,7 @@ async function cmdApiKey(gateway: string, positional: string[], flags: Record<st
         console.log('');
         if (keys.length === 0) {
             console.log(C.dim('  No API keys. Create one:'));
-            console.log(C.cyan('    clawtopus apikey create --name "my-app"'));
+            console.log(C.cyan('    tentaclaw apikey create --name "my-app"'));
         } else {
             console.log('  ' + C.purple(C.bold('API Keys')) + C.dim(` (${keys.length})`));
             console.log('');
@@ -2372,7 +2372,7 @@ async function cmdApiKey(gateway: string, positional: string[], flags: Record<st
 
     if (sub === 'revoke') {
         const keyId = positional[1];
-        if (!keyId) { console.error(C.red('  Usage: clawtopus apikey revoke <id>')); process.exit(1); }
+        if (!keyId) { console.error(C.red('  Usage: tentaclaw apikey revoke <id>')); process.exit(1); }
         await apiGet(gateway, ''); // placeholder - need delete method
         console.log('  ' + C.green('\u2714') + ' Key revoked');
         return;
@@ -2433,7 +2433,7 @@ async function cmdAnalytics(gateway: string, flags: Record<string, string>): Pro
 
     if (data.total_requests === 0) {
         console.log('  ' + C.dim('No inference requests yet. Try:'));
-        console.log('  ' + C.cyan('  clawtopus chat --model dolphin-mistral:latest'));
+        console.log('  ' + C.cyan('  tentaclaw chat --model dolphin-mistral:latest'));
         console.log('');
     }
 }
@@ -2579,9 +2579,9 @@ function formatSize(bytes: number): string {
 async function cmdSearch(positional: string[], flags: Record<string, string>): Promise<void> {
     const query = positional.join(' ').trim();
     if (!query) {
-        console.error(C.red('  Usage: clawtopus search <query> [--source ollama|hf|all] [--limit N]'));
-        console.error(C.dim('  Example: clawtopus search llama'));
-        console.error(C.dim('  Example: clawtopus search codellama --source hf'));
+        console.error(C.red('  Usage: tentaclaw search <query> [--source ollama|hf|all] [--limit N]'));
+        console.error(C.dim('  Example: tentaclaw search llama'));
+        console.error(C.dim('  Example: tentaclaw search codellama --source hf'));
         process.exit(1);
     }
 
@@ -2619,7 +2619,7 @@ async function cmdSearch(positional: string[], flags: Record<string, string>): P
                 );
             }
             console.log('');
-            console.log('  ' + C.dim('Deploy: ') + C.cyan('clawtopus deploy <model>'));
+            console.log('  ' + C.dim('Deploy: ') + C.cyan('tentaclaw deploy <model>'));
         }
         console.log('');
     }
@@ -2680,24 +2680,24 @@ async function cmdBrowseTags(): Promise<void> {
 
     for (const cat of categories) {
         console.log('  ' + C.cyan(cat.icon) + ' ' + padRight(C.white(C.bold(cat.label)), 28) + C.dim(cat.desc));
-        console.log('    ' + C.dim('Browse: ') + C.cyan('clawtopus keywords ' + cat.tag));
+        console.log('    ' + C.dim('Browse: ') + C.cyan('tentaclaw keywords ' + cat.tag));
     }
 
     console.log('');
     console.log('  ' + C.dim('Or search directly:'));
-    console.log('    ' + C.cyan('clawtopus search llama'));
-    console.log('    ' + C.cyan('clawtopus search mistral --source ollama'));
-    console.log('    ' + C.cyan('clawtopus keywords text-generation --limit 20'));
+    console.log('    ' + C.cyan('tentaclaw search llama'));
+    console.log('    ' + C.cyan('tentaclaw search mistral --source ollama'));
+    console.log('    ' + C.cyan('tentaclaw keywords text-generation --limit 20'));
     console.log('');
 }
 
 async function cmdKeywords(positional: string[], flags: Record<string, string>): Promise<void> {
     const keyword = positional.join(' ').trim();
     if (!keyword) {
-        console.error(C.red('  Usage: clawtopus keywords <tag/pipeline> [--limit N] [--sort downloads|likes|trending]'));
-        console.error(C.dim('  Example: clawtopus keywords text-generation'));
-        console.error(C.dim('  Example: clawtopus keywords gguf --limit 20'));
-        console.error(C.dim('  Run "clawtopus tags" to see available categories'));
+        console.error(C.red('  Usage: tentaclaw keywords <tag/pipeline> [--limit N] [--sort downloads|likes|trending]'));
+        console.error(C.dim('  Example: tentaclaw keywords text-generation'));
+        console.error(C.dim('  Example: tentaclaw keywords gguf --limit 20'));
+        console.error(C.dim('  Run "tentaclaw tags" to see available categories'));
         process.exit(1);
     }
 
@@ -2716,7 +2716,7 @@ async function cmdKeywords(positional: string[], flags: Record<string, string>):
 
         if (models.length === 0) {
             console.log('  ' + C.dim('No models found for tag: ' + keyword));
-            console.log('  ' + C.dim('Try: clawtopus tags'));
+            console.log('  ' + C.dim('Try: tentaclaw tags'));
             console.log('');
             return;
         }
@@ -2747,8 +2747,8 @@ async function cmdKeywords(positional: string[], flags: Record<string, string>):
 async function cmdModelInfo(positional: string[]): Promise<void> {
     const modelId = positional.join('/').trim();
     if (!modelId || !modelId.includes('/')) {
-        console.error(C.red('  Usage: clawtopus info <org/model>'));
-        console.error(C.dim('  Example: clawtopus info meta-llama/Llama-3.1-8B-Instruct'));
+        console.error(C.red('  Usage: tentaclaw info <org/model>'));
+        console.error(C.dim('  Example: tentaclaw info meta-llama/Llama-3.1-8B-Instruct'));
         process.exit(1);
     }
 
@@ -2860,7 +2860,7 @@ function cmdHelp(): void {
     console.log('');
 
     section('SMART');
-    cmd('optimize', 'CLAWtopus optimizes your cluster');
+    cmd('optimize', 'TentaCLAW optimizes your cluster');
     cmd('explain', 'Plain English cluster summary');
     cmd('fix', 'Auto-fix cluster issues');
     cmd('auto', 'Full auto mode \u2014 let TentaCLAW decide');
@@ -2902,18 +2902,18 @@ function cmdHelp(): void {
 
 // Random startup tips — show 20% of the time
 const TIPS = [
-    'Run `clawtopus top` for a real-time cluster monitor.',
-    'Use `clawtopus backends` to see what inference engines each node runs.',
-    'Try `clawtopus joke` when you need a laugh.',
+    'Run `tentaclaw top` for a real-time cluster monitor.',
+    'Use `tentaclaw backends` to see what inference engines each node runs.',
+    'Try `tentaclaw joke` when you need a laugh.',
     'Set TENTACLAW_GATEWAY to avoid passing --gateway every time.',
-    'Use `clawtopus drain <node>` to safely take a node offline.',
-    'Run `clawtopus doctor` to auto-diagnose cluster issues.',
-    'Use `clawtopus fortune` for octopus wisdom.',
-    'Deploy BitNet models on CPU-only nodes with `clawtopus deploy bitnet-b1.58`.',
-    'Model aliases: `gpt-4` can route to any model you want. Try `clawtopus alias`.',
+    'Use `tentaclaw drain <node>` to safely take a node offline.',
+    'Run `tentaclaw doctor` to auto-diagnose cluster issues.',
+    'Use `tentaclaw fortune` for octopus wisdom.',
+    'Deploy BitNet models on CPU-only nodes with `tentaclaw deploy bitnet-b1.58`.',
+    'Model aliases: `gpt-4` can route to any model you want. Try `tentaclaw alias`.',
     'The `tentaclaw auto mode lets TentaCLAW decide everything. Trust the octopus.',
-    'Browse CLAWHub with `clawtopus hub trending` — see what the family is building.',
-    'Publish to CLAWHub: `clawtopus hub init && clawtopus hub publish`. Join the family.',
+    'Browse CLAWHub with `tentaclaw hub trending` — see what the family is building.',
+    'Publish to CLAWHub: `tentaclaw hub init && tentaclaw hub publish`. Join the family.',
 ];
 
 async function main(): Promise<void> {
@@ -2944,7 +2944,7 @@ async function main(): Promise<void> {
             if (!nodeId) {
                 console.error('');
                 console.error(C.red('  \u2718 Missing node ID'));
-                console.error(C.dim('  Usage: clawtopus node <nodeId>'));
+                console.error(C.dim('  Usage: tentaclaw node <nodeId>'));
                 console.error('');
                 process.exit(1);
             }
@@ -2957,8 +2957,8 @@ async function main(): Promise<void> {
             if (!model) {
                 console.error('');
                 console.error(C.red('  \u2718 Missing model name'));
-                console.error(C.dim('  Usage: clawtopus deploy <model>'));
-                console.error(C.dim('  Example: clawtopus deploy llama3.1:8b'));
+                console.error(C.dim('  Usage: tentaclaw deploy <model>'));
+                console.error(C.dim('  Example: tentaclaw deploy llama3.1:8b'));
                 console.error('');
                 process.exit(1);
             }
@@ -2978,8 +2978,8 @@ async function main(): Promise<void> {
             if (!nodeId || !action) {
                 console.error('');
                 console.error(C.red('  \u2718 Missing arguments'));
-                console.error(C.dim('  Usage: clawtopus command <nodeId> <action> [--model <m>] [--gpu <n>]'));
-                console.error(C.dim('  Example: clawtopus command NODE-001 install_model --model llama3.1:8b'));
+                console.error(C.dim('  Usage: tentaclaw command <nodeId> <action> [--model <m>] [--gpu <n>]'));
+                console.error(C.dim('  Example: tentaclaw command NODE-001 install_model --model llama3.1:8b'));
                 console.error('');
                 process.exit(1);
             }
@@ -3071,12 +3071,12 @@ async function main(): Promise<void> {
                 'I told my CPU a joke about inference. It didn\'t get it — not enough context.',
                 'What\'s a GPU\'s favorite music? Heavy metal. Obviously.',
                 'Why don\'t GPUs ever get lonely? They always work in parallel.',
-                'My VRAM is full but my heart is empty. — CLAWtopus, 3am',
+                'My VRAM is full but my heart is empty. — TentaCLAW, 3am',
                 'I asked the model for advice. It said "temperature 0". Cold.',
                 'How many arms does it take to manage a GPU cluster? Eight. Obviously.',
                 'knock knock. Who\'s there? OOM. OOM w— *process killed*',
                 'A GPU walks into a bar. The bartender says "you look hot." The GPU says "always."',
-                'Per-token pricing is a scam. This is not a joke. — CLAWtopus',
+                'Per-token pricing is a scam. This is not a joke. — TentaCLAW',
             ];
             console.log('');
             console.log('  ' + C.teal('\uD83D\uDC19') + ' ' + C.white(jokes[Math.floor(Math.random() * jokes.length)]));
@@ -3100,7 +3100,7 @@ async function main(): Promise<void> {
                 'The tentacle that reaches furthest finds the coolest GPU.',
             ];
             console.log('');
-            console.log('  ' + C.purple('\u2728') + ' ' + C.dim('CLAWtopus fortune:'));
+            console.log('  ' + C.purple('\u2728') + ' ' + C.dim('TentaCLAW fortune:'));
             console.log('  ' + C.white(fortunes[Math.floor(Math.random() * fortunes.length)]));
             console.log('');
             break;
@@ -3114,7 +3114,7 @@ async function main(): Promise<void> {
                 '    o/\n    /|\n    / \\',
             ];
             console.log('');
-            console.log('  ' + C.teal('\uD83D\uDC19 CLAWtopus is dancing!'));
+            console.log('  ' + C.teal('\uD83D\uDC19 TentaCLAW is dancing!'));
             for (const frame of frames) {
                 console.log('');
                 for (const line of frame.split('\n')) {
@@ -3129,7 +3129,7 @@ async function main(): Promise<void> {
 
         case 'credits': {
             console.log('');
-            for (const line of CLAWTOPUS_FACE) {
+            for (const line of MASCOT_FACE) {
                 console.log('  ' + line);
             }
             console.log('');
@@ -3137,7 +3137,7 @@ async function main(): Promise<void> {
             console.log('  ' + C.purple(C.italic('Eight arms. One mind. Zero compromises.')));
             console.log('');
             console.log('  ' + padRight(C.purple('Created by'), 16) + C.white('TentaCLAW-OS'));
-            console.log('  ' + padRight(C.purple('Mascot'), 16) + C.white('CLAWtopus \uD83D\uDC19'));
+            console.log('  ' + padRight(C.purple('Mascot'), 16) + C.white('TentaCLAW \uD83D\uDC19'));
             console.log('  ' + padRight(C.purple('License'), 16) + C.white('MIT'));
             console.log('  ' + padRight(C.purple('Website'), 16) + C.teal('www.tentaclaw.io'));
             console.log('  ' + padRight(C.purple('GitHub'), 16) + C.teal('github.com/TentaCLAW-OS'));
@@ -3209,8 +3209,8 @@ async function main(): Promise<void> {
             if (!sheetId) {
                 console.error('');
                 console.error(C.red('  \u2718 Missing flight sheet ID'));
-                console.error(C.dim('  Usage: clawtopus apply <flightSheetId>'));
-                console.error(C.dim('  Run "clawtopus flight-sheets" to see available IDs.'));
+                console.error(C.dim('  Usage: tentaclaw apply <flightSheetId>'));
+                console.error(C.dim('  Run "tentaclaw flight-sheets" to see available IDs.'));
                 console.error('');
                 process.exit(1);
             }
@@ -3225,7 +3225,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
             console.log('  ' + C.teal(C.bold('NODE GROUPS')));
             console.log('');
             if (groups.length === 0) {
-                console.log('  ' + C.dim('No groups. Create one: clawtopus groups create <name>'));
+                console.log('  ' + C.dim('No groups. Create one: tentaclaw groups create <name>'));
             } else {
                 for (const g of groups) {
                     console.log('  ' + C.white(g.name) + C.dim(' (' + g.member_count + ' nodes) ID: ' + g.id));
@@ -3279,7 +3279,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
             console.log('  ' + C.teal(C.bold('IDLE NODES')) + C.dim(' (< 10% GPU utilization)'));
             console.log('');
             if (idle.length === 0) {
-                console.log('  ' + C.green('All nodes are busy. CLAWtopus approves.'));
+                console.log('  ' + C.green('All nodes are busy. TentaCLAW approves.'));
             } else {
                 for (const n of idle) {
                     console.log('  ' + padRight(C.white(n.hostname), 25) + C.dim(n.avg_util + '% util') + C.dim('  (' + n.gpu_count + ' GPUs)'));
@@ -3355,11 +3355,11 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
         }
 
         case 'alert-rules': {
-            const rules = await apiGet(gateway, '/api/v1/alert-rules') as Array<{ id: string; name: string; metric: string; operator: string; threshold: number; severity: string; enabled: number }>;
+            const { rules } = await apiGet(gateway, '/api/v1/alert-rules') as { rules: Array<{ id: string; name: string; metric: string; operator: string; threshold: number; severity: string; enabled: number }> };
             console.log('');
             console.log('  ' + C.teal(C.bold('ALERT RULES')));
             console.log('');
-            for (const r of rules) {
+            for (const r of (rules || [])) {
                 const status = r.enabled ? C.green('enabled') : C.red('disabled');
                 const sevColor = r.severity === 'critical' ? C.red : C.yellow;
                 console.log('  ' + padRight(C.white(r.name), 30) + padRight(sevColor(r.severity), 12) + C.dim(r.metric + ' ' + r.operator + ' ' + r.threshold) + '  ' + status);
@@ -3414,7 +3414,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
 
         case 'estimate': {
             const model = parsed.positional[0];
-            if (!model) { console.error(C.red('  Usage: clawtopus estimate <model> [--quantization Q4_K_M]')); process.exit(1); }
+            if (!model) { console.error(C.red('  Usage: tentaclaw estimate <model> [--quantization Q4_K_M]')); process.exit(1); }
             const quant = parsed.flags['quantization'] || parsed.flags['quant'] || 'Q4_K_M';
             const est = await apiGet(gateway, `/api/v1/models/estimate-vram?model=${encodeURIComponent(model)}&quantization=${encodeURIComponent(quant)}`) as { model: string; quantization: string; format: string; recommended_backends: string[]; vram: { model_weights_mb: number; kv_cache_mb: number; total_mb: number } };
             console.log('');
@@ -3432,7 +3432,8 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
 
         case 'audit': {
             const limit = parsed.flags['limit'] || '20';
-            const events = await apiGet(gateway, `/api/v1/audit?limit=${limit}`) as Array<{ event_type: string; actor: string; ip_address: string; detail: string; created_at: string }>;
+            const auditData = await apiGet(gateway, `/api/v1/audit?limit=${limit}`) as { audit_log: Array<{ event_type: string; actor: string; ip_address: string; detail: string; created_at: string }> };
+            const events = auditData.audit_log || [];
             console.log('');
             console.log('  ' + C.teal(C.bold('AUDIT LOG')));
             console.log('');
@@ -3472,7 +3473,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     const method = parsed.flags['method'] || 'qlora';
                     const output = parsed.flags['output'] || 'my-finetuned-model';
                     if (!base || !data) {
-                        console.error(C.red('  Usage: clawtopus finetune create --base <model> --data <path> [--method qlora] [--output name]'));
+                        console.error(C.red('  Usage: tentaclaw finetune create --base <model> --data <path> [--method qlora] [--output name]'));
                         process.exit(1);
                     }
                     console.log('');
@@ -3483,7 +3484,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     console.log('  ' + C.dim('Output:     ') + C.white(output));
                     const job = await apiPost(gateway, '/api/v1/finetune/jobs', { baseModel: base, dataset: data, method, outputModel: output }) as { id: string };
                     console.log('  ' + C.green('\u2714') + ' Job created: ' + C.white(job.id));
-                    console.log('  ' + C.dim('"Your data. Your model. Your hardware." \u2014 CLAWtopus'));
+                    console.log('  ' + C.dim('"Your data. Your model. Your hardware." \u2014 TentaCLAW'));
                     console.log('');
                     break;
                 }
@@ -3494,7 +3495,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     console.log('  ' + C.teal(C.bold('FINE-TUNE JOBS')));
                     console.log('');
                     if (jobs.length === 0) {
-                        console.log('  ' + C.dim('No jobs. Start one: clawtopus finetune create --base llama3.1:8b --data ./data.jsonl'));
+                        console.log('  ' + C.dim('No jobs. Start one: tentaclaw finetune create --base llama3.1:8b --data ./data.jsonl'));
                     }
                     for (const j of jobs) {
                         const statusColor = j.status === 'completed' ? C.green : j.status === 'training' ? C.yellow : j.status === 'failed' ? C.red : C.dim;
@@ -3508,7 +3509,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                 }
                 case 'cancel': {
                     const jobId = parsed.positional[1];
-                    if (!jobId) { console.error(C.red('  Usage: clawtopus finetune cancel <job-id>')); process.exit(1); }
+                    if (!jobId) { console.error(C.red('  Usage: tentaclaw finetune cancel <job-id>')); process.exit(1); }
                     await apiPost(gateway, `/api/v1/finetune/jobs/${encodeURIComponent(jobId)}/cancel`, {});
                     console.log('  ' + C.yellow('\u26A0') + ' Job ' + C.white(jobId) + ' cancelled');
                     break;
@@ -3531,12 +3532,12 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                 case 'run': {
                     const model = parsed.flags['model'] || parsed.positional[1];
                     const suite = parsed.flags['suite'] || 'standard';
-                    if (!model) { console.error(C.red('  Usage: clawtopus benchmark run --model <name> [--suite standard]')); process.exit(1); }
+                    if (!model) { console.error(C.red('  Usage: tentaclaw benchmark run --model <name> [--suite standard]')); process.exit(1); }
                     console.log('');
                     console.log('  ' + C.teal('\uD83D\uDC19') + ' Running benchmark: ' + C.white(suite) + ' on ' + C.white(model));
                     const run = await apiPost(gateway, '/api/v1/benchmarks/run', { model, suite }) as { id: string };
                     console.log('  ' + C.green('\u2714') + ' Benchmark started: ' + C.white(run.id));
-                    console.log('  ' + C.dim('"Numbers don\'t lie." \u2014 CLAWtopus'));
+                    console.log('  ' + C.dim('"Numbers don\'t lie." \u2014 TentaCLAW'));
                     console.log('');
                     break;
                 }
@@ -3556,7 +3557,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                 case 'compare': {
                     const m1 = parsed.positional[1];
                     const m2 = parsed.positional[2];
-                    if (!m1 || !m2) { console.error(C.red('  Usage: clawtopus benchmark compare <model1> <model2>')); process.exit(1); }
+                    if (!m1 || !m2) { console.error(C.red('  Usage: tentaclaw benchmark compare <model1> <model2>')); process.exit(1); }
                     console.log('  ' + C.teal('\uD83D\uDC19') + ' Comparing ' + C.white(m1) + ' vs ' + C.white(m2) + '...');
                     console.log('  ' + C.dim('(Feature in progress — check dashboard for visual comparison)'));
                     break;
@@ -3578,10 +3579,10 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
             switch (sub) {
                 case 'create': {
                     const name = parsed.positional[1];
-                    if (!name) { console.error(C.red('  Usage: clawtopus namespace create <name>')); process.exit(1); }
+                    if (!name) { console.error(C.red('  Usage: tentaclaw namespace create <name>')); process.exit(1); }
                     const ns = await apiPost(gateway, '/api/v1/namespaces', { name }) as { name: string };
                     console.log('  ' + C.green('\u2714') + ' Namespace created: ' + C.white(ns.name));
-                    console.log('  ' + C.dim('"Every family has territories." \u2014 CLAWtopus'));
+                    console.log('  ' + C.dim('"Every family has territories." \u2014 TentaCLAW'));
                     break;
                 }
                 case 'list':
@@ -3598,7 +3599,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                 }
                 case 'delete': {
                     const name = parsed.positional[1];
-                    if (!name) { console.error(C.red('  Usage: clawtopus namespace delete <name>')); process.exit(1); }
+                    if (!name) { console.error(C.red('  Usage: tentaclaw namespace delete <name>')); process.exit(1); }
                     await apiPost(gateway, `/api/v1/namespaces/${encodeURIComponent(name)}/delete`, {}).catch(() => apiGet(gateway, `/api/v1/namespaces/${encodeURIComponent(name)}`));
                     console.log('  ' + C.green('\u2714') + ' Namespace deleted: ' + C.white(name));
                     break;
@@ -3618,7 +3619,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
         case 'apply': {
             const file = parsed.flags['f'] || parsed.flags['file'] || parsed.positional[0];
             if (!file) {
-                console.error(C.red('  Usage: clawtopus apply -f deployment.yaml'));
+                console.error(C.red('  Usage: tentaclaw apply -f deployment.yaml'));
                 process.exit(1);
             }
             console.log('');
@@ -3629,7 +3630,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                 const content = fs.readFileSync(file, 'utf-8');
                 const result = await apiPost(gateway, '/api/v2/deployments', JSON.parse(content)) as { name: string; status: string };
                 console.log('  ' + C.green('\u2714') + ' Deployment applied: ' + C.white(result.name));
-                console.log('  ' + C.dim('"You declare. I reconcile." \u2014 CLAWtopus'));
+                console.log('  ' + C.dim('"You declare. I reconcile." \u2014 TentaCLAW'));
             } catch (err) {
                 console.error('  ' + C.red('\u2718 Failed: ') + (err instanceof Error ? err.message : String(err)));
             }
@@ -3648,7 +3649,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                 const ready = d.status?.readyReplicas || 0;
                 console.log('  ' + padRight(C.white(d.metadata.name), 25) + padRight(C.dim(d.metadata.namespace), 15) + padRight(C.teal(d.spec.model), 25) + phaseColor(phase) + C.dim(' ' + ready + '/' + d.spec.replicas));
             }
-            if (deps.length === 0) console.log('  ' + C.dim('No deployments. Apply one: clawtopus apply -f deployment.yaml'));
+            if (deps.length === 0) console.log('  ' + C.dim('No deployments. Apply one: tentaclaw apply -f deployment.yaml'));
             console.log('');
             break;
         }
@@ -3661,7 +3662,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
             for (const a of adapters) {
                 console.log('  ' + padRight(C.white(a.name), 30) + padRight(C.dim(a.baseModel), 25) + C.dim(a.method + ' / ' + a.sizeMb + 'MB'));
             }
-            if (adapters.length === 0) console.log('  ' + C.dim('No adapters. Fine-tune one: clawtopus finetune create --base llama3.1:8b --data ./data.jsonl'));
+            if (adapters.length === 0) console.log('  ' + C.dim('No adapters. Fine-tune one: tentaclaw finetune create --base llama3.1:8b --data ./data.jsonl'));
             console.log('');
             break;
         }
@@ -3672,7 +3673,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
             console.log('  ' + C.teal(C.bold('COST INTELLIGENCE')));
             console.log('');
             if (!dashboard) {
-                console.log('  ' + C.dim('Cost tracking not available. Configure: clawtopus cost config'));
+                console.log('  ' + C.dim('Cost tracking not available. Configure: tentaclaw cost config'));
             } else {
                 const d = dashboard as any;
                 console.log('  ' + padRight(C.dim('Power draw'), 25) + C.white((d.current_power_watts || 0) + 'W'));
@@ -3687,7 +3688,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                 }
                 if (d.hardware_roi) {
                     console.log('');
-                    console.log('  ' + C.dim('"Per-token pricing is a scam. Here\'s the proof." \u2014 CLAWtopus'));
+                    console.log('  ' + C.dim('"Per-token pricing is a scam. Here\'s the proof." \u2014 TentaCLAW'));
                 }
             }
             console.log('');
@@ -3703,7 +3704,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     console.log('  ' + C.teal(C.bold('CLOUD BURST STATUS')));
                     console.log('');
                     if (!stats) {
-                        console.log('  ' + C.dim('Cloud burst not configured. Add providers: clawtopus burst add-provider'));
+                        console.log('  ' + C.dim('Cloud burst not configured. Add providers: tentaclaw burst add-provider'));
                     } else {
                         const s = stats as any;
                         console.log('  ' + padRight(C.dim('Total burst requests'), 25) + C.white(String(s.total_requests || 0)));
@@ -3788,7 +3789,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                 console.log('  ' + padRight(C.green('@tentaclaw/' + s.name), 40) + padRight(C.teal(s.vram), 8) + C.dim(s.desc));
             }
             console.log('');
-            console.log('  Install: ' + C.white('clawtopus hub install @tentaclaw/<stack-name>'));
+            console.log('  Install: ' + C.white('tentaclaw hub install @tentaclaw/<stack-name>'));
             console.log('');
             break;
         }
@@ -3802,7 +3803,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
         case 'version':
         case '--version':
         case '-v':
-            console.log('clawtopus-cli v' + CLI_VERSION);
+            console.log('tentaclaw-cli v' + CLI_VERSION);
             break;
 
         case 'backends': {
@@ -3827,7 +3828,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
 
         case 'drain': {
             const nodeId = parsed.positional[0];
-            if (!nodeId) { console.error(C.red('  Usage: clawtopus drain <nodeId>')); process.exit(1); }
+            if (!nodeId) { console.error(C.red('  Usage: tentaclaw drain <nodeId>')); process.exit(1); }
             console.log('');
             console.log('  ' + C.yellow('\u26A0') + ' Draining node ' + C.white(nodeId) + '...');
             await apiPost(gateway, `/api/v1/nodes/${encodeURIComponent(nodeId)}/maintenance`, { enabled: true });
@@ -3839,7 +3840,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
 
         case 'cordon': {
             const nodeId = parsed.positional[0];
-            if (!nodeId) { console.error(C.red('  Usage: clawtopus cordon <nodeId>')); process.exit(1); }
+            if (!nodeId) { console.error(C.red('  Usage: tentaclaw cordon <nodeId>')); process.exit(1); }
             await apiPost(gateway, `/api/v1/nodes/${encodeURIComponent(nodeId)}/maintenance`, { enabled: true });
             console.log('');
             console.log('  ' + C.yellow('\u26A0') + ' ' + C.white(nodeId) + ' cordoned — no new scheduling');
@@ -3849,7 +3850,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
 
         case 'uncordon': {
             const nodeId = parsed.positional[0];
-            if (!nodeId) { console.error(C.red('  Usage: clawtopus uncordon <nodeId>')); process.exit(1); }
+            if (!nodeId) { console.error(C.red('  Usage: tentaclaw uncordon <nodeId>')); process.exit(1); }
             await apiPost(gateway, `/api/v1/nodes/${encodeURIComponent(nodeId)}/maintenance`, { enabled: false });
             console.log('');
             console.log('  ' + C.green('\u2714') + ' ' + C.white(nodeId) + ' uncordoned — ready for scheduling');
@@ -3915,7 +3916,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     if (!query) {
                         console.error('');
                         console.error(C.red('  \u2718 Missing search query'));
-                        console.error(C.dim('  Usage: clawtopus hub search <query> [--type agent]'));
+                        console.error(C.dim('  Usage: tentaclaw hub search <query> [--type agent]'));
                         console.error('');
                         process.exit(1);
                     }
@@ -3943,7 +3944,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     if (!pkgSpec) {
                         console.error('');
                         console.error(C.red('  \u2718 Missing package name'));
-                        console.error(C.dim('  Usage: clawtopus hub install @ns/package[@version]'));
+                        console.error(C.dim('  Usage: tentaclaw hub install @ns/package[@version]'));
                         console.error('');
                         process.exit(1);
                     }
@@ -3978,7 +3979,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     console.log('  ' + C.teal(C.bold('INSTALLED PACKAGES')) + C.dim(' — ~/.tentaclaw/packages/'));
                     console.log('');
                     if (!fs.existsSync(packagesDir)) {
-                        console.log('  ' + C.dim('No packages installed yet. Run: clawtopus hub install @ns/package'));
+                        console.log('  ' + C.dim('No packages installed yet. Run: tentaclaw hub install @ns/package'));
                     } else {
                         const namespaces = fs.readdirSync(packagesDir).filter(f => fs.statSync(path.join(packagesDir, f)).isDirectory());
                         let count = 0;
@@ -4018,7 +4019,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     if (!pkgRef) {
                         console.error('');
                         console.error(C.red('  \u2718 Missing package name'));
-                        console.error(C.dim('  Usage: clawtopus hub info @ns/package'));
+                        console.error(C.dim('  Usage: tentaclaw hub info @ns/package'));
                         console.error('');
                         process.exit(1);
                     }
@@ -4060,7 +4061,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     if (!fs.existsSync(manifestFile)) {
                         console.error('');
                         console.error(C.red('  \u2718 No clawhub.yaml found in current directory'));
-                        console.error(C.dim('  Run "clawtopus hub init" to create one.'));
+                        console.error(C.dim('  Run "tentaclaw hub init" to create one.'));
                         console.error('');
                         process.exit(1);
                     }
@@ -4124,7 +4125,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     if (!starRef) {
                         console.error('');
                         console.error(C.red('  \u2718 Missing package name'));
-                        console.error(C.dim('  Usage: clawtopus hub star @ns/package'));
+                        console.error(C.dim('  Usage: tentaclaw hub star @ns/package'));
                         console.error('');
                         process.exit(1);
                     }
@@ -4182,7 +4183,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     console.log('');
                     console.log('  ' + C.dim('Next steps:'));
                     console.log('    1. Edit clawhub.yaml with your package details');
-                    console.log('    2. Run ' + C.teal('clawtopus hub publish') + ' to publish');
+                    console.log('    2. Run ' + C.teal('tentaclaw hub publish') + ' to publish');
                     console.log('');
                     break;
                 }
@@ -4195,7 +4196,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     console.log('');
                     console.log('  ' + C.cyan(C.bold('USAGE')));
                     console.log('');
-                    console.log('    clawtopus hub <command> [options]');
+                    console.log('    tentaclaw hub <command> [options]');
                     console.log('');
                     console.log('  ' + C.cyan(C.bold('COMMANDS')));
                     console.log('');
@@ -4216,14 +4217,14 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     console.log('  ' + C.cyan(C.bold('EXAMPLES')));
                     console.log('');
                     console.log(C.dim('    # Search for agents'));
-                    console.log('    clawtopus hub search "code review" --type agent');
+                    console.log('    tentaclaw hub search "code review" --type agent');
                     console.log('');
                     console.log(C.dim('    # Install a package'));
-                    console.log('    clawtopus hub install @tentaclaw/router-agent@1.0.0');
+                    console.log('    tentaclaw hub install @tentaclaw/router-agent@1.0.0');
                     console.log('');
                     console.log(C.dim('    # Publish your package'));
-                    console.log('    clawtopus hub init --type agent');
-                    console.log('    clawtopus hub publish');
+                    console.log('    tentaclaw hub init --type agent');
+                    console.log('    tentaclaw hub publish');
                     console.log('');
                     break;
                 }
@@ -4231,7 +4232,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                 default:
                     console.error('');
                     console.error(C.red('  \u2718 Unknown hub command: ' + sub));
-                    console.error(C.dim('  Run "clawtopus hub help" for usage.'));
+                    console.error(C.dim('  Run "tentaclaw hub help" for usage.'));
                     console.error('');
                     process.exit(1);
             }
@@ -4241,7 +4242,7 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
         default:
             console.error('');
             console.error(C.red('  \u2718 Unknown command: ') + C.white(parsed.command));
-            console.error(C.dim('  Run "clawtopus help" for usage.'));
+            console.error(C.dim('  Run "tentaclaw help" for usage.'));
             console.error('');
             process.exit(1);
     }

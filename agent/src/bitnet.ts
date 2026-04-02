@@ -4,7 +4,7 @@
  * Manages Microsoft's BitNet 1-bit inference engine for CPU-only nodes.
  * BitNet runs 2-6x faster than FP16 on CPUs and uses ~70% less energy.
  *
- * CLAWtopus says: "No GPU? No problem. I've got CPUs for that."
+ * TentaCLAW says: "No GPU? No problem. I've got CPUs for that."
  */
 
 import * as fs from 'fs';

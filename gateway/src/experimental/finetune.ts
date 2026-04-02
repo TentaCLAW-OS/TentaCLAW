@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\finetune.ts
 // Fine-Tuning Orchestration Engine
-// CLAWtopus says: "Train on your data. On your hardware. No cloud fees. Ever."
+// TentaCLAW says: "Train on your data. On your hardware. No cloud fees. Ever."
 
 import { getDb } from './db';
 import { getAllNodes } from './db';

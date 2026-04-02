@@ -1,11 +1,11 @@
 #!/bin/bash
 # =============================================================================
-# TentaCLAW OS — CLAWtopus Setup Wizard
+# TentaCLAW OS — TentaCLAW Setup Wizard
 # =============================================================================
 # Interactive first-boot setup wizard.
 # Because configuring your cluster should be fun.
 #
-# CLAWtopus says: "Let's get you set up, human."
+# TentaCLAW says: "Let's get you set up, human."
 # =============================================================================
 
 set -euo pipefail
@@ -94,10 +94,10 @@ spinner() {
 }
 
 # =============================================================================
-# CLAWtopus ASCII Art
+# TentaCLAW ASCII Art
 # =============================================================================
 
-clawtopus_welcome() {
+tentaclaw_welcome() {
     cat << 'EOF'
 
         ╭──────────────────────────────────────────────────────────╮
@@ -123,7 +123,7 @@ clawtopus_welcome() {
 EOF
 }
 
-clawtopus_happy() {
+tentaclaw_happy() {
     cat << 'EOF'
 
         ${GREEN}     ,---.
@@ -140,7 +140,7 @@ clawtopus_happy() {
 EOF
 }
 
-clawtopus_thinking() {
+tentaclaw_thinking() {
     cat << 'EOF'
 
         ${YELLOW}     ,---.
@@ -165,10 +165,10 @@ EOF
 welcome() {
     clear
     echo -e "${BOLD}"
-    clawtopus_welcome
+    tentaclaw_welcome
     echo -e "${RESET}"
     
-    echo -e "  ${DIM}Welcome to TentaCLAW OS! I'm CLAWtopus, and I'll be${RESET}"
+    echo -e "  ${DIM}Welcome to TentaCLAW OS! I'm TentaCLAW, and I'll be${RESET}"
     echo -e "  ${DIM}your guide to setting up your AI inference cluster.${RESET}"
     echo ""
     
@@ -509,7 +509,7 @@ step_summary() {
     echo ""
     
     echo -e "${GREEN}"
-    clawtopus_happy
+    tentaclaw_happy
     echo -e "${RESET}"
     
     echo -e "  ${BOLD}${WHITE}Here's your setup summary:${RESET}"
@@ -530,14 +530,14 @@ step_summary() {
     echo -e "  ${DIM}Next steps:${RESET}"
     echo ""
     echo -e "    1. ${WHITE}Reboot: ${CYAN}sudo reboot${RESET}"
-    echo -e "    2. ${WHITE}CLAWtopus will auto-start and begin pushing stats${RESET}"
+    echo -e "    2. ${WHITE}TentaCLAW will auto-start and begin pushing stats${RESET}"
     echo -e "    3. ${WHITE}Add this node to your dashboard using the Farm Hash${RESET}"
     echo ""
     
     if confirm "Reboot now?" "y"; then
         echo ""
         echo -e "  ${CYAN}See you on the other side!${RESET}"
-        echo -e "  ${YELLOW}CLAWtopus says: \"Don't tickle my tentacles on the way out.\"${RESET}"
+        echo -e "  ${YELLOW}TentaCLAW says: \"Don't tickle my tentacles on the way out.\"${RESET}"
         sleep 2
         reboot
     else

@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\federation.ts
 // Multi-Cluster Federation — One API, Many Clusters
-// CLAWtopus says: "One cluster is a business. Many clusters is an empire."
+// TentaCLAW says: "One cluster is a business. Many clusters is an empire."
 
 /**
  * TentaCLAW Gateway — Multi-Cluster Federation Controller
@@ -15,7 +15,7 @@
  * - Zero external deps: uses only fetch() for cross-cluster HTTP.
  *
  * Self-hosted. No SaaS. Your data stays on your hardware.
- * CLAWtopus says: "Eight arms across eight clusters. Now that's reach."
+ * TentaCLAW says: "Eight arms across eight clusters. Now that's reach."
  */
 
 import { getDb } from './db';

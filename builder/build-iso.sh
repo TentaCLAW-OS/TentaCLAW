@@ -13,7 +13,7 @@
 # Prerequisites:
 #   - Ubuntu/Debian with: debootstrap, xorriso, grub-efi-amd64-bin
 #
-# CLAWtopus says: "Time to build an OS with eight arms."
+# TentaCLAW says: "Time to build an OS with eight arms."
 # =============================================================================
 
 set -euo pipefail
@@ -438,9 +438,9 @@ install_scripts() {
     cp "${SCRIPT_DIR}/scripts/init-top/"*.sh "$ROOTFS/opt/tentaclaw/scripts/init-top/" 2>/dev/null || true
     chmod +x "$ROOTFS/opt/tentaclaw/scripts/init-top/"*.sh 2>/dev/null || true
 
-    # ── CLAWtopus ASCII art library ──
-    cp "${SCRIPT_DIR}/scripts/clawtopus.sh" "$ROOTFS/opt/tentaclaw/scripts/" 2>/dev/null || true
-    chmod +x "$ROOTFS/opt/tentaclaw/scripts/clawtopus.sh" 2>/dev/null || true
+    # ── TentaCLAW ASCII art library ──
+    cp "${SCRIPT_DIR}/scripts/tentaclaw.sh" "$ROOTFS/opt/tentaclaw/scripts/" 2>/dev/null || true
+    chmod +x "$ROOTFS/opt/tentaclaw/scripts/tentaclaw.sh" 2>/dev/null || true
 
     # ── Shared types (optional, for reference) ──
     if [ -d "${SCRIPT_DIR}/../shared" ]; then
@@ -539,11 +539,11 @@ EOF
 }
 
 # =============================================================================
-# Create Initrd with CLAWtopus Scripts
+# Create Initrd with TentaCLAW Scripts
 # =============================================================================
 
 create_initrd() {
-    log_step "Creating initrd with CLAWtopus early boot"
+    log_step "Creating initrd with TentaCLAW early boot"
 
     # Create init-bottom scripts directory in initrd
     local initrd_dir="$BUILD_ROOT/initrd"
@@ -551,13 +551,13 @@ create_initrd() {
 
     # Copy scripts
     cp "${SCRIPT_DIR}/scripts/init-bottom/"*.sh "$initrd_dir/scripts/"
-    cp "${SCRIPT_DIR}/scripts/clawtopus.sh" "$initrd_dir/scripts/"
+    cp "${SCRIPT_DIR}/scripts/tentaclaw.sh" "$initrd_dir/scripts/"
 
     # Create the init script
     cat > "$initrd_dir/init" << 'INITEOF'
 #!/bin/bash
 # TentaCLAW OS — Init (runs in initrd)
-# CLAWtopus says: "I'm waking up."
+# TentaCLAW says: "I'm waking up."
 
 set -e
 
@@ -566,18 +566,18 @@ mount -t proc proc /proc
 mount -t sysfs sys /sys
 mount -t devtmpfs dev /dev 2>/dev/null || mount -t devpts devpts /dev/pts
 
-# Source CLAWtopus art
-. /scripts/clawtopus.sh
+# Source TentaCLAW art
+. /scripts/tentaclaw.sh
 
 # Clear screen
 clear
 
 # Print splash
-clawtopus_splash
+tentaclaw_splash
 
 # Run init-bottom scripts in order
 for script in /scripts/*.sh; do
-    if [ -f "$script" ] && [ "$(basename "$script")" != "clawtopus.sh" ]; then
+    if [ -f "$script" ] && [ "$(basename "$script")" != "tentaclaw.sh" ]; then
         echo ""
         echo -e "${CYAN}Running: $(basename $script)${RESET}"
         echo ""
@@ -603,7 +603,7 @@ INITEOF
     find . -print0 | cpio --null --quiet -ov --format=newc | gzip -9 > "$ISO_ROOT/boot/initrd.img"
     cd - > /dev/null
 
-    log_success "Initrd created with CLAWtopus scripts"
+    log_success "Initrd created with TentaCLAW scripts"
 }
 
 # =============================================================================

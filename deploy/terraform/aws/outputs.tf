@@ -7,7 +7,7 @@
 #   terraform output -json worker_ips
 #   terraform output alb_dns
 #
-# CLAWtopus says: "Output everything. Hide nothing. Octopuses are transparent."
+# TentaCLAW says: "Output everything. Hide nothing. Octopuses are transparent."
 # =============================================================================
 
 # -----------------------------------------------------------------------------

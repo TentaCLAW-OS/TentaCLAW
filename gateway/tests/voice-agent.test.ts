@@ -122,9 +122,9 @@ describe('Voice Agent Templates', () => {
         }
     });
 
-    it('CLAWtopus Voice template exists', () => {
+    it('TentaCLAW Voice template exists', () => {
         const clawTemplate = getVoiceAgentTemplates().find(t => t.name === 'Cluster Monitor');
         expect(clawTemplate).toBeTruthy();
-        expect(clawTemplate!.config.llm.system_prompt).toContain('CLAWtopus');
+        expect(clawTemplate!.config.llm.system_prompt).toContain('TentaCLAW');
     });
 });

@@ -23,7 +23,7 @@ Manage your GPU inference cluster from Python.
     for chunk in tc.chat("llama3.1:8b", "Tell me a story", stream=True):
         print(chunk, end="", flush=True)
 
-CLAWtopus says: "Python devs, welcome to the family."
+TentaCLAW says: "Python devs, welcome to the family."
 """
 
 __version__ = "0.1.0"

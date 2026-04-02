@@ -8,7 +8,7 @@
  *   - NCCL environment variable auto-tuning
  *   - Bandwidth benchmarking between GPU pairs
  *
- * CLAWtopus says: "All-reduce? More like all-embrace."
+ * TentaCLAW says: "All-reduce? More like all-embrace."
  */
 
 import { execFileSync } from 'child_process';

@@ -10,7 +10,7 @@
  *   npx tsx src/spawner.ts --nodes 8            # 8 mock nodes
  *   npx tsx src/spawner.ts --nodes 12 --gateway http://10.0.0.1:8080
  *
- * CLAWtopus says: "Deploy the swarm."
+ * TentaCLAW says: "Deploy the swarm."
  */
 
 import { fork } from 'child_process';

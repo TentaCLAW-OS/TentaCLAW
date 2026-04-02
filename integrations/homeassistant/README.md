@@ -72,4 +72,4 @@ automation:
 
 ---
 
-*CLAWtopus says: "Your smart home just got smarter. Eight arms for every room."*
+*TentaCLAW says: "Your smart home just got smarter. Eight arms for every room."*

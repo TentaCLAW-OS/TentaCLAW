@@ -1,6 +1,6 @@
 /**
  * GPU Topology Detection — Know Your Hardware
- * CLAWtopus says: "I know every connection. Every bus. Every link."
+ * TentaCLAW says: "I know every connection. Every bus. Every link."
  *
  * Detects the physical GPU interconnect topology (NVLink, PCIe, NVSwitch)
  * and reports it to the gateway for smarter scheduling decisions.

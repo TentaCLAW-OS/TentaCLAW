@@ -10,7 +10,7 @@
 #   - Systemd service
 #   - Prometheus + Grafana (optional)
 #
-# CLAWtopus says: "The brain of the cluster. One node to coordinate them all."
+# TentaCLAW says: "The brain of the cluster. One node to coordinate them all."
 # =============================================================================
 
 # -------------------------------------------------------------------------

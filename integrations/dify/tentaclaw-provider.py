@@ -7,7 +7,7 @@ Usage:
 2. Set TENTACLAW_GATEWAY_URL in Dify's .env
 3. TentaCLAW appears as a model provider in Dify settings
 
-CLAWtopus says: "Dify builds the workflows. I provide the muscle."
+TentaCLAW says: "Dify builds the workflows. I provide the muscle."
 """
 
 import os

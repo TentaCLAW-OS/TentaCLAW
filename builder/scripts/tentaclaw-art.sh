@@ -2,7 +2,7 @@
 # =============================================================================
 # TentaCLAW OS — ASCII Art Collection
 # =============================================================================
-# Display various CLAWtopus ASCII art.
+# Display various TentaCLAW ASCII art.
 #
 # Usage:
 #   tentaclaw-art              # Random art
@@ -11,7 +11,7 @@
 #   tentaclaw-art --random    # Random art
 #   tentaclaw-art --list      # List available art
 #
-# CLAWtopus says: "I'm not just one octopus. I'm MANY octopuses."
+# TentaCLAW says: "I'm not just one octopus. I'm MANY octopuses."
 # =============================================================================
 
 set -euo pipefail

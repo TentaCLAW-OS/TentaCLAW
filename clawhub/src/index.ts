@@ -4,7 +4,7 @@
  *
  * Starts the CLAWHub package marketplace server.
  *
- * CLAWtopus says: "Every tentacle deserves the right tool."
+ * TentaCLAW says: "Every tentacle deserves the right tool."
  */
 
 import { serve } from '@hono/node-server';

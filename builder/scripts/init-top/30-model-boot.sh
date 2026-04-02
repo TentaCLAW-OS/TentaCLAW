@@ -6,7 +6,7 @@
 # is up. Pulls the default model on first boot so the node is ready to
 # serve inference requests immediately.
 #
-# CLAWtopus says: "Feeding the brain."
+# TentaCLAW says: "Feeding the brain."
 # =============================================================================
 
 set -euo pipefail
@@ -23,12 +23,12 @@ RESET='\x1b[0m'
 BOLD='\x1b[1m'
 
 # =============================================================================
-# CLAWtopus ASCII Art Library (optional)
+# TentaCLAW ASCII Art Library (optional)
 # =============================================================================
-CLAWTOPUS_LIB="/opt/tentaclaw/scripts/clawtopus.sh"
-if [ -f "$CLAWTOPUS_LIB" ]; then
+TENTACLAW_LIB="/opt/tentaclaw/scripts/tentaclaw.sh"
+if [ -f "$TENTACLAW_LIB" ]; then
     # shellcheck source=/dev/null
-    source "$CLAWTOPUS_LIB"
+    source "$TENTACLAW_LIB"
 fi
 
 # =============================================================================
@@ -218,12 +218,12 @@ verify_model() {
 
 echo ""
 echo -e "${BOLD}${CYAN}  =======================================================${RESET}"
-echo -e "${BOLD}${CYAN}  ||        ${PURPLE}CLAWtopus Model Boot${CYAN}                      ${RESET}"
+echo -e "${BOLD}${CYAN}  ||        ${PURPLE}TentaCLAW Model Boot${CYAN}                      ${RESET}"
 echo -e "${BOLD}${CYAN}  =======================================================${RESET}"
 echo ""
 
 log "Initializing model boot sequence..."
-log "CLAWtopus says: \"Feeding the brain.\""
+log "TentaCLAW says: \"Feeding the brain.\""
 
 # Load config to determine which model to pull
 load_model_config
@@ -268,13 +268,13 @@ echo -e "  ${GREEN}Default model: ${BOLD}${DEFAULT_MODEL}${RESET}"
 echo -e "  ${GREEN}Inference endpoint: ${BOLD}${OLLAMA_API}${RESET}"
 echo ""
 
-# CLAWtopus celebrates
-if type clawtopus_quote &>/dev/null; then
-    echo -e "  $(clawtopus_quote)"
-elif type clawtopus_happy &>/dev/null; then
-    clawtopus_happy
+# TentaCLAW celebrates
+if type tentaclaw_quote &>/dev/null; then
+    echo -e "  $(tentaclaw_quote)"
+elif type tentaclaw_happy &>/dev/null; then
+    tentaclaw_happy
 else
-    echo -e "  ${YELLOW}\"Eight arms. One mind. Zero compromises.\"${RESET} -- CLAWtopus"
+    echo -e "  ${YELLOW}\"Eight arms. One mind. Zero compromises.\"${RESET} -- TentaCLAW"
 fi
 
 echo ""

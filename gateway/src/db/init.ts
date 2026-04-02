@@ -2,7 +2,7 @@
  * TentaCLAW Gateway — Database Initialization (SQLite)
  *
  * Self-hosted. No SaaS. Your data stays on your hardware.
- * CLAWtopus says: "I remember everything. Eight arms, one brain."
+ * TentaCLAW says: "I remember everything. Eight arms, one brain."
  */
 
 import Database from 'better-sqlite3';

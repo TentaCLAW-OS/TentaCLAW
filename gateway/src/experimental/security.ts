@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\security.ts
 // Advanced Security — Zero Trust for GPU Clusters
-// CLAWtopus says: "Trust nobody. Verify everything. Eight arms on guard."
+// TentaCLAW says: "Trust nobody. Verify everything. Eight arms on guard."
 
 /**
  * TentaCLAW Gateway — Security Module v3.0
@@ -17,7 +17,7 @@
  *
  * Zero external deps: uses only Node.js built-in crypto module.
  * Self-hosted. No SaaS. Your data stays on your hardware.
- * CLAWtopus says: "I trust no one by default. Earn it."
+ * TentaCLAW says: "I trust no one by default. Earn it."
  */
 
 import { getDb } from './db';

@@ -527,7 +527,7 @@ print_status() {
     echo -e "  ${BOLD}Stop:${RESET}       ${DIM}bash $0 --stop${RESET}"
     echo ""
 
-    # Show the CLAWtopus quip
+    # Show the TentaCLAW quip
     local quips=(
         "eight arms, zero problems"
         "all systems purring"

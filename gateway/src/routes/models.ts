@@ -354,4 +354,53 @@ routes.get('/api/v1/models/coverage', (c) => {
     return c.json({ total_models: coverage.length, online_nodes: onlineCount, avg_coverage_pct: avgCoverage, redundant_models: coverage.filter(m => m.redundant).length, models: coverage });
 });
 
+// VRAM estimation endpoint
+routes.get('/api/v1/models/estimate-vram', (c) => {
+    const model = c.req.query('model');
+    if (!model) return c.json({ error: 'model query parameter required' }, 400);
+    const quantization = c.req.query('quantization') || 'Q4_K_M';
+    const weightsMb = estimateModelVram(model);
+    // KV cache rough estimate: ~10-15% of model weights for Q4
+    const kvCacheMb = Math.round(weightsMb * 0.12);
+    const totalMb = weightsMb + kvCacheMb;
+    const format = quantization.startsWith('Q') ? 'GGUF' : 'safetensors';
+    const backends = ['ollama', 'vllm'];
+    if (format === 'GGUF') backends.unshift('llamacpp');
+    return c.json({
+        model, quantization, format,
+        recommended_backends: backends,
+        vram: { model_weights_mb: weightsMb, kv_cache_mb: kvCacheMb, total_mb: totalMb },
+    });
+});
+
+// Model recommendations based on cluster VRAM
+routes.get('/api/v1/models/recommend', (c) => {
+    const vramParam = c.req.query('vram_mb');
+    let availableVram: number;
+    if (vramParam) {
+        availableVram = parseInt(vramParam);
+    } else {
+        const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
+        if (nodes.length === 0) return c.json([]);
+        // Use the largest single-node VRAM as the budget
+        availableVram = Math.max(...nodes.map(n => {
+            const stats = n.latest_stats!;
+            return stats.gpus.reduce((s, g) => s + g.vramTotalMb, 0) - stats.gpus.reduce((s, g) => s + g.vramUsedMb, 0);
+        }));
+    }
+    const catalog: Array<{ model: string; quantization: string; vram_required_mb: number; use_case: string; description: string }> = [
+        { model: 'llama3.2:1b', quantization: 'Q4_K_M', vram_required_mb: 1024, use_case: 'edge', description: 'Ultra-light chat for edge devices' },
+        { model: 'llama3.2:3b', quantization: 'Q4_K_M', vram_required_mb: 2048, use_case: 'chat', description: 'Lightweight general-purpose chat' },
+        { model: 'phi3:3.8b', quantization: 'Q4_K_M', vram_required_mb: 2560, use_case: 'reasoning', description: 'Microsoft compact reasoning model' },
+        { model: 'mistral:7b', quantization: 'Q4_K_M', vram_required_mb: 4608, use_case: 'chat', description: 'Fast and efficient all-rounder' },
+        { model: 'llama3.1:8b', quantization: 'Q4_K_M', vram_required_mb: 5120, use_case: 'general', description: 'Meta Llama 3.1 — great all-rounder' },
+        { model: 'deepseek-r1:8b', quantization: 'Q4_K_M', vram_required_mb: 5120, use_case: 'reasoning', description: 'DeepSeek R1 — deep reasoning' },
+        { model: 'codellama:7b', quantization: 'Q4_K_M', vram_required_mb: 4608, use_case: 'code', description: 'Code Llama — code generation' },
+        { model: 'gemma2:9b', quantization: 'Q4_K_M', vram_required_mb: 5632, use_case: 'chat', description: 'Google Gemma 2 — efficient' },
+        { model: 'deepseek-coder-v2:16b', quantization: 'Q4_K_M', vram_required_mb: 10240, use_case: 'code', description: 'DeepSeek Coder V2 — advanced coding' },
+        { model: 'llama3.1:70b', quantization: 'Q4_K_M', vram_required_mb: 41984, use_case: 'production', description: 'Meta Llama 3.1 70B — production quality' },
+    ];
+    return c.json(catalog.filter(m => m.vram_required_mb <= availableVram));
+});
+
 export default routes;

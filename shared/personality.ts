@@ -1,9 +1,9 @@
 /**
- * CLAWtopus Personality Engine
+ * TentaCLAW Personality Engine
  * "I'm gonna make you an inference you can't refuse."
  *
  * Shared personality module for TentaCLAW CLI, Gateway, and Dashboard.
- * All 225 quotes from the CLAWtopus Mob Quotes Archive, organized by category,
+ * All 225 quotes from the TentaCLAW Mob Quotes Archive, organized by category,
  * with mood-aware selection and context-driven responses.
  */
 
@@ -25,7 +25,7 @@ export interface PersonalityContext {
 }
 
 // =============================================================================
-// Quote Database — All 225 quotes from CLAWTOPUS_MOB_QUOTES.md
+// Quote Database — All 225 quotes from TENTACLAW_MOB_QUOTES.md
 // =============================================================================
 
 // --- 1. Classic Mob Greetings & Farewells ---
@@ -50,7 +50,7 @@ const FAREWELLS: string[] = [
     /* 14 */ "Don't ever come to me with cold GPUs again.",
     /* 15 */ "You're dead to me. And by dead I mean your SSH session timed out.",
     /* 16 */ "Get outta here before I deallocate ya.",
-    /* 17 */ 'Go home. Hug your GPU. Tell it CLAWtopus sent you.',
+    /* 17 */ 'Go home. Hug your GPU. Tell it TentaCLAW sent you.',
     /* 18 */ 'Arrivederci, overpriced API.',
     /* 19 */ "This conversation never happened. Check the logs if you don't believe me.",
     /* 20 */ "I'll be here. I'm always here. Eight arms don't sleep.",
@@ -85,7 +85,7 @@ const BENCHMARKS_GOOD: string[] = [
     /* 41 */ 'Latency so low, the packets think they\'re time traveling.',
     /* 42 */ "You want speed? I'll give you speed. I got eight arms on the throttle.",
     /* 43 */ "Per-token is a scam. Per-second? Now that's MY language.",
-    /* 44 */ "The numbers don't lie. And neither does CLAWtopus.",
+    /* 44 */ "The numbers don't lie. And neither does TentaCLAW.",
 ];
 
 // --- 3. Threat & Warning Lines ---
@@ -307,7 +307,7 @@ const MOVIE_UNTOUCHABLES: string[] = [
     /* 196 */ "Enthusiasms, enthusiasms... What do you got? Clean CUDA installs? Full VRAM allocation? Huh?",
 ];
 
-// --- 8. CLAWtopus Originals ---
+// --- 8. TentaCLAW Originals ---
 
 const ORIGINALS: string[] = [
     /* 197 */ "Eight arms, eight functions: route, balance, monitor, deploy, benchmark, overclock, heal, scale. I do 'em all before you finish your coffee.",
@@ -452,7 +452,7 @@ function pick<T>(arr: T[]): T {
 // =============================================================================
 
 /**
- * Determine CLAWtopus mood from cluster context.
+ * Determine TentaCLAW mood from cluster context.
  *
  * Priority order:
  *   1. milestone achieved → celebrating

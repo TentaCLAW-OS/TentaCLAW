@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\cloud-burst.ts
 // Cloud Burst — Overflow to Cloud When Local is Full
-// CLAWtopus says: "My cluster is full? Fine. I'll rent some muscle."
+// TentaCLAW says: "My cluster is full? Fine. I'll rent some muscle."
 
 /**
  * TentaCLAW Gateway — Cloud Burst System
@@ -10,7 +10,7 @@
  * Tracks cost, enforces budgets, and reports savings vs 100% cloud.
  *
  * Self-hosted. No SaaS. Your data stays on your hardware (unless you burst).
- * CLAWtopus says: "Local first. Cloud when desperate. Always in control."
+ * TentaCLAW says: "Local first. Cloud when desperate. Always in control."
  */
 
 import { getAllNodes, getInferenceAnalytics } from './db';

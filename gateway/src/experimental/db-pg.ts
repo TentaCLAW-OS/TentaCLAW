@@ -2,7 +2,7 @@
  * TentaCLAW Gateway — PostgreSQL Database Driver
  *
  * Self-hosted. No SaaS. Your data stays on your hardware.
- * CLAWtopus says: "SQLite for homelabs. Postgres for empires."
+ * TentaCLAW says: "SQLite for homelabs. Postgres for empires."
  *
  * This module defines the full interface contract for PostgreSQL support,
  * enabling production-grade HA deployments with connection pooling, read

@@ -1,13 +1,13 @@
 /**
- * CLAWtopus ASCII Art Collection
+ * TentaCLAW ASCII Art Collection
  * 20 poses for different moods and situations.
- * CLAWtopus says: "I look good in every frame."
+ * TentaCLAW says: "I look good in every frame."
  */
-export declare const CLAWTOPUS_POSES: Record<string, string[]>;
+export declare const TENTACLAW_POSES: Record<string, string[]>;
 /**
  * Get ASCII art for current mood
  */
-export declare function getAsciiArt(pose?: keyof typeof CLAWTOPUS_POSES): string[];
+export declare function getAsciiArt(pose?: keyof typeof TENTACLAW_POSES): string[];
 /**
  * Get a random pose
  */

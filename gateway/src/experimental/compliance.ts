@@ -10,7 +10,7 @@
  *   - Risk classification (minimal/limited/high)
  *   - Compliance report generation
  *
- * CLAWtopus says: "Compliance is not optional. It is tentacle-seven's specialty."
+ * TentaCLAW says: "Compliance is not optional. It is tentacle-seven's specialty."
  */
 
 import { getDb } from './db';

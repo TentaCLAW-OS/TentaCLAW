@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 
-interface CLAWtopusTipsProps {
+interface TentaCLAWTipsProps {
   /** The tip message to display (without the octopus emoji) */
   tip: string;
 }
 
 /**
- * Contextual tip component — shows a CLAWtopus personality hint
+ * Contextual tip component — shows a TentaCLAW personality hint
  * with a subtle fade-in animation. Used in empty states.
  */
-export function CLAWtopusTips({ tip }: CLAWtopusTipsProps) {
+export function TentaCLAWTips({ tip }: TentaCLAWTipsProps) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {

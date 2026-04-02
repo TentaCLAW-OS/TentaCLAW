@@ -842,7 +842,7 @@ routes.post('/api/v1/webhooks/:id/test', async (c) => {
     const id = c.req.param('id');
     const wh = webhooks.find(w => w.id === id);
     if (!wh) return c.json({ error: 'Webhook not found' }, 404);
-    fireWebhooks('test', { message: 'CLAWtopus says hello!', webhook_id: id });
+    fireWebhooks('test', { message: 'TentaCLAW says hello!', webhook_id: id });
     return c.json({ sent: true });
 });
 
@@ -1104,7 +1104,7 @@ routes.get('/api/v1/openapi.json', (c) => {
 
 routes.get('/api/v1/version', (c) => {
     return c.json({
-        name: 'TentaCLAW OS', version: '0.2.0', mascot: 'CLAWtopus',
+        name: 'TentaCLAW OS', version: '0.2.0', mascot: 'TentaCLAW',
         tagline: 'Eight arms. One mind. Zero compromises.', api_version: 'v1',
         features: ['zero-config-discovery', 'auto-backend-detection', 'smart-load-balancing', 'circuit-breaker', 'auto-retry', 'vram-aware-routing', 'model-aliases', 'fallback-chains', 'prompt-caching', 'function-calling', 'json-mode', 'embeddings-batching', 'api-keys', 'auto-mode', 'watchdog', 'notifications', 'remote-shell', 'doctor', 'power-tracking', 'fleet-reliability', 'event-timeline', 'config-export-import', 'maintenance-mode', 'hardware-inventory', 'model-package-manager', 'multi-modal', 'audio-transcription', 'audio-tts', 'image-generation', 'vision'],
         openai_compatible: ['/v1/chat/completions', '/v1/completions', '/v1/embeddings', '/v1/models', '/v1/audio/transcriptions', '/v1/audio/speech', '/v1/audio/translate', '/v1/images/generations'],
@@ -1128,7 +1128,7 @@ routes.get('/api/v1/capabilities', (c) => {
 });
 
 routes.get('/api/v1/about', (c) => {
-    return c.json({ product: 'TentaCLAW OS', mascot: 'CLAWtopus', tagline: 'Eight arms. One mind. Zero compromises.', description: 'The operating system for personal AI infrastructure. Plug it in. It just works.', version: '0.2.0', website: 'https://www.tentaclaw.io', github: 'https://github.com/TentaCLAW-OS/TentaCLAW', license: 'MIT', waves_completed: 100, api_endpoints: 200 });
+    return c.json({ product: 'TentaCLAW OS', mascot: 'TentaCLAW', tagline: 'Eight arms. One mind. Zero compromises.', description: 'The operating system for personal AI infrastructure. Plug it in. It just works.', version: '0.2.0', website: 'https://www.tentaclaw.io', github: 'https://github.com/TentaCLAW-OS/TentaCLAW', license: 'MIT', waves_completed: 100, api_endpoints: 200 });
 });
 
 routes.get('/api/v1/status-page', (c) => {
@@ -1294,9 +1294,9 @@ routes.get('/api/v1/suggestions', (c) => {
     const nodes = getAllNodes().filter(n => n.status === 'online');
 
     if (summary.online_nodes === 0) suggestions.push({ priority: 'critical', action: 'Add nodes', reason: 'No nodes online — cluster is empty', command: 'Boot a machine with TentaCLAW agent' });
-    if (models.length === 0 && nodes.length > 0) suggestions.push({ priority: 'high', action: 'Deploy a model', reason: 'No models loaded', command: 'clawtopus deploy llama3.1:8b' });
-    if (models.filter(m => m.node_count < 2).length > 3) suggestions.push({ priority: 'medium', action: 'Add redundancy', reason: models.filter(m => m.node_count < 2).length + ' models only on 1 node', command: 'clawtopus auto' });
-    if (health.score < 80) suggestions.push({ priority: 'medium', action: 'Fix health issues', reason: 'Health score: ' + health.score + '/100', command: 'clawtopus fix' });
+    if (models.length === 0 && nodes.length > 0) suggestions.push({ priority: 'high', action: 'Deploy a model', reason: 'No models loaded', command: 'tentaclaw deploy llama3.1:8b' });
+    if (models.filter(m => m.node_count < 2).length > 3) suggestions.push({ priority: 'medium', action: 'Add redundancy', reason: models.filter(m => m.node_count < 2).length + ' models only on 1 node', command: 'tentaclaw auto' });
+    if (health.score < 80) suggestions.push({ priority: 'medium', action: 'Fix health issues', reason: 'Health score: ' + health.score + '/100', command: 'tentaclaw fix' });
 
     return c.json({ suggestions });
 });

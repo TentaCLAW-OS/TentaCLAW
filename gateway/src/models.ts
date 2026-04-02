@@ -1,6 +1,6 @@
 /**
  * TentaCLAW Model Catalog — Unified Model Discovery & Management
- * CLAWtopus says: "135,000 models on HuggingFace. I know which ones fit your cluster."
+ * TentaCLAW says: "135,000 models on HuggingFace. I know which ones fit your cluster."
  */
 
 // =============================================================================

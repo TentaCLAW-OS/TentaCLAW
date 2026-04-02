@@ -1,6 +1,6 @@
 // F:\tentaclaw-os\gateway\src\sso.ts
 // Enterprise SSO & RBAC
-// CLAWtopus says: "The family has rules. You follow the rules, you're in."
+// TentaCLAW says: "The family has rules. You follow the rules, you're in."
 
 import { getDb } from './db';
 import { createHash, randomBytes } from 'crypto';

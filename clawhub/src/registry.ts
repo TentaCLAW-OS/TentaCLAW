@@ -4,7 +4,7 @@
  * The backend for the TentaCLAW package marketplace.
  * Serves packages: agents, skills, model configs, integrations, themes.
  *
- * CLAWtopus says: "Every tentacle deserves the right tool."
+ * TentaCLAW says: "Every tentacle deserves the right tool."
  */
 
 import { Hono } from 'hono';
