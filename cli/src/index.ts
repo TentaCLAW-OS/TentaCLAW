@@ -1647,6 +1647,7 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
 
     // Session + multi-turn history
     const chatSessionId = generateSessionId();
+    const chatUsage = newUsageStats();
     const chatMessages: Array<{ role: string; content: string }> = [
         { role: 'system', content: 'You are TentaCLAW \u2014 a helpful, witty AI assistant. Be concise but thorough.' },
     ];
@@ -1659,7 +1660,7 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
     bootSplash();
     console.log('  ' + C.purple(C.bold('Chat Mode')) + C.dim(` \u2014 model: ${model}`) + C.dim(' via ') + backendLabel);
     console.log('  ' + C.dim(`Session: ${chatSessionId}`));
-    console.log('  ' + C.dim('Commands: /new /status /model <name> /quit  |  Multi-turn history enabled'));
+    console.log('  ' + C.dim('Commands: /help for full list  |  Multi-turn history enabled'));
     console.log('');
 
     const readline = await import('readline');
@@ -1677,37 +1678,130 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
 
         // Chat slash commands
         if (input.startsWith('/')) {
-            const chatCmd = input.slice(1).split(' ')[0]?.toLowerCase();
-            const chatArg = input.slice(1 + (chatCmd?.length || 0)).trim();
-            if (chatCmd === 'quit' || chatCmd === 'exit') {
-                appendSessionEvent(chatSessionId, { type: 'session_end', timestamp: new Date().toISOString(), sessionId: chatSessionId });
-                console.log('');
-                console.log(C.dim(`  Session saved: ${chatSessionId}`));
-                console.log(C.dim('  TentaCLAW waves goodbye! \ud83d\udc19'));
-                rl.close();
-                process.exit(0);
+            const parts = input.slice(1).split(' ');
+            const chatCmd = (parts[0] || '').toLowerCase();
+            const chatArg = parts.slice(1).join(' ').trim();
+
+            switch (chatCmd) {
+                case 'quit':
+                case 'exit': {
+                    appendSessionEvent(chatSessionId, { type: 'session_end', timestamp: new Date().toISOString(), sessionId: chatSessionId });
+                    updateSessionMeta(chatSessionId, { messageCount: chatMessages.filter(m => m.role === 'user').length, tokenCount: chatUsage.totalTokens });
+                    console.log('');
+                    console.log(C.dim(`  Session saved: ${chatSessionId}`));
+                    console.log(C.dim('  TentaCLAW waves goodbye \uD83D\uDC19'));
+                    rl.close();
+                    process.exit(0);
+                    break;
+                }
+                case 'new':
+                case 'reset': {
+                    chatMessages.splice(1);
+                    chatUsage.inputTokens = 0; chatUsage.outputTokens = 0; chatUsage.totalTokens = 0; chatUsage.requestCount = 0;
+                    console.log('  ' + C.green('\u2714 Conversation cleared.'));
+                    rl.prompt(); return;
+                }
+                case 'status': {
+                    const turns = chatMessages.filter(m => m.role === 'user').length;
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('STATUS')));
+                    console.log('  ' + padRight(C.dim('Session'), 18) + C.white(chatSessionId));
+                    console.log('  ' + padRight(C.dim('Model'), 18) + C.white(model));
+                    console.log('  ' + padRight(C.dim('Backend'), 18) + backendLabel);
+                    console.log('  ' + padRight(C.dim('Turns'), 18) + C.white(String(turns)));
+                    console.log('  ' + padRight(C.dim('Requests'), 18) + C.white(String(chatUsage.requestCount)));
+                    console.log('  ' + padRight(C.dim('Tokens'), 18) + C.white(`${formatTokens(chatUsage.inputTokens)} in / ${formatTokens(chatUsage.outputTokens)} out`));
+                    console.log('');
+                    rl.prompt(); return;
+                }
+                case 'model': {
+                    if (chatArg) {
+                        model = chatArg;
+                        appendSessionEvent(chatSessionId, { type: 'model_change', timestamp: new Date().toISOString(), sessionId: chatSessionId, model });
+                        console.log('  ' + C.green(`\u2714 Model: ${model}`));
+                    } else {
+                        console.log('  ' + C.dim(`Current model: ${model}`));
+                    }
+                    rl.prompt(); return;
+                }
+                case 'sessions': {
+                    const sessions = listRecentSessions(8);
+                    if (sessions.length === 0) { console.log('  ' + C.dim('No sessions yet.')); }
+                    else {
+                        console.log('');
+                        for (const s of sessions) {
+                            const ts = new Date(s.createdAt || '').toLocaleString();
+                            console.log('  ' + C.dim(s.sessionId.slice(0, 8)) + '  ' + C.white(s.label || s.model || 'chat') + '  ' + C.dim(ts) + (s.messageCount ? C.dim(`  ${s.messageCount} msgs`) : ''));
+                        }
+                        console.log('');
+                    }
+                    rl.prompt(); return;
+                }
+                case 'save': {
+                    updateSessionMeta(chatSessionId, { messageCount: chatMessages.filter(m => m.role === 'user').length, tokenCount: chatUsage.totalTokens });
+                    console.log('  ' + C.green(`\u2714 Session saved: ${chatSessionId}`));
+                    rl.prompt(); return;
+                }
+                case 'export': {
+                    const exportPath = chatArg || path.join(process.cwd(), `chat-${chatSessionId.slice(0, 8)}.md`);
+                    const lines = [`# Chat Export\nSession: ${chatSessionId}\nDate: ${new Date().toISOString()}\nModel: ${model}\n`];
+                    for (const m of chatMessages) {
+                        if (m.role === 'system') continue;
+                        lines.push(`## ${m.role === 'user' ? 'You' : 'TentaCLAW'}\n\n${m.content}\n`);
+                    }
+                    fs.writeFileSync(exportPath, lines.join('\n'), 'utf8');
+                    console.log('  ' + C.green(`\u2714 Exported: ${exportPath}`));
+                    rl.prompt(); return;
+                }
+                case 'compact': {
+                    const system = chatMessages[0];
+                    const recent = chatMessages.slice(-6);
+                    chatMessages.splice(0, chatMessages.length, system!, ...recent);
+                    console.log('  ' + C.green(`\u2714 Compacted to last ${recent.length} messages.`));
+                    rl.prompt(); return;
+                }
+                case 'context': {
+                    const userCount = chatMessages.filter(m => m.role === 'user').length;
+                    const asstCount = chatMessages.filter(m => m.role === 'assistant').length;
+                    console.log('  ' + C.dim(`${chatMessages.length} messages (${userCount} user, ${asstCount} assistant)`));
+                    rl.prompt(); return;
+                }
+                case 'workspace': {
+                    const wsDir = getWorkspaceDir();
+                    if (!fs.existsSync(wsDir)) { console.log('  ' + C.dim('Workspace not initialized.')); rl.prompt(); return; }
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('WORKSPACE')) + C.dim(`  ${wsDir}`));
+                    const wsFiles = fs.readdirSync(wsDir).filter(f => !fs.statSync(path.join(wsDir, f)).isDirectory());
+                    for (const f of wsFiles) console.log('  ' + C.dim('  \u2022 ') + C.white(f));
+                    console.log('');
+                    rl.prompt(); return;
+                }
+                case 'clear': {
+                    console.clear();
+                    rl.prompt(); return;
+                }
+                case 'help': {
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('CHAT COMMANDS')));
+                    console.log('  ' + C.dim('/new') + '          Clear conversation history');
+                    console.log('  ' + C.dim('/status') + '       Show session info and token counts');
+                    console.log('  ' + C.dim('/model <m>') + '    Switch model');
+                    console.log('  ' + C.dim('/sessions') + '     List recent sessions');
+                    console.log('  ' + C.dim('/save') + '         Save session to disk');
+                    console.log('  ' + C.dim('/export [f]') + '   Export chat to markdown file');
+                    console.log('  ' + C.dim('/compact') + '      Trim older messages to save context');
+                    console.log('  ' + C.dim('/context') + '      Show message count');
+                    console.log('  ' + C.dim('/workspace') + '    Show workspace files');
+                    console.log('  ' + C.dim('/clear') + '        Clear terminal');
+                    console.log('  ' + C.dim('/quit') + '         Save and exit');
+                    console.log('');
+                    rl.prompt(); return;
+                }
+                default: {
+                    console.log('  ' + C.dim(`Unknown: /${chatCmd}. Try /help.`));
+                    rl.prompt(); return;
+                }
             }
-            if (chatCmd === 'new' || chatCmd === 'reset') {
-                chatMessages.splice(1);
-                console.log('  ' + C.green('\u2714 Conversation cleared.'));
-                rl.prompt(); return;
-            }
-            if (chatCmd === 'status') {
-                const turns = chatMessages.filter(m => m.role === 'user').length;
-                console.log('  ' + C.dim(`Model: ${model} | Turns: ${turns} | Session: ${chatSessionId}`));
-                rl.prompt(); return;
-            }
-            if (chatCmd === 'model' && chatArg) {
-                model = chatArg;
-                console.log('  ' + C.green(`\u2714 Model: ${model}`));
-                rl.prompt(); return;
-            }
-            if (chatCmd === 'help') {
-                console.log('  ' + C.dim('/new \u2014 clear history  /status \u2014 show info  /model <m> \u2014 switch  /quit \u2014 exit'));
-                rl.prompt(); return;
-            }
-            console.log('  ' + C.dim(`Unknown: /${chatCmd}. Try /help.`));
-            rl.prompt(); return;
         }
 
         // Add to multi-turn history
@@ -1760,7 +1854,15 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
                             const raw = line.slice(6).trim();
                             if (raw === '[DONE]') continue;
                             try {
-                                const ev = JSON.parse(raw) as { choices?: Array<{ delta?: { content?: string } }> };
+                                const ev = JSON.parse(raw) as {
+                                    choices?: Array<{ delta?: { content?: string } }>;
+                                    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+                                };
+                                if (ev.usage) {
+                                    chatUsage.inputTokens += ev.usage.prompt_tokens || 0;
+                                    chatUsage.outputTokens += ev.usage.completion_tokens || 0;
+                                    chatUsage.totalTokens += ev.usage.total_tokens || 0;
+                                }
                                 const content = ev.choices?.[0]?.delta?.content;
                                 if (content) {
                                     process.stdout.write(content);
@@ -1778,6 +1880,7 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
             });
 
             if (fullContent) {
+                chatUsage.requestCount++;
                 chatMessages.push({ role: 'assistant', content: fullContent });
                 appendSessionEvent(chatSessionId, {
                     type: 'message', timestamp: new Date().toISOString(), sessionId: chatSessionId,
@@ -1888,6 +1991,64 @@ const CODE_AGENT_TOOLS = [
             },
         },
     },
+    {
+        type: 'function',
+        function: {
+            name: 'create_directory',
+            description: 'Create a directory (and any missing parent directories). Safe to call if it already exists.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'Directory path to create' },
+                },
+                required: ['path'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'delete_file',
+            description: 'Permanently delete a file. ALWAYS requires user approval. Shows file size before deleting.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    path: { type: 'string', description: 'File path to delete' },
+                },
+                required: ['path'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'move_file',
+            description: 'Move or rename a file. Requires user approval.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    source: { type: 'string', description: 'Source file path' },
+                    destination: { type: 'string', description: 'Destination file path' },
+                },
+                required: ['source', 'destination'],
+            },
+        },
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'copy_file',
+            description: 'Copy a file to a new location. No approval needed.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    source: { type: 'string', description: 'Source file path' },
+                    destination: { type: 'string', description: 'Destination file path' },
+                },
+                required: ['source', 'destination'],
+            },
+        },
+    },
 ];
 
 // =============================================================================
@@ -1913,6 +2074,10 @@ interface AgentToolCall {
     args: string;
 }
 
+function resolvePath(p: string): string {
+    return path.resolve(p.replace(/^~/, os.homedir()));
+}
+
 async function executeCodeTool(
     call: AgentToolCall,
     rl: import('readline').Interface | null,
@@ -1929,7 +2094,7 @@ async function executeCodeTool(
 
     switch (call.name) {
         case 'read_file': {
-            const filePath = path.resolve(args['path'] || '');
+            const filePath = resolvePath(args['path'] || '');
             try {
                 const content = fs.readFileSync(filePath, 'utf8');
                 const totalLines = content.split('\n').length;
@@ -1942,7 +2107,7 @@ async function executeCodeTool(
         }
 
         case 'write_file': {
-            const filePath = path.resolve(args['path'] || '');
+            const filePath = resolvePath(args['path'] || '');
             const content = args['content'] || '';
             if (!autoApprove) {
                 const existing = fs.existsSync(filePath);
@@ -1963,7 +2128,7 @@ async function executeCodeTool(
         }
 
         case 'list_dir': {
-            const dirPath = path.resolve(args['path'] || '.');
+            const dirPath = resolvePath(args['path'] || '.');
             try {
                 const entries = fs.readdirSync(dirPath, { withFileTypes: true });
                 const lines = entries
@@ -2015,7 +2180,7 @@ async function executeCodeTool(
 
         case 'search_files': {
             const pattern = args['pattern'] || '';
-            const dir = path.resolve(args['directory'] || '.');
+            const dir = resolvePath(args['directory'] || '.');
             const glob = args['file_pattern'] || '*';
             if (!pattern) return 'Error: pattern required';
             try {
@@ -2047,7 +2212,7 @@ async function executeCodeTool(
         }
 
         case 'edit_file': {
-            const filePath = path.resolve(args['path'] || '');
+            const filePath = resolvePath(args['path'] || '');
             const oldText = args['old_text'] || '';
             const newText = args['new_text'] ?? '';
             if (!oldText) return 'Error: old_text is required';
@@ -2100,6 +2265,64 @@ async function executeCodeTool(
                 return `Edited: ${filePath} (replaced ${linesChanged} line${linesChanged > 1 ? 's' : ''})`;
             } catch (e) {
                 return `Error writing: ${e instanceof Error ? e.message : String(e)}`;
+            }
+        }
+
+        case 'create_directory': {
+            const dirPath = resolvePath(args['path'] || '');
+            try {
+                fs.mkdirSync(dirPath, { recursive: true });
+                return `Created: ${dirPath}`;
+            } catch (e) {
+                return `Error: ${e instanceof Error ? e.message : String(e)}`;
+            }
+        }
+
+        case 'delete_file': {
+            const filePath = resolvePath(args['path'] || '');
+            try {
+                const stat = fs.statSync(filePath);
+                const size = stat.size < 1024 ? `${stat.size} B` : `${(stat.size / 1024).toFixed(1)} KB`;
+                console.log('');
+                console.log('  ' + C.red(`\u26A1 DELETE: ${C.white(filePath)} ${C.dim(`(${size})`)}`));
+                if (!rl) return 'Delete cancelled (no interactive prompt in --task mode without --yes).';
+                const ok = await new Promise<string>(res => rl.question('  ' + C.dim('  Permanently delete? [y/N] '), res));
+                if (!ok.trim().toLowerCase().startsWith('y')) return 'Delete cancelled.';
+                fs.unlinkSync(filePath);
+                return `Deleted: ${filePath}`;
+            } catch (e) {
+                return `Error: ${e instanceof Error ? e.message : String(e)}`;
+            }
+        }
+
+        case 'move_file': {
+            const src = resolvePath(args['source'] || '');
+            const dst = resolvePath(args['destination'] || '');
+            if (!autoApprove) {
+                console.log('');
+                console.log('  ' + C.yellow(`\u26A1 Move: ${C.white(src)} \u2192 ${C.white(dst)}`));
+                if (!rl) return 'Move cancelled (no interactive prompt in --task mode without --yes).';
+                const ok = await new Promise<string>(res => rl.question('  ' + C.dim('  Approve? [y/N] '), res));
+                if (!ok.trim().toLowerCase().startsWith('y')) return 'Move cancelled.';
+            }
+            try {
+                fs.mkdirSync(path.dirname(dst), { recursive: true });
+                fs.renameSync(src, dst);
+                return `Moved: ${src} → ${dst}`;
+            } catch (e) {
+                return `Error: ${e instanceof Error ? e.message : String(e)}`;
+            }
+        }
+
+        case 'copy_file': {
+            const src = resolvePath(args['source'] || '');
+            const dst = resolvePath(args['destination'] || '');
+            try {
+                fs.mkdirSync(path.dirname(dst), { recursive: true });
+                fs.copyFileSync(src, dst);
+                return `Copied: ${src} → ${dst}`;
+            } catch (e) {
+                return `Error: ${e instanceof Error ? e.message : String(e)}`;
             }
         }
 
@@ -2222,9 +2445,9 @@ Long-term memory: You can and should write to ${getWorkspaceDir()}/MEMORY.md whe
             } catch { /* skip unreadable */ }
         }
     }
-    // Detect first-run bootstrap
+    // Detect first-run bootstrap — only in interactive mode, not --task
     const bootstrapPath = path.join(getWorkspaceDir(), 'BOOTSTRAP.md');
-    const hasBootstrap = fs.existsSync(bootstrapPath);
+    const hasBootstrap = !taskFlag && fs.existsSync(bootstrapPath);
     if (hasBootstrap) {
         console.log('  ' + C.purple('\u2728 First run detected \u2014 onboarding will start'));
     }
