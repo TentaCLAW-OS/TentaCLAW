@@ -2184,34 +2184,46 @@ async function executeCodeTool(
         case 'search_files': {
             const pattern = args['pattern'] || '';
             const dir = resolvePath(args['directory'] || '.');
-            const glob = args['file_pattern'] || '*';
+            const fileGlob = args['file_pattern'] || '*';
             if (!pattern) return 'Error: pattern required';
-            try {
-                // Use execFileSync with arg arrays to avoid shell injection
-                const filesRaw = execFileSync('grep', ['-rl', pattern, dir, `--include=${glob}`], {
-                    encoding: 'utf8',
-                    timeout: 10000,
-                    stdio: ['pipe', 'pipe', 'pipe'],
-                }).trim();
-                if (!filesRaw) return 'No matches found.';
-                const fileList = filesRaw.split('\n').slice(0, 5);
-                const results: string[] = [];
-                for (const f of fileList) {
-                    const hits = execFileSync('grep', ['-n', pattern, f], {
-                        encoding: 'utf8',
-                        timeout: 5000,
-                        stdio: ['pipe', 'pipe', 'pipe'],
-                    }).trim().split('\n').slice(0, 5).join('\n');
-                    results.push(`${f}:\n${hits}`);
+
+            // Pure Node.js search — no grep dependency, works on Windows/Linux/macOS
+            const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.next', '__pycache__', 'coverage']);
+            const globToRegex = (g: string) => new RegExp(
+                '^' + g.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$',
+                'i'
+            );
+            const fileRegex = globToRegex(fileGlob);
+            const matchFiles: Array<{ file: string; hits: string[] }> = [];
+
+            const walk = (d: string, depth: number): void => {
+                if (depth > 5 || matchFiles.length >= 5) return;
+                let entries: string[];
+                try { entries = fs.readdirSync(d); } catch { return; }
+                for (const entry of entries) {
+                    if (matchFiles.length >= 5) return;
+                    if (entry.startsWith('.') || SKIP_DIRS.has(entry)) continue;
+                    const full = path.join(d, entry);
+                    let stat: fs.Stats;
+                    try { stat = fs.statSync(full); } catch { continue; }
+                    if (stat.isDirectory()) {
+                        walk(full, depth + 1);
+                    } else if (stat.isFile() && fileRegex.test(entry)) {
+                        let content: string;
+                        try { content = fs.readFileSync(full, 'utf8').replace(/^\uFEFF/, ''); } catch { continue; }
+                        const lines = content.split('\n');
+                        const hits: string[] = [];
+                        for (let i = 0; i < lines.length && hits.length < 5; i++) {
+                            if (lines[i].includes(pattern)) hits.push(`${i + 1}: ${lines[i]}`);
+                        }
+                        if (hits.length > 0) matchFiles.push({ file: full, hits });
+                    }
                 }
-                return results.join('\n\n');
-            } catch (e: unknown) {
-                const err = e as { status?: number; stdout?: string };
-                // grep exits 1 when no matches found
-                if (err.status === 1) return 'No matches found.';
-                if (err.stdout) return err.stdout.trim().slice(0, 4000);
-                return `Search error: ${e instanceof Error ? e.message : String(e)}`;
-            }
+            };
+
+            walk(dir, 0);
+            if (matchFiles.length === 0) return 'No matches found.';
+            return matchFiles.map(m => `${m.file}:\n${m.hits.join('\n')}`).join('\n\n');
         }
 
         case 'edit_file': {

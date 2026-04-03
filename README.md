@@ -31,7 +31,7 @@
 ---
 
 <p align="center">
-  <img src="assets/terminal-screenshot.png" alt="CLAWtopus terminal" width="600">
+  <img src="assets/terminal-screenshot.png" alt="TentaCLAW terminal" width="600">
 </p>
 
 ---
@@ -91,7 +91,7 @@ cd gateway && npm install && npm run dev
 
 ## Why TentaCLAW?
 
-> "Eight arms. One mind. Zero compromises." &mdash; CLAWtopus
+> "Eight arms. One mind. Zero compromises." &mdash; TentaCLAW
 
 There are GPU inference tools. There are model runners. There are cluster schedulers. None of them are a complete operating system for your AI hardware.
 
@@ -389,25 +389,33 @@ TentaCLAW OS plays well with the tools you already use.
 ## CLI
 
 ```bash
-# Cluster overview
+# Install
+curl -fsSL tentaclaw.io/install-cli | bash   # Linux / macOS / Proxmox
+irm tentaclaw.io/install.ps1 | iex           # Windows PowerShell
+
+# Cluster management
 tentaclaw status                          # Nodes, GPUs, VRAM, tok/s
 tentaclaw nodes                           # List all cluster nodes
-
-# Chat with your cluster
-tentaclaw chat "Hello, world"             # Chat with the default model
-tentaclaw chat --model llama3.2 "Hi"      # Chat with a specific model
-
-# Model management
 tentaclaw models                          # List loaded models across cluster
+tentaclaw health                          # Health score with letter grade
+
+# AI coding agent — reads files, writes files, runs shell, iterates
+tentaclaw code                            # Interactive REPL
+tentaclaw code --model alexa-coder:latest # Use a specific model
+tentaclaw code --task "Write fizzbuzz.js and run it" --yes  # Non-interactive
+tentaclaw code --resume <sessionId>       # Resume a previous session
+
+# Chat
+tentaclaw chat --model llama3.1:8b        # Streaming chat, slash commands
 ```
 
 > Full CLI reference: **[docs/CLI.md](docs/CLI.md)**
 
 ---
 
-## CLAWtopus
+## The Octopus
 
-The octopus that runs your cluster. Eight arms, each with a job.
+Eight arms, each with a job. TentaCLAW keeps your cluster healthy so you don't have to.
 
 ```
             ___
@@ -416,7 +424,7 @@ The octopus that runs your cluster. Eight arms, each with a job.
           | \___/ |     "I'm gonna make you an inference
            \_____/        you can't refuse."
        .-~|||||||~-.
-      /  |||||||||| \         — CLAWtopus
+      /  |||||||||| \         — TentaCLAW
      {  /|\ /|\ /|\  }
       \ |||_|||_||| /     Arm 1: Route      Arm 5: Benchmark
        '-.______.-'       Arm 2: Balance     Arm 6: Overclock
@@ -424,7 +432,7 @@ The octopus that runs your cluster. Eight arms, each with a job.
         |   |   |         Arm 4: Deploy      Arm 8: Scale
 ```
 
-**CLAWtopus says:**
+**TentaCLAW says:**
 - *"Say hello to my little GPU."*
 - *"Leave the gun. Take the model weights."*
 - *"Per-token pricing is a scam."*
@@ -510,7 +518,7 @@ npm run test:coverage
 
 | Channel | Link |
 |---------|------|
-| **Discord** | [The Tank](https://discord.gg/tentaclaw) -- CLAWtopus lives here |
+| **Discord** | [The Tank](https://discord.gg/tentaclaw) -- TentaCLAW lives here |
 | **GitHub Discussions** | [Questions, ideas, showcase](https://github.com/TentaCLAW-OS/TentaCLAW/discussions) |
 | **GitHub Issues** | [Bugs and feature requests](https://github.com/TentaCLAW-OS/TentaCLAW/issues) |
 | **Website** | [tentaclaw.io](https://www.tentaclaw.io) |
