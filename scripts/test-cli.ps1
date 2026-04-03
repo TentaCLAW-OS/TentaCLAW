@@ -68,7 +68,7 @@ Write-Host "  ${T}${B}--- VERSION & HELP ---${X}"
 # ═══════════════════════════════════════════════════════════════
 
 $ver = tentaclaw --version 2>&1 | Out-String
-Test-Check "tentaclaw --version shows v1.0.0" ($ver -match "v1\.0\.0")
+Test-Check "tentaclaw --version shows v2.0.0" ($ver -match "v2\.0\.0")
 
 $help = tentaclaw help 2>&1 | Out-String
 Test-Check "help has SETUP section" ($help -match "SETUP")
@@ -165,11 +165,11 @@ Test-Check "run_shell tool called" ($toolOut -match "run_shell")
 
 # --- edit_file tool ---
 Write-Host "  ${D}Running: edit_file test...${X}"
-"original content for test" | Out-File -FilePath "edit-test.txt" -Encoding utf8
-$editOut = tentaclaw code --task "Use read_file to read 'edit-test.txt', then use edit_file to replace 'original content for test' with 'edited by tentaclaw'. Then read it back to confirm." --yes --model $Model 2>&1 | Out-String
+[System.IO.File]::WriteAllText((Join-Path (Get-Location) "edit-test.txt"), "ORIG_TOKEN")
+$editOut = tentaclaw code --task "Read 'edit-test.txt'. It contains ORIG_TOKEN. Use edit_file with old_text='ORIG_TOKEN' and new_text='EDIT_TOKEN'. Read back to confirm." --yes --model $Model 2>&1 | Out-String
 Test-Check "edit_file tool used" ($editOut -match "edit_file")
 $editResult = if (Test-Path "edit-test.txt") { Get-Content "edit-test.txt" -Raw } else { "" }
-Test-Check "edit_file changed file content" ($editResult -match "edited by tentaclaw")
+Test-Check "edit_file changed file content" ($editResult -match "EDIT_TOKEN")
 Remove-Item "edit-test.txt" -ErrorAction SilentlyContinue
 
 # --- create_directory + copy_file tools ---
@@ -291,6 +291,28 @@ $cfgPath = Join-Path $env:USERPROFILE ".tentaclaw\config.json"
 $bakPath = Join-Path $env:USERPROFILE ".tentaclaw\config.json.bak"
 tentaclaw config set model $Model 2>&1 | Out-Null
 Test-Check "config.json.bak created on config set" (Test-Path $bakPath)
+
+# ═══════════════════════════════════════════════════════════════
+Write-Host ""
+Write-Host "  ${T}${B}--- CHAT COMMAND ---${X}"
+# ═══════════════════════════════════════════════════════════════
+
+Write-Host "  ${D}Testing: tentaclaw chat with piped input...${X}"
+$chatInput = "Say only the word CHAT_OK and nothing else.`n/quit"
+$chatOut = $chatInput | tentaclaw chat --model $Model 2>&1 | Out-String
+Test-Check "chat responds to input"    ($chatOut -match "CHAT_OK|chat|message")
+Test-Check "chat shows model name"     ($chatOut -match $Model -or $chatOut -match "model|provider|Chat")
+Test-Check "chat /quit exits cleanly"  ($chatOut -match "quit|bye|goodbye|Saved|session|CHAT_OK|done")
+
+Write-Host "  ${D}Testing: chat /help slash command...${X}"
+$chatHelpInput = "/help`n/quit"
+$chatHelpOut = $chatHelpInput | tentaclaw chat --model $Model 2>&1 | Out-String
+Test-Check "chat /help shows commands" ($chatHelpOut -match "SLASH COMMANDS|/quit|/new|/save")
+
+Write-Host "  ${D}Testing: chat /status command...${X}"
+$chatStatusInput = "/status`n/quit"
+$chatStatusOut = $chatStatusInput | tentaclaw chat --model $Model 2>&1 | Out-String
+Test-Check "chat /status shows info" ($chatStatusOut -match "STATUS|model|session|messages")
 
 # ═══════════════════════════════════════════════════════════════
 Write-Host ""

@@ -55,7 +55,7 @@ const C = {
     italic:  (s: string) => `\x1b[3m${s}\x1b[0m`,
 };
 
-const CLI_VERSION = '1.0.0';
+const CLI_VERSION = '2.0.0';
 
 // =============================================================================
 // Config System — ~/.tentaclaw/config.json
@@ -2221,7 +2221,7 @@ async function executeCodeTool(
             if (!oldText) return 'Error: old_text is required';
             let content: string;
             try {
-                content = fs.readFileSync(filePath, 'utf8');
+                content = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, ''); // strip BOM
             } catch (e) {
                 return `Error reading: ${e instanceof Error ? e.message : String(e)}`;
             }

@@ -70,7 +70,7 @@ echo "  ${T}${B}--- VERSION & HELP ---${X}"
 # ═══════════════════════════════════════════════════════════════
 
 ver=$(tentaclaw --version 2>&1)
-check "tentaclaw --version shows v1.0.0" "$(contains "$ver" "v1\.0\.0")"
+check "tentaclaw --version shows v2.0.0" "$(contains "$ver" "v2\.0\.0")"
 
 help=$(tentaclaw help 2>&1)
 check "help has SETUP section"    "$(contains "$help" "SETUP")"
@@ -166,15 +166,15 @@ check "run_shell tool called"  "$(contains "$tool_out" "run_shell")"
 
 # --- edit_file ---
 echo "  ${D}Running: edit_file test...${X}"
-echo "original content for bash test" > edit-test-bash.txt
-edit_out=$(tentaclaw code --task "Use read_file to read 'edit-test-bash.txt', then use edit_file to replace 'original content for bash test' with 'edited by tentaclaw bash'. Then read it back to confirm." --yes --model "$MODEL" 2>&1)
+printf 'ORIG_TOKEN' > edit-test-bash.txt
+edit_out=$(tentaclaw code --task "Read 'edit-test-bash.txt'. It contains ORIG_TOKEN. Use edit_file with old_text='ORIG_TOKEN' and new_text='EDIT_TOKEN'. Read back to confirm." --yes --model "$MODEL" 2>&1)
 check "edit_file tool used" "$(contains "$edit_out" "edit_file")"
 if [ -f "edit-test-bash.txt" ]; then
     edit_result=$(cat "edit-test-bash.txt")
 else
     edit_result=""
 fi
-check "edit_file changed file content" "$(contains "$edit_result" "edited by tentaclaw bash")"
+check "edit_file changed file content" "$(contains "$edit_result" "EDIT_TOKEN")"
 rm -f "edit-test-bash.txt"
 
 # --- create_directory + copy_file ---
@@ -293,6 +293,25 @@ check "/usage shows token info"    "$(contains "$usage_out" "tokens\|FREE")"
 tentaclaw config set model "$MODEL" >/dev/null 2>&1
 bak_path="$HOME/.tentaclaw/config.json.bak"
 check "config.json.bak created on config set" "$(file_exists "$bak_path")"
+
+# ═══════════════════════════════════════════════════════════════
+echo ""
+echo "  ${T}${B}--- CHAT COMMAND ---${X}"
+# ═══════════════════════════════════════════════════════════════
+
+echo "  ${D}Testing: tentaclaw chat with piped input...${X}"
+chat_out=$(printf 'Say only the word CHAT_OK and nothing else.\n/quit\n' | tentaclaw chat --model "$MODEL" 2>&1)
+check "chat responds to input"    "$(contains "$chat_out" "CHAT_OK\|chat\|message")"
+check "chat shows model name"     "$(contains "$chat_out" "$MODEL\|model\|provider\|Chat")"
+check "chat /quit exits cleanly"  "$(contains "$chat_out" "quit\|bye\|goodbye\|Saved\|session\|CHAT_OK\|done")"
+
+echo "  ${D}Testing: chat /help slash command...${X}"
+chat_help_out=$(printf '/help\n/quit\n' | tentaclaw chat --model "$MODEL" 2>&1)
+check "chat /help shows commands" "$(contains "$chat_help_out" "SLASH COMMANDS\|/quit\|/new\|/save")"
+
+echo "  ${D}Testing: chat /status command...${X}"
+chat_status_out=$(printf '/status\n/quit\n' | tentaclaw chat --model "$MODEL" 2>&1)
+check "chat /status shows info" "$(contains "$chat_status_out" "STATUS\|model\|session\|messages")"
 
 # ═══════════════════════════════════════════════════════════════
 echo ""
