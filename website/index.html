@@ -542,6 +542,38 @@
     .dashboard-caption strong { color:var(--text); font-weight:600; }
 
     /* ============================================================
+       CLI SECTION
+       ============================================================ */
+    .cli-feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      margin: 40px 0;
+    }
+    .cli-feature-card {
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px;
+    }
+    .cli-feature-icon { font-size: 1.4rem; margin-bottom: 12px; }
+    .cli-feature-title { font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .cli-feature-desc { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
+    .cli-install-wrap { max-width: 640px; margin: 0 auto; }
+    .cli-install-spacer { margin-top: 12px; }
+    .cli-cta-wrap { text-align: center; margin-top: 32px; }
+    .cli-cta-btn {
+      display: inline-block;
+      padding: 12px 28px;
+      background: var(--teal);
+      color: #000;
+      font-weight: 700;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+
+    /* ============================================================
        INSTALL SECTION
        ============================================================ */
     .install-section {
@@ -1179,7 +1211,7 @@
         <div class="install-code-wrap">
           <div class="install-code-bar">
             <span>bash</span>
-            <button class="copy-btn" id="copyBtn" onclick="copyInstall()">Copy</button>
+            <button type="button" class="copy-btn" id="copyBtn" onclick="copyInstall()">Copy</button>
           </div>
           <div class="install-code">
             <span class="dollar">$</span>curl -fsSL tentaclaw.io/install | bash
@@ -1203,6 +1235,67 @@
             <div class="step-desc">Start serving models</div>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="glow-line"></div>
+
+  <!-- ============================================================
+       CLI SECTION
+       ============================================================ -->
+  <section class="section" id="cli">
+    <div class="section-inner reveal">
+      <div class="section-label">AI Coding Agent</div>
+      <h2 class="section-title">TentaCLAW CLI</h2>
+      <p class="section-sub">
+        A coding agent that runs on your own cluster. No cloud. No subscriptions.<br>
+        Reads files, writes files, runs commands, and iterates until the task is done.
+      </p>
+
+      <div class="cli-feature-grid">
+        <div class="cli-feature-card">
+          <div class="cli-feature-icon">🐙</div>
+          <div class="cli-feature-title">Agentic code loop</div>
+          <div class="cli-feature-desc">Reads, writes, edits files. Runs shell commands. Searches codebases. Iterates until done.</div>
+        </div>
+        <div class="cli-feature-card">
+          <div class="cli-feature-icon">💾</div>
+          <div class="cli-feature-title">Persistent memory</div>
+          <div class="cli-feature-desc">Workspace files, session history, JSONL event logs. Resume any session where you left off.</div>
+        </div>
+        <div class="cli-feature-card">
+          <div class="cli-feature-icon">⚡</div>
+          <div class="cli-feature-title">Zero dependencies</div>
+          <div class="cli-feature-desc">Pure Node.js. No npm packages beyond TypeScript types. Works on Linux, macOS, Windows, Proxmox.</div>
+        </div>
+      </div>
+
+      <div class="cli-install-wrap">
+        <div class="install-code-wrap">
+          <div class="install-code-bar">
+            <span>bash</span>
+            <button type="button" class="copy-btn" onclick="navigator.clipboard.writeText('curl -fsSL tentaclaw.io/install-cli | bash')">Copy</button>
+          </div>
+          <div class="install-code">
+            <span class="dollar">$</span>curl -fsSL tentaclaw.io/install-cli | bash
+          </div>
+        </div>
+        <div class="install-code-wrap cli-install-spacer">
+          <div class="install-code-bar">
+            <span>powershell</span>
+            <button type="button" class="copy-btn" onclick="navigator.clipboard.writeText('irm tentaclaw.io/install.ps1 | iex')">Copy</button>
+          </div>
+          <div class="install-code">
+            <span class="dollar">PS&gt;</span>irm tentaclaw.io/install.ps1 | iex
+          </div>
+        </div>
+      </div>
+
+      <div class="cli-cta-wrap">
+        <a href="https://github.com/TentaCLAW-OS/tentaclaw-os/blob/master/docs/CLI.md" class="cli-cta-btn">
+          CLI Docs →
+        </a>
       </div>
     </div>
   </section>

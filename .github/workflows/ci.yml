@@ -253,6 +253,23 @@ jobs:
       - name: Build CLI
         run: cd cli && npx tsc
 
+      - name: Verify CLI build output
+        run: |
+          if [ ! -f "cli/dist/index.js" ]; then
+            echo "ERROR: cli/dist/index.js not found after build"
+            exit 1
+          fi
+          node cli/dist/index.js --version
+          echo "CLI build OK: $(node cli/dist/index.js --version)"
+
+      - name: Report CLI version in job summary
+        run: |
+          echo "## CLI Build" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Field | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Version | $(node cli/dist/index.js --version 2>/dev/null || echo 'unknown') |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Entry point | \`cli/dist/index.js\` |" >> "$GITHUB_STEP_SUMMARY"
+
   # ---------------------------------------------------------------------------
   # Security Scan — Dependency audit + Trivy container scan (Wave 4)
   # ---------------------------------------------------------------------------
