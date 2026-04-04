@@ -5170,6 +5170,11 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
         appendSessionEvent(sessionId, { type: 'session_end', timestamp: new Date().toISOString(), sessionId });
         const msgCount = messages.filter(m => m.role === 'user').length;
         updateSessionMeta(sessionId, { messageCount: msgCount, tokenCount: sessionUsage.totalTokens });
+        try {
+            const fd = fs.openSync(path.join(getSessionsDir(), `${sessionId}.jsonl`), 'r');
+            fs.fsyncSync(fd);
+            fs.closeSync(fd);
+        } catch { /* best effort */ }
         if (bootstrapConsumed) {
             try { fs.unlinkSync(bootstrapPath); } catch { /* ok */ }
         }
