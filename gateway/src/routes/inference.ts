@@ -624,7 +624,8 @@ routes.post('/v1/messages', async (c) => {
                     controller.enqueue(encoder.encode('event: content_block_start\ndata: ' + JSON.stringify(blockStart) + '\n\n'));
 
                     try {
-                        while (true) {
+                        let doneReading = false;
+                        while (!doneReading) {
                             const { done, value } = await reader.read();
                             if (done) break;
 
@@ -635,7 +636,10 @@ routes.post('/v1/messages', async (c) => {
                             for (const line of lines) {
                                 if (!line.startsWith('data: ')) continue;
                                 const data = line.slice(6).trim();
-                                if (data === '[DONE]') continue;
+                                if (data === '[DONE]') {
+                                    doneReading = true;
+                                    break;
+                                }
 
                                 try {
                                     const chunk = JSON.parse(data);
