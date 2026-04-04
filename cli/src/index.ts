@@ -96,11 +96,9 @@ function saveConfig(config: TentaclawConfig): void {
     const dir = getConfigDir();
     fs.mkdirSync(dir, { recursive: true });
     const cfgPath = getConfigPath();
-    // Backup before write
-    if (fs.existsSync(cfgPath)) {
-        try { fs.copyFileSync(cfgPath, cfgPath + '.bak'); } catch { /* ok */ }
-    }
-    fs.writeFileSync(cfgPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+    const tmpPath = cfgPath + '.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
+    fs.renameSync(tmpPath, cfgPath);
 }
 
 /** Resolve inference endpoint + auth headers from config */
