@@ -60,6 +60,9 @@ import adminRoutes from './routes/admin';
 import dashboardRoutes from './routes/dashboard';
 import namespaceRoutes from './routes/namespaces';
 import miscRoutes from './routes/misc';
+import routingRoutes from './routes/routing'; // Wave 468-472
+import fleetRoutes, { checkGpuHangs } from './routes/fleet'; // Wave 480-498
+import observabilityRoutes from './routes/observability'; // Wave 491-500
 
 // Re-export for tests
 export { app, initClusterSecret, isAuthDisabled, log, paginate };
@@ -319,6 +322,9 @@ app.route('/', modelRoutes);
 app.route('/', adminRoutes);
 app.route('/', dashboardRoutes);
 app.route('/', namespaceRoutes);
+app.route('/', routingRoutes); // Wave 468-472
+app.route('/', fleetRoutes);           // Wave 480-498
+app.route('/', observabilityRoutes);   // Wave 491-500
 app.route('/', miscRoutes);
 
 // Root redirect to dashboard (must be after route mounting since misc has '/')
@@ -347,6 +353,15 @@ setInterval(() => {
         console.log(`[tentaclaw] Pruned ${pruned} old stats records`);
     }
 }, 86_400_000);
+
+// Wave 494: GPU hang detection — check every 60s, alert if in-flight > 0 and tok/s = 0 for >60s
+setInterval(() => {
+    const hangs = checkGpuHangs();
+    for (const hang of hangs) {
+        console.warn(`[tentaclaw] GPU hang detected: ${hang.hostname} (${hang.node_id}) — ${hang.duration_s}s stalled`);
+        broadcastSSE('gpu_hang', { node_id: hang.node_id, hostname: hang.hostname, duration_s: hang.duration_s });
+    }
+}, 60_000);
 
 // Run scheduled tasks every 60 seconds
 setInterval(() => {

@@ -56,7 +56,7 @@ const C = {
     italic:  (s: string) => `\x1b[3m${s}\x1b[0m`,
 };
 
-const CLI_VERSION = '2.34.0';
+const CLI_VERSION = '2.35.0';
 
 // Wave 341: module-level .clawignore patterns — set by cmdCode, used by executeCodeTool
 let _clawIgnorePatterns: string[] = [];
@@ -4006,6 +4006,50 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
             }
         } catch { /* skip unreadable */ }
     }
+    // Wave 531: project-aware context — auto-detect language/framework and inject relevant hints
+    try {
+        const cwd = process.cwd();
+        const detected531: string[] = [];
+        if (fs.existsSync(path.join(cwd, 'package.json'))) {
+            try {
+                const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'));
+                const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+                if (deps['next']) detected531.push('Next.js');
+                else if (deps['react']) detected531.push('React');
+                if (deps['express']) detected531.push('Express');
+                if (deps['hono']) detected531.push('Hono');
+                if (deps['typescript'] || fs.existsSync(path.join(cwd, 'tsconfig.json'))) detected531.push('TypeScript');
+                else detected531.push('JavaScript/Node.js');
+                if (deps['vitest'] || deps['jest']) detected531.push(deps['vitest'] ? 'Vitest' : 'Jest');
+                if (deps['prisma'] || deps['@prisma/client']) detected531.push('Prisma');
+                if (deps['tailwindcss']) detected531.push('Tailwind CSS');
+            } catch { detected531.push('Node.js'); }
+        } else if (fs.existsSync(path.join(cwd, 'Cargo.toml'))) {
+            detected531.push('Rust/Cargo');
+        } else if (fs.existsSync(path.join(cwd, 'go.mod'))) {
+            detected531.push('Go');
+        } else if (fs.existsSync(path.join(cwd, 'pyproject.toml')) || fs.existsSync(path.join(cwd, 'setup.py')) || fs.existsSync(path.join(cwd, 'requirements.txt'))) {
+            detected531.push('Python');
+            if (fs.existsSync(path.join(cwd, 'manage.py'))) detected531.push('Django');
+            else if (fs.existsSync(path.join(cwd, 'app.py'))) detected531.push('Flask/FastAPI');
+        } else if (fs.existsSync(path.join(cwd, 'Makefile'))) {
+            detected531.push('C/C++ (Makefile)');
+        }
+        if (fs.existsSync(path.join(cwd, '.git'))) detected531.push('Git');
+        if (fs.existsSync(path.join(cwd, 'Dockerfile')) || fs.existsSync(path.join(cwd, 'docker-compose.yml'))) detected531.push('Docker');
+        if (detected531.length > 0) {
+            systemPrompt += `\n\n## Detected Stack\n${detected531.join(', ')}`;
+        }
+    } catch { /* skip detection errors */ }
+
+    // Wave 536: diff-aware context — inject recent git diff into system prompt
+    try {
+        const diffResult = execSync('git diff HEAD --stat 2>/dev/null || true', { encoding: 'utf8', stdio: 'pipe', timeout: 3000 }).trim();
+        if (diffResult && diffResult.length < 2000) {
+            systemPrompt += `\n\n## Recent Changes (git diff --stat)\n\`\`\`\n${diffResult}\n\`\`\``;
+        }
+    } catch { /* not a git repo or git unavailable */ }
+
     // Detect first-run bootstrap — only in interactive mode, not --task
     const bootstrapPath = path.join(getWorkspaceDir(), 'BOOTSTRAP.md');
     const hasBootstrap = !taskFlag && fs.existsSync(bootstrapPath);
@@ -4123,6 +4167,31 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
         const mentionsSpecificFile = userMessage.match(/\b[\w./\\-]+\.[a-z]{2,6}\b/i);
         if (isShortEditTask && mentionsSpecificFile && messages.filter(m => m.role === 'user').length === 0) {
             actualMessage = `${actualMessage}\n\n[REMINDER: read_file("${mentionsSpecificFile[0]}") first before editing]`;
+        }
+        // Wave 537: error context — when user pastes an error with file:line references, auto-inject those file contents
+        const errorLooksLike537 = /\b(error|exception|traceback|panic|failed|undefined is not|cannot read|cannot find|type ?error|reference ?error|syntax ?error)\b/i.test(userMessage);
+        if (errorLooksLike537 && messages.filter(m => m.role === 'user').length === 0) {
+            // Extract file:line references from error messages
+            const fileLineRefs = userMessage.match(/(?:[\w./\\-]+\.[a-z]{2,6}):(\d+)/gi) || [];
+            const injected537: string[] = [];
+            for (const ref of fileLineRefs.slice(0, 3)) {
+                const [filePath537, lineStr] = ref.split(':');
+                if (!filePath537 || !lineStr) continue;
+                const absPath537 = path.resolve(filePath537);
+                if (!fs.existsSync(absPath537)) continue;
+                try {
+                    const content537 = fs.readFileSync(absPath537, 'utf8');
+                    const lines537 = content537.split('\n');
+                    const lineNum537 = parseInt(lineStr, 10);
+                    const start537 = Math.max(0, lineNum537 - 5);
+                    const end537 = Math.min(lines537.length, lineNum537 + 5);
+                    const snippet = lines537.slice(start537, end537).map((l, i) => `${start537 + i + 1}: ${l}`).join('\n');
+                    injected537.push(`[Auto-read ${filePath537}:${lineNum537}]\n\`\`\`\n${snippet}\n\`\`\``);
+                } catch { /* skip unreadable */ }
+            }
+            if (injected537.length > 0) {
+                actualMessage = `${actualMessage}\n\n${injected537.join('\n\n')}`;
+            }
         }
         // Wave 425: inject compact file listing on first message when task involves files/code
         const looksFileRelated425 = /\b(file|dir|folder|read|write|edit|create|list|find|search|glob|run|build|code|project|src|test)\b/i.test(actualMessage);
@@ -12827,10 +12896,39 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
         }
 
         case 'top': {
+            // Wave 500: --gpus flag shows per-GPU view via /api/v1/fleet/gpus
+            const gpuMode500 = parsed.flags['gpus'] === 'true' || parsed.flags['gpu'] === 'true' || parsed.flags['cluster'] === 'true';
             console.log('');
-            console.log('  ' + C.teal(C.bold('CLUSTER TOP')) + C.dim(' \u2014 refreshing every 3s (Ctrl+C to quit)'));
+            console.log('  ' + C.teal(C.bold(gpuMode500 ? 'CLUSTER GPU TOP' : 'CLUSTER TOP')) + C.dim(' \u2014 refreshing every 3s (Ctrl+C to quit)'));
             console.log('');
             const refreshTop = async () => {
+                if (gpuMode500) {
+                    const gpuData = await apiGet(gateway, '/api/v1/fleet/gpus') as { gpus: Array<{ hostname: string; gpu_index: number; name: string; util_pct: number; temp_c: number; vram_used_mb: number; vram_total_mb: number; fan_pct: number; model_loaded: string }> };
+                    process.stdout.write('\x1b[2J\x1b[H');
+                    const W = 90;
+                    console.log(boxTop('TENTACLAW GPU TOP  ' + new Date().toLocaleTimeString() + '  ' + (gpuData.gpus?.length || 0) + ' GPUs', W));
+                    console.log(boxMid(
+                        padRight(C.dim('NODE'), 14) + padRight(C.dim('#'), 3) +
+                        padRight(C.dim('GPU'), 22) + padRight(C.dim('UTIL'), 12) +
+                        padRight(C.dim('TEMP'), 10) + padRight(C.dim('VRAM'), 14) +
+                        C.dim('MODEL'), W
+                    ));
+                    console.log(boxSep(W));
+                    for (const g of (gpuData.gpus || [])) {
+                        const tFn = tempColor(g.temp_c);
+                        console.log(boxMid(
+                            padRight(C.white(g.hostname), 14) + padRight(C.dim(String(g.gpu_index)), 3) +
+                            padRight(C.white(g.name.slice(0, 20)), 22) +
+                            padRight(miniBar(g.util_pct, 5) + ' ' + C.white(g.util_pct + '%'), 12) +
+                            padRight(tFn(g.temp_c + '\u00B0C'), 10) +
+                            padRight(C.teal(Math.round(g.vram_used_mb / 1024) + '/' + Math.round(g.vram_total_mb / 1024) + 'G'), 14) +
+                            C.dim(g.model_loaded || '-'), W
+                        ));
+                    }
+                    console.log(boxBot(W));
+                    console.log('  ' + C.dim('Press Ctrl+C to exit'));
+                    return;
+                }
                 const topRaw = await apiGet(gateway, '/api/v1/nodes') as any;
                 const topNodes: Array<{ id: string; hostname: string; status: string; gpu_count: number; latest_stats?: { gpus: Array<{ temperatureC: number; utilizationPct: number; vramUsedMb: number; vramTotalMb: number; powerDrawW: number }>; cpu: { usage_pct: number }; inference: { loaded_models: string[]; in_flight_requests: number } } }> = Array.isArray(topRaw) ? topRaw : (topRaw?.nodes ?? []);
                 process.stdout.write('\x1b[2J\x1b[H'); // clear screen
