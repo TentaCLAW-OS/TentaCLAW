@@ -253,7 +253,7 @@ interface SessionEvent {
     tool_calls?: unknown;
     tool_call_id?: string;
     name?: string;
-    usage?: { inputTokens: number; outputTokens: number; totalTokens: number };
+    usage?: { inputTokens: number; outputTokens: number; totalTokens: number; cumulativeInput?: number; cumulativeOutput?: number; cumulativeTotal?: number };
     metadata?: Record<string, unknown>;
 }
 
