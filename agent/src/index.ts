@@ -1161,7 +1161,7 @@ async function pushStats(config: AgentConfig, stats: StatsPayload): Promise<Gate
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'User-Agent': 'TentaCLAW-Agent/0.1.0',
+                'User-Agent': `TentaCLAW-Agent/${AGENT_VERSION}`,
                 ...(config.clusterSecret ? { 'X-Cluster-Secret': config.clusterSecret } : {}),
             },
             timeout: 10000,
@@ -1265,7 +1265,7 @@ async function postBenchmarkResult(model: string, result: {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'User-Agent': 'TentaCLAW-Agent/0.1.0',
+                'User-Agent': `TentaCLAW-Agent/${AGENT_VERSION}`,
                 ...(config.clusterSecret ? { 'X-Cluster-Secret': config.clusterSecret } : {}),
             },
             timeout: 10000,
