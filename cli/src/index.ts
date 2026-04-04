@@ -297,7 +297,10 @@ function saveSessionIndex(index: Record<string, SessionMeta>): void {
     const trimmed: Record<string, SessionMeta> = {};
     for (const e of entries.slice(0, 500)) trimmed[e.sessionId] = e;
     fs.mkdirSync(getSessionsDir(), { recursive: true });
-    fs.writeFileSync(getSessionIndexPath(), JSON.stringify(trimmed, null, 2) + '\n');
+    const indexPath = getSessionIndexPath();
+    const tmpPath = indexPath + '.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(trimmed, null, 2) + '\n');
+    fs.renameSync(tmpPath, indexPath);
 }
 
 function appendSessionEvent(sessionId: string, event: SessionEvent): void {
@@ -4769,30 +4772,32 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
             // EXCEPTION: only allow multi-tool continuation if task explicitly asks for multiple files
             const taskMentionsMultiFile = taskFlag && /\b(two files|three files|both files|multiple files|also create|and create|and a [\w.]+ file)\b/i.test(taskFlag);
             if (toolCalls.length === 0 && taskFlag && sessionToolCallCount > 0 && !(taskMentionsMultiFile && sessionToolCallCount < 4)) {
-                if (fullContent) {
+                if (fullContent && fullContent.trim().length > 0) {
                     messages.push({ role: 'assistant', content: fullContent });
                     appendSessionEvent(sessionId, {
                         type: 'message', timestamp: new Date().toISOString(), sessionId,
                         role: 'assistant', content: fullContent, model,
                     });
+                    sessionUsage.requestCount++;
+                    appendSessionEvent(sessionId, {
+                        type: 'usage', timestamp: new Date().toISOString(), sessionId,
+                        usage: {
+                            inputTokens: sessionUsage.inputTokens - prevSessionInput,
+                            outputTokens: sessionUsage.outputTokens - prevSessionOutput,
+                            totalTokens: sessionUsage.totalTokens - prevSessionTotal,
+                            cumulativeInput: sessionUsage.inputTokens,
+                            cumulativeOutput: sessionUsage.outputTokens,
+                            cumulativeTotal: sessionUsage.totalTokens,
+                        },
+                        metadata: { model, requestCount: sessionUsage.requestCount },
+                    });
+                    if (!jsonMode) {
+                        if (printMode) { process.stdout.write('\n'); } else { console.log(''); }
+                    }
+                    return;
                 }
-                sessionUsage.requestCount++;
-                appendSessionEvent(sessionId, {
-                    type: 'usage', timestamp: new Date().toISOString(), sessionId,
-                    usage: {
-                        inputTokens: sessionUsage.inputTokens - prevSessionInput,
-                        outputTokens: sessionUsage.outputTokens - prevSessionOutput,
-                        totalTokens: sessionUsage.totalTokens - prevSessionTotal,
-                        cumulativeInput: sessionUsage.inputTokens,
-                        cumulativeOutput: sessionUsage.outputTokens,
-                        cumulativeTotal: sessionUsage.totalTokens,
-                    },
-                    metadata: { model, requestCount: sessionUsage.requestCount },
-                });
-                if (!jsonMode) {
-                    if (printMode) { process.stdout.write('\n'); } else { console.log(''); }
-                }
-                return;
+                // No final content — let the loop continue for one more try
+                continue;
             }
 
             // No tool calls — final response
@@ -7404,7 +7409,7 @@ async function cmdPower(gateway: string): Promise<void> {
     const data = await apiGet(gateway, '/api/v1/power') as any;
 
     const totalW = data.total_watts || 0;
-    const dailyKwh = data.daily_kwh || data.daily_cost_usd ? ((totalW * 24) / 1000) : 0;
+    const dailyKwh = data.daily_kwh || ((totalW * 24) / 1000);
     const monthlyKwh = dailyKwh * 30;
     const rate = data.electricity_rate || data.cost_per_kwh || 0.12;
     const dailyCost = data.daily_cost || data.daily_cost_usd || (dailyKwh * rate);
@@ -9297,7 +9302,7 @@ async function cmdConfigCli(positional: string[]): Promise<void> {
                 console.log('  ' + padRight(C.dim('openai.apiKey'), 18) + C.dim(config.openai.apiKey.slice(0, 8) + '...' + config.openai.apiKey.slice(-4)));
                 if (config.openai.baseUrl) console.log('  ' + padRight(C.dim('openai.baseUrl'), 18) + C.white(config.openai.baseUrl));
             }
-            if (config.openrouter) console.log('  ' + padRight(C.dim('openrouter.key'), 18) + C.dim(config.openrouter.apiKey.slice(0, 8) + '...'));
+            if (config.openrouter?.apiKey) console.log('  ' + padRight(C.dim('openrouter.key'), 18) + C.dim(config.openrouter.apiKey.slice(0, 8) + '...'));
             if (config.custom) {
                 console.log('  ' + padRight(C.dim('custom.baseUrl'), 18) + C.white(config.custom.baseUrl));
                 if (config.custom.apiKey) console.log('  ' + padRight(C.dim('custom.apiKey'), 18) + C.dim('(set)'));
@@ -12879,7 +12884,8 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
         }
 
         case 'alert-rules': {
-            const { rules } = await apiGet(gateway, '/api/v1/alert-rules') as { rules: Array<{ id: string; name: string; metric: string; operator: string; threshold: number; severity: string; enabled: number }> };
+            const alertRulesResponse = await apiGet(gateway, '/api/v1/alert-rules') as { rules?: Array<{ id: string; name: string; metric: string; operator: string; threshold: number; severity: string; enabled: number }> } | null;
+            const rules = alertRulesResponse?.rules || [];
             console.log('');
             console.log('  ' + C.teal(C.bold('ALERT RULES')));
             console.log('');
