@@ -3899,12 +3899,14 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
 
     // Build system prompt — task mode gets a stripped-down version for better small-model focus
     let systemPrompt = taskFlag
-        ? `You are an expert programmer. Complete the task by calling write_file with COMPLETE, WORKING code.
+        ? `You are an expert programmer. Complete the task using tools. Do NOT explain — just call the tool.
 
 RULES:
-- Write FULL implementations. Never use 'pass', stubs, or placeholders.
-- Call write_file IMMEDIATELY. Do not explain first.
-- One tool call, then a one-line summary. That's it.
+- For creating files: call write_file with COMPLETE, WORKING code. No stubs, no 'pass'.
+- For running commands: call run_shell.
+- For reading files: call read_file.
+- For editing files: call read_file first, then edit_file with exact old_text.
+- Call tools IMMEDIATELY. Do not describe what you will do.
 - CWD: ${process.cwd()}`
         : `You are TentaCLAW Code Agent — an expert AI software engineer embedded in TentaCLAW OS.
 
@@ -4609,6 +4611,8 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                                 contentRaw = contentRaw.slice(colonIdx + 1).trim();
                                 // Remove leading quotes/triple-quotes
                                 contentRaw = contentRaw.replace(/^["']{1,3}/, '').replace(/["']{1,3}\s*\}?\s*\}?\s*$/, '');
+                                // Unescape common escape sequences that models output as literal chars
+                                contentRaw = contentRaw.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\r/g, '\r');
                                 toolCalls.push({ id: `call_embed_${Date.now()}_${toolCalls.length}`, name: tcName577, args: JSON.stringify({ path: tcPath, content: contentRaw }) });
                             }
                         } else if (tcName577) {
@@ -4628,7 +4632,9 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
 
             // Task mode early exit: if a tool already created/edited a file, and this response
             // has no more tool calls, the task is done. Don't let the model ramble or hallucinate.
-            if (toolCalls.length === 0 && taskFlag && sessionToolCallCount > 0) {
+            // EXCEPTION: if the ORIGINAL TASK asks for multiple files, let the model continue
+            const taskMentionsMultiple = taskFlag && /\b(two|three|both|multiple|and a|also create|second file|another file)\b/i.test(taskFlag);
+            if (toolCalls.length === 0 && taskFlag && sessionToolCallCount > 0 && !(taskMentionsMultiple && sessionToolCallCount < 3)) {
                 if (fullContent) {
                     messages.push({ role: 'assistant', content: fullContent });
                     appendSessionEvent(sessionId, {
@@ -4960,9 +4966,10 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
 
                 // Wave 577: for embedTools mode, send tool result as user message with <tool_response> tags
                 if (useEmbedTools) {
-                    // In task mode: after a successful write/create, tell the model to STOP
+                    // In task mode: after a successful write/create, hint completion
+                    // Don't force stop — the task might need multiple files
                     const isSuccess577 = ['Created:', 'Overwritten:', 'Edited:', 'Appended'].some(p => result452.startsWith(p));
-                    const stopHint577 = (taskFlag && isSuccess577) ? '\n\nTask complete. Write a one-line summary and stop.' : '';
+                    const stopHint577 = (taskFlag && isSuccess577) ? '\n\nIf the task is complete, write a one-line summary. If more files are needed, create them now.' : '';
                     messages.push({ role: 'user', content: `<tool_response>\n${result452}${stopHint577}\n</tool_response>` });
                 } else {
                     messages.push({ role: 'tool', tool_call_id: tcId, name: tc.name, content: result452 });
