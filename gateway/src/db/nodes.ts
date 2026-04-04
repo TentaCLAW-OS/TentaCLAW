@@ -26,28 +26,30 @@ export function registerNode(reg: {
 }): Node {
     const d = getDb();
 
-    const existing = d.prepare('SELECT id FROM nodes WHERE id = ?').get(reg.node_id) as { id: string } | undefined;
+    d.transaction(() => {
+        const existing = d.prepare('SELECT id FROM nodes WHERE id = ?').get(reg.node_id) as { id: string } | undefined;
 
-    if (existing) {
-        d.prepare(`
-            UPDATE nodes SET
-                farm_hash = ?, hostname = ?, ip_address = ?, mac_address = ?,
-                gpu_count = ?, os_version = ?, status = 'online', last_seen_at = datetime('now')
-            WHERE id = ?
-        `).run(
-            reg.farm_hash, reg.hostname, reg.ip_address || null, reg.mac_address || null,
-            reg.gpu_count, reg.os_version || null, reg.node_id
-        );
-    } else {
-        d.prepare(`
-            INSERT INTO nodes (id, farm_hash, hostname, ip_address, mac_address, gpu_count, os_version, status, last_seen_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'online', datetime('now'))
-        `).run(
-            reg.node_id, reg.farm_hash, reg.hostname,
-            reg.ip_address || null, reg.mac_address || null,
-            reg.gpu_count, reg.os_version || null
-        );
-    }
+        if (existing) {
+            d.prepare(`
+                UPDATE nodes SET
+                    farm_hash = ?, hostname = ?, ip_address = ?, mac_address = ?,
+                    gpu_count = ?, os_version = ?, status = 'online', last_seen_at = datetime('now')
+                WHERE id = ?
+            `).run(
+                reg.farm_hash, reg.hostname, reg.ip_address || null, reg.mac_address || null,
+                reg.gpu_count, reg.os_version || null, reg.node_id
+            );
+        } else {
+            d.prepare(`
+                INSERT INTO nodes (id, farm_hash, hostname, ip_address, mac_address, gpu_count, os_version, status, last_seen_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'online', datetime('now'))
+            `).run(
+                reg.node_id, reg.farm_hash, reg.hostname,
+                reg.ip_address || null, reg.mac_address || null,
+                reg.gpu_count, reg.os_version || null
+            );
+        }
+    })();
 
     return d.prepare('SELECT * FROM nodes WHERE id = ?').get(reg.node_id) as Node;
 }
@@ -115,12 +117,11 @@ export function updateNodeStatus(nodeId: string, status: NodeStatus): void {
  */
 export function markStaleNodes(thresholdSecs: number = 60): string[] {
     const d = getDb();
-    const cutoff = new Date(Date.now() - thresholdSecs * 1000).toISOString().replace('T', ' ').slice(0, 19);
     const stale = d.prepare(`
         SELECT id FROM nodes
         WHERE status = 'online'
-        AND last_seen_at < ?
-    `).all(cutoff) as { id: string }[];
+        AND (julianday('now') - julianday(last_seen_at)) * 86400 > ?
+    `).all(thresholdSecs) as { id: string }[];
 
     if (stale.length > 0) {
         const stmt = d.prepare("UPDATE nodes SET status = 'offline' WHERE id = ?");
