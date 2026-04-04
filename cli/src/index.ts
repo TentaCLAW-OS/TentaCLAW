@@ -543,20 +543,8 @@ _(e.g., pve-gpu: RTX 4070 Ti Super, pve-vega2: Vega 64)_
 # - Review today's memory log and update MEMORY.md with what matters
 # - Check if any TODOs were added since last session
 `,
-    'BOOTSTRAP.md': `# First-Run Onboarding
-
-This is your first session with this user. Before doing anything else:
-
-1. Introduce yourself as TentaCLAW — their AI coding assistant with eight arms and one mind.
-2. Ask their name and what to call them.
-3. Ask their role (developer, researcher, founder, etc.).
-4. Ask what languages and tools they primarily use.
-5. Ask what they're working on right now (project context).
-6. Update USER.md with their answers using edit_file.
-7. Then proceed with whatever they originally asked.
-
-Keep the onboarding quick — one message, not an interview. This file will be deleted after your first session.
-`,
+    // BOOTSTRAP.md removed from defaults — it was recreated every session, blocking real work.
+    // First-run onboarding is handled by checking if USER.md has default content instead.
 };
 
 function ensureWorkspace(): void {
@@ -4632,9 +4620,9 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
 
             // Task mode early exit: if a tool already created/edited a file, and this response
             // has no more tool calls, the task is done. Don't let the model ramble or hallucinate.
-            // EXCEPTION: if the ORIGINAL TASK asks for multiple files, let the model continue
-            const taskMentionsMultiple = taskFlag && /\b(two|three|both|multiple|and a|also create|second file|another file)\b/i.test(taskFlag);
-            if (toolCalls.length === 0 && taskFlag && sessionToolCallCount > 0 && !(taskMentionsMultiple && sessionToolCallCount < 3)) {
+            // EXCEPTION: only allow multi-tool continuation if task explicitly asks for multiple files
+            const taskMentionsMultiFile = taskFlag && /\b(two files|three files|both files|multiple files|also create|and create|and a [\w.]+ file)\b/i.test(taskFlag);
+            if (toolCalls.length === 0 && taskFlag && sessionToolCallCount > 0 && !(taskMentionsMultiFile && sessionToolCallCount < 4)) {
                 if (fullContent) {
                     messages.push({ role: 'assistant', content: fullContent });
                     appendSessionEvent(sessionId, {
@@ -4968,8 +4956,8 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                 if (useEmbedTools) {
                     // In task mode: after a successful write/create, hint completion
                     // Don't force stop — the task might need multiple files
-                    const isSuccess577 = ['Created:', 'Overwritten:', 'Edited:', 'Appended'].some(p => result452.startsWith(p));
-                    const stopHint577 = (taskFlag && isSuccess577) ? '\n\nIf the task is complete, write a one-line summary. If more files are needed, create them now.' : '';
+                    const isSuccess577 = ['Created:', 'Overwritten:', 'Edited:', 'Appended', 'Deleted:'].some(p => result452.startsWith(p));
+                    const stopHint577 = (taskFlag && isSuccess577) ? '\n\nTask done. Write a one-line summary. Do NOT create, write, or modify any other files.' : '';
                     messages.push({ role: 'user', content: `<tool_response>\n${result452}${stopHint577}\n</tool_response>` });
                 } else {
                     messages.push({ role: 'tool', tool_call_id: tcId, name: tc.name, content: result452 });
@@ -5057,6 +5045,25 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
         return;
     }
 
+    // Auto-detect piped input: if stdin is not a TTY, read all input and run as task
+    if (!process.stdin.isTTY) {
+        const chunks: Buffer[] = [];
+        for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
+        const pipedInput = Buffer.concat(chunks).toString('utf8').trim();
+        if (pipedInput) {
+            if (!printMode) console.log('  ' + C.dim(`Piped input: ${pipedInput.slice(0, 60)}${pipedInput.length > 60 ? '...' : ''}`));
+            rl = null;
+            try { await runAgentLoop(pipedInput); } catch (e) { console.error(C.red('  Error: ' + (e instanceof Error ? e.message : String(e)))); }
+            const pipedMsgCount = messages.filter(m => m.role === 'user').length;
+            if (!printMode) {
+                console.log('');
+                console.log('  ' + C.dim(`Done. ${pipedMsgCount} exchange${pipedMsgCount !== 1 ? 's' : ''}, ${sessionToolCallCount} tool call${sessionToolCallCount !== 1 ? 's' : ''}, ${formatTokens(sessionUsage.totalTokens)} tokens.`));
+            }
+            appendSessionEvent(sessionId, { type: 'session_end', timestamp: new Date().toISOString(), sessionId });
+            return;
+        }
+    }
+
     // Interactive REPL mode
     rl = readline.createInterface({
         input: process.stdin,
@@ -5065,6 +5072,16 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
     });
 
     rl.prompt();
+
+    // Graceful stdin close — piped input EOF or Ctrl+D
+    rl.on('close', () => {
+        appendSessionEvent(sessionId, { type: 'session_end', timestamp: new Date().toISOString(), sessionId });
+        const msgCount = messages.filter(m => m.role === 'user').length;
+        updateSessionMeta(sessionId, { messageCount: msgCount, tokenCount: sessionUsage.totalTokens });
+        // Always delete bootstrap on session end — prevents stale onboarding
+        try { fs.unlinkSync(bootstrapPath); } catch { /* ok */ }
+        process.exit(0);
+    });
 
     // Graceful Ctrl+C — save session cleanly, no JSONL corruption
     process.on('SIGINT', () => {
