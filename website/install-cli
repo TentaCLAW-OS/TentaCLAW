@@ -160,11 +160,11 @@ build_cli() {
     cd "$INSTALL_DIR"
 
     step "Installing dependencies..."
-    npm install --no-audit --no-fund --loglevel=error 2>&1 | tail -3
+    npm install --no-audit --no-fund --loglevel=error 2>&1 | tail -3 || fail "npm install failed"
     info "Dependencies installed"
 
     step "Building CLI..."
-    npm run build --workspace=cli 2>&1 | tail -3
+    npm run build --workspace=cli 2>&1 | tail -3 || fail "npm run build failed"
     info "CLI built"
 }
 
@@ -252,7 +252,7 @@ main() {
             tentaclaw setup 2>/dev/null || "$INSTALL_DIR/cli/dist/cli/src/index.js" setup || true
         else
             echo -e "  ${YELLOW}${BOLD}Next steps:${RESET}"
-            echo -e "    ${GREEN}1.${RESET} Install Ollama: ${DIM}curl -fsSL https://ollama.ai/install.sh | sh${RESET}"
+            echo -e "    ${GREEN}1.${RESET} Install Ollama: ${DIM}curl -fsSL https://ollama.com/install.sh | sh${RESET}"
             echo -e "    ${GREEN}2.${RESET} Pull a model:   ${DIM}ollama pull llama3.1:8b${RESET}"
             echo -e "    ${GREEN}3.${RESET} Configure:      ${DIM}tentaclaw setup${RESET}"
             echo -e "    ${GREEN}4.${RESET} Start coding:   ${DIM}tentaclaw code${RESET}"
