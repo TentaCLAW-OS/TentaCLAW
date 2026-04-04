@@ -613,6 +613,22 @@ const MIGRATIONS: Migration[] = [
             db.exec(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
         },
     },
+    {
+        version: 13,
+        name: 'add_notification_log',
+        up: (db: Database.Database) => {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS notification_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel_id TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at TEXT DEFAULT (datetime('now'))
+                );
+                CREATE INDEX IF NOT EXISTS idx_notification_log_channel ON notification_log(channel_id, created_at DESC);
+            `);
+        },
+    },
 ];
 
 /**
