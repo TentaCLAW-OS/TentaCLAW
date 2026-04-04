@@ -3104,13 +3104,19 @@ async function executeCodeTool(
                 const norm449OldText = normalize449(oldText);
                 const norm449Idx = norm449Content.indexOf(norm449OldText);
                 if (norm449Idx !== -1 && norm449OldText.trim().length > 0) {
-                    const norm449Result = replaceAll
-                        ? norm449Content.split(norm449OldText).join(normalize449(newText))
-                        : norm449Content.slice(0, norm449Idx) + normalize449(newText) + norm449Content.slice(norm449Idx + norm449OldText.length);
+                    // Map normalized position to original content using line counts
+                    const beforeNorm = norm449Content.slice(0, norm449Idx);
+                    const startLine = beforeNorm.split('\n').length - 1;
+                    const oldLineCount = norm449OldText.split('\n').length;
+
+                    const origLines = content.split('\n');
+                    const beforeLines = origLines.slice(0, startLine);
+                    const afterLines = origLines.slice(startLine + oldLineCount);
+                    const result = [...beforeLines, ...newText.split('\n'), ...afterLines].join('\n');
+
                     try {
-                        fs.writeFileSync(filePath, norm449Result, 'utf8');
-                        const insertLine449 = norm449Content.slice(0, norm449Idx).split('\n').length;
-                        return `Edited: ${path.basename(filePath)} at L${insertLine449} — ${norm449OldText.split('\n').length} lines replaced`;
+                        fs.writeFileSync(filePath, result, 'utf8');
+                        return `Edited: ${path.basename(filePath)} at L${startLine + 1} — ${oldLineCount} lines replaced`;
                     } catch (e) {
                         return `Error writing: ${e instanceof Error ? e.message : String(e)}`;
                     }
