@@ -21,6 +21,16 @@ export type SSEClient = {
 
 export const sseClients: SSEClient[] = [];
 
+setInterval(() => {
+    for (let i = sseClients.length - 1; i >= 0; i--) {
+        try {
+            sseClients[i].controller.enqueue(new TextEncoder().encode(': heartbeat\n\n'));
+        } catch {
+            sseClients.splice(i, 1);
+        }
+    }
+}, 30_000).unref();
+
 export function broadcastSSE(eventType: string, data: unknown): void {
     const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
     const encoder = new TextEncoder();
@@ -76,6 +86,16 @@ export function fireWebhooks(eventType: string, data: unknown): void {
 // =============================================================================
 
 export const daphneyClients: SSEClient[] = [];
+
+setInterval(() => {
+    for (let i = daphneyClients.length - 1; i >= 0; i--) {
+        try {
+            daphneyClients[i].controller.enqueue(new TextEncoder().encode(': heartbeat\n\n'));
+        } catch {
+            daphneyClients.splice(i, 1);
+        }
+    }
+}, 30_000).unref();
 
 export function broadcastDaphney(eventType: string, data: unknown): void {
     const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
