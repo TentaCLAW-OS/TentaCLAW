@@ -303,10 +303,14 @@ function saveSessionIndex(index: Record<string, SessionMeta>): void {
 }
 
 function appendSessionEvent(sessionId: string, event: SessionEvent): void {
-    const dir = getSessionsDir();
-    fs.mkdirSync(dir, { recursive: true });
-    const filePath = path.join(dir, `${sessionId}.jsonl`);
-    fs.appendFileSync(filePath, JSON.stringify(event) + '\n');
+    try {
+        const dir = getSessionsDir();
+        fs.mkdirSync(dir, { recursive: true });
+        const filePath = path.join(dir, `${sessionId}.jsonl`);
+        fs.appendFileSync(filePath, JSON.stringify(event) + '\n');
+    } catch {
+        // Session write failed — don't crash the REPL
+    }
 }
 
 function loadSessionTranscript(sessionId: string): SessionEvent[] {
