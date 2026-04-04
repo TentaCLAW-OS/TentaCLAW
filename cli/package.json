@@ -1,6 +1,6 @@
 {
   "name": "tentaclaw-cli",
-  "version": "2.37.0",
+  "version": "2.38.0",
   "description": "TentaCLAW CLI — Distributed AI inference cluster management for TentaCLAW OS.",
   "main": "dist/cli/src/index.js",
   "bin": {

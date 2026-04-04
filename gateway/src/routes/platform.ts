@@ -243,4 +243,187 @@ platform.get('/api/v1/agents/definitions/:id', (c) => {
     return c.json(def);
 });
 
+// =============================================================================
+// Wave 712: Node quarantine — POST /api/v1/nodes/:nodeId/quarantine
+// Isolate a misbehaving node: mark it so routing skips it
+// =============================================================================
+
+const quarantinedNodes = new Set<string>();
+
+platform.post('/api/v1/nodes/:nodeId/quarantine', async (c) => {
+    const nodeId = c.req.param('nodeId');
+    const body = await c.req.json<{ reason?: string }>().catch(() => ({}));
+    quarantinedNodes.add(nodeId);
+    return c.json({ node_id: nodeId, quarantined: true, reason: (body as { reason?: string }).reason || 'manual' });
+});
+
+platform.delete('/api/v1/nodes/:nodeId/quarantine', (c) => {
+    const nodeId = c.req.param('nodeId');
+    quarantinedNodes.delete(nodeId);
+    return c.json({ node_id: nodeId, quarantined: false });
+});
+
+platform.get('/api/v1/quarantine', (c) => {
+    return c.json({ quarantined: [...quarantinedNodes] });
+});
+
+export function isQuarantined(nodeId: string): boolean {
+    return quarantinedNodes.has(nodeId);
+}
+
+// =============================================================================
+// Wave 618: A/B testing — POST /api/v1/ab-tests, GET /api/v1/ab-tests
+// Route X% to model A, Y% to model B, track quality
+// =============================================================================
+
+interface ABTest {
+    id: string;
+    name: string;
+    model_a: string;
+    model_b: string;
+    split_pct: number; // % routed to model_a (remainder to model_b)
+    results_a: { count: number; avg_latency_ms: number; avg_tps: number };
+    results_b: { count: number; avg_latency_ms: number; avg_tps: number };
+    active: boolean;
+    created_at: string;
+}
+
+const abTests = new Map<string, ABTest>();
+
+platform.get('/api/v1/ab-tests', (c) => {
+    return c.json({ tests: [...abTests.values()] });
+});
+
+platform.post('/api/v1/ab-tests', async (c) => {
+    const body = await c.req.json<{ name: string; model_a: string; model_b: string; split_pct?: number }>();
+    if (!body.name || !body.model_a || !body.model_b) return c.json({ error: 'name, model_a, model_b required' }, 400);
+    const id = `ab_${Date.now().toString(36)}`;
+    const test: ABTest = {
+        id, name: body.name, model_a: body.model_a, model_b: body.model_b,
+        split_pct: body.split_pct ?? 50, active: true, created_at: new Date().toISOString(),
+        results_a: { count: 0, avg_latency_ms: 0, avg_tps: 0 },
+        results_b: { count: 0, avg_latency_ms: 0, avg_tps: 0 },
+    };
+    abTests.set(id, test);
+    return c.json(test, 201);
+});
+
+platform.delete('/api/v1/ab-tests/:id', (c) => {
+    abTests.delete(c.req.param('id'));
+    return c.json({ deleted: c.req.param('id') });
+});
+
+// Resolve which model to use for an A/B test (called by inference route)
+export function resolveABTest(model: string): { model: string; test_id?: string; variant?: 'a' | 'b' } {
+    for (const [, test] of abTests) {
+        if (!test.active) continue;
+        if (model === test.model_a || model === test.model_b || model === test.name) {
+            const useA = Math.random() * 100 < test.split_pct;
+            return { model: useA ? test.model_a : test.model_b, test_id: test.id, variant: useA ? 'a' : 'b' };
+        }
+    }
+    return { model };
+}
+
+export function recordABResult(testId: string, variant: 'a' | 'b', latencyMs: number, tps: number): void {
+    const test = abTests.get(testId);
+    if (!test) return;
+    const r = variant === 'a' ? test.results_a : test.results_b;
+    r.count++;
+    r.avg_latency_ms = Math.round(((r.avg_latency_ms * (r.count - 1)) + latencyMs) / r.count);
+    r.avg_tps = Math.round(((r.avg_tps * (r.count - 1)) + tps) / r.count * 10) / 10;
+}
+
+// =============================================================================
+// Wave 734: Usage metering — GET /api/v1/usage
+// Per-key token counts, per-model breakdown
+// =============================================================================
+
+platform.get('/api/v1/usage', (c) => {
+    const hours = parseInt(c.req.query('hours') || '24', 10);
+    // Delegate to existing analytics
+    const { getInferenceAnalytics } = require('../db') as typeof import('../db');
+    const analytics = getInferenceAnalytics(hours);
+    return c.json({
+        window_hours: hours,
+        total_requests: analytics.total_requests,
+        total_tokens_in: analytics.total_tokens_in,
+        total_tokens_out: analytics.total_tokens_out,
+        total_tokens: analytics.total_tokens_in + analytics.total_tokens_out,
+        avg_latency_ms: Math.round(analytics.avg_latency_ms),
+        p50_latency_ms: analytics.p50_latency_ms,
+        p95_latency_ms: analytics.p95_latency_ms,
+        requests_per_minute: analytics.requests_per_minute,
+        by_model: analytics.by_model,
+        by_node: analytics.by_node,
+    });
+});
+
+// =============================================================================
+// Wave 745: Revenue dashboard — GET /api/v1/revenue
+// Estimate revenue from usage at given pricing
+// =============================================================================
+
+platform.get('/api/v1/revenue', (c) => {
+    const pricePerMTokIn = parseFloat(c.req.query('price_in') || '0.50');  // $/M input tokens
+    const pricePerMTokOut = parseFloat(c.req.query('price_out') || '1.50'); // $/M output tokens
+    const hours = parseInt(c.req.query('hours') || '720', 10); // default 30 days
+    const { getInferenceAnalytics } = require('../db') as typeof import('../db');
+    const analytics = getInferenceAnalytics(hours);
+
+    const revenueIn = (analytics.total_tokens_in / 1_000_000) * pricePerMTokIn;
+    const revenueOut = (analytics.total_tokens_out / 1_000_000) * pricePerMTokOut;
+    const totalRevenue = revenueIn + revenueOut;
+
+    // Power cost estimate
+    const nodes = getAllNodes();
+    let totalWatts = 0;
+    for (const n of nodes) {
+        if (n.status !== 'online' || !n.latest_stats?.gpus) continue;
+        totalWatts += n.latest_stats.gpus.reduce((s, g) => s + g.powerDrawW, 0);
+    }
+    const rateKwh = parseFloat(c.req.query('rate_kwh') || '0.12');
+    const powerCost = (totalWatts / 1000) * rateKwh * (hours);
+
+    return c.json({
+        window_hours: hours,
+        pricing: { input_per_m_tokens: pricePerMTokIn, output_per_m_tokens: pricePerMTokOut },
+        tokens: { input: analytics.total_tokens_in, output: analytics.total_tokens_out },
+        revenue: {
+            input: Math.round(revenueIn * 100) / 100,
+            output: Math.round(revenueOut * 100) / 100,
+            total: Math.round(totalRevenue * 100) / 100,
+        },
+        costs: {
+            power: Math.round(powerCost * 100) / 100,
+        },
+        profit: Math.round((totalRevenue - powerCost) * 100) / 100,
+        by_model: analytics.by_model.map(m => ({
+            ...m,
+            estimated_revenue: Math.round(((m.count * 500 / 1_000_000) * pricePerMTokIn + (m.count * 200 / 1_000_000) * pricePerMTokOut) * 100) / 100,
+        })),
+    });
+});
+
+// =============================================================================
+// Wave 545: TDD mode config — POST /api/v1/config/tdd
+// Store project-level TDD preferences
+// =============================================================================
+
+platform.get('/api/v1/config/tdd', (c) => {
+    const tddEnabled = getClusterConfig('tdd_mode_enabled');
+    const testCmd = getClusterConfig('tdd_test_command');
+    return c.json({
+        enabled: tddEnabled === 'true',
+        test_command: testCmd || 'npm test',
+    });
+});
+
+platform.post('/api/v1/config/tdd', async (c) => {
+    const body = await c.req.json<{ enabled?: boolean; test_command?: string }>();
+    if (body.enabled !== undefined) setClusterConfig('tdd_mode_enabled', String(body.enabled));
+    if (body.test_command) setClusterConfig('tdd_test_command', body.test_command);
+    return c.json({ enabled: body.enabled, test_command: body.test_command });
+});
+
 export default platform;

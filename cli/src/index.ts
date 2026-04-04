@@ -56,7 +56,7 @@ const C = {
     italic:  (s: string) => `\x1b[3m${s}\x1b[0m`,
 };
 
-const CLI_VERSION = '2.37.0';
+const CLI_VERSION = '2.38.0';
 
 // Wave 341: module-level .clawignore patterns — set by cmdCode, used by executeCodeTool
 let _clawIgnorePatterns: string[] = [];
@@ -1017,6 +1017,21 @@ async function apiPut(baseUrl: string, path: string, body?: unknown): Promise<un
     const url = baseUrl.replace(/\/+$/, '') + path;
     try {
         const resp = await apiRequest('PUT', url, body);
+        if (resp.status >= 400) {
+            const errData = resp.data as Record<string, unknown>;
+            throw new Error(String(errData['error'] || `HTTP ${resp.status}`));
+        }
+        return resp.data;
+    } catch (err) {
+        handleConnectionError(err, baseUrl);
+        process.exit(1);
+    }
+}
+
+async function apiDelete(baseUrl: string, pathStr: string): Promise<unknown> {
+    const url = baseUrl.replace(/\/+$/, '') + pathStr;
+    try {
+        const resp = await apiRequest('DELETE', url);
         if (resp.status >= 400) {
             const errData = resp.data as Record<string, unknown>;
             throw new Error(String(errData['error'] || `HTTP ${resp.status}`));
@@ -3659,6 +3674,8 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
 
     // Wave 567: --quantize-aware adjusts prompting based on model size/tier
     const quantizeAwareFlag = flags['quantize-aware'] === 'true';
+    // Wave 545: --tdd mode — write tests first, then implementation
+    const tddFlag = flags['tdd'] === 'true' || flags['tdd'] === '';
 
     // Wave 63: --agent <name> loads a named workspace (workspace-<name>/ directory)
     const agentFlag = flags['agent'] || flags['a'] || '';
@@ -4092,6 +4109,11 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
     // Wave 567: quantize-aware mode — remind agent to consider VRAM and quantization
     if (quantizeAwareFlag) {
         systemPrompt += '\n\n## Quantize-Aware Mode\nWhen recommending or writing code that loads, fine-tunes, or serves models, always factor in quantization (GGUF Q4_K_M, AWQ, GPTQ, bitsandbytes). Prefer approaches that run within typical home-lab VRAM (8–24 GB per GPU).';
+    }
+
+    // Wave 545: TDD mode — write tests first, then implementation
+    if (tddFlag) {
+        systemPrompt += '\n\n## TDD Mode (--tdd)\nFor EVERY change you make:\n1. Write the failing test FIRST (using the project\'s test framework)\n2. Run the test to confirm it fails\n3. Write the minimal code to make it pass\n4. Run the test to confirm it passes\n5. Refactor if needed, run tests again\nNever write implementation code without a test first. If the project has no test setup, create one.';
     }
 
     // Wave 556: inject recent shell history context
@@ -11904,6 +11926,113 @@ ${projectType}
             }
             if (!regData.models?.length) console.log('  ' + C.dim('No models loaded. Deploy a model first.'));
             console.log('');
+            break;
+        }
+
+        case 'revenue': {
+            // Wave 745: revenue dashboard
+            const revHours = parsed.flags['hours'] || '720';
+            const revData = await apiGet(gateway, `/api/v1/revenue?hours=${revHours}`) as {
+                window_hours: number; revenue: { input: number; output: number; total: number };
+                costs: { power: number }; profit: number; tokens: { input: number; output: number };
+                by_model: Array<{ model: string; count: number; estimated_revenue: number }>;
+            };
+            console.log('');
+            console.log('  ' + C.teal(C.bold('REVENUE DASHBOARD')) + C.dim(` — last ${revHours}h`));
+            console.log('');
+            console.log('  ' + padRight(C.dim('Tokens in:'), 18) + C.white(formatNumber(revData.tokens.input)));
+            console.log('  ' + padRight(C.dim('Tokens out:'), 18) + C.white(formatNumber(revData.tokens.output)));
+            console.log('  ' + padRight(C.dim('Revenue:'), 18) + C.green('$' + revData.revenue.total.toFixed(2)));
+            console.log('  ' + padRight(C.dim('Power cost:'), 18) + C.yellow('$' + revData.costs.power.toFixed(2)));
+            console.log('  ' + padRight(C.dim('Profit:'), 18) + (revData.profit >= 0 ? C.green : C.red)('$' + revData.profit.toFixed(2)));
+            if (revData.by_model?.length > 0) {
+                console.log('');
+                console.log('  ' + padRight(C.dim('MODEL'), 30) + padRight(C.dim('REQS'), 10) + C.dim('EST. REV'));
+                for (const m of revData.by_model.slice(0, 10)) {
+                    console.log('  ' + padRight(C.white(m.model), 30) + padRight(C.dim(formatNumber(m.count)), 10) + C.green('$' + m.estimated_revenue.toFixed(2)));
+                }
+            }
+            console.log('');
+            break;
+        }
+
+        case 'usage': {
+            // Wave 734: usage metering (shortcut to /api/v1/usage)
+            const usageHours = parsed.flags['hours'] || '24';
+            const uData = await apiGet(gateway, `/api/v1/usage?hours=${usageHours}`) as {
+                total_requests: number; total_tokens: number; total_tokens_in: number; total_tokens_out: number;
+                avg_latency_ms: number; requests_per_minute: number;
+                by_model: Array<{ model: string; count: number; avg_latency_ms: number }>;
+            };
+            console.log('');
+            console.log('  ' + C.teal(C.bold('USAGE')) + C.dim(` — last ${usageHours}h`));
+            console.log('');
+            console.log('  ' + padRight(C.dim('Requests:'), 18) + C.white(formatNumber(uData.total_requests)));
+            console.log('  ' + padRight(C.dim('Tokens:'), 18) + C.white(formatNumber(uData.total_tokens)) + C.dim(` (${formatNumber(uData.total_tokens_in)} in, ${formatNumber(uData.total_tokens_out)} out)`));
+            console.log('  ' + padRight(C.dim('Avg latency:'), 18) + C.white(uData.avg_latency_ms + 'ms'));
+            console.log('  ' + padRight(C.dim('RPM:'), 18) + C.white(String(uData.requests_per_minute)));
+            if (uData.by_model?.length > 0) {
+                console.log('');
+                for (const m of uData.by_model.slice(0, 8)) {
+                    console.log('  ' + padRight(C.white(m.model), 28) + C.dim(`${formatNumber(m.count)} reqs, ${m.avg_latency_ms}ms avg`));
+                }
+            }
+            console.log('');
+            break;
+        }
+
+        case 'quarantine': {
+            // Wave 712: node quarantine
+            const qSub = parsed.positional[0];
+            const qNodeId = parsed.positional[1] || parsed.flags['node'] || '';
+            if (qSub === 'add' && qNodeId) {
+                await apiPost(gateway, `/api/v1/nodes/${qNodeId}/quarantine`, { reason: parsed.flags['reason'] || 'manual' });
+                console.log('  ' + C.yellow(`\u26A0 Node ${qNodeId} quarantined`));
+            } else if (qSub === 'remove' && qNodeId) {
+                await apiDelete(gateway, `/api/v1/nodes/${qNodeId}/quarantine`);
+                console.log('  ' + C.green(`\u2714 Node ${qNodeId} removed from quarantine`));
+            } else {
+                const qData = await apiGet(gateway, '/api/v1/quarantine') as { quarantined: string[] };
+                console.log('');
+                console.log('  ' + C.teal(C.bold('QUARANTINED NODES')));
+                if (qData.quarantined?.length > 0) {
+                    for (const n of qData.quarantined) console.log('  ' + C.red('\u25CB') + ' ' + C.white(n));
+                } else {
+                    console.log('  ' + C.dim('No nodes quarantined.'));
+                }
+                console.log('');
+            }
+            break;
+        }
+
+        case 'ab':
+        case 'ab-test': {
+            // Wave 618: A/B testing
+            const abSub = parsed.positional[0];
+            if (abSub === 'create') {
+                const abBody = { name: parsed.flags['name'] || parsed.positional[1] || '', model_a: parsed.flags['a'] || '', model_b: parsed.flags['b'] || '', split_pct: parseInt(parsed.flags['split'] || '50', 10) };
+                if (!abBody.name || !abBody.model_a || !abBody.model_b) {
+                    console.log(C.yellow('  Usage: tentaclaw ab create --name test1 --a hermes3:8b --b qwen2.5-coder:7b [--split 50]'));
+                    return;
+                }
+                await apiPost(gateway, '/api/v1/ab-tests', abBody);
+                console.log('  ' + C.green(`\u2714 A/B test "${abBody.name}" created: ${abBody.model_a} (${abBody.split_pct}%) vs ${abBody.model_b} (${100 - abBody.split_pct}%)`));
+            } else {
+                const abData = await apiGet(gateway, '/api/v1/ab-tests') as { tests: Array<{ id: string; name: string; model_a: string; model_b: string; split_pct: number; active: boolean; results_a: { count: number; avg_tps: number }; results_b: { count: number; avg_tps: number } }> };
+                console.log('');
+                console.log('  ' + C.teal(C.bold('A/B TESTS')));
+                console.log('');
+                for (const t of (abData.tests || [])) {
+                    const winner = t.results_a.avg_tps > t.results_b.avg_tps ? 'A' : t.results_b.avg_tps > t.results_a.avg_tps ? 'B' : '-';
+                    console.log('  ' + C.white(C.bold(t.name)) + (t.active ? C.green(' ACTIVE') : C.dim(' ended')));
+                    console.log('    A: ' + C.teal(t.model_a) + C.dim(` (${t.split_pct}%) `) + C.white(`${t.results_a.count} reqs, ${t.results_a.avg_tps} tps`));
+                    console.log('    B: ' + C.purple(t.model_b) + C.dim(` (${100 - t.split_pct}%) `) + C.white(`${t.results_b.count} reqs, ${t.results_b.avg_tps} tps`));
+                    console.log('    Winner: ' + C.green(winner === 'A' ? t.model_a : winner === 'B' ? t.model_b : 'tie'));
+                    console.log('');
+                }
+                if (!abData.tests?.length) console.log('  ' + C.dim('No A/B tests. Create one: tentaclaw ab create --name test1 --a model1 --b model2'));
+                console.log('');
+            }
             break;
         }
 
