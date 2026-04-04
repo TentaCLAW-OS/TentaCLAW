@@ -34,6 +34,7 @@ export function CommandPalette() {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [easterEggResult, setEasterEggResult] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
+  const confettiTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const nodes = useClusterStore((s) => s.nodes);
   const setActiveTab = useUIStore((s) => s.setActiveTab);
@@ -42,7 +43,15 @@ export function CommandPalette() {
 
   const triggerConfetti = useCallback(() => {
     setShowConfetti(true);
-    setTimeout(() => setShowConfetti(false), 2000);
+    if (confettiTimeout.current) clearTimeout(confettiTimeout.current);
+    confettiTimeout.current = setTimeout(() => setShowConfetti(false), 2000);
+  }, []);
+
+  // Cleanup confetti timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (confettiTimeout.current) clearTimeout(confettiTimeout.current);
+    };
   }, []);
 
   const [themePickerOpen, setThemePickerOpen] = useState(false);
@@ -174,8 +183,10 @@ export function CommandPalette() {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIdx((i) => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' && filtered[selectedIdx]) {
-      const cmd = filtered[selectedIdx].item;
+    } else if (e.key === 'Enter') {
+      if (filtered.length === 0) return;
+      const safeIdx = Math.min(selectedIdx, Math.max(0, filtered.length - 1));
+      const cmd = filtered[safeIdx].item;
       cmd.action();
       // Easter eggs: show result inline, don't close (except confetti which closes)
       if (cmd.displayResult) {
