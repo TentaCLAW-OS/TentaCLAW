@@ -7,6 +7,7 @@
 
 import type { SshKey, NodeWithStats } from '../../../shared/types';
 import { getDb, generateId } from './init';
+import { safeJsonParse } from './safe-json';
 
 // =============================================================================
 // Benchmarks
@@ -88,13 +89,13 @@ export function getSchedule(id: string): Schedule | null {
     const d = getDb();
     const row = d.prepare('SELECT * FROM schedules WHERE id = ?').get(id) as any;
     if (!row) return null;
-    return { ...row, config: JSON.parse(row.config), enabled: !!row.enabled };
+    return { ...row, config: safeJsonParse(row.config, {}), enabled: !!row.enabled };
 }
 
 export function getAllSchedules(): Schedule[] {
     const d = getDb();
     const rows = d.prepare('SELECT * FROM schedules ORDER BY created_at DESC').all() as any[];
-    return rows.map(r => ({ ...r, config: JSON.parse(r.config), enabled: !!r.enabled }));
+    return rows.map(r => ({ ...r, config: safeJsonParse(r.config, {}), enabled: !!r.enabled }));
 }
 
 export function deleteSchedule(id: string): boolean {
@@ -121,7 +122,7 @@ export function getDueSchedules(): Schedule[] {
     const rows = d.prepare(
         'SELECT * FROM schedules WHERE enabled = 1 AND (next_run IS NULL OR next_run <= ?)'
     ).all(now) as any[];
-    return rows.map(r => ({ ...r, config: JSON.parse(r.config), enabled: !!r.enabled }));
+    return rows.map(r => ({ ...r, config: safeJsonParse(r.config, {}), enabled: !!r.enabled }));
 }
 
 /**
@@ -216,7 +217,7 @@ export function getNodesByTag(tag: string): NodeWithStats[] {
         ).get(r.node_id) as { payload: string } | undefined;
         return {
             ...node,
-            latest_stats: latestStat ? JSON.parse(latestStat.payload) : null,
+            latest_stats: latestStat ? safeJsonParse(latestStat.payload, null) : null,
         };
     }).filter((n): n is NodeWithStats => n !== null);
 }
@@ -355,7 +356,7 @@ export function createNotificationChannel(type: string, name: string, config: Re
 export function getAllNotificationChannels(): any[] {
     const d = getDb();
     const rows = d.prepare('SELECT * FROM notification_channels ORDER BY created_at').all() as any[];
-    return rows.map(r => ({ ...r, config: JSON.parse(r.config), enabled: !!r.enabled }));
+    return rows.map(r => ({ ...r, config: safeJsonParse(r.config, {}), enabled: !!r.enabled }));
 }
 
 export function deleteNotificationChannel(id: string): boolean {
@@ -368,7 +369,7 @@ export async function sendNotification(channelId: string, message: string): Prom
     const channel = d.prepare('SELECT * FROM notification_channels WHERE id = ? AND enabled = 1').get(channelId) as any;
     if (!channel) return false;
 
-    const config = JSON.parse(channel.config);
+    const config = safeJsonParse(channel.config, {} as Record<string, any>);
 
     try {
         switch (channel.type) {
@@ -560,10 +561,10 @@ export function exportClusterConfig(): Record<string, unknown> {
     const d = getDb();
     // Inline alias query to avoid circular dependency with models.ts
     const aliasRows = d.prepare('SELECT * FROM model_aliases ORDER BY alias').all() as any[];
-    const aliases = aliasRows.map(r => ({ ...r, fallbacks: JSON.parse(r.fallbacks || '[]') }));
+    const aliases = aliasRows.map(r => ({ ...r, fallbacks: safeJsonParse(r.fallbacks || '[]', []) }));
     // Inline flight sheet query to avoid circular dependency with commands.ts
     const fsRows = d.prepare('SELECT * FROM flight_sheets ORDER BY created_at DESC').all() as any[];
-    const flightSheets = fsRows.map(r => ({ ...r, targets: JSON.parse(r.targets) }));
+    const flightSheets = fsRows.map(r => ({ ...r, targets: safeJsonParse(r.targets, []) }));
 
     return {
         version: '0.2.0',

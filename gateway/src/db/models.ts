@@ -7,6 +7,7 @@ import { getDb, generateId } from './init';
 import { getNode, getAllNodes } from './nodes';
 import { getClusterModels } from './stats';
 import { queueCommand } from './commands';
+import { safeJsonParse } from './safe-json';
 
 // =============================================================================
 // Smart Model Management -- VRAM estimation
@@ -108,7 +109,7 @@ export function resolveModelAlias(model: string): { target: string; fallbacks: s
     const d = getDb();
     const row = d.prepare('SELECT target, fallbacks FROM model_aliases WHERE alias = ?').get(model) as any;
     if (row) {
-        return { target: row.target, fallbacks: JSON.parse(row.fallbacks || '[]') };
+        return { target: row.target, fallbacks: safeJsonParse(row.fallbacks || '[]', []) };
     }
     return { target: model, fallbacks: [] };
 }
@@ -116,7 +117,7 @@ export function resolveModelAlias(model: string): { target: string; fallbacks: s
 export function getAllModelAliases(): Array<{ alias: string; target: string; fallbacks: string[]; created_at: string }> {
     const d = getDb();
     const rows = d.prepare('SELECT * FROM model_aliases ORDER BY alias').all() as any[];
-    return rows.map(r => ({ ...r, fallbacks: JSON.parse(r.fallbacks || '[]') }));
+    return rows.map(r => ({ ...r, fallbacks: safeJsonParse(r.fallbacks || '[]', []) }));
 }
 
 export function deleteModelAlias(alias: string): boolean {

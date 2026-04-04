@@ -10,6 +10,7 @@ import type {
 } from '../../../shared/types';
 import { getDb, generateId } from './init';
 import { getAllNodes } from './nodes';
+import { safeJsonParse } from './safe-json';
 
 // =============================================================================
 // Command Operations
@@ -50,7 +51,7 @@ export function getPendingCommands(nodeId: string): GatewayCommand[] {
     }
 
     return rows.map(row => {
-        const params = row.payload ? JSON.parse(row.payload) : {};
+        const params = row.payload ? safeJsonParse(row.payload, {}) : {};
         return {
             id: row.id,
             action: row.action as CommandAction,
@@ -80,20 +81,20 @@ export function createFlightSheet(name: string, description: string, targets: Fl
     `).run(id, name, description, JSON.stringify(targets));
 
     const row = d.prepare('SELECT * FROM flight_sheets WHERE id = ?').get(id) as Omit<FlightSheet, 'targets'> & { targets: string };
-    return { ...row, targets: JSON.parse(row.targets) };
+    return { ...row, targets: safeJsonParse(row.targets, []) };
 }
 
 export function getAllFlightSheets(): FlightSheet[] {
     const d = getDb();
     const rows = d.prepare('SELECT * FROM flight_sheets ORDER BY created_at DESC').all() as (Omit<FlightSheet, 'targets'> & { targets: string })[];
-    return rows.map(r => ({ ...r, targets: JSON.parse(r.targets) }));
+    return rows.map(r => ({ ...r, targets: safeJsonParse(r.targets, []) }));
 }
 
 export function getFlightSheet(id: string): FlightSheet | null {
     const d = getDb();
     const row = d.prepare('SELECT * FROM flight_sheets WHERE id = ?').get(id) as (Omit<FlightSheet, 'targets'> & { targets: string }) | undefined;
     if (!row) return null;
-    return { ...row, targets: JSON.parse(row.targets) };
+    return { ...row, targets: safeJsonParse(row.targets, []) };
 }
 
 export function deleteFlightSheet(id: string): boolean {

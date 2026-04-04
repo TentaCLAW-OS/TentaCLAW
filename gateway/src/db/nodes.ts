@@ -9,6 +9,7 @@ import type {
 } from '../../../shared/types';
 import { getDb } from './init';
 import { recordUptimeEvent, getNodeUptime } from './misc';
+import { safeJsonParse } from './safe-json';
 
 // =============================================================================
 // Node Operations
@@ -62,7 +63,7 @@ export function getNode(nodeId: string): NodeWithStats | null {
 
     return {
         ...node,
-        latest_stats: latestStat ? JSON.parse(latestStat.payload) : null,
+        latest_stats: latestStat ? safeJsonParse(latestStat.payload, null) : null,
     };
 }
 
@@ -77,7 +78,7 @@ export function getAllNodes(): NodeWithStats[] {
 
         return {
             ...node,
-            latest_stats: latestStat ? JSON.parse(latestStat.payload) : null,
+            latest_stats: latestStat ? safeJsonParse(latestStat.payload, null) : null,
         };
     });
 }
@@ -93,7 +94,7 @@ export function getNodesByFarm(farmHash: string): NodeWithStats[] {
 
         return {
             ...node,
-            latest_stats: latestStat ? JSON.parse(latestStat.payload) : null,
+            latest_stats: latestStat ? safeJsonParse(latestStat.payload, null) : null,
         };
     });
 }

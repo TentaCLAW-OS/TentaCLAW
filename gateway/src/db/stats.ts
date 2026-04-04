@@ -5,6 +5,7 @@
 import type { StatsPayload, Node, NodeWithStats } from '../../../shared/types';
 import { getDb } from './init';
 import { recordUptimeEvent } from './misc';
+import { safeJsonParse } from './safe-json';
 
 /**
  * Helper: fetch all nodes with their latest stats payload.
@@ -19,7 +20,7 @@ function _getAllNodesWithStats(): NodeWithStats[] {
         ).get(node.id) as { payload: string } | undefined;
         return {
             ...node,
-            latest_stats: latestStat ? JSON.parse(latestStat.payload) : null,
+            latest_stats: latestStat ? safeJsonParse(latestStat.payload, null) : null,
         };
     });
 }
@@ -61,7 +62,7 @@ export function getStatsHistory(nodeId: string, limit: number = 100): StatsPaylo
         'SELECT payload FROM stats WHERE node_id = ? ORDER BY timestamp DESC LIMIT ?'
     ).all(nodeId, limit) as { payload: string }[];
 
-    return rows.map(r => JSON.parse(r.payload));
+    return rows.map(r => safeJsonParse(r.payload, {} as StatsPayload));
 }
 
 /**
@@ -101,7 +102,8 @@ export function getCompactHistory(nodeId: string, limit: number = 60): {
     const toksSec: number[] = [];
 
     for (const row of rows) {
-        const stats: StatsPayload = JSON.parse(row.payload);
+        const stats: StatsPayload = safeJsonParse(row.payload, null as any);
+        if (!stats || !stats.cpu || !stats.ram || !stats.gpus) continue;
         timestamps.push(row.timestamp);
         cpuUsage.push(stats.cpu.usage_pct);
         ramPct.push(stats.ram.total_mb > 0 ? Math.round((stats.ram.used_mb / stats.ram.total_mb) * 100) : 0);
@@ -208,6 +210,65 @@ export function getInferenceAnalytics(hours: number = 24): {
 // =============================================================================
 
 const nodeErrorCounts = new Map<string, { errors: number; lastError: number; blocked: boolean }>();
+
+// Wave 471: routing telemetry log — persisted in-memory, last 500 decisions
+export interface RoutingDecision {
+    time: number;
+    nodeId: string;
+    hostname: string;
+    model: string;
+    latencyMs: number;
+    success: boolean;
+    score: number;
+    reason: string;
+    vramFree_mb: number;
+    inFlight: number;
+    taskType?: string;
+    priority?: string;
+}
+const routingLog: RoutingDecision[] = [];
+
+// Wave 467: sticky session map — user stays on same node for conversation context
+const stickySessions = new Map<string, { nodeId: string; expiry: number }>();
+const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+export function getStickyNode(sessionKey: string): string | null {
+    const entry = stickySessions.get(sessionKey);
+    if (!entry) return null;
+    if (Date.now() > entry.expiry) { stickySessions.delete(sessionKey); return null; }
+    return entry.nodeId;
+}
+
+export function setStickyNode(sessionKey: string, nodeId: string): void {
+    stickySessions.set(sessionKey, { nodeId, expiry: Date.now() + SESSION_TTL_MS });
+}
+
+export function clearStickySession(sessionKey: string): void {
+    stickySessions.delete(sessionKey);
+}
+
+// Wave 471: expose routing telemetry
+export function getRoutingLog(limit = 100): RoutingDecision[] {
+    return routingLog.slice(-limit).reverse();
+}
+
+// Wave 461: inline VRAM estimation for routing (avoids circular dep with models.ts)
+function _estimateVramForRouting(modelName: string): number {
+    const known: Record<string, number> = {
+        'llama3.1:8b': 5120, 'llama3.1:70b': 41000, 'llama3.2:3b': 2048, 'llama3.2:1b': 1024,
+        'codellama:7b': 4608, 'codellama:13b': 8192, 'codellama:34b': 20480,
+        'mistral:7b': 4608, 'mixtral:8x7b': 28672, 'qwen2.5:7b': 4608,
+        'qwen2.5:3b': 2048, 'qwen3:14b': 9216, 'gemma2:9b': 5632,
+        'phi3:3.8b': 2560, 'deepseek-coder-v2:16b': 10240, 'hermes3:8b': 5120,
+        'nomic-embed-text': 512, 'dolphin-mistral': 4096,
+    };
+    if (known[modelName]) return known[modelName];
+    const base = modelName.split(':')[0];
+    for (const [k, v] of Object.entries(known)) { if (k.startsWith(base)) return v; }
+    const m = modelName.match(/(\d+)b/i);
+    return m ? parseInt(m[1]) * 600 : 4096;
+}
+
 const requestLog: Array<{ time: number; nodeId: string; model: string; latencyMs: number; success: boolean }> = [];
 
 export function recordRouteResult(nodeId: string, model: string, latencyMs: number, success: boolean): void {
@@ -308,9 +369,12 @@ export interface InferenceTarget {
     backend_port: number;
 }
 
-export function findBestNode(model: string): InferenceTarget | null {
+export function findBestNode(model: string, opts?: { taskType?: string; priority?: 'cost' | 'speed' | 'balanced' }): InferenceTarget | null {
     const nodes = _getAllNodesWithStats();
-    const candidates: (InferenceTarget & { score: number })[] = [];
+    const candidates: (InferenceTarget & { score: number; vramFree_mb: number; scoreReason: string })[] = [];
+
+    // Wave 461: VRAM-primary routing — estimate required VRAM for this model
+    const requiredVramMb = _estimateVramForRouting(model);
 
     for (const node of nodes) {
         if (node.status !== 'online' || !node.latest_stats) continue;
@@ -326,20 +390,52 @@ export function findBestNode(model: string): InferenceTarget | null {
 
         const totalVram = node.latest_stats.gpus.reduce((s: number, g: any) => s + g.vramTotalMb, 0);
         const usedVram = node.latest_stats.gpus.reduce((s: number, g: any) => s + g.vramUsedMb, 0);
-        const vramHeadroom = totalVram > 0 ? ((totalVram - usedVram) / totalVram) * 100 : 0;
+        const freeVramMb = totalVram - usedVram;
 
         const latencyP50 = getNodeLatencyP50(node.id, model);
         const throughput = getNodeThroughput(node.id, model);
 
-        const score = (node.latest_stats.inference.in_flight_requests * 40) +
+        // Wave 461: heavy penalty if model likely won't fit in free VRAM
+        const vramFitPenalty = (totalVram > 0 && freeVramMb < requiredVramMb) ? 200 : 0;
+
+        // Wave 462: VRAM pressure as primary continuous factor (0-50 pts)
+        const vramPressure = totalVram > 0 ? (usedVram / totalVram) * 50 : 50;
+
+        // Wave 466: health penalty — thermal throttle zone
+        let healthPenalty = 0;
+        if (node.latest_stats.gpus.length > 0) {
+            const maxTemp = Math.max(...node.latest_stats.gpus.map((g: any) => g.temperatureC as number));
+            if (maxTemp > 85) healthPenalty = 50;      // throttling territory
+            else if (maxTemp > 75) healthPenalty = 15; // approaching throttle
+        }
+
+        // Wave 475: priority-based routing modifier
+        let priorityModifier = 0;
+        if (opts?.priority === 'cost') {
+            // Prefer lowest power draw — penalize high-watt nodes
+            const totalWatts = node.latest_stats.gpus.reduce((s: number, g: any) => s + (g.powerDrawW || 0), 0);
+            priorityModifier = totalWatts * 0.05;
+        } else if (opts?.priority === 'speed') {
+            // Prefer highest throughput — bonus for high tok/s nodes
+            priorityModifier = throughput > 0 ? -(throughput * 0.3) : 0;
+        }
+
+        const score = vramFitPenalty +
+                      vramPressure +
+                      healthPenalty +
+                      (node.latest_stats.inference.in_flight_requests * 40) +
                       (avgUtil * 0.3) +
-                      ((100 - vramHeadroom) * 0.3) +
-                      (latencyP50 * 0.1) -
-                      (throughput * 0.05);
+                      (latencyP50 * 0.01) -
+                      (throughput * 0.05) +
+                      priorityModifier;
 
         const backend = (node.latest_stats as any).backend;
-        const backendType = backend?.type || 'ollama';
-        const backendPort = backend?.port || 11434;
+        const parts: string[] = [];
+        if (vramFitPenalty > 0) parts.push('vram-tight');
+        if (healthPenalty > 0) parts.push('thermal');
+        if (node.latest_stats.inference.in_flight_requests > 0) parts.push(`${node.latest_stats.inference.in_flight_requests}-inflight`);
+        if (opts?.priority && opts.priority !== 'balanced') parts.push(opts.priority);
+        const scoreReason = parts.length > 0 ? parts.join(',') : 'healthy';
 
         candidates.push({
             node_id: node.id,
@@ -347,24 +443,39 @@ export function findBestNode(model: string): InferenceTarget | null {
             ip_address: node.ip_address,
             gpu_utilization_avg: avgUtil,
             in_flight_requests: node.latest_stats.inference.in_flight_requests,
-            backend_type: backendType,
-            backend_port: backendPort,
+            backend_type: backend?.type || 'ollama',
+            backend_port: backend?.port || 11434,
             score: Math.round(score * 10) / 10,
+            vramFree_mb: freeVramMb,
+            scoreReason,
         });
     }
 
     if (candidates.length === 0) return null;
     candidates.sort((a, b) => a.score - b.score);
-    return candidates[0];
+    const best = candidates[0];
+
+    // Wave 471: log routing decision
+    routingLog.push({
+        time: Date.now(), nodeId: best.node_id, hostname: best.hostname,
+        model, latencyMs: 0, success: true, score: best.score,
+        reason: best.scoreReason, vramFree_mb: best.vramFree_mb,
+        inFlight: best.in_flight_requests, taskType: opts?.taskType, priority: opts?.priority,
+    });
+    if (routingLog.length > 500) routingLog.splice(0, 250);
+
+    return best;
 }
 
 /**
  * Return ALL online nodes that have the model loaded, sorted by score (best first).
  * Used by the failover loop to try each candidate in order.
+ * Wave 461/462/466: same scoring logic as findBestNode.
  */
-export function findNodesForModel(model: string): InferenceTarget[] {
+export function findNodesForModel(model: string, opts?: { taskType?: string; priority?: 'cost' | 'speed' | 'balanced' }): InferenceTarget[] {
     const nodes = _getAllNodesWithStats();
     const candidates: (InferenceTarget & { score: number })[] = [];
+    const requiredVramMb = _estimateVramForRouting(model);
 
     for (const node of nodes) {
         if (node.status !== 'online' || !node.latest_stats) continue;
@@ -379,12 +490,35 @@ export function findNodesForModel(model: string): InferenceTarget[] {
         const avgUtil = gpuUtils.length > 0 ? gpuUtils.reduce((a: number, b: number) => a + b, 0) / gpuUtils.length : 100;
         const totalVram = node.latest_stats.gpus.reduce((s: number, g: any) => s + g.vramTotalMb, 0);
         const usedVram = node.latest_stats.gpus.reduce((s: number, g: any) => s + g.vramUsedMb, 0);
-        const vramHeadroom = totalVram > 0 ? ((totalVram - usedVram) / totalVram) * 100 : 0;
+        const freeVramMb = totalVram - usedVram;
         const latencyP50 = getNodeLatencyP50(node.id, model);
         const throughput = getNodeThroughput(node.id, model);
-        const score = (node.latest_stats.inference.in_flight_requests * 40) +
-                      (avgUtil * 0.3) + ((100 - vramHeadroom) * 0.3) +
-                      (latencyP50 * 0.1) - (throughput * 0.05);
+
+        // Wave 461: VRAM fit penalty
+        const vramFitPenalty = (totalVram > 0 && freeVramMb < requiredVramMb) ? 200 : 0;
+        const vramPressure = totalVram > 0 ? (usedVram / totalVram) * 50 : 50;
+
+        // Wave 466: thermal health penalty
+        let healthPenalty = 0;
+        if (node.latest_stats.gpus.length > 0) {
+            const maxTemp = Math.max(...node.latest_stats.gpus.map((g: any) => g.temperatureC as number));
+            if (maxTemp > 85) healthPenalty = 50;
+            else if (maxTemp > 75) healthPenalty = 15;
+        }
+
+        // Wave 475: priority modifier
+        let priorityModifier = 0;
+        if (opts?.priority === 'cost') {
+            const totalWatts = node.latest_stats.gpus.reduce((s: number, g: any) => s + (g.powerDrawW || 0), 0);
+            priorityModifier = totalWatts * 0.05;
+        } else if (opts?.priority === 'speed') {
+            priorityModifier = throughput > 0 ? -(throughput * 0.3) : 0;
+        }
+
+        const score = vramFitPenalty + vramPressure + healthPenalty +
+                      (node.latest_stats.inference.in_flight_requests * 40) +
+                      (avgUtil * 0.3) + (latencyP50 * 0.01) -
+                      (throughput * 0.05) + priorityModifier;
 
         const backend = (node.latest_stats as any).backend;
         candidates.push({

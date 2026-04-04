@@ -6,6 +6,7 @@ import { createHash, randomBytes, pbkdf2Sync, timingSafeEqual } from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { getDb, generateId, dbPath } from './init';
+import { safeJsonParse } from './safe-json';
 
 // =============================================================================
 // API Key Management
@@ -55,12 +56,9 @@ export function validateApiKey(rawKey: string, requiredPermission?: string): Api
     }
 
     // Parse permissions -- backward compat: missing column -> full access
-    let permissions: string[];
-    try {
-        permissions = row.permissions ? JSON.parse(row.permissions) : ['read', 'write', 'admin'];
-    } catch {
-        permissions = ['read', 'write', 'admin'];
-    }
+    const permissions: string[] = row.permissions
+        ? safeJsonParse(row.permissions, ['read', 'write', 'admin'])
+        : ['read', 'write', 'admin'];
 
     // Check required permission
     if (requiredPermission && !permissions.includes(requiredPermission) && !permissions.includes('admin')) {
@@ -90,7 +88,7 @@ export function getAllApiKeys(): any[] {
     const rows = d.prepare('SELECT id, name, key_prefix, scope, permissions, rate_limit_rpm, monthly_token_limit, tokens_used, requests_count, last_used_at, expires_at, enabled, created_at FROM api_keys ORDER BY created_at DESC').all() as any[];
     return rows.map(row => ({
         ...row,
-        permissions: (() => { try { return row.permissions ? JSON.parse(row.permissions) : ['read', 'write', 'admin']; } catch { return ['read', 'write', 'admin']; } })(),
+        permissions: row.permissions ? safeJsonParse(row.permissions, ['read', 'write', 'admin']) : ['read', 'write', 'admin'],
     }));
 }
 
