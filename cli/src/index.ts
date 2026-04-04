@@ -224,19 +224,21 @@ interface BackendCapabilities {
     parallelToolCalls: boolean;    // whether to allow parallel tool_calls field
     numCtxParam: 'ollama' | 'none'; // how to request a larger context window
     defaultCtx: number;            // tokens to request (0 = don't override)
+    embedTools: boolean;           // Wave 577: embed tools in system prompt instead of API tools param (Ollama compat)
 }
 
 const BACKEND_CAPS: Record<LocalBackend, BackendCapabilities> = {
     // Local backends: no tool_choice, no parallel, Ollama gets num_ctx
-    ollama:     { sendToolChoice: false, parallelToolCalls: false, numCtxParam: 'ollama', defaultCtx: 32768 },
-    lmstudio:   { sendToolChoice: false, parallelToolCalls: false, numCtxParam: 'none',   defaultCtx: 0 },
-    llamafile:  { sendToolChoice: false, parallelToolCalls: false, numCtxParam: 'none',   defaultCtx: 0 },
-    vllm:       { sendToolChoice: true,  parallelToolCalls: false, numCtxParam: 'none',   defaultCtx: 0 },
-    tabbyapi:   { sendToolChoice: false, parallelToolCalls: false, numCtxParam: 'none',   defaultCtx: 0 },
+    // Wave 577: embedTools=true for Ollama — Ollama's OpenAI compat layer drops tool calls ~60% of the time
+    ollama:     { sendToolChoice: false, parallelToolCalls: false, numCtxParam: 'ollama', defaultCtx: 32768, embedTools: true },
+    lmstudio:   { sendToolChoice: false, parallelToolCalls: false, numCtxParam: 'none',   defaultCtx: 0,     embedTools: true },
+    llamafile:  { sendToolChoice: false, parallelToolCalls: false, numCtxParam: 'none',   defaultCtx: 0,     embedTools: true },
+    vllm:       { sendToolChoice: true,  parallelToolCalls: false, numCtxParam: 'none',   defaultCtx: 0,     embedTools: false },
+    tabbyapi:   { sendToolChoice: false, parallelToolCalls: false, numCtxParam: 'none',   defaultCtx: 0,     embedTools: false },
     // Cloud providers: tool_choice supported, context managed by provider
-    openai:     { sendToolChoice: true,  parallelToolCalls: true,  numCtxParam: 'none',   defaultCtx: 0 },
-    openrouter: { sendToolChoice: true,  parallelToolCalls: false, numCtxParam: 'none',   defaultCtx: 0 },
-    unknown:    { sendToolChoice: false, parallelToolCalls: false, numCtxParam: 'none',   defaultCtx: 0 },
+    openai:     { sendToolChoice: true,  parallelToolCalls: true,  numCtxParam: 'none',   defaultCtx: 0,     embedTools: false },
+    openrouter: { sendToolChoice: true,  parallelToolCalls: false, numCtxParam: 'none',   defaultCtx: 0,     embedTools: false },
+    unknown:    { sendToolChoice: false, parallelToolCalls: false, numCtxParam: 'none',   defaultCtx: 0,     embedTools: false },
 };
 
 // =============================================================================
@@ -4182,16 +4184,36 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
             const url = inferenceUrl.replace(/\/+$/, '') + '/v1/chat/completions';
             // Wave 447: use backend capability matrix — local models are the default, cloud is the exception
             const caps447 = BACKEND_CAPS[_detectedBackend];
+            // Wave 577: for embedTools backends, inject COMPACT tool summary into system prompt
+            // and DON'T send the tools param — Ollama's parser drops tool calls ~60% of the time
+            // Full tool defs are 10K chars — way too much. Compact summary is ~500 chars.
+            const useEmbedTools = caps447.embedTools && !noTools;
+            let reqMessages = messages;
+            if (useEmbedTools && messages.length > 0 && messages[0]!.role === 'system') {
+                const embedSuffix = `\n\n## Tool Calling
+Available tools: write_file(path, content), read_file(path), edit_file(path, old_text, new_text), run_shell(command), search_files(pattern, path), list_dir(path), glob_files(pattern), create_directory(path), delete_file(path), move_file(source, destination), copy_file(source, destination), patch_file(path, patches[{old_text,new_text}]), http_get(url), write_note(note)
+
+To call a tool, output a <tool_call> tag with JSON:
+<tool_call>
+{"function": "write_file", "arguments": {"path": "hello.py", "content": "print('hello')"}}
+</tool_call>
+
+IMPORTANT: Use relative paths from the current directory. Do not create subdirectories unless asked.`;
+                reqMessages = [
+                    { ...messages[0], content: (messages[0]!.content as string) + embedSuffix },
+                    ...messages.slice(1),
+                ];
+            }
             const bodyStr = JSON.stringify({
                 model,
-                messages,
-                ...(noTools ? {} : {
+                messages: reqMessages,
+                ...(!noTools && !useEmbedTools ? {
                     tools: CODE_AGENT_TOOLS,
                     // tool_choice only sent to backends that need it (openai, openrouter, vllm)
                     ...(caps447.sendToolChoice ? { tool_choice: 'auto' } : {}),
                     // parallel_tool_calls disabled for local models — causes confused multi-tool responses
                     ...(!caps447.parallelToolCalls ? { parallel_tool_calls: false } : {}),
-                }),
+                } : {}),
                 stream: true,
                 temperature: agentTemperature,  // Wave 73: /think sets this
                 ...(maxTokensFlag > 0 ? { max_tokens: maxTokensFlag } : {}),  // Wave 271
@@ -4343,10 +4365,20 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
                                         continue;
                                     }
                                     if (!inThinkingTag) {
+                                        // Wave 577: suppress <tool_call> tags from display in embedTools mode
+                                        // Content is still accumulated in fullContent for post-stream parsing
+                                        let displayContent = delta.content;
+                                        if (useEmbedTools && displayContent) {
+                                            displayContent = displayContent.replace(/<\/?tool_call>/g, '');
+                                            // Suppress JSON between tool_call tags — check if fullContent is mid-tag
+                                            const openCount = (fullContent + delta.content).split('<tool_call>').length - 1;
+                                            const closeCount = (fullContent + delta.content).split('</tool_call>').length - 1;
+                                            if (openCount > closeCount) displayContent = '';  // inside a tool_call tag
+                                        }
                                         // Wave 251: in jsonMode, collect without streaming (JSON emitted at end)
-                                        if (!jsonMode) {
-                                            process.stdout.write(delta.content);
-                                            if (printMode && delta.content.trim()) printModeHasText422 = true;
+                                        if (!jsonMode && displayContent) {
+                                            process.stdout.write(displayContent);
+                                            if (printMode && displayContent.trim()) printModeHasText422 = true;
                                         }
                                     }
                                     fullContent += delta.content;
@@ -4451,6 +4483,31 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
                 process.stdout.write(C.dim(`  [${toksPerSec} tok/s${ttftStr}]`));
             }
 
+            // Wave 577: parse <tool_call> tags from content (embedded tools mode)
+            // When using embedTools, the model outputs <tool_call>JSON</tool_call> in content instead of tool_calls
+            if (toolCalls.length === 0 && fullContent && useEmbedTools) {
+                const tcTagRegex = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
+                let tcTagMatch;
+                while ((tcTagMatch = tcTagRegex.exec(fullContent)) !== null) {
+                    try {
+                        const parsed577 = JSON.parse(tcTagMatch[1]!) as { function?: string; name?: string; arguments?: Record<string, unknown> };
+                        const tcName577 = parsed577.function || parsed577.name || '';
+                        const tcArgs577 = parsed577.arguments || {};
+                        if (tcName577) {
+                            toolCalls.push({
+                                id: `call_embed_${Date.now()}_${toolCalls.length}`,
+                                name: tcName577,
+                                args: JSON.stringify(tcArgs577),
+                            });
+                        }
+                    } catch { /* malformed JSON in tool_call tag — skip */ }
+                }
+                // Strip <tool_call> tags from content shown to user
+                if (toolCalls.length > 0) {
+                    fullContent = fullContent.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
+                }
+            }
+
             // No tool calls — final response
             if (toolCalls.length === 0) {
                 // Wave 450: aggressive text-mode tool recovery for local models
@@ -4513,8 +4570,11 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
                 if (fullContent && !noTools && intentionNudgeCount < 2) {
                     const validToolNames = CODE_AGENT_TOOLS.map(t => t.function.name);
                     // Case A: model says "I will use/call/edit/modify [tool]" but didn't call it
-                    const intentionMatch = fullContent.match(/\b(?:will|going to|proceed(?:ing)? to|now|let me|I'll)\s+(?:use|call|apply|execute|invoke|run|edit|modify|change|update|create|write|read)\s+(?:the\s+)?(?:file\s+)?[`']?(\w+)[`']?/i);
-                    const mentionedTool = intentionMatch?.[1] || '';
+                    // Wave 577: wider regex — also catches "Next, use", "First, use", "use the write_file function"
+                    const intentionMatch = fullContent.match(/\b(?:will|going to|proceed(?:ing)? to|now|let me|I'll|next,?\s+(?:I'll\s+)?|first,?\s+(?:I'll\s+)?)\s*(?:use|call|apply|execute|invoke|run|edit|modify|change|update|create|write|read)\s+(?:the\s+)?(?:file\s+)?[`'"]?(\w+)[`'"]?/i);
+                    // Wave 577: also try direct tool name mention — "write_file(" or "`write_file`"
+                    const directToolMatch: RegExpMatchArray | null = !intentionMatch ? fullContent.match(/[`'"]?(read_file|write_file|edit_file|run_shell|search_files|list_dir|glob_files|patch_file|create_directory|delete_file|move_file|copy_file|http_get|write_note)[`'"]?\s*\(/) : null;
+                    const mentionedTool = intentionMatch?.[1] || directToolMatch?.[1] || '';
                     const caseA = mentionedTool && validToolNames.includes(mentionedTool) && fullContent.length < 500;
                     // Case B/D shared prerequisite: how many tool calls happened so far
                     const prevToolCallCount = messages.filter(m => m.role === 'tool').length;
@@ -4540,15 +4600,12 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
                         claimsAction || asksPermission);
                     if (caseA || looksIntermediate) {
                         const nudgeTool = caseA ? mentionedTool : '';
-                        // Extract original task to remind model exactly what it needs to do
-                        const originalTask = messages.find(m => m.role === 'user' && typeof m.content === 'string')?.content || '';
-                        // Keep reminder brief to avoid confusing hermes3 with repeated context
-                        const taskReminder = originalTask ? `\n\nTask: ${originalTask.slice(0, 120)}` : '';
+                        // Wave 577: SHORT nudge messages — long nudges bloat context and cause empty retries
                         const nudgeMsg = nudgeTool
-                            ? `Please proceed — call ${nudgeTool} now. Do not describe what you'll do, just call the tool.${taskReminder}`
+                            ? `Call ${nudgeTool} now.`
                             : asksPermission
-                                ? `Yes, proceed. Auto-approved. Make the change now using the appropriate tool (edit_file or write_file).${taskReminder}`
-                                : `You have read the file. Now call edit_file (or write_file) to make the required change. Do NOT call write_note, do NOT say you've already made it — use edit_file with exact text from the read output.${taskReminder}`;
+                                ? `Yes, proceed now.`
+                                : `Call edit_file or write_file now.`;
                         if (!printMode) console.log('\n  ' + C.yellow(`\u26A0 ${caseA ? `Stalled intention ("${nudgeTool}")` : 'Premature stop detected'} — nudging agent`));
                         // Wave 257: lower temperature when nudging — more deterministic on retry
                         agentTemperature = Math.max(0.0, agentTemperature - 0.2);
@@ -4572,16 +4629,23 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
                         role: 'assistant', content: fullContent, model,
                     });
                 } else {
-                    // Wave 219: empty response protection — push a placeholder so the model doesn't loop
-                    if (!printMode) console.log('  ' + C.yellow('\u26A0 Model returned empty response. Continuing…'));
-                    messages.push({ role: 'assistant', content: '(empty response)' });
-                    // Wave 422b/431: in task mode, inject nudge to recover from empty response (max 2 times)
-                    if (taskFlag && emptyNudgeCount431 < 2) {
-                        const origTask = messages.find(m => m.role === 'user' && typeof m.content === 'string')?.content || '';
-                        messages.push({ role: 'user', content: `Please complete the task using tools. Task: ${origTask.slice(0, 200)}` });
-                        sessionUsage.requestCount++;
+                    // Wave 577: empty response = model tried tool call but Ollama dropped it (common with quantized models)
+                    // Retry immediately without growing context — just loop and re-request
+                    if (emptyNudgeCount431 < 3) {
                         emptyNudgeCount431++;
+                        if (!printMode) console.log('  ' + C.yellow(`\u26A0 Empty response (attempt ${emptyNudgeCount431}/3) — retrying…`));
+                        // In task mode: reset to clean state for best chance of success
+                        if (taskFlag && messages.length > 2) {
+                            const sysMsg = messages[0]!;
+                            const origUser = messages.find(m => m.role === 'user' && typeof m.content === 'string');
+                            messages.length = 0;
+                            messages.push(sysMsg);
+                            messages.push(origUser || { role: 'user', content: taskFlag });
+                        }
+                        continue;  // retry without hitting the `return` at line below
                     }
+                    if (!printMode) console.log('  ' + C.yellow('\u26A0 Model returned empty response after 3 attempts.'));
+                    messages.push({ role: 'assistant', content: '(empty response)' });
                 }
                 sessionUsage.requestCount++;
                 appendSessionEvent(sessionId, {
@@ -4620,7 +4684,14 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
                 type: 'function' as const,
                 function: { name: tc.name, arguments: tc.args },
             }));
-            messages.push({ role: 'assistant', content: fullContent || null, tool_calls: formattedCalls });
+            // Wave 577: for embedTools mode, don't push tool_calls structure (model doesn't understand it)
+            if (useEmbedTools) {
+                // Reconstruct the <tool_call> text for the assistant message
+                const tcText = toolCalls.map(tc => `<tool_call>\n{"function": "${tc.name}", "arguments": ${tc.args}}\n</tool_call>`).join('\n');
+                messages.push({ role: 'assistant', content: (fullContent ? fullContent + '\n' : '') + tcText });
+            } else {
+                messages.push({ role: 'assistant', content: fullContent || null, tool_calls: formattedCalls });
+            }
             appendSessionEvent(sessionId, {
                 type: 'message', timestamp: new Date().toISOString(), sessionId,
                 role: 'assistant', content: fullContent || null, tool_calls: formattedCalls, model,
@@ -4641,7 +4712,11 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
                             `Received: ${tc.args.slice(0, 300)}`,
                             `Please retry with complete, valid JSON arguments.`,
                         ].join('\n');
-                        messages.push({ role: 'tool', tool_call_id: tcId, name: tc.name, content: badArgsResult });
+                        if (useEmbedTools) {
+                            messages.push({ role: 'user', content: `<tool_response>\n${badArgsResult}\n</tool_response>` });
+                        } else {
+                            messages.push({ role: 'tool', tool_call_id: tcId, name: tc.name, content: badArgsResult });
+                        }
                         if (!printMode) console.log('  ' + C.red(`\u2718 ${tc.name}: malformed args (stream truncated) — agent will retry`));
                         sessionUsage.requestCount++;
                         continue;
@@ -4729,7 +4804,12 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
                     } catch { /* file may not exist or be unreadable */ }
                 }
 
-                messages.push({ role: 'tool', tool_call_id: tcId, name: tc.name, content: result452 });
+                // Wave 577: for embedTools mode, send tool result as user message with <tool_response> tags
+                if (useEmbedTools) {
+                    messages.push({ role: 'user', content: `<tool_response>\n${result452}\n</tool_response>` });
+                } else {
+                    messages.push({ role: 'tool', tool_call_id: tcId, name: tc.name, content: result452 });
+                }
                 appendSessionEvent(sessionId, {
                     type: 'tool_result', timestamp: new Date().toISOString(), sessionId,
                     role: 'tool', tool_call_id: tcId, name: tc.name,
