@@ -1242,7 +1242,8 @@ routes.get('/api/v1/utilization', (c) => {
     const utilization = nodes.map(n => {
         const s = n.latest_stats!;
         const gpuUtil = s.gpus.length > 0 ? Math.round(s.gpus.reduce((sum, g) => sum + g.utilizationPct, 0) / s.gpus.length) : 0;
-        const vramUtil = s.gpus.length > 0 ? Math.round(s.gpus.reduce((sum, g) => sum + g.vramUsedMb, 0) / s.gpus.reduce((sum, g) => sum + g.vramTotalMb, 0) * 100) : 0;
+        const totalVramNode = s.gpus.reduce((sum, g) => sum + g.vramTotalMb, 0);
+        const vramUtil = totalVramNode > 0 ? Math.round(s.gpus.reduce((sum, g) => sum + g.vramUsedMb, 0) / totalVramNode * 100) : 0;
         return { node_id: n.id, hostname: n.hostname, gpu_util_pct: gpuUtil, vram_util_pct: vramUtil, cpu_util_pct: s.cpu.usage_pct, ram_util_pct: s.ram.total_mb > 0 ? Math.round((s.ram.used_mb / s.ram.total_mb) * 100) : 0 };
     });
     const avgGpu = utilization.length > 0 ? Math.round(utilization.reduce((s, u) => s + u.gpu_util_pct, 0) / utilization.length) : 0;
