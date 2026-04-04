@@ -12,7 +12,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders(), ...init?.headers },
   });
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      detail = body.error || body.message || detail;
+    } catch { /* response wasn't JSON */ }
+    throw new Error(`API ${res.status}: ${detail}`);
+  }
   return res.json();
 }
 
