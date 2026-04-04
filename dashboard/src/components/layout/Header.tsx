@@ -207,6 +207,7 @@ export function Header() {
             className="text-[10px] cursor-pointer px-1.5 py-0.5 rounded transition-colors"
             style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}
             title="Toggle sidebar (Ctrl+B)"
+            aria-label="Toggle left sidebar"
           >
             ☰
           </button>
@@ -215,6 +216,7 @@ export function Header() {
             className="text-[10px] cursor-pointer px-1.5 py-0.5 rounded transition-colors"
             style={{ color: 'var(--text-muted)', border: '1px solid var(--border)' }}
             title="Toggle context panel (Ctrl+J)"
+            aria-label="Toggle context panel"
           >
             ◫
           </button>
@@ -244,7 +246,7 @@ export function Header() {
         </div>
 
         {/* Notification bell */}
-        <div className="relative cursor-pointer text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
+        <div className="relative cursor-pointer text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors" role="button" aria-label="Notifications">
           <span className="text-sm">&#x1F514;</span>
           <div
             className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full"
@@ -253,7 +255,7 @@ export function Header() {
         </div>
 
         {/* Settings gear */}
-        <span className="text-sm cursor-pointer text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
+        <span className="text-sm cursor-pointer text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors" role="button" aria-label="Settings">
           &#x2699;
         </span>
 
