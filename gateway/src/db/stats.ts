@@ -31,29 +31,31 @@ function _getAllNodesWithStats(): NodeWithStats[] {
 
 export function insertStats(nodeId: string, payload: StatsPayload): void {
     const d = getDb();
+    const txn = d.transaction(() => {
+        d.prepare(`
+            INSERT INTO stats (node_id, payload, gpu_count, cpu_usage_pct, ram_used_mb, ram_total_mb, toks_per_sec)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `).run(
+            nodeId,
+            JSON.stringify(payload),
+            payload.gpu_count,
+            payload.cpu.usage_pct,
+            payload.ram.used_mb,
+            payload.ram.total_mb,
+            payload.toks_per_sec
+        );
 
-    d.prepare(`
-        INSERT INTO stats (node_id, payload, gpu_count, cpu_usage_pct, ram_used_mb, ram_total_mb, toks_per_sec)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-        nodeId,
-        JSON.stringify(payload),
-        payload.gpu_count,
-        payload.cpu.usage_pct,
-        payload.ram.used_mb,
-        payload.ram.total_mb,
-        payload.toks_per_sec
-    );
-
-    // Update node last_seen and status -- track state transition for uptime
-    const current = d.prepare('SELECT status FROM nodes WHERE id = ?').get(nodeId) as { status: string } | undefined;
-    if (current && current.status !== 'online') {
-        recordUptimeEvent(nodeId, 'stats_online', current.status, 'online');
-    }
-    d.prepare(`
-        UPDATE nodes SET last_seen_at = datetime('now'), status = 'online', gpu_count = ?
-        WHERE id = ?
-    `).run(payload.gpu_count, nodeId);
+        // Update node last_seen and status -- track state transition for uptime
+        const current = d.prepare('SELECT status FROM nodes WHERE id = ?').get(nodeId) as { status: string } | undefined;
+        if (current && current.status !== 'online') {
+            recordUptimeEvent(nodeId, 'stats_online', current.status, 'online');
+        }
+        d.prepare(`
+            UPDATE nodes SET last_seen_at = datetime('now'), status = 'online', gpu_count = ?
+            WHERE id = ?
+        `).run(payload.gpu_count, nodeId);
+    });
+    txn();
 }
 
 export function getStatsHistory(nodeId: string, limit: number = 100): StatsPayload[] {
