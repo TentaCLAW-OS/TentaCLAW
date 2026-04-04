@@ -48,13 +48,18 @@ export {
     findNodesForModel,
     getClusterModels,
     getModelPreloadHints,
+    getRoutingLog,
+    getStickyNode,
+    setStickyNode,
+    clearStickySession,
 } from './stats';
-export type { InferenceTarget } from './stats';
+export type { InferenceTarget, RoutingDecision } from './stats';
 
 // Command operations
 export {
     queueCommand,
     getPendingCommands,
+    ackCommand,
     completeCommand,
     createFlightSheet,
     getAllFlightSheets,

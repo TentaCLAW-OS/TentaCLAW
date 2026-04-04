@@ -15,6 +15,7 @@ import {
     getNode,
     insertStats,
     getPendingCommands,
+    ackCommand,
     queueCommand,
     getClusterSummary,
     getHealthScore,
@@ -99,7 +100,8 @@ describe('Integration: Full Node Lifecycle', () => {
         expect(pending.length).toBe(1);
         expect(pending[0].model).toBe('codellama:7b');
 
-        // 6. Commands are now marked as sent
+        // 6. ACK the command — now it should no longer appear as pending
+        ackCommand(cmd.id);
         const pendingAgain = getPendingCommands('int-node-1');
         expect(pendingAgain.length).toBe(0);
     });

@@ -18,6 +18,7 @@ import {
     insertStats,
     getStatsHistory,
     getPendingCommands,
+    ackCommand,
     queueCommand,
     completeCommand,
     createFlightSheet,
@@ -238,11 +239,16 @@ describe('Commands', () => {
         expect(pending[0].model).toBe('llama3.1:8b');
     });
 
-    it('marks commands as sent after retrieval', () => {
+    it('marks commands as sent after ACK', () => {
         registerNode({ node_id: 'cn', farm_hash: 'F1', hostname: 'h1', gpu_count: 1 });
-        queueCommand('cn', 'install_model', { model: 'test' });
+        const cmd = queueCommand('cn', 'install_model', { model: 'test' });
 
+        // Commands stay pending until explicitly ACKed
         expect(getPendingCommands('cn').length).toBe(1);
+        expect(getPendingCommands('cn').length).toBe(1);
+
+        // ACK the command — now it should no longer appear as pending
+        ackCommand(cmd.id);
         expect(getPendingCommands('cn').length).toBe(0);
     });
 

@@ -12,6 +12,7 @@ import {
     insertStats,
     getStatsHistory,
     getPendingCommands,
+    ackCommand,
     queueCommand,
     completeCommand,
     checkAndAlert,
@@ -248,6 +249,9 @@ routes.post('/api/v1/nodes/:nodeId/commands', async (c) => {
     if (!node) {
         return c.json({ error: 'Node not found' }, 404);
     }
+    if (node.status !== 'online') {
+        return c.json({ error: 'Node is offline', status: node.status }, 409);
+    }
 
     const command = queueCommand(nodeId, body.action as CommandAction, {
         model: body.model,
@@ -265,6 +269,12 @@ routes.post('/api/v1/nodes/:nodeId/commands', async (c) => {
     console.log(`[tentaclaw] Command queued: ${command.action} → ${nodeId}`);
 
     return c.json({ status: 'queued', command });
+});
+
+routes.post('/api/v1/commands/:commandId/ack', (c) => {
+    const commandId = c.req.param('commandId');
+    ackCommand(commandId);
+    return c.json({ status: 'acknowledged', id: commandId });
 });
 
 routes.post('/api/v1/commands/:commandId/complete', (c) => {

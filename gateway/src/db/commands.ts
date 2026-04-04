@@ -44,12 +44,6 @@ export function getPendingCommands(nodeId: string): GatewayCommand[] {
         "SELECT * FROM commands WHERE node_id = ? AND status = 'pending' ORDER BY created_at"
     ).all(nodeId) as { id: string; action: string; payload: string | null }[];
 
-    // Mark them as sent
-    const markSent = d.prepare("UPDATE commands SET status = 'sent', sent_at = datetime('now') WHERE id = ?");
-    for (const row of rows) {
-        markSent.run(row.id);
-    }
-
     return rows.map(row => {
         const params = row.payload ? safeJsonParse(row.payload, {}) : {};
         return {
@@ -58,6 +52,11 @@ export function getPendingCommands(nodeId: string): GatewayCommand[] {
             ...params,
         };
     });
+}
+
+export function ackCommand(commandId: string): void {
+    const d = getDb();
+    d.prepare("UPDATE commands SET status = 'sent', sent_at = datetime('now') WHERE id = ?").run(commandId);
 }
 
 export function completeCommand(commandId: string): void {
