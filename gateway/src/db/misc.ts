@@ -9,6 +9,17 @@ import type { SshKey, NodeWithStats } from '../../../shared/types';
 import { getDb, generateId } from './init';
 import { safeJsonParse } from './safe-json';
 
+/** Ensure stats.inference and stats.gpus always exist (duplicated from nodes.ts to avoid circular dep) */
+function _normalizeStats(stats: any): any {
+    if (!stats) return null;
+    if (!stats.inference || typeof stats.inference !== 'object') {
+        stats.inference = { loaded_models: [], in_flight_requests: 0, tokens_generated: 0, avg_latency_ms: 0 };
+    }
+    if (!Array.isArray(stats.inference.loaded_models)) stats.inference.loaded_models = [];
+    if (!Array.isArray(stats.gpus)) stats.gpus = [];
+    return stats;
+}
+
 // =============================================================================
 // Benchmarks
 // =============================================================================
@@ -217,7 +228,7 @@ export function getNodesByTag(tag: string): NodeWithStats[] {
         ).get(r.node_id) as { payload: string } | undefined;
         return {
             ...node,
-            latest_stats: latestStat ? safeJsonParse(latestStat.payload, null) : null,
+            latest_stats: latestStat ? _normalizeStats(safeJsonParse(latestStat.payload, null)) : null,
         };
     }).filter((n): n is NodeWithStats => n !== null);
 }
