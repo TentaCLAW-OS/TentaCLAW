@@ -315,7 +315,10 @@ function loadSessionTranscript(sessionId: string): SessionEvent[] {
     const filePath = path.join(getSessionsDir(), `${sessionId}.jsonl`);
     try {
         const lines = fs.readFileSync(filePath, 'utf8').trim().split('\n');
-        return lines.filter(l => l.trim()).map(l => JSON.parse(l));
+        return lines.filter(l => l.trim()).reduce((acc: SessionEvent[], l: string) => {
+            try { acc.push(JSON.parse(l)); } catch { /* skip corrupted line */ }
+            return acc;
+        }, []);
     } catch {
         return [];
     }
