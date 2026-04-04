@@ -4967,7 +4967,8 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                 return;
             }
 
-            // Streamed some text then made tool calls
+            // Streamed some text then made tool calls — combine content+tool_calls in single message
+            // IMPORTANT: never push content and tool_calls as separate messages (causes history bloat)
             if (!printMode) console.log('');
             const formattedCalls = toolCalls.map(tc => ({
                 id: tc.id || `call_${Date.now()}_${_toolCallCounter++}`,
@@ -4976,10 +4977,11 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
             }));
             // Wave 577: for embedTools mode, don't push tool_calls structure (model doesn't understand it)
             if (useEmbedTools) {
-                // Reconstruct the <tool_call> text for the assistant message
+                // Reconstruct the <tool_call> text for the assistant message (single combined message)
                 const tcText = toolCalls.map(tc => `<tool_call>\n{"function": "${tc.name}", "arguments": ${tc.args}}\n</tool_call>`).join('\n');
                 messages.push({ role: 'assistant', content: (fullContent ? fullContent + '\n' : '') + tcText });
             } else {
+                // Single message with both content and tool_calls — never push separately
                 messages.push({ role: 'assistant', content: fullContent || null, tool_calls: formattedCalls });
             }
             appendSessionEvent(sessionId, {
