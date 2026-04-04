@@ -1549,10 +1549,10 @@ async function main() {
         '\x1b[38;2;139;92;246m     ╚═╝   ╚══════╝╚═╝  ╚═══╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝\x1b[0m\n' +
         '\n' +
         '\x1b[38;2;255;255;255m  \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\x1b[0m\n' +
-        '\x1b[2m  Agent v0.2.0 \u2014 Eight arms. One mind. Zero compromises.\x1b[0m\n'
+        `\x1b[2m  Agent v${AGENT_VERSION} \u2014 Eight arms. One mind. Zero compromises.\x1b[0m\n`
     );
 
-    console.log('[agent] TentaCLAW Agent v0.2.0');
+    console.log(`[agent] TentaCLAW Agent v${AGENT_VERSION}`);
     if (config.mockMode) {
         console.log('[agent] \x1b[38;2;255;220;50mMOCK MODE\x1b[0m \u2014 Generating fake stats (' + MOCK_GPU_COUNT + ' GPUs)');
     }
