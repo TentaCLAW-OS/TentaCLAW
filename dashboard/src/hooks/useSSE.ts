@@ -7,6 +7,7 @@ export function useSSE() {
   const setConnected = useClusterStore((s) => s.setConnected);
   const loadInitial = useClusterStore((s) => s.loadInitial);
   const esRef = useRef<EventSource | null>(null);
+  const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSSERef = useRef(handleSSE);
   handleSSERef.current = handleSSE;
   const setConnectedRef = useRef(setConnected);
@@ -43,16 +44,21 @@ export function useSSE() {
         if (!mounted) return;
         setConnectedRef.current(false);
         es.close();
-        setTimeout(connect, 2000);
+        if (reconnectRef.current) clearTimeout(reconnectRef.current);
+        reconnectRef.current = setTimeout(connect, 2000);
       };
     }
 
     loadInitialRef.current()
       .then(connect)
-      .catch(() => setTimeout(connect, 2000));
+      .catch(() => {
+        if (reconnectRef.current) clearTimeout(reconnectRef.current);
+        reconnectRef.current = setTimeout(connect, 2000);
+      });
 
     return () => {
       mounted = false;
+      if (reconnectRef.current) clearTimeout(reconnectRef.current);
       esRef.current?.close();
     };
   }, []); // Empty deps — connect once
