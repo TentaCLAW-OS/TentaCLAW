@@ -41,6 +41,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       model,
     };
 
+    // Capture conversation history BEFORE state mutations to avoid stale closure
+    const historyForApi = [
+      ...state.messages.map((m) => ({ role: m.role, content: m.content })),
+      { role: 'user' as const, content },
+    ];
+
     set({ messages: [...state.messages, userMessage], streaming: true });
 
     const assistantMessage: ChatMessage = {
@@ -67,12 +73,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         body: JSON.stringify({
           model,
           stream: true,
-          messages: [
-            ...get().messages.slice(0, -1).map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
-          ],
+          messages: historyForApi,
         }),
       });
 
