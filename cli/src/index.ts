@@ -2495,6 +2495,20 @@ const CODE_AGENT_TOOLS = [
 // Code Agent — Helpers
 // =============================================================================
 
+const SENSITIVE_PATTERNS = [
+    /[/\\]\.env($|\.)/i,
+    /[/\\]\.ssh[/\\]/i,
+    /[/\\]\.aws[/\\]/i,
+    /[/\\]\.gnupg[/\\]/i,
+    /[/\\]\.npmrc$/i,
+    /[/\\]credentials\.json$/i,
+    /[/\\]id_(rsa|ed25519|ecdsa)(\.pub)?$/i,
+];
+
+function isSensitivePath(filePath: string): boolean {
+    return SENSITIVE_PATTERNS.some(p => p.test(filePath));
+}
+
 function summarizeToolArgs(argsJson: string, toolName?: string): string {
     // Wave 118: per-tool readable summaries
     try {
@@ -2575,6 +2589,9 @@ async function executeCodeTool(
                 rawPath = rawPath.slice(0, rawPath.lastIndexOf(':'));
             }
             const filePath = resolvePath(rawPath);
+            if (isSensitivePath(filePath)) {
+                return `Blocked: ${path.basename(filePath)} is a sensitive file (credentials/secrets)`;
+            }
             // Wave 341: check .clawignore patterns
             if (_clawIgnorePatterns.length > 0) {
                 const relToIgnore = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
@@ -2683,6 +2700,9 @@ async function executeCodeTool(
 
         case 'write_file': {
             const filePath = resolvePath(args['path'] || '');
+            if (isSensitivePath(filePath)) {
+                return `Blocked: ${path.basename(filePath)} is a sensitive file (credentials/secrets)`;
+            }
             const content = args['content'] || '';
             // Wave 154: append mode
             const writeMode = (args['mode'] || 'overwrite').toLowerCase();
