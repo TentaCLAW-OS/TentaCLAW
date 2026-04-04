@@ -26,7 +26,7 @@ const routes = new Hono();
 // =============================================================================
 
 routes.get('/api/v1/routing/telemetry', (c) => {
-    const limit = Math.min(500, parseInt(c.req.query('limit') || '100', 10));
+    const limit = Math.min(500, parseInt(c.req.query('limit') || '100', 10) || 100);
     const decisions = getRoutingLog(limit);
     return c.json({
         decisions,

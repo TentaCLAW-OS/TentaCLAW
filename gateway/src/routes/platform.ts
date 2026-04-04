@@ -90,7 +90,7 @@ platform.get('/api/v1/fleet/inventory', (c) => {
 // =============================================================================
 
 platform.get('/api/v1/power/cost', (c) => {
-    const rateKwh = parseFloat(c.req.query('rate_kwh') || '0.12'); // $/kWh default
+    const rateKwh = parseFloat(c.req.query('rate_kwh') || '0.12') || 0.12; // $/kWh default
     const nodes = getAllNodes();
 
     let totalWatts = 0;
@@ -340,7 +340,7 @@ export function recordABResult(testId: string, variant: 'a' | 'b', latencyMs: nu
 // =============================================================================
 
 platform.get('/api/v1/usage', (c) => {
-    const hours = parseInt(c.req.query('hours') || '24', 10);
+    const hours = parseInt(c.req.query('hours') || '24', 10) || 24;
     // Delegate to existing analytics
     const { getInferenceAnalytics } = require('../db') as typeof import('../db');
     const analytics = getInferenceAnalytics(hours);
@@ -365,9 +365,9 @@ platform.get('/api/v1/usage', (c) => {
 // =============================================================================
 
 platform.get('/api/v1/revenue', (c) => {
-    const pricePerMTokIn = parseFloat(c.req.query('price_in') || '0.50');  // $/M input tokens
-    const pricePerMTokOut = parseFloat(c.req.query('price_out') || '1.50'); // $/M output tokens
-    const hours = parseInt(c.req.query('hours') || '720', 10); // default 30 days
+    const pricePerMTokIn = parseFloat(c.req.query('price_in') || '0.50') || 0.50;  // $/M input tokens
+    const pricePerMTokOut = parseFloat(c.req.query('price_out') || '1.50') || 1.50; // $/M output tokens
+    const hours = parseInt(c.req.query('hours') || '720', 10) || 720; // default 30 days
     const { getInferenceAnalytics } = require('../db') as typeof import('../db');
     const analytics = getInferenceAnalytics(hours);
 
@@ -382,7 +382,7 @@ platform.get('/api/v1/revenue', (c) => {
         if (n.status !== 'online' || !n.latest_stats?.gpus) continue;
         totalWatts += n.latest_stats.gpus.reduce((s, g) => s + g.powerDrawW, 0);
     }
-    const rateKwh = parseFloat(c.req.query('rate_kwh') || '0.12');
+    const rateKwh = parseFloat(c.req.query('rate_kwh') || '0.12') || 0.12;
     const powerCost = (totalWatts / 1000) * rateKwh * (hours);
 
     return c.json({

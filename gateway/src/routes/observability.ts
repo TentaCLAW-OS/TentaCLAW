@@ -151,7 +151,7 @@ observability.post('/api/v1/fleet/oom-check', (c) => {
 // =============================================================================
 
 observability.get('/api/v1/metrics/history', (c) => {
-    const hours = Math.min(720, Math.max(1, parseInt(c.req.query('hours') || '24', 10)));
+    const hours = Math.min(720, Math.max(1, parseInt(c.req.query('hours') || '24', 10) || 24));
     const analytics = getInferenceAnalytics(hours);
     const perNode = getAllNodes().map(node => {
         const stats = node.latest_stats;

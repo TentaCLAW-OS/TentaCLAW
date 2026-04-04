@@ -15,7 +15,7 @@ import {
 const routes = new Hono();
 
 routes.get('/api/v1/alerts', (c) => {
-    const limit = parseInt(c.req.query('limit') || '50');
+    const limit = parseInt(c.req.query('limit') || '50') || 50;
     const alerts = getRecentAlerts(limit);
     return c.json({ alerts });
 });

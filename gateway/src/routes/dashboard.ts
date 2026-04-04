@@ -497,7 +497,7 @@ routes.get('/api/v1/playground/models', (c) => {
 });
 
 routes.get('/api/v1/playground/history', (c) => {
-    const limit = Math.min(parseInt(c.req.query('limit') || '50'), 100);
+    const limit = Math.min(parseInt(c.req.query('limit') || '50') || 50, 100);
     const history = getPlaygroundHistory(limit);
     return c.json({ history, count: history.length });
 });

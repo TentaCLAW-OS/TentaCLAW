@@ -348,7 +348,7 @@ routes.get('/api/v1/audit', (c) => {
         return c.json({ error: 'Admin access required' }, 403);
     }
 
-    const limit = parseInt(c.req.query('limit') || '100');
+    const limit = parseInt(c.req.query('limit') || '100') || 100;
     const eventType = c.req.query('event_type') || undefined;
     return c.json({ audit_log: getAuditLog(limit, eventType) });
 });

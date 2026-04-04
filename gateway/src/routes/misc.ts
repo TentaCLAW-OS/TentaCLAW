@@ -467,12 +467,12 @@ routes.get('/api/v1/fleet', (c) => {
 });
 
 routes.get('/api/v1/uptime', (c) => {
-    const hours = parseInt(c.req.query('hours') || '24');
+    const hours = parseInt(c.req.query('hours') || '24') || 24;
     return c.json(getFleetUptime(hours));
 });
 
 routes.get('/api/v1/timeline', (c) => {
-    const limit = parseInt(c.req.query('limit') || '50');
+    const limit = parseInt(c.req.query('limit') || '50') || 50;
     return c.json(getClusterTimeline(limit));
 });
 
@@ -1270,7 +1270,7 @@ routes.get('/api/v1/capacity', (c) => {
 });
 
 routes.get('/api/v1/errors', (c) => {
-    const hours = parseInt(c.req.query('hours') || '24');
+    const hours = parseInt(c.req.query('hours') || '24') || 24;
     const d = getDb();
     const since = new Date(Date.now() - hours * 3600000).toISOString().replace('T', ' ').slice(0, 19);
     const errors = d.prepare("SELECT node_id, model, error, created_at FROM inference_log WHERE success = 0 AND created_at >= ? ORDER BY created_at DESC LIMIT 50").all(since) as any[];

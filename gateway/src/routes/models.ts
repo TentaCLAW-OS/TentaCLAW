@@ -154,7 +154,7 @@ routes.get('/api/v1/inference/stats', (c) => {
 });
 
 routes.get('/api/v1/inference/analytics', (c) => {
-    const hours = parseInt(c.req.query('hours') || '24');
+    const hours = parseInt(c.req.query('hours') || '24') || 24;
     return c.json(getInferenceAnalytics(hours));
 });
 

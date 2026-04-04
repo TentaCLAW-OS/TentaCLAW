@@ -252,7 +252,7 @@ routes.delete('/api/v1/nodes/:nodeId', (c) => {
 
 routes.get('/api/v1/nodes/:nodeId/stats/history', (c) => {
     const nodeId = c.req.param('nodeId');
-    const limit = parseInt(c.req.query('limit') || '100');
+    const limit = parseInt(c.req.query('limit') || '100') || 100;
     const history = getStatsHistory(nodeId, limit);
     return c.json({ stats: history });
 });
@@ -318,14 +318,14 @@ routes.post('/api/v1/commands/:commandId/complete', (c) => {
 // =============================================================================
 
 routes.get('/api/v1/benchmarks', (c) => {
-    const limit = parseInt(c.req.query('limit') || '50');
+    const limit = parseInt(c.req.query('limit') || '50') || 50;
     const benchmarks = getAllBenchmarks(limit);
     return c.json({ benchmarks });
 });
 
 routes.get('/api/v1/nodes/:nodeId/benchmarks', (c) => {
     const nodeId = c.req.param('nodeId');
-    const limit = parseInt(c.req.query('limit') || '20');
+    const limit = parseInt(c.req.query('limit') || '20') || 20;
     const benchmarks = getNodeBenchmarks(nodeId, limit);
     return c.json({ benchmarks });
 });
@@ -386,14 +386,14 @@ routes.post('/api/v1/nodes/:nodeId/benchmark/run', async (c) => {
 
 routes.get('/api/v1/nodes/:nodeId/events', (c) => {
     const nodeId = c.req.param('nodeId');
-    const limit = parseInt(c.req.query('limit') || '50');
+    const limit = parseInt(c.req.query('limit') || '50') || 50;
     const events = getNodeEvents(nodeId, limit);
     return c.json({ events });
 });
 
 routes.get('/api/v1/nodes/:nodeId/sparklines', (c) => {
     const nodeId = c.req.param('nodeId');
-    const limit = parseInt(c.req.query('points') || '60');
+    const limit = parseInt(c.req.query('points') || '60') || 60;
     const history = getCompactHistory(nodeId, limit);
     return c.json(history);
 });
@@ -406,7 +406,7 @@ const nodeLogBuffers = new Map<string, { lines: string[]; maxLines: number }>();
 
 routes.get('/api/v1/nodes/:nodeId/logs', (c) => {
     const nodeId = c.req.param('nodeId');
-    const limit = parseInt(c.req.query('limit') || '100');
+    const limit = parseInt(c.req.query('limit') || '100') || 100;
     const buffer = nodeLogBuffers.get(nodeId);
     if (!buffer) return c.json({ logs: [] });
     return c.json({ logs: buffer.lines.slice(-limit) });
@@ -440,7 +440,7 @@ routes.get('/api/v1/nodes/:id/health-score', (c) => {
 });
 
 routes.get('/api/v1/nodes/:id/uptime', (c) => {
-    const hours = parseInt(c.req.query('hours') || '24');
+    const hours = parseInt(c.req.query('hours') || '24') || 24;
     return c.json(getNodeUptime(c.req.param('id'), hours));
 });
 
@@ -523,7 +523,7 @@ routes.get('/api/v1/nodes/:id/watchdog', (c) => {
 });
 
 routes.get('/api/v1/watchdog', (c) => {
-    const limit = parseInt(c.req.query('limit') || '100');
+    const limit = parseInt(c.req.query('limit') || '100') || 100;
     return c.json(getAllWatchdogEvents(limit));
 });
 
