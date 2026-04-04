@@ -4605,7 +4605,8 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                             }
                         } else if (tcName577) {
                             // For non-write_file tools, try to extract args loosely
-                            const argsMatch = raw577.match(/"arguments"\s*:\s*(\{[\s\S]*\})/);
+                            // Use non-greedy match to avoid consuming too much on nested JSON
+                            const argsMatch = raw577.match(/"arguments"\s*:\s*(\{[\s\S]*?\})\s*\}?\s*$/);
                             let argsStr = '{}';
                             if (argsMatch) { try { argsStr = JSON.stringify(JSON.parse(argsMatch[1]!)); } catch { argsStr = argsMatch[1]!; } }
                             toolCalls.push({ id: `call_embed_${Date.now()}_${toolCalls.length}`, name: tcName577, args: argsStr });
@@ -4763,20 +4764,12 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                         role: 'assistant', content: fullContent, model,
                     });
                 } else {
-                    // Wave 577: empty response = model tried tool call but Ollama dropped it (common with quantized models)
-                    // Retry immediately without growing context — just loop and re-request
+                    // Empty response — retry without resetting context (keep tool results intact)
                     if (emptyNudgeCount431 < 3) {
                         emptyNudgeCount431++;
                         if (!printMode) console.log('  ' + C.yellow(`\u26A0 Empty response (attempt ${emptyNudgeCount431}/3) — retrying…`));
-                        // In task mode: reset to clean state for best chance of success
-                        if (taskFlag && messages.length > 2) {
-                            const sysMsg = messages[0]!;
-                            const origUser = messages.find(m => m.role === 'user' && typeof m.content === 'string');
-                            messages.length = 0;
-                            messages.push(sysMsg);
-                            messages.push(origUser || { role: 'user', content: taskFlag });
-                        }
-                        continue;  // retry without hitting the `return` at line below
+                        // Don't reset messages — tool results from prior iterations are valuable context
+                        continue;
                     }
                     if (!printMode) console.log('  ' + C.yellow('\u26A0 Model returned empty response after 3 attempts.'));
                     messages.push({ role: 'assistant', content: '(empty response)' });
@@ -5052,6 +5045,7 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
         const pipedInput = Buffer.concat(chunks).toString('utf8').trim();
         if (pipedInput) {
             if (!printMode) console.log('  ' + C.dim(`Piped input: ${pipedInput.slice(0, 60)}${pipedInput.length > 60 ? '...' : ''}`));
+            taskFlag = pipedInput;  // treat piped input as task mode for early-exit logic
             rl = null;
             try { await runAgentLoop(pipedInput); } catch (e) { console.error(C.red('  Error: ' + (e instanceof Error ? e.message : String(e)))); }
             const pipedMsgCount = messages.filter(m => m.role === 'user').length;
