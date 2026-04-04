@@ -38,7 +38,7 @@ export function SummaryTab() {
 
   const onlineCount = summary?.online_nodes ?? onlineNodes.length;
   const offlineCount = summary?.offline_nodes ?? offlineNodes.length;
-  const totalToks = summary ? totalToksPerSec : totalToksPerSec;
+  const totalToks = summary?.total_toks_per_sec ?? totalToksPerSec;
 
   // Power display
   const totalWatts = power?.total_watts ?? 0;
