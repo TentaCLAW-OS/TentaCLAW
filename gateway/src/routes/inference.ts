@@ -789,24 +789,27 @@ routes.post('/v1/embeddings', async (c) => {
 
     try {
         const allEmbeddings: any[] = [];
+        let globalIdx = 0;
         for (let i = 0; i < inputs.length; i += 32) {
             const batch = inputs.slice(i, i + 32);
-            for (const text of batch) {
-                try {
-                    const proxyReq = await fetchWithTimeout(embedUrl, { model: resolvedModel, input: text }, 30_000);
-                    const result = await proxyReq.json() as any;
-                    if (result.data?.[0]) {
+            try {
+                const proxyReq = await fetchWithTimeout(embedUrl, { model: resolvedModel, input: batch }, 30_000);
+                const result = await proxyReq.json() as any;
+                if (result.data && Array.isArray(result.data)) {
+                    for (const item of result.data) {
                         allEmbeddings.push({
                             object: 'embedding',
-                            embedding: result.data[0].embedding,
-                            index: allEmbeddings.length,
+                            embedding: item.embedding,
+                            index: globalIdx++,
                         });
                     }
-                } catch {
+                }
+            } catch {
+                for (let j = 0; j < batch.length; j++) {
                     allEmbeddings.push({
                         object: 'embedding',
                         embedding: [],
-                        index: allEmbeddings.length,
+                        index: globalIdx++,
                     });
                 }
             }
@@ -816,11 +819,12 @@ routes.post('/v1/embeddings', async (c) => {
         recordRouteResult(target.node_id, resolvedModel, latencyMs, true);
         logInferenceRequest(target.node_id, resolvedModel, latencyMs, true, inputs.length, 0);
 
+        const estimatedTokens = inputs.reduce((s: number, t: string) => s + Math.ceil(t.length / 4), 0);
         return c.json({
             object: 'list',
             data: allEmbeddings,
             model: resolvedModel,
-            usage: { prompt_tokens: inputs.reduce((s: number, t: string) => s + t.split(' ').length, 0), total_tokens: inputs.reduce((s: number, t: string) => s + t.split(' ').length, 0) },
+            usage: { prompt_tokens: estimatedTokens, total_tokens: estimatedTokens },
             _tentaclaw: {
                 routed_to: target.node_id,
                 hostname: target.hostname,
