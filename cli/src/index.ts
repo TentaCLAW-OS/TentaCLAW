@@ -2120,7 +2120,34 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
                             } catch { /* skip malformed SSE */ }
                         }
                     });
-                    res.on('end', resolve);
+                    res.on('end', () => {
+                        // Flush remaining buffer
+                        if (buf.trim()) {
+                            const remainingLines = buf.split('\n');
+                            for (const line of remainingLines) {
+                                if (!line.startsWith('data: ')) continue;
+                                const raw = line.slice(6).trim();
+                                if (raw === '[DONE]') continue;
+                                try {
+                                    const ev = JSON.parse(raw) as {
+                                        choices?: Array<{ delta?: { content?: string } }>;
+                                        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+                                    };
+                                    if (ev.usage) {
+                                        chatUsage.inputTokens += ev.usage.prompt_tokens || 0;
+                                        chatUsage.outputTokens += ev.usage.completion_tokens || 0;
+                                        chatUsage.totalTokens += ev.usage.total_tokens || 0;
+                                    }
+                                    const content = ev.choices?.[0]?.delta?.content;
+                                    if (content) {
+                                        process.stdout.write(content);
+                                        fullContent += content;
+                                    }
+                                } catch { /* skip */ }
+                            }
+                        }
+                        resolve();
+                    });
                     res.on('error', reject);
                 });
                 req.on('error', reject);
@@ -4479,7 +4506,57 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                             } catch { /* skip malformed SSE */ }
                         }
                     });
-                    res.on('end', () => { clearInterval(spinner); if (loadingTimer445) clearTimeout(loadingTimer445); firstTokenReceived = true; resolve(); });
+                    res.on('end', () => {
+                        clearInterval(spinner); if (loadingTimer445) clearTimeout(loadingTimer445); firstTokenReceived = true;
+                        // Flush remaining buffer
+                        if (buf.trim()) {
+                            const remainingLines = buf.split('\n');
+                            for (const line of remainingLines) {
+                                if (!line.startsWith('data: ')) continue;
+                                const raw = line.slice(6).trim();
+                                if (raw === '[DONE]') continue;
+                                try {
+                                    const ev = JSON.parse(raw) as {
+                                        choices?: Array<{
+                                            delta?: {
+                                                content?: string;
+                                                tool_calls?: Array<{
+                                                    index?: number;
+                                                    id?: string;
+                                                    function?: { name?: string; arguments?: string };
+                                                }>;
+                                            };
+                                            finish_reason?: string;
+                                        }>;
+                                        usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+                                    };
+                                    if (ev.usage) {
+                                        sessionUsage.inputTokens += ev.usage.prompt_tokens || 0;
+                                        const outToks = ev.usage.completion_tokens || 0;
+                                        sessionUsage.outputTokens += outToks;
+                                        outputTokensThisRound += outToks;
+                                        sessionUsage.totalTokens += ev.usage.total_tokens || 0;
+                                    }
+                                    const fr = ev.choices?.[0]?.finish_reason;
+                                    if (fr) streamState.finishReason = fr;
+                                    const delta = ev.choices?.[0]?.delta;
+                                    if (delta) {
+                                        if (delta.content) fullContent += delta.content;
+                                        if (delta.tool_calls) {
+                                            for (const tc of delta.tool_calls) {
+                                                const idx = tc.index ?? 0;
+                                                if (!tcAcc[idx]) tcAcc[idx] = { id: '', name: '', args: '' };
+                                                if (tc.id) tcAcc[idx].id += tc.id;
+                                                if (tc.function?.name) tcAcc[idx].name += tc.function.name;
+                                                if (tc.function?.arguments) tcAcc[idx].args += tc.function.arguments;
+                                            }
+                                        }
+                                    }
+                                } catch { /* skip */ }
+                            }
+                        }
+                        resolve();
+                    });
                     res.on('error', (e) => { clearInterval(spinner); if (loadingTimer445) clearTimeout(loadingTimer445); firstTokenReceived = true; streamState.error = e.message; resolve(); });
                 });
                 // Wave 445: 120s socket timeout — local models can be slow to load but shouldn't hang forever
