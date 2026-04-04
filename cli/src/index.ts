@@ -2071,6 +2071,9 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
             const url = inferenceUrl.replace(/\/+$/, '') + '/v1/chat/completions';
             const bodyStr = JSON.stringify({ model, messages: chatMessages, stream: true });
             let fullContent = '';
+            const prevChatInput = chatUsage.inputTokens;
+            const prevChatOutput = chatUsage.outputTokens;
+            const prevChatTotal = chatUsage.totalTokens;
 
             await new Promise<void>((resolve, reject) => {
                 const parsed = new URL(url);
@@ -2169,7 +2172,14 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
                 // Wave 35: emit usage event per turn + keep index fresh
                 appendSessionEvent(chatSessionId, {
                     type: 'usage', timestamp: new Date().toISOString(), sessionId: chatSessionId,
-                    usage: { inputTokens: chatUsage.inputTokens, outputTokens: chatUsage.outputTokens, totalTokens: chatUsage.totalTokens },
+                    usage: {
+                        inputTokens: chatUsage.inputTokens - prevChatInput,
+                        outputTokens: chatUsage.outputTokens - prevChatOutput,
+                        totalTokens: chatUsage.totalTokens - prevChatTotal,
+                        cumulativeInput: chatUsage.inputTokens,
+                        cumulativeOutput: chatUsage.outputTokens,
+                        cumulativeTotal: chatUsage.totalTokens,
+                    },
                     metadata: { model, requestCount: chatUsage.requestCount },
                 });
                 updateSessionMeta(chatSessionId, { messageCount: chatMessages.filter(m => m.role === 'user').length, tokenCount: chatUsage.totalTokens });
@@ -4346,6 +4356,9 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
             let fullContent = '';
             const tcAcc: Record<number, { id: string; name: string; args: string }> = {};
             let outputTokensThisRound = 0;  // Wave 46: tok/s tracking
+            const prevSessionInput = sessionUsage.inputTokens;
+            const prevSessionOutput = sessionUsage.outputTokens;
+            const prevSessionTotal = sessionUsage.totalTokens;
             // Wave 279: track <thinking> tag state — suppress from visible output, keep in fullContent
             let inThinkingTag = false;
             let thinkingBuffer = '';
@@ -4721,7 +4734,14 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                 sessionUsage.requestCount++;
                 appendSessionEvent(sessionId, {
                     type: 'usage', timestamp: new Date().toISOString(), sessionId,
-                    usage: { inputTokens: sessionUsage.inputTokens, outputTokens: sessionUsage.outputTokens, totalTokens: sessionUsage.totalTokens },
+                    usage: {
+                        inputTokens: sessionUsage.inputTokens - prevSessionInput,
+                        outputTokens: sessionUsage.outputTokens - prevSessionOutput,
+                        totalTokens: sessionUsage.totalTokens - prevSessionTotal,
+                        cumulativeInput: sessionUsage.inputTokens,
+                        cumulativeOutput: sessionUsage.outputTokens,
+                        cumulativeTotal: sessionUsage.totalTokens,
+                    },
                     metadata: { model, requestCount: sessionUsage.requestCount },
                 });
                 if (!jsonMode) {
@@ -4838,7 +4858,14 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                         // Emit usage on nudge path so session always has usage event
                         appendSessionEvent(sessionId, {
                             type: 'usage', timestamp: new Date().toISOString(), sessionId,
-                            usage: { inputTokens: sessionUsage.inputTokens, outputTokens: sessionUsage.outputTokens, totalTokens: sessionUsage.totalTokens },
+                            usage: {
+                                inputTokens: sessionUsage.inputTokens - prevSessionInput,
+                                outputTokens: sessionUsage.outputTokens - prevSessionOutput,
+                                totalTokens: sessionUsage.totalTokens - prevSessionTotal,
+                                cumulativeInput: sessionUsage.inputTokens,
+                                cumulativeOutput: sessionUsage.outputTokens,
+                                cumulativeTotal: sessionUsage.totalTokens,
+                            },
                             metadata: { model, requestCount: sessionUsage.requestCount },
                         });
                         continue;
@@ -4864,7 +4891,14 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                 sessionUsage.requestCount++;
                 appendSessionEvent(sessionId, {
                     type: 'usage', timestamp: new Date().toISOString(), sessionId,
-                    usage: { inputTokens: sessionUsage.inputTokens, outputTokens: sessionUsage.outputTokens, totalTokens: sessionUsage.totalTokens },
+                    usage: {
+                        inputTokens: sessionUsage.inputTokens - prevSessionInput,
+                        outputTokens: sessionUsage.outputTokens - prevSessionOutput,
+                        totalTokens: sessionUsage.totalTokens - prevSessionTotal,
+                        cumulativeInput: sessionUsage.inputTokens,
+                        cumulativeOutput: sessionUsage.outputTokens,
+                        cumulativeTotal: sessionUsage.totalTokens,
+                    },
                     metadata: { model, requestCount: sessionUsage.requestCount },
                 });
                 const msgCount = messages.filter(m => m.role === 'user').length;
