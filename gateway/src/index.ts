@@ -63,6 +63,7 @@ import miscRoutes from './routes/misc';
 import routingRoutes from './routes/routing'; // Wave 468-472
 import fleetRoutes, { checkGpuHangs } from './routes/fleet'; // Wave 480-498
 import observabilityRoutes from './routes/observability'; // Wave 491-500
+import modelMgmtRoutes from './routes/model-mgmt'; // Wave 607-628 Phase 4
 
 // Re-export for tests
 export { app, initClusterSecret, isAuthDisabled, log, paginate };
@@ -325,6 +326,7 @@ app.route('/', namespaceRoutes);
 app.route('/', routingRoutes); // Wave 468-472
 app.route('/', fleetRoutes);           // Wave 480-498
 app.route('/', observabilityRoutes);   // Wave 491-500
+app.route('/', modelMgmtRoutes);       // Wave 607-628 Phase 4
 app.route('/', miscRoutes);
 
 // Root redirect to dashboard (must be after route mounting since misc has '/')

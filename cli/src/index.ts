@@ -56,7 +56,7 @@ const C = {
     italic:  (s: string) => `\x1b[3m${s}\x1b[0m`,
 };
 
-const CLI_VERSION = '2.35.0';
+const CLI_VERSION = '2.36.0';
 
 // Wave 341: module-level .clawignore patterns — set by cmdCode, used by executeCodeTool
 let _clawIgnorePatterns: string[] = [];
@@ -11872,6 +11872,40 @@ ${projectType}
         case 'health':
             await cmdHealth(gateway);
             break;
+
+        case 'leaderboard':
+        case 'lb': {
+            // Wave 617: model leaderboard
+            const lbTask = parsed.flags['task'] || parsed.flags['type'] || '';
+            const lbData = await apiGet(gateway, `/api/v1/leaderboard${lbTask ? '?task_type=' + lbTask : ''}`) as { leaderboard: Array<{ model: string; task_type: string; avg_tps: number; avg_latency_ms: number; total_requests: number }> };
+            console.log('');
+            console.log('  ' + C.teal(C.bold('MODEL LEADERBOARD')) + (lbTask ? C.dim(` — ${lbTask}`) : ''));
+            console.log('');
+            console.log('  ' + padRight(C.dim('MODEL'), 30) + padRight(C.dim('TASK'), 12) + padRight(C.dim('TPS'), 10) + padRight(C.dim('LATENCY'), 12) + C.dim('REQS'));
+            console.log('  ' + C.dim('\u2500'.repeat(75)));
+            for (const entry of (lbData.leaderboard || [])) {
+                console.log('  ' + padRight(C.white(entry.model), 30) + padRight(C.purple(entry.task_type), 12) + padRight(C.green(String(entry.avg_tps)), 10) + padRight(C.yellow(entry.avg_latency_ms + 'ms'), 12) + C.dim(String(entry.total_requests)));
+            }
+            if (!lbData.leaderboard?.length) console.log('  ' + C.dim('No data yet. Run some inference to populate.'));
+            console.log('');
+            break;
+        }
+
+        case 'registry': {
+            // Wave 607: model registry
+            const regData = await apiGet(gateway, '/api/v1/registry') as { models: Array<{ name: string; family: string; parameter_size: string; quantization: string; context_length: number; tags: string[]; benchmark_tps: number; nodes: string[] }> };
+            console.log('');
+            console.log('  ' + C.teal(C.bold('MODEL REGISTRY')) + C.dim(` — ${regData.models?.length || 0} models`));
+            console.log('');
+            console.log('  ' + padRight(C.dim('MODEL'), 28) + padRight(C.dim('FAMILY'), 12) + padRight(C.dim('SIZE'), 8) + padRight(C.dim('QUANT'), 10) + padRight(C.dim('CTX'), 8) + padRight(C.dim('TPS'), 8) + C.dim('TAGS'));
+            console.log('  ' + C.dim('\u2500'.repeat(85)));
+            for (const m of (regData.models || [])) {
+                console.log('  ' + padRight(C.white(m.name), 28) + padRight(C.dim(m.family), 12) + padRight(C.teal(m.parameter_size), 8) + padRight(C.dim(m.quantization), 10) + padRight(C.yellow(formatNumber(m.context_length)), 8) + padRight(m.benchmark_tps > 0 ? C.green(String(m.benchmark_tps)) : C.dim('-'), 8) + C.purple(m.tags.join(', ')));
+            }
+            if (!regData.models?.length) console.log('  ' + C.dim('No models loaded. Deploy a model first.'));
+            console.log('');
+            break;
+        }
 
         case 'ping': {
             // Wave 343: tentaclaw ping [--n <count>] — measure gateway round-trip latency
