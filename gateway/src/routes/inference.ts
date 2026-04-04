@@ -265,7 +265,22 @@ routes.post('/v1/chat/completions', async (c) => {
                 });
             }
 
+            if (!proxyReq.ok) {
+                const errText = await proxyReq.text();
+                lastErr = `Backend returned ${proxyReq.status}: ${errText.slice(0, 200)}`;
+                console.warn(`[failover] Node ${candidate.hostname} returned ${proxyReq.status} — trying next`);
+                continue;
+            }
+
             const result = await proxyReq.json() as Record<string, unknown>;
+
+            // Some backends return 200 with an error object
+            if (result.error) {
+                lastErr = `Backend returned error: ${JSON.stringify(result.error).slice(0, 200)}`;
+                console.warn(`[failover] Node ${candidate.hostname} returned error in body — trying next`);
+                continue;
+            }
+
             result._tentaclaw = {
                 routed_to: candidate.node_id,
                 hostname: candidate.hostname,
@@ -284,13 +299,11 @@ routes.post('/v1/chat/completions', async (c) => {
                 sticky_session: sessionId ? true : undefined,  // Wave 467
             };
 
-            if (!body.stream && proxyReq.ok) {
-                const cacheKey = createHash('sha256').update(JSON.stringify({ model: resolvedModel, messages: body.messages })).digest('hex');
-                const usage = (result as any).usage;
-                cacheResponse(cacheKey, resolvedModel, JSON.stringify(body.messages).slice(0, 100), JSON.stringify(result), (usage?.total_tokens) || 0);
-            }
+            const cacheKey = createHash('sha256').update(JSON.stringify({ model: resolvedModel, messages: body.messages })).digest('hex');
+            const usage = (result as any).usage;
+            cacheResponse(cacheKey, resolvedModel, JSON.stringify(body.messages).slice(0, 100), JSON.stringify(result), (usage?.total_tokens) || 0);
 
-            return c.json(result, proxyReq.status as any);
+            return c.json(result);
 
         } catch (err: any) {
             lastErr = err.message;
@@ -652,7 +665,6 @@ routes.post('/v1/messages', async (c) => {
                                             delta: { type: 'text_delta', text: delta.content },
                                         };
                                         controller.enqueue(encoder.encode('event: content_block_delta\ndata: ' + JSON.stringify(blockDelta) + '\n\n'));
-                                        outputTokens++;
                                     }
 
                                     if (chunk.usage) {
