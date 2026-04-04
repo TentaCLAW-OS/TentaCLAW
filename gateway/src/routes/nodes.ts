@@ -123,6 +123,17 @@ routes.post('/api/v1/nodes/:nodeId/stats', async (c) => {
         stats.inference = { loaded_models: [], in_flight_requests: 0, tokens_generated: 0, avg_latency_ms: 0 };
     }
 
+    // Validate numeric fields — prevent NaN/Infinity from entering the DB
+    if (!Number.isFinite(stats.toks_per_sec) || stats.toks_per_sec < 0) stats.toks_per_sec = 0;
+    if (stats.cpu && (!Number.isFinite(stats.cpu.usage_pct) || stats.cpu.usage_pct < 0)) stats.cpu.usage_pct = 0;
+    for (const gpu of (stats.gpus || [])) {
+        if (!Number.isFinite(gpu.vramTotalMb) || gpu.vramTotalMb < 0) gpu.vramTotalMb = 0;
+        if (!Number.isFinite(gpu.vramUsedMb) || gpu.vramUsedMb < 0) gpu.vramUsedMb = 0;
+        if (gpu.vramUsedMb > gpu.vramTotalMb) gpu.vramUsedMb = gpu.vramTotalMb;
+        if (!Number.isFinite(gpu.temperatureC)) gpu.temperatureC = 0;
+        if (!Number.isFinite(gpu.utilizationPct) || gpu.utilizationPct < 0 || gpu.utilizationPct > 100) gpu.utilizationPct = 0;
+    }
+
     const existing = getNode(nodeId);
     if (!existing) {
         registerNode({
@@ -131,6 +142,8 @@ routes.post('/api/v1/nodes/:nodeId/stats', async (c) => {
             hostname: stats.hostname || nodeId,
             gpu_count: stats.gpu_count || 0,
         });
+    } else if (stats.farm_hash && stats.farm_hash !== existing.farm_hash && existing.farm_hash !== 'unknown') {
+        console.warn(`[nodes] Ignoring farm_hash change for ${nodeId}: ${existing.farm_hash} → ${stats.farm_hash}`);
     }
 
     insertStats(nodeId, stats);
