@@ -332,6 +332,21 @@ function rebuildMessagesFromTranscript(events: SessionEvent[]): Array<{ role: st
             if (ev.name) msg['name'] = ev.name;
             messages.push(msg as { role: string; content: string | null; tool_calls?: unknown; tool_call_id?: string; name?: string });
         }
+        if (ev.type === 'tool_result' && ev.tool_call_id) {
+            messages.push({
+                role: 'tool',
+                content: ev.content ?? '',
+                tool_call_id: ev.tool_call_id,
+                name: ev.name || 'unknown',
+            } as { role: string; content: string | null; tool_calls?: unknown; tool_call_id?: string; name?: string });
+        }
+        if (ev.type === 'tool_call' && ev.tool_calls) {
+            messages.push({
+                role: 'assistant',
+                content: ev.content ?? null,
+                tool_calls: ev.tool_calls,
+            } as { role: string; content: string | null; tool_calls?: unknown; tool_call_id?: string; name?: string });
+        }
     }
     return messages;
 }
