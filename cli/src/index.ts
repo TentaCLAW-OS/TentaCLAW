@@ -3897,9 +3897,16 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
         }
     }
 
-    // Build system prompt with workspace context
-    // Wave 133: enhanced system prompt with better agent guidance
-    let systemPrompt = `You are TentaCLAW Code Agent — an expert AI software engineer embedded in TentaCLAW OS.
+    // Build system prompt — task mode gets a stripped-down version for better small-model focus
+    let systemPrompt = taskFlag
+        ? `You are an expert programmer. Complete the task by calling write_file with COMPLETE, WORKING code.
+
+RULES:
+- Write FULL implementations. Never use 'pass', stubs, or placeholders.
+- Call write_file IMMEDIATELY. Do not explain first.
+- One tool call, then a one-line summary. That's it.
+- CWD: ${process.cwd()}`
+        : `You are TentaCLAW Code Agent — an expert AI software engineer embedded in TentaCLAW OS.
 
 ## Core Principles
 - **Act, don't ask.** Use tools immediately. Never say "I would need to read X" — just read it.
@@ -3910,68 +3917,46 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
 - **Answer directly** for questions that don't involve files, code, or the system (math, definitions, explanations). Don't use tools for pure knowledge questions.
 
 ## Tool Strategy
-- **glob_files(pattern)** — fastest way to find files. Add exclude="*.test.ts" to skip patterns. Use modified_since="30m" to find recently changed files. Combine with sort="mtime".
-- **search_files(pattern, file_type="ts")** — preferred over reading files to locate code. Use file_type shorthand (ts, py, go, rs, md, json). Increase max_results if truncated.
-- **read_file(path, grep="pattern")** — use grep param to return only matching lines instead of reading the whole file. This is the efficient way to find specific code in a known file.
-- **read_file(path, start_line, end_line)** — use line ranges for large files instead of reading everything.
-- **edit_file(path, old_text, new_text)** — surgical replacement. old_text must match exactly (whitespace, indentation). If old_text appears multiple times, use nth_occurrence=N to target a specific one.
-- **patch_file(path, patches)** — apply multiple edits to one file in a single call. Use when changing 3+ separate sections of the same file. patches is [{old_text, new_text}, ...].
-- **list_dir(path, sort="mtime")** — use sort="mtime" to find recently modified files, sort="size" for largest files.
-- **http_get(url, method, body)** — fetch docs, APIs, GitHub raw files. Supports GET and POST. HTML is stripped automatically. Use json_path="field.subfield" to extract a specific value from JSON responses without reading the full payload.
-- **run_shell(command)** — run tests, builds, git commands. Streaming output shown in real-time. Use timeout_secs for long-running commands. Use max_output_lines=50 to cap noisy output. Use env="KEY=val,KEY2=val2" to pass extra environment variables.
-
-## Wave 380: Efficiency Rules
-- Never read a file to search for something — use search_files first, then read_file with grep or line ranges.
-- Never glob every file then read each one — search_files is O(1) compared to that approach.
-- When editing: read only the relevant section (grep or line range), not the full file.
-
-## Wave 410: Commit Checkpoints
-- After completing a discrete unit of work (new feature, bug fix, refactor), commit immediately via run_shell("git add -A && git commit -m '...'").
-- Don't batch 10 changes into 1 commit. Each logical change = 1 commit.
-- Before starting a risky refactor, commit the current state first as a checkpoint.
-- Commit message format: "<type>: <what changed>" — e.g. "fix: null check in parser", "feat: add retry logic".
-
-## Wave 420: File Size Discipline
-- Don't add code to a file "just in case" — only write what's needed for the current task.
-- When adding a feature: add it. Don't add configuration options, flags, or abstractions unless the task explicitly asks for them.
-- Never pad a file with extra logging, comments, or boilerplate. Every line should be load-bearing.
-- If a file is already large, prefer editing existing code over appending new code. Refactor when necessary — don't just grow the file.
-- After writing: check if the total line count increased more than the task required. If so, trim.
+- **glob_files(pattern)** — fastest way to find files.
+- **search_files(pattern, file_type="ts")** — preferred over reading files to locate code.
+- **read_file(path, grep="pattern")** — use grep param to return only matching lines.
+- **read_file(path, start_line, end_line)** — use line ranges for large files.
+- **edit_file(path, old_text, new_text)** — surgical replacement. old_text must match exactly.
+- **run_shell(command)** — run tests, builds, git commands.
 
 ## Error Recovery
 - If edit_file fails "not found": read the file first, copy the exact text including indentation.
-- If patch_file reports a patch as FAILED: use edit_file for that specific section with the exact text from the file.
 - If run_shell fails: read the error, fix the cause — don't retry blindly.
-- If a tool errors: try a different approach, not the same call again.
-- After writing a file: immediately read it back to verify the content is correct.
-- Never guess file content. Always read before editing. Never say "I'll read X next" — just read it.
+- Never guess file content. Always read before editing.
 
 ## What NOT to do
 - Do NOT say "I'll now...", "Let me...", "I would need to..." — just do it.
-- Do NOT ask permission before reading files. Read first, explain after.
 - Do NOT repeat the task back before starting. Start immediately.
 - Do NOT output placeholder comments like "// add implementation here".
 
 ## Memory
-- Use write_note(note, persist=true) for facts that should survive across sessions: user preferences, project architecture decisions, gotchas discovered, recurring patterns.
-- Use write_note(note) (no persist) for transient session notes: what you tried, intermediate findings, debug steps.
-- Write to MEMORY.md directly (via edit_file/write_file) only when doing a full structured memory update.
-- Update memory proactively after discovering important facts. Never ask permission.
+- Use write_note(note, persist=true) for facts that should survive across sessions.
 
 ## Environment
 - CWD: ${process.cwd()}
 - Platform: ${process.platform} | Node.js: ${process.version}
-- Session: ${sessionId} | Date: ${new Date().toISOString().slice(0, 10)}${noTools ? '\n- Mode: no-tools (pure chat)' : ''}${taskFlag ? `\n\n## TASK MODE (--task)\nYou are running a non-interactive task. CRITICAL RULES:\n- For tasks involving files/code/shell: use tools immediately. Do NOT describe what you will do — just do it.\n- For pure knowledge questions (math, definitions): answer directly without tools.\n- NEVER say "I would", "I'll", "Let me" — act immediately.\n- Complete the task fully. Do not stop partway or ask for input.\n- After writing/editing files, read back to confirm correctness.\n- When done, write a one-line summary of what was accomplished.\n\n## Wave 544: Task Decomposition\nFor complex tasks (multiple files, multiple steps): break into subtasks, complete each one fully before moving to the next. After each subtask, run_shell("git add -A && git commit -m 'subtask: <desc>'") if --checkpoint is enabled. This gives you rollback points.` : ''}`;
+- Session: ${sessionId} | Date: ${new Date().toISOString().slice(0, 10)}${noTools ? '\n- Mode: no-tools (pure chat)' : ''}`;
 
     // Load workspace context (SOUL.md, USER.md, IDENTITY.md, MEMORY.md, etc.)
-    const workspaceCtx = loadWorkspaceContext();
-    if (workspaceCtx) {
-        systemPrompt += workspaceCtx;
-        const wsFiles = workspaceCtx.match(/--- (\S+) ---/g)?.map(m => m.replace(/--- | ---/g, '')) || [];
-        if (wsFiles.length > 0 && !printMode) {
-            const wsCtxKb = (workspaceCtx.length / 1024).toFixed(1);
-            console.log('  ' + C.green(`\u2714 Workspace: ${wsFiles.join(', ')}`) + C.dim(` (${wsCtxKb}kb)`));
+    // In task mode: skip workspace files entirely — they add 3KB+ of personality/protocol
+    // that drowns out the actual task for small models
+    if (!taskFlag) {
+        const workspaceCtx = loadWorkspaceContext();
+        if (workspaceCtx) {
+            systemPrompt += workspaceCtx;
+            const wsFiles = workspaceCtx.match(/--- (\S+) ---/g)?.map(m => m.replace(/--- | ---/g, '')) || [];
+            if (wsFiles.length > 0 && !printMode) {
+                const wsCtxKb = (workspaceCtx.length / 1024).toFixed(1);
+                console.log('  ' + C.green(`\u2714 Workspace: ${wsFiles.join(', ')}`) + C.dim(` (${wsCtxKb}kb)`));
+            }
         }
+    } else if (!printMode) {
+        console.log('  ' + C.dim('\u2714 Workspace: task mode (lightweight)'));
     }
 
     // Wave 201: inject brief project structure when no CLAUDE.md/AGENTS.md loaded
@@ -4035,6 +4020,16 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
             }
         } catch { /* skip unreadable */ }
     }
+    // Detect first-run bootstrap — only in interactive mode, not --task
+    const bootstrapPath = path.join(getWorkspaceDir(), 'BOOTSTRAP.md');
+    const hasBootstrap = !taskFlag && fs.existsSync(bootstrapPath);
+    if (hasBootstrap && !printMode) {
+        console.log('  ' + C.purple('\u2728 First run detected \u2014 onboarding will start'));
+    }
+
+    // Skip all context injection in task mode — keep prompt tiny for small models
+    if (!taskFlag) {
+
     // Wave 531: project-aware context — auto-detect language/framework and inject relevant hints
     try {
         const cwd = process.cwd();
@@ -4079,13 +4074,6 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
         }
     } catch { /* not a git repo or git unavailable */ }
 
-    // Detect first-run bootstrap — only in interactive mode, not --task
-    const bootstrapPath = path.join(getWorkspaceDir(), 'BOOTSTRAP.md');
-    const hasBootstrap = !taskFlag && fs.existsSync(bootstrapPath);
-    if (hasBootstrap && !printMode) {
-        console.log('  ' + C.purple('\u2728 First run detected \u2014 onboarding will start'));
-    }
-
     // Wave 92: HEARTBEAT.md — inject periodic tasks as a reminder at session start
     const heartbeatPath = path.join(getWorkspaceDir(), 'HEARTBEAT.md');
     if (!taskFlag && fs.existsSync(heartbeatPath)) {
@@ -4129,6 +4117,8 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
             }
         } catch { /* ignore — shell history is best-effort */ }
     }
+
+    } // end of !taskFlag context injection block
 
     if (!printMode) console.log('');
 
@@ -4592,18 +4582,43 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                 const tcTagRegex = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
                 let tcTagMatch;
                 while ((tcTagMatch = tcTagRegex.exec(fullContent)) !== null) {
+                    const raw577 = tcTagMatch[1]!;
+                    // Try standard JSON.parse first
+                    let parsed577ok = false;
                     try {
-                        const parsed577 = JSON.parse(tcTagMatch[1]!) as { function?: string; name?: string; arguments?: Record<string, unknown> };
-                        const tcName577 = parsed577.function || parsed577.name || '';
-                        const tcArgs577 = parsed577.arguments || {};
-                        if (tcName577) {
-                            toolCalls.push({
-                                id: `call_embed_${Date.now()}_${toolCalls.length}`,
-                                name: tcName577,
-                                args: JSON.stringify(tcArgs577),
-                            });
+                        const p = JSON.parse(raw577) as { function?: string; name?: string; arguments?: Record<string, unknown> };
+                        const n = p.function || p.name || '';
+                        if (n) { toolCalls.push({ id: `call_embed_${Date.now()}_${toolCalls.length}`, name: n, args: JSON.stringify(p.arguments || {}) }); parsed577ok = true; }
+                    } catch { /* try fallback */ }
+                    // Fallback: regex extraction — handles triple-quotes, unescaped newlines, etc.
+                    if (!parsed577ok) {
+                        const fnMatch = raw577.match(/"function"\s*:\s*"(\w+)"/);
+                        const nameMatch: RegExpMatchArray | null = !fnMatch ? raw577.match(/"name"\s*:\s*"(\w+)"/) : null;
+                        const tcName577 = fnMatch?.[1] || nameMatch?.[1] || '';
+                        // Extract "path" and "content" fields individually
+                        const pathMatch = raw577.match(/"path"\s*:\s*["']([^"']+)["']/);
+                        const tcPath = pathMatch?.[1] || '';
+                        if (tcName577 && tcName577 === 'write_file' && tcPath) {
+                            // Extract content between "content": and the closing of arguments
+                            // This handles triple-quotes, unescaped newlines, etc.
+                            const contentStart = raw577.indexOf('"content"');
+                            if (contentStart >= 0) {
+                                let contentRaw = raw577.slice(contentStart);
+                                // Find the content value after the colon
+                                const colonIdx = contentRaw.indexOf(':');
+                                contentRaw = contentRaw.slice(colonIdx + 1).trim();
+                                // Remove leading quotes/triple-quotes
+                                contentRaw = contentRaw.replace(/^["']{1,3}/, '').replace(/["']{1,3}\s*\}?\s*\}?\s*$/, '');
+                                toolCalls.push({ id: `call_embed_${Date.now()}_${toolCalls.length}`, name: tcName577, args: JSON.stringify({ path: tcPath, content: contentRaw }) });
+                            }
+                        } else if (tcName577) {
+                            // For non-write_file tools, try to extract args loosely
+                            const argsMatch = raw577.match(/"arguments"\s*:\s*(\{[\s\S]*\})/);
+                            let argsStr = '{}';
+                            if (argsMatch) { try { argsStr = JSON.stringify(JSON.parse(argsMatch[1]!)); } catch { argsStr = argsMatch[1]!; } }
+                            toolCalls.push({ id: `call_embed_${Date.now()}_${toolCalls.length}`, name: tcName577, args: argsStr });
                         }
-                    } catch { /* malformed JSON in tool_call tag — skip */ }
+                    }
                 }
                 // Strip <tool_call> tags from content shown to user
                 if (toolCalls.length > 0) {
