@@ -16,11 +16,17 @@
 
 import * as fs from 'fs';
 import * as os from 'os';
+import * as path from 'path';
 import * as dgram from 'dgram';
 import { execSync, execFileSync, spawn } from 'child_process';
 import * as https from 'https';
 import * as http from 'http';
 import WebSocket from 'ws';
+
+const AGENT_VERSION = (() => {
+    try { return JSON.parse(fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf8')).version; }
+    catch { return '0.3.0'; }
+})();
 
 // =============================================================================
 // CLI Args
@@ -1037,10 +1043,10 @@ function getSystemInfo(): any {
             arch,
             os: osName,
             disk_type: diskType,
-            agent_version: '0.2.0',
+            agent_version: AGENT_VERSION,
         };
     } catch {
-        cachedSystemInfo = { cpu_model: 'unknown', cpu_cores: 0, cpu_threads: 0, ram_total_gb: 0, kernel: '', arch: '', os: '', disk_type: 'unknown', agent_version: '0.2.0' };
+        cachedSystemInfo = { cpu_model: 'unknown', cpu_cores: 0, cpu_threads: 0, ram_total_gb: 0, kernel: '', arch: '', os: '', disk_type: 'unknown', agent_version: AGENT_VERSION };
     }
 
     return cachedSystemInfo;
@@ -2263,7 +2269,7 @@ function startDiscoveryBroadcast(config: AgentConfig): void {
                     gpu_count: MOCK_MODE ? MOCK_GPU_COUNT : 0,
                     ip: getLocalIp(),
                     port: 0,  // Agent doesn't listen, it pushes to gateway
-                    version: '0.2.0',
+                    version: AGENT_VERSION,
                 });
                 const buf = Buffer.from(payload);
                 sock.send(buf, 0, buf.length, DISCOVERY_PORT, '255.255.255.255', () => {});
@@ -2353,7 +2359,7 @@ export function _checkNetworkLatency(gatewayUrl: string): Promise<number> {
 // Report agent version and capabilities to gateway
 export function _getAgentCapabilities() {
     return {
-        version: '0.2.0',
+        version: AGENT_VERSION,
         gpu_vendor: detectGpuVendor(),
         backends: ['ollama'], // Will expand
         features: ['watchdog', 'self-heal', 'auto-discovery', 'remote-shell', 'gpu-stats'],
