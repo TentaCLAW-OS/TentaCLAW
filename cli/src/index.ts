@@ -4611,6 +4611,28 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                 }
             }
 
+            // Task mode early exit: if a tool already created/edited a file, and this response
+            // has no more tool calls, the task is done. Don't let the model ramble or hallucinate.
+            if (toolCalls.length === 0 && taskFlag && sessionToolCallCount > 0) {
+                if (fullContent) {
+                    messages.push({ role: 'assistant', content: fullContent });
+                    appendSessionEvent(sessionId, {
+                        type: 'message', timestamp: new Date().toISOString(), sessionId,
+                        role: 'assistant', content: fullContent, model,
+                    });
+                }
+                sessionUsage.requestCount++;
+                appendSessionEvent(sessionId, {
+                    type: 'usage', timestamp: new Date().toISOString(), sessionId,
+                    usage: { inputTokens: sessionUsage.inputTokens, outputTokens: sessionUsage.outputTokens, totalTokens: sessionUsage.totalTokens },
+                    metadata: { model, requestCount: sessionUsage.requestCount },
+                });
+                if (!jsonMode) {
+                    if (printMode) { process.stdout.write('\n'); } else { console.log(''); }
+                }
+                return;
+            }
+
             // No tool calls — final response
             if (toolCalls.length === 0) {
                 // Wave 450: aggressive text-mode tool recovery for local models
@@ -4923,7 +4945,10 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
 
                 // Wave 577: for embedTools mode, send tool result as user message with <tool_response> tags
                 if (useEmbedTools) {
-                    messages.push({ role: 'user', content: `<tool_response>\n${result452}\n</tool_response>` });
+                    // In task mode: after a successful write/create, tell the model to STOP
+                    const isSuccess577 = ['Created:', 'Overwritten:', 'Edited:', 'Appended'].some(p => result452.startsWith(p));
+                    const stopHint577 = (taskFlag && isSuccess577) ? '\n\nTask complete. Write a one-line summary and stop.' : '';
+                    messages.push({ role: 'user', content: `<tool_response>\n${result452}${stopHint577}\n</tool_response>` });
                 } else {
                     messages.push({ role: 'tool', tool_call_id: tcId, name: tc.name, content: result452 });
                 }
@@ -4980,7 +5005,8 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
         }
         // Wave 152: summary after task completes
         const taskMsgCount = messages.filter(m => m.role === 'user').length;
-        const taskToolCount = messages.filter(m => m.role === 'tool').length;
+        // Wave 577 fix: in embedded tools mode, tool results are role:user with <tool_response>, not role:tool
+        const taskToolCount = sessionToolCallCount;
         if (jsonMode) {
             // Wave 251: --json — output structured result for scripting
             const lastAssistant = messages.slice().reverse().find(m => m.role === 'assistant' && typeof m.content === 'string' && m.content.trim());
