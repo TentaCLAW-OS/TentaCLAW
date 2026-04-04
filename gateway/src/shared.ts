@@ -3,7 +3,7 @@
  * This module holds SSE clients, webhook config, rate limiters,
  * and helper functions that multiple route files need.
  */
-import { createHash, createHmac } from 'crypto';
+import { createHmac } from 'crypto';
 import {
     getClusterConfig,
     getOrCreateClusterSecret,
