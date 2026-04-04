@@ -8,6 +8,16 @@ import fs from 'fs';
 import { getDb, generateId, dbPath } from './init';
 import { safeJsonParse } from './safe-json';
 
+/**
+ * Parse a SQLite datetime string into a JS Date.
+ * SQLite datetime('now') returns 'YYYY-MM-DD HH:MM:SS' (no T, no Z).
+ * JS Date constructor needs the ISO 8601 'T' separator to parse correctly.
+ */
+function parseSqliteDate(s: string): Date {
+    if (s.includes('T')) return new Date(s);
+    return new Date(s.replace(' ', 'T') + 'Z');
+}
+
 // =============================================================================
 // API Key Management
 // =============================================================================
@@ -222,7 +232,7 @@ export function validateSession(token: string): User | null {
 
     if (!session) return null;
 
-    if (new Date(session.expires_at + (session.expires_at.endsWith('Z') ? '' : 'Z')) < new Date()) {
+    if (parseSqliteDate(session.expires_at) < new Date()) {
         d.prepare('DELETE FROM sessions WHERE id = ?').run(session.id);
         return null;
     }
@@ -433,11 +443,11 @@ export function recordAuthFailure(ipAddress: string): boolean {
     ).get(ipAddress) as { ip_address: string; failure_count: number; window_start: string; blocked_until: string | null } | undefined;
 
     if (row) {
-        if (row.blocked_until && new Date(row.blocked_until + (row.blocked_until.endsWith('Z') ? '' : 'Z')) > new Date()) {
+        if (row.blocked_until && parseSqliteDate(row.blocked_until) > new Date()) {
             return true;
         }
 
-        if (new Date(row.window_start + (row.window_start.endsWith('Z') ? '' : 'Z')) < new Date(windowStart + (windowStart.endsWith('Z') ? '' : 'Z'))) {
+        if (parseSqliteDate(row.window_start) < parseSqliteDate(windowStart)) {
             d.prepare(
                 "UPDATE auth_failures SET failure_count = 1, window_start = datetime('now'), blocked_until = NULL WHERE ip_address = ?",
             ).run(ipAddress);
@@ -472,7 +482,7 @@ export function isIpBlocked(ipAddress: string): boolean {
     ).get(ipAddress) as { blocked_until: string | null } | undefined;
 
     if (!row || !row.blocked_until) return false;
-    return new Date(row.blocked_until + (row.blocked_until.endsWith('Z') ? '' : 'Z')) > new Date();
+    return parseSqliteDate(row.blocked_until) > new Date();
 }
 
 export function clearAuthFailures(ipAddress: string): void {
