@@ -7,6 +7,12 @@ export function useSSE() {
   const setConnected = useClusterStore((s) => s.setConnected);
   const loadInitial = useClusterStore((s) => s.loadInitial);
   const esRef = useRef<EventSource | null>(null);
+  const handleSSERef = useRef(handleSSE);
+  handleSSERef.current = handleSSE;
+  const setConnectedRef = useRef(setConnected);
+  setConnectedRef.current = setConnected;
+  const loadInitialRef = useRef(loadInitial);
+  loadInitialRef.current = loadInitial;
 
   useEffect(() => {
     let mounted = true;
@@ -18,8 +24,8 @@ export function useSSE() {
 
       es.onopen = () => {
         if (!mounted) return;
-        setConnected(true);
-        loadInitial();
+        setConnectedRef.current(true);
+        loadInitialRef.current();
       };
 
       es.onmessage = (e) => {
@@ -27,7 +33,7 @@ export function useSSE() {
         try {
           const data = JSON.parse(e.data);
           if (data.type === 'connected') return;
-          handleSSE(data as SSEEvent);
+          handleSSERef.current(data as SSEEvent);
         } catch {
           /* ignore malformed events */
         }
@@ -35,13 +41,13 @@ export function useSSE() {
 
       es.onerror = () => {
         if (!mounted) return;
-        setConnected(false);
+        setConnectedRef.current(false);
         es.close();
         setTimeout(connect, 2000);
       };
     }
 
-    loadInitial()
+    loadInitialRef.current()
       .then(connect)
       .catch(() => setTimeout(connect, 2000));
 
@@ -49,5 +55,5 @@ export function useSSE() {
       mounted = false;
       esRef.current?.close();
     };
-  }, [handleSSE, setConnected, loadInitial]);
+  }, []); // Empty deps — connect once
 }
