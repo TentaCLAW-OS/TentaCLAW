@@ -68,7 +68,7 @@ Write-Host "  ${T}${B}--- VERSION & HELP ---${X}"
 # ═══════════════════════════════════════════════════════════════
 
 $ver = tentaclaw --version 2>&1 | Out-String
-Test-Check "tentaclaw --version shows v2.36.0" ($ver -match "v2\.36\.0")
+Test-Check "tentaclaw --version shows v2.37.0" ($ver -match "v2\.37\.0")
 
 $help = tentaclaw help 2>&1 | Out-String
 Test-Check "help has SETUP section" ($help -match "SETUP")

@@ -56,7 +56,7 @@ const C = {
     italic:  (s: string) => `\x1b[3m${s}\x1b[0m`,
 };
 
-const CLI_VERSION = '2.36.0';
+const CLI_VERSION = '2.37.0';
 
 // Wave 341: module-level .clawignore patterns — set by cmdCode, used by executeCodeTool
 let _clawIgnorePatterns: string[] = [];
@@ -12000,9 +12000,61 @@ ${projectType}
             break;
 
         case 'power':
-        case 'cost':
-            await cmdPower(gateway);
+        case 'cost': {
+            const powerSub = parsed.positional[0];
+            if (powerSub === 'cost') {
+                // Wave 717: per-request power cost
+                const rate = parsed.flags['rate'] || '0.12';
+                const costData = await apiGet(gateway, `/api/v1/power/cost?rate_kwh=${rate}`) as { cluster: { total_watts: number; total_tps: number; cost_per_1k_tokens: number; monthly_power_cost: number }; nodes: Array<{ hostname: string; watts: number; tps: number; cost_per_1k_tokens: number; tok_per_watt: number }> };
+                console.log('');
+                console.log('  ' + C.teal(C.bold('POWER COST')) + C.dim(` — $${rate}/kWh`));
+                console.log('');
+                console.log('  ' + padRight(C.dim('Cluster draw:'), 22) + C.white(costData.cluster.total_watts + 'W'));
+                console.log('  ' + padRight(C.dim('Cluster tok/s:'), 22) + C.white(String(costData.cluster.total_tps)));
+                console.log('  ' + padRight(C.dim('Cost per 1K tokens:'), 22) + C.green('$' + costData.cluster.cost_per_1k_tokens.toFixed(6)));
+                console.log('  ' + padRight(C.dim('Monthly power:'), 22) + C.yellow('$' + costData.cluster.monthly_power_cost.toFixed(2)));
+                if (costData.nodes?.length > 0) {
+                    console.log('');
+                    console.log('  ' + padRight(C.dim('NODE'), 16) + padRight(C.dim('WATTS'), 8) + padRight(C.dim('TPS'), 8) + padRight(C.dim('TOK/W'), 8) + C.dim('$/1K'));
+                    for (const n of costData.nodes) {
+                        console.log('  ' + padRight(C.white(n.hostname), 16) + padRight(C.yellow(String(n.watts)), 8) + padRight(C.green(String(n.tps)), 8) + padRight(C.teal(String(n.tok_per_watt)), 8) + C.dim('$' + n.cost_per_1k_tokens.toFixed(6)));
+                    }
+                }
+                console.log('');
+            } else if (powerSub === 'budget') {
+                // Wave 725: power budget
+                const setVal = parsed.flags['set'] || parsed.positional[1] || '';
+                if (setVal) {
+                    await apiPost(gateway, '/api/v1/power/budget', { watts: parseInt(setVal, 10) });
+                    console.log('  ' + C.green(`\u2714 Power budget set to ${setVal}W`));
+                } else {
+                    const budget = await apiGet(gateway, '/api/v1/power/budget') as { budget_watts: number; current_watts: number; utilization_pct: number; over_budget: boolean };
+                    console.log('');
+                    console.log('  ' + C.teal(C.bold('POWER BUDGET')));
+                    console.log('  ' + padRight(C.dim('Budget:'), 16) + (budget.budget_watts > 0 ? C.white(budget.budget_watts + 'W') : C.dim('Not set')));
+                    console.log('  ' + padRight(C.dim('Current:'), 16) + C.white(budget.current_watts + 'W'));
+                    if (budget.budget_watts > 0) {
+                        const col = budget.over_budget ? C.red : budget.utilization_pct > 80 ? C.yellow : C.green;
+                        console.log('  ' + padRight(C.dim('Usage:'), 16) + col(budget.utilization_pct + '%') + (budget.over_budget ? C.red(' OVER BUDGET') : ''));
+                    }
+                    console.log('');
+                }
+            } else if (powerSub === 'efficiency') {
+                // Wave 728: energy efficiency
+                const eff = await apiGet(gateway, '/api/v1/power/efficiency') as { efficiency: Array<{ hostname: string; tok_per_watt: number; watts: number; tps: number }> };
+                console.log('');
+                console.log('  ' + C.teal(C.bold('ENERGY EFFICIENCY')) + C.dim(' — tok/W by node'));
+                console.log('');
+                for (const n of (eff.efficiency || [])) {
+                    console.log('  ' + padRight(C.white(n.hostname), 16) + C.green(n.tok_per_watt + ' tok/W') + C.dim(`  (${n.watts}W, ${n.tps} tok/s)`));
+                }
+                console.log('');
+            } else {
+                await cmdPower(gateway);
+            }
             break;
+        }
+
 
         case 'alias':
         case 'aliases':
@@ -12990,6 +13042,53 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     console.log('');
                 }
             }
+            break;
+        }
+
+        case 'inventory':
+        case 'hw': {
+            // Wave 715: hardware inventory
+            const inv = await apiGet(gateway, '/api/v1/fleet/inventory') as { cluster_totals: { nodes: number; online: number; gpus: number; vram_gb: number; ram_gb: number; disk_gb: number }; nodes: Array<{ hostname: string; status: string; gpus: Array<{ name: string; vram_total_mb: number; temperature_c: number; utilization_pct: number }>; ram: { total_mb: number; used_mb: number }; disk: { total_gb: number; used_gb: number }; models_loaded: string[] }> };
+            const t = inv.cluster_totals;
+            console.log('');
+            console.log('  ' + C.teal(C.bold('HARDWARE INVENTORY')));
+            console.log('  ' + C.dim(`${t.nodes} nodes (${t.online} online) \u2022 ${t.gpus} GPUs \u2022 ${t.vram_gb}GB VRAM \u2022 ${t.ram_gb}GB RAM \u2022 ${t.disk_gb}GB disk`));
+            console.log('');
+            for (const n of inv.nodes || []) {
+                const stIcon = n.status === 'online' ? C.green('\u25CF') : C.red('\u25CB');
+                console.log('  ' + stIcon + ' ' + C.white(C.bold(n.hostname)));
+                for (const g of n.gpus) {
+                    console.log('    ' + C.teal(g.name) + C.dim(` ${Math.round(g.vram_total_mb / 1024)}GB`) + '  ' + miniBar(g.utilization_pct, 5) + ' ' + C.dim(g.utilization_pct + '%') + '  ' + tempColor(g.temperature_c)(g.temperature_c + '\u00B0C'));
+                }
+                console.log('    ' + C.dim(`RAM: ${Math.round(n.ram.used_mb / 1024)}/${Math.round(n.ram.total_mb / 1024)}GB  Disk: ${Math.round(n.disk.used_gb)}/${Math.round(n.disk.total_gb)}GB`) + (n.models_loaded.length > 0 ? '  ' + C.purple(n.models_loaded.join(', ')) : ''));
+            }
+            console.log('');
+            break;
+        }
+
+        case 'quantize': {
+            // Wave 601: quantize a model via Ollama
+            const qModel = parsed.positional[0];
+            const qBits = parsed.flags['bits'] || '4';
+            if (!qModel) {
+                console.log(C.yellow('  Usage: tentaclaw quantize <model> [--bits 4|5|8]'));
+                return;
+            }
+            console.log('');
+            console.log('  ' + C.purple(C.bold('QUANTIZE')) + C.dim(` — ${qModel} to Q${qBits}`));
+            console.log('  ' + C.dim('This creates a quantized copy via Ollama modelfile.'));
+            console.log('');
+            const qName = `${qModel.split(':')[0]}:q${qBits}`;
+            const modelfile = `FROM ${qModel}\nPARAMETER num_ctx 32768`;
+            console.log('  ' + C.dim(`Creating ${qName} from ${qModel}...`));
+            try {
+                execSync(`ollama create ${qName} -f - <<< "${modelfile}"`, { encoding: 'utf8', stdio: 'pipe', timeout: 300_000 });
+                console.log('  ' + C.green(`\u2714 Created ${qName}`));
+            } catch (e) {
+                console.log('  ' + C.yellow(`\u26A0 Ollama create not available. For GGUF quantization, use llama.cpp:`));
+                console.log('  ' + C.dim(`  llama-quantize model.gguf model-q${qBits}.gguf Q${qBits}_K_M`));
+            }
+            console.log('');
             break;
         }
 
