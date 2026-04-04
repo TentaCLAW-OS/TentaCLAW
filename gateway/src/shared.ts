@@ -3,7 +3,7 @@
  * This module holds SSE clients, webhook config, rate limiters,
  * and helper functions that multiple route files need.
  */
-import { createHash } from 'crypto';
+import { createHash, createHmac } from 'crypto';
 import {
     getClusterConfig,
     getOrCreateClusterSecret,
@@ -60,10 +60,10 @@ export function fireWebhooks(eventType: string, data: unknown): void {
         if (!wh.events.includes('*') && !wh.events.includes(eventType)) continue;
 
         const payload = JSON.stringify({ event: eventType, data, timestamp: new Date().toISOString() });
-        const headers: Record<string, string> = { 'Content-Type': 'application/json', 'User-Agent': 'TentaCLAW-Webhook/0.2.0' };
+        const headers: Record<string, string> = { 'Content-Type': 'application/json', 'User-Agent': 'TentaCLAW-Webhook/0.3.0' };
 
         if (wh.secret) {
-            const sig = createHash('sha256').update(wh.secret + payload).digest('hex');
+            const sig = createHmac('sha256', wh.secret).update(payload).digest('hex');
             headers['X-TentaCLAW-Signature'] = sig;
         }
 
