@@ -61,7 +61,7 @@ export function validateApiKey(rawKey: string, requiredPermission?: string): Api
     if (!row) return { valid: false, error: 'not_found' };
 
     // Check expiration
-    if (row.expires_at && new Date(row.expires_at + 'Z') < new Date()) {
+    if (row.expires_at && parseSqliteDate(row.expires_at) < new Date()) {
         return { valid: false, error: 'expired' };
     }
 
@@ -376,7 +376,7 @@ export function validateJoinToken(rawToken: string): { valid: boolean; error?: s
     const row = d.prepare('SELECT * FROM join_tokens WHERE token_hash = ?').get(tokenHash) as any;
 
     if (!row) return { valid: false, error: 'invalid_token' };
-    if (new Date(row.expires_at) < new Date()) return { valid: false, error: 'expired' };
+    if (parseSqliteDate(row.expires_at) < new Date()) return { valid: false, error: 'expired' };
     if (row.max_uses > 0 && row.uses >= row.max_uses) return { valid: false, error: 'max_uses_exceeded' };
 
     d.prepare('UPDATE join_tokens SET uses = uses + 1 WHERE id = ?').run(row.id);
