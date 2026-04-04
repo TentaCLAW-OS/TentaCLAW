@@ -381,6 +381,7 @@ function updateSessionMeta(sessionId: string, updates: Partial<SessionMeta>): vo
 
 // Wave 63: can be overridden per-session by --agent flag
 let _workspaceDirOverride = '';
+let _toolCallCounter = 0;
 
 function getWorkspaceDir(): string {
     return _workspaceDirOverride || path.join(getConfigDir(), 'workspace');
@@ -4828,7 +4829,7 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                         try {
                             const tArgs = JSON.parse(tArgsRaw) as Record<string, unknown>;
                             if (!printMode) console.log('\n  ' + C.yellow(`\u26A0 Text-mode tool recovered \u2014 auto-executing: ${tName}`));
-                            const syntheticId = `call_txt_${Date.now()}`;
+                            const syntheticId = `call_txt_${Date.now()}_${_toolCallCounter++}`;
                             const syntheticArgs = JSON.stringify(tArgs);
                             messages.push({ role: 'assistant', content: null, tool_calls: [{ id: syntheticId, type: 'function', function: { name: tName, arguments: syntheticArgs } }] });
                             const toolResult = await executeCodeTool({ id: syntheticId, name: tName, args: syntheticArgs }, rl, autoApprove, printMode);
@@ -4967,7 +4968,7 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
             // Streamed some text then made tool calls
             if (!printMode) console.log('');
             const formattedCalls = toolCalls.map(tc => ({
-                id: tc.id || `call_${Date.now()}`,
+                id: tc.id || `call_${Date.now()}_${_toolCallCounter++}`,
                 type: 'function' as const,
                 function: { name: tc.name, arguments: tc.args },
             }));
@@ -4986,7 +4987,7 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
 
             // Execute each tool and feed results back
             for (const tc of toolCalls) {
-                const tcId = tc.id || `call_${Date.now()}`;
+                const tcId = tc.id || `call_${Date.now()}_${_toolCallCounter++}`;
 
                 // Wave 453: harden tool args JSON parsing — truncated SSE can produce malformed args
                 // Surface the error clearly so the model retries with complete args, rather than running with {}
