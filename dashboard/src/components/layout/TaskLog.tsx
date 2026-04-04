@@ -7,12 +7,18 @@ import { ResizeHandle } from '@/components/layout/ResizeHandle';
 type LogTab = 'tasks' | 'cluster-log' | 'alerts';
 
 interface TaskRow {
+  id: string;
   time: string;
   node: string;
   user: string;
   description: string;
   status: string;
   statusColor: string;
+}
+
+let taskRowSeq = 0;
+function genTaskId(): string {
+  return `task_${Date.now()}_${++taskRowSeq}`;
 }
 
 function formatTime(date: Date): string {
@@ -24,33 +30,34 @@ function sseEventToRow(type: string, data: Record<string, unknown>): TaskRow | n
   const nodeId = (data.node_id ?? data.nodeId ?? '') as string;
   const hostname = nodeId.split('-').slice(-1)[0] || nodeId;
 
+  const id = genTaskId();
   switch (type) {
     case 'stats_update':
       return null; // Too noisy
     case 'node_online':
-      return { time: now, node: hostname, user: 'system', description: 'Node came online', status: '\u2713 OK', statusColor: 'var(--green)' };
+      return { id, time: now, node: hostname, user: 'system', description: 'Node came online', status: '\u2713 OK', statusColor: 'var(--green)' };
     case 'node_offline':
-      return { time: now, node: hostname, user: 'system', description: 'Node went offline', status: '\u2717 ERR', statusColor: 'var(--red)' };
+      return { id, time: now, node: hostname, user: 'system', description: 'Node went offline', status: '\u2717 ERR', statusColor: 'var(--red)' };
     case 'alert':
-      return { time: now, node: hostname, user: 'watchdog', description: (data.alert as Record<string, string>)?.message ?? 'Alert triggered', status: '\u26A0 WARN', statusColor: 'var(--yellow)' };
+      return { id, time: now, node: hostname, user: 'watchdog', description: (data.alert as Record<string, string>)?.message ?? 'Alert triggered', status: '\u26A0 WARN', statusColor: 'var(--yellow)' };
     case 'command_sent':
-      return { time: now, node: hostname, user: 'admin', description: `Command: ${(data.command as Record<string, string>)?.action ?? 'unknown'}`, status: '\u27F3 sent', statusColor: 'var(--cyan)' };
+      return { id, time: now, node: hostname, user: 'admin', description: `Command: ${(data.command as Record<string, string>)?.action ?? 'unknown'}`, status: '\u27F3 sent', statusColor: 'var(--cyan)' };
     case 'command_completed':
-      return { time: now, node: '', user: 'system', description: `Command ${data.command_id} completed`, status: '\u2713 OK', statusColor: 'var(--green)' };
+      return { id, time: now, node: '', user: 'system', description: `Command ${data.command_id} completed`, status: '\u2713 OK', statusColor: 'var(--green)' };
     case 'watchdog_event':
-      return { time: now, node: hostname, user: 'watchdog', description: `Level ${data.level} watchdog: ${data.action}`, status: '\u26A0 WARN', statusColor: 'var(--yellow)' };
+      return { id, time: now, node: hostname, user: 'watchdog', description: `Level ${data.level} watchdog: ${data.action}`, status: '\u26A0 WARN', statusColor: 'var(--yellow)' };
     case 'benchmark_complete':
-      return { time: now, node: hostname, user: 'system', description: 'Benchmark completed', status: '\u2713 OK', statusColor: 'var(--green)' };
+      return { id, time: now, node: hostname, user: 'system', description: 'Benchmark completed', status: '\u2713 OK', statusColor: 'var(--green)' };
     case 'model_pull_started':
-      return { time: now, node: hostname, user: 'system', description: `Model pull started: ${data.model ?? ''}`, status: '\u27F3 running', statusColor: 'var(--cyan)' };
+      return { id, time: now, node: hostname, user: 'system', description: `Model pull started: ${data.model ?? ''}`, status: '\u27F3 running', statusColor: 'var(--cyan)' };
     default:
-      return { time: now, node: hostname || 'cluster', user: 'system', description: type.replace(/_/g, ' '), status: '\u2022 info', statusColor: 'var(--text-muted)' };
+      return { id, time: now, node: hostname || 'cluster', user: 'system', description: type.replace(/_/g, ' '), status: '\u2022 info', statusColor: 'var(--text-muted)' };
   }
 }
 
 // Seed with some initial rows so the log isn't empty
 const seedTasks: TaskRow[] = [
-  { time: formatTime(new Date()), node: 'cluster', user: 'system', description: 'Dashboard connected to gateway', status: '\u2713 OK', statusColor: 'var(--green)' },
+  { id: 'seed_0', time: formatTime(new Date()), node: 'cluster', user: 'system', description: 'Dashboard connected to gateway', status: '\u2713 OK', statusColor: 'var(--green)' },
 ];
 
 const logTabs: { id: LogTab; label: string }[] = [
@@ -150,9 +157,9 @@ export function TaskLog() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-1.5">
           {activeLogTab === 'tasks' ? (
             <div className="flex flex-col gap-px">
-              {tasks.map((task, idx) => (
+              {tasks.map((task) => (
                 <div
-                  key={idx}
+                  key={task.id}
                   className="grid items-center gap-2 py-0.5"
                   style={{ gridTemplateColumns: '90px 100px 80px 1fr 70px' }}
                 >

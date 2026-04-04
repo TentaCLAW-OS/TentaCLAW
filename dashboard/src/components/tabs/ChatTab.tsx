@@ -369,7 +369,7 @@ export function ChatTab() {
           <>
             {messages.map((msg, i) => (
               <MessageBubble
-                key={msg.timestamp + '-' + i}
+                key={msg.id ?? `${msg.timestamp}-${i}`}
                 message={msg}
                 streaming={
                   streaming &&
