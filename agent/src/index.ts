@@ -1732,10 +1732,10 @@ function getWatchdogConfig(_config: AgentConfig): WatchdogConfig {
 
     return {
         enabled: conf['WATCHDOG_ENABLED'] !== '0',
-        checkIntervalMs: parseInt(conf['WATCHDOG_INTERVAL'] || '30000'),
-        toksThreshold: parseInt(conf['WATCHDOG_TOKS_MIN'] || '0'),
-        tempThreshold: parseInt(conf['WATCHDOG_TEMP_MAX'] || '90'),
-        maxEscalationsPerHour: parseInt(conf['WATCHDOG_MAX_ESCALATIONS'] || '3'),
+        checkIntervalMs: parseInt(conf['WATCHDOG_INTERVAL'] || '30000') || 30000,
+        toksThreshold: parseInt(conf['WATCHDOG_TOKS_MIN'] || '0') || 0,
+        tempThreshold: parseInt(conf['WATCHDOG_TEMP_MAX'] || '90') || 90,
+        maxEscalationsPerHour: parseInt(conf['WATCHDOG_MAX_ESCALATIONS'] || '3') || 3,
         healthProbeEnabled: conf['WATCHDOG_HEALTH_PROBE'] === '1',
         healthProbeModel: conf['WATCHDOG_PROBE_MODEL'] || 'dolphin-mistral:latest',
     };
