@@ -1635,8 +1635,18 @@ async function main() {
 
                 if (response?.commands && response.commands.length > 0) {
                     console.log('[agent] Received ' + response.commands.length + ' command(s)');
+                    const COMMAND_TIMEOUT = 300_000; // 5 minutes
                     for (const cmd of response.commands) {
-                        await executeCommand(cmd, config.mockMode);
+                        const timer = setTimeout(() => {
+                            console.error(`[agent] Command ${cmd.action} timed out after 5 minutes`);
+                        }, COMMAND_TIMEOUT);
+                        try {
+                            await executeCommand(cmd, config.mockMode);
+                        } catch (e) {
+                            console.error(`[agent] Command ${cmd.action} failed:`, e);
+                        } finally {
+                            clearTimeout(timer);
+                        }
                     }
                 }
             } catch (pushErr) {
