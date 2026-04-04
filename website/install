@@ -277,7 +277,7 @@ WorkingDirectory=$INSTALL_DIR/gateway
 Environment=TENTACLAW_PORT=$PORT
 Environment=TENTACLAW_HOST=0.0.0.0
 Environment=NODE_ENV=production
-ExecStart=$NODE_BIN dist/gateway/src/index.js
+ExecStart="$NODE_BIN" dist/gateway/src/index.js
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
@@ -301,7 +301,7 @@ Type=simple
 WorkingDirectory=$INSTALL_DIR/agent
 Environment=NODE_ENV=production
 EnvironmentFile=-/etc/tentaclaw/rig.conf
-ExecStart=$NODE_BIN dist/agent/src/index.js --gateway http://127.0.0.1:$PORT
+ExecStart="$NODE_BIN" dist/agent/src/index.js --gateway http://127.0.0.1:$PORT
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
