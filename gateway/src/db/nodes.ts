@@ -422,24 +422,28 @@ export function getClusterTimeline(limit: number = 50): Array<{
     const events = d.prepare(`
         SELECT 'node_event' as type, 'node' as source, node_id, event || ': ' || COALESCE(detail, '') as message, 'info' as severity, created_at
         FROM node_events
+        WHERE created_at >= datetime('now', '-7 days')
         UNION ALL
         SELECT 'watchdog' as type, 'watchdog' as source, node_id,
             action || ': ' || COALESCE(detail, '') as message,
             CASE WHEN level >= 3 THEN 'critical' WHEN level >= 2 THEN 'warning' ELSE 'info' END as severity,
             created_at
         FROM watchdog_events
+        WHERE created_at >= datetime('now', '-7 days')
         UNION ALL
         SELECT 'alert' as type, 'alert' as source, node_id,
             type || ': ' || message as message,
             severity,
             created_at
         FROM alerts
+        WHERE created_at >= datetime('now', '-7 days')
         UNION ALL
         SELECT 'uptime' as type, 'uptime' as source, node_id,
             event || ': ' || COALESCE(from_status, '?') || ' -> ' || COALESCE(to_status, '?') as message,
             CASE WHEN to_status = 'offline' THEN 'warning' ELSE 'info' END as severity,
             created_at
         FROM uptime_events
+        WHERE created_at >= datetime('now', '-7 days')
         ORDER BY created_at DESC
         LIMIT ?
     `).all(limit) as any[];
