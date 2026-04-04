@@ -213,6 +213,17 @@ export function getInferenceAnalytics(hours: number = 24): {
 
 const nodeErrorCounts = new Map<string, { errors: number; lastError: number; blocked: boolean }>();
 
+// Purge stale nodeErrorCounts entries every 5 minutes to prevent memory leak
+const NODE_ERROR_STALE_MS = 10 * 60 * 1000; // 10 minutes
+setInterval(() => {
+    const cutoff = Date.now() - NODE_ERROR_STALE_MS;
+    for (const [nodeId, entry] of nodeErrorCounts) {
+        if (entry.lastError < cutoff) {
+            nodeErrorCounts.delete(nodeId);
+        }
+    }
+}, 5 * 60 * 1000).unref();
+
 // Wave 471: routing telemetry log — persisted in-memory, last 500 decisions
 export interface RoutingDecision {
     time: number;
