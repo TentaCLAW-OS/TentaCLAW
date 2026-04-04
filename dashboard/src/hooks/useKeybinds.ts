@@ -60,6 +60,10 @@ export function useKeybinds(keybinds: KeybindAction[]) {
         if (parsed.length === 1 && parsed[0][0] === pressed) {
           e.preventDefault();
           bind.action();
+          if (sequenceTimeout.current) {
+            clearTimeout(sequenceTimeout.current);
+            sequenceTimeout.current = null;
+          }
           sequenceBuffer.current = [];
           return;
         }
