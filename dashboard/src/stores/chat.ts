@@ -1,12 +1,19 @@
 import { create } from 'zustand';
 
 export interface ChatMessage {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
   model?: string;
   latencyMs?: number;
   tokens?: number;
+}
+
+const MAX_MESSAGES = 200;
+
+function genMsgId(): string {
+  return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 interface ChatState {
@@ -35,6 +42,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (!model) return;
 
     const userMessage: ChatMessage = {
+      id: genMsgId(),
       role: 'user',
       content,
       timestamp: Date.now(),
@@ -47,16 +55,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
       { role: 'user' as const, content },
     ];
 
-    set({ messages: [...state.messages, userMessage], streaming: true });
+    set({ messages: [...state.messages, userMessage].slice(-MAX_MESSAGES), streaming: true });
 
     const assistantMessage: ChatMessage = {
+      id: genMsgId(),
       role: 'assistant',
       content: '',
       timestamp: Date.now(),
       model,
     };
 
-    set((s) => ({ messages: [...s.messages, assistantMessage] }));
+    set((s) => ({ messages: [...s.messages, assistantMessage].slice(-MAX_MESSAGES) }));
 
     const startTime = Date.now();
     let accumulated = '';
@@ -113,7 +122,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 const msgs = [...s.messages];
                 const last = msgs[msgs.length - 1];
                 msgs[msgs.length - 1] = { ...last, content: accumulated };
-                return { messages: msgs };
+                return { messages: msgs.slice(-MAX_MESSAGES) };
               });
             }
           } catch {
