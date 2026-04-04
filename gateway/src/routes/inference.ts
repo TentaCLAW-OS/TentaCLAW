@@ -16,6 +16,9 @@ import {
     logInferenceRequest,
     getCachedResponse,
     cacheResponse,
+    getStickyNode,
+    setStickyNode,
+    getNode,
 } from '../db';
 import { checkChatRateLimit, CHAT_RATE_LIMIT, getQueueStats, MAX_QUEUE_DEPTH } from '../shared';
 
@@ -111,19 +114,38 @@ routes.post('/v1/chat/completions', async (c) => {
     // X-Node-Id header lets callers pin to a specific node (benchmark, testing)
     const pinnedNodeId = c.req.header('x-node-id');
 
+    // Wave 464: task-type routing — caller can hint at task type via header or body field
+    const taskType = c.req.header('x-task-type') || body.task_type as string | undefined || undefined;
+
+    // Wave 475: routing priority — cost (lowest power), speed (highest tok/s), balanced (default)
+    const rawPriority = c.req.header('x-routing-priority') || body.routing_priority as string | undefined;
+    const routingPriority = (rawPriority === 'cost' || rawPriority === 'speed') ? rawPriority : 'balanced';
+
+    // Wave 467: sticky session — x-session-id keeps the user on the same node
+    const sessionId = c.req.header('x-session-id');
+
     const resolved = resolveModelAlias(model);
     let resolvedModel = resolved.target;
 
+    // Wave 464: if task type is 'code', prefer coder model aliases
+    if (taskType === 'code' && resolvedModel === model) {
+        const coderAliasNames = ['code-fast', 'code', 'coder', 'code-quality'];
+        for (const alias of coderAliasNames) {
+            const aliasResolved = resolveModelAlias(alias);
+            if (aliasResolved.target !== alias) { resolvedModel = aliasResolved.target; break; }
+        }
+    }
+
+    const routingOpts = { taskType, priority: routingPriority as 'cost' | 'speed' | 'balanced' };
     let target: import('../db/stats').InferenceTarget | null = null;
     let usedFallback = false;
 
     if (pinnedNodeId) {
         // Try to find the node in the routing table (model loaded)
-        target = findNodesForModel(resolvedModel).find(n => n.node_id === pinnedNodeId) ?? null;
+        target = findNodesForModel(resolvedModel, routingOpts).find(n => n.node_id === pinnedNodeId) ?? null;
         // Fallback: build target from node registration even if model not in loaded_models
         // (Ollama will auto-load from its model store)
         if (!target) {
-            const { getNode } = await import('../db/nodes');
             const nodeRow = getNode(pinnedNodeId);
             if (nodeRow) {
                 // Allow routing to any registered node — even offline ones (benchmark/direct test use)
@@ -140,19 +162,31 @@ routes.post('/v1/chat/completions', async (c) => {
                 };
             }
         }
+    } else if (sessionId) {
+        // Wave 467: sticky session — try to route to the same node as last time
+        const stickyNodeId = getStickyNode(sessionId);
+        if (stickyNodeId) {
+            target = findNodesForModel(resolvedModel, routingOpts).find(n => n.node_id === stickyNodeId) ?? null;
+        }
+        if (!target) target = findBestNode(resolvedModel, routingOpts);
     } else {
-        target = findBestNode(resolvedModel);
+        target = findBestNode(resolvedModel, routingOpts);
     }
 
     if (!target && resolved.fallbacks.length > 0) {
         for (const fallback of resolved.fallbacks) {
-            target = findBestNode(fallback);
+            target = findBestNode(fallback, routingOpts);
             if (target) {
                 resolvedModel = fallback;
                 usedFallback = true;
                 break;
             }
         }
+    }
+
+    // Wave 467: persist sticky session after routing decision
+    if (sessionId && target) {
+        setStickyNode(sessionId, target.node_id);
     }
 
     if (!target) {
@@ -245,6 +279,9 @@ routes.post('/v1/chat/completions', async (c) => {
                 cached: false,
                 tools_used: hasTools || undefined,
                 json_mode: hasJsonMode || undefined,
+                task_type: taskType || undefined,              // Wave 464
+                routing_priority: routingPriority !== 'balanced' ? routingPriority : undefined, // Wave 475
+                sticky_session: sessionId ? true : undefined,  // Wave 467
             };
 
             if (!body.stream && proxyReq.ok) {
@@ -739,12 +776,20 @@ routes.post('/v1/embeddings', async (c) => {
         for (let i = 0; i < inputs.length; i += 32) {
             const batch = inputs.slice(i, i + 32);
             for (const text of batch) {
-                const proxyReq = await fetchWithTimeout(embedUrl, { model: resolvedModel, input: text }, 30_000);
-                const result = await proxyReq.json() as any;
-                if (result.data?.[0]) {
+                try {
+                    const proxyReq = await fetchWithTimeout(embedUrl, { model: resolvedModel, input: text }, 30_000);
+                    const result = await proxyReq.json() as any;
+                    if (result.data?.[0]) {
+                        allEmbeddings.push({
+                            object: 'embedding',
+                            embedding: result.data[0].embedding,
+                            index: allEmbeddings.length,
+                        });
+                    }
+                } catch {
                     allEmbeddings.push({
                         object: 'embedding',
-                        embedding: result.data[0].embedding,
+                        embedding: [],
                         index: allEmbeddings.length,
                     });
                 }
