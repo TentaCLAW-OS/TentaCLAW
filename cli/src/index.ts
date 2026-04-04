@@ -996,12 +996,15 @@ async function apiGet(baseUrl: string, path: string): Promise<unknown> {
 }
 
 /** Non-fatal version of apiGet — returns null on any failure instead of exiting */
-async function apiProbe(baseUrl: string, path: string): Promise<unknown | null> {
-    const url = baseUrl.replace(/\/+$/, '') + path;
+async function apiProbe(baseUrl: string, apiPath: string, timeoutMs = 15000): Promise<unknown | null> {
+    const url = baseUrl.replace(/\/+$/, '') + apiPath;
     try {
-        const resp = await apiRequest('GET', url);
-        if (resp.status >= 400) return null;
-        return resp.data;
+        const result = await Promise.race([
+            apiRequest('GET', url),
+            new Promise<null>(resolve => setTimeout(() => resolve(null), timeoutMs)),
+        ]);
+        if (!result || (result as ApiResponse).status >= 400) return null;
+        return (result as ApiResponse).data;
     } catch {
         return null;
     }
@@ -1876,7 +1879,7 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
     }
 
     if (!inferenceUrl || !model) {
-        const gwResp = await apiProbe(gateway, '/v1/models') as { data?: Array<{ id: string }> } | null;
+        const gwResp = await apiProbe(gateway, '/v1/models', 5000) as { data?: Array<{ id: string }> } | null;
         const gwModels = (gwResp?.data || []).map(m => m.id);
         if (model && gwModels.includes(model)) {
             inferenceUrl = gateway; backendLabel = C.teal('cluster');
@@ -3807,7 +3810,7 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
 
     // If no config or config provider unavailable, try gateway
     if (!inferenceUrl || !model) {
-        const gwResp = await apiProbe(gateway, '/v1/models') as { data?: Array<{ id: string }> } | null;
+        const gwResp = await apiProbe(gateway, '/v1/models', 5000) as { data?: Array<{ id: string }> } | null;
         const gatewayModels = (gwResp?.data || []).map(m => m.id);
         if (model && gatewayModels.includes(model)) {
             inferenceUrl = gateway;
@@ -11601,7 +11604,7 @@ ${projectType}
                 if (!askModel) askModel = askConfig.model;
             }
             if (!askUrl || !askModel) {
-                const gwResp = await apiProbe(gateway, '/v1/models') as { data?: Array<{ id: string }> } | null;
+                const gwResp = await apiProbe(gateway, '/v1/models', 5000) as { data?: Array<{ id: string }> } | null;
                 const gm = (gwResp?.data || []).map(m => m.id);
                 if (gm.length > 0) { askUrl = gateway; if (!askModel) askModel = gm[0]!; }
             }
