@@ -313,8 +313,8 @@ export function getAmdGpuStats(busId?: string): GpuStats[] {
             let vramTotal = 0;
             let vramUsed = 0;
             try {
-                vramTotal = Math.round(parseInt(readSysfs('mem_info_vram_total')) / 1048576);
-                vramUsed = Math.round(parseInt(readSysfs('mem_info_vram_used')) / 1048576);
+                vramTotal = Math.round(parseInt(readSysfs('mem_info_vram_total')) / 1048576) || 0;
+                vramUsed = Math.round(parseInt(readSysfs('mem_info_vram_used')) / 1048576) || 0;
             } catch { /* VRAM info not available */ }
 
             // Temperature from hwmon (millidegrees C)
@@ -323,7 +323,7 @@ export function getAmdGpuStats(busId?: string): GpuStats[] {
                 const hwmonDir = resolveHwmonDir(base);
                 if (hwmonDir) {
                     const tempStr = fs.readFileSync(`${hwmonDir}/temp1_input`, 'utf-8').trim();
-                    temp = Math.round(parseInt(tempStr) / 1000);
+                    temp = Math.round(parseInt(tempStr) / 1000) || 0;
                 }
             } catch { /* temp not available */ }
 
@@ -336,7 +336,7 @@ export function getAmdGpuStats(busId?: string): GpuStats[] {
                 const hwmonDir = resolveHwmonDir(base);
                 if (hwmonDir) {
                     const powerStr = fs.readFileSync(`${hwmonDir}/power1_average`, 'utf-8').trim();
-                    power = Math.round(parseInt(powerStr) / 1_000_000);
+                    power = Math.round(parseInt(powerStr) / 1_000_000) || 0;
                 }
             } catch { /* power info not available */ }
 
