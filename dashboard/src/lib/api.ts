@@ -12,6 +12,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders(), ...init?.headers },
   });
+  if (res.status === 401) {
+    localStorage.removeItem('tentaclaw_token');
+    window.location.reload();
+    throw new Error('Session expired');
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {
