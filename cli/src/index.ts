@@ -2527,7 +2527,13 @@ interface AgentToolCall {
 }
 
 function resolvePath(p: string): string {
-    return path.resolve(p.replace(/^~/, os.homedir()));
+    const resolved = path.resolve(p.replace(/^~/, os.homedir()));
+    const cwd = process.cwd();
+    const home = os.homedir();
+    if (!resolved.startsWith(cwd) && !resolved.startsWith(home)) {
+        throw new Error(`Path outside project and home directory: ${p}`);
+    }
+    return resolved;
 }
 
 async function executeCodeTool(
