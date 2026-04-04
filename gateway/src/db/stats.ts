@@ -315,12 +315,17 @@ export function getRequestStats(): { total: number; last_hour: number; avg_laten
 export function recordRouteLatency(nodeId: string, model: string, latencyMs: number): void {
     const d = getDb();
     d.prepare('INSERT INTO route_latency (node_id, model, latency_ms) VALUES (?, ?, ?)').run(nodeId, model, latencyMs);
-    d.prepare(`
-        DELETE FROM route_latency WHERE id NOT IN (
-            SELECT id FROM route_latency WHERE node_id = ? AND model = ?
-            ORDER BY created_at DESC LIMIT 200
-        ) AND node_id = ? AND model = ?
-    `).run(nodeId, model, nodeId, model);
+    const latencyCount = d.prepare(
+        'SELECT COUNT(*) as cnt FROM route_latency WHERE node_id = ? AND model = ?'
+    ).get(nodeId, model) as { cnt: number };
+    if (latencyCount.cnt > 250) {
+        d.prepare(`
+            DELETE FROM route_latency WHERE id IN (
+                SELECT id FROM route_latency WHERE node_id = ? AND model = ?
+                ORDER BY created_at ASC LIMIT ?
+            )
+        `).run(nodeId, model, latencyCount.cnt - 200);
+    }
 }
 
 export function getNodeLatencyP50(nodeId: string, model: string): number {
@@ -339,12 +344,17 @@ export function getNodeLatencyP50(nodeId: string, model: string): number {
 export function recordRouteThroughput(nodeId: string, model: string, tokensPerSec: number): void {
     const d = getDb();
     d.prepare('INSERT INTO route_throughput (node_id, model, tokens_per_sec) VALUES (?, ?, ?)').run(nodeId, model, tokensPerSec);
-    d.prepare(`
-        DELETE FROM route_throughput WHERE id NOT IN (
-            SELECT id FROM route_throughput WHERE node_id = ? AND model = ?
-            ORDER BY created_at DESC LIMIT 200
-        ) AND node_id = ? AND model = ?
-    `).run(nodeId, model, nodeId, model);
+    const throughputCount = d.prepare(
+        'SELECT COUNT(*) as cnt FROM route_throughput WHERE node_id = ? AND model = ?'
+    ).get(nodeId, model) as { cnt: number };
+    if (throughputCount.cnt > 250) {
+        d.prepare(`
+            DELETE FROM route_throughput WHERE id IN (
+                SELECT id FROM route_throughput WHERE node_id = ? AND model = ?
+                ORDER BY created_at ASC LIMIT ?
+            )
+        `).run(nodeId, model, throughputCount.cnt - 200);
+    }
 }
 
 export function getNodeThroughput(nodeId: string, model: string): number {
