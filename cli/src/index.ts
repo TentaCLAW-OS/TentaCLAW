@@ -3617,9 +3617,10 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
     // Wave 233: load autoApprove default from config (set via `tentaclaw config set autoApprove true`)
     const savedAutoApprove = loadConfig()?.autoApprove ?? false;
     let autoApprove = flags['yes'] === 'true' || flags['y'] === 'true' || headless || savedAutoApprove;
-    // Wave 124: --temp / --temperature sets initial temperature (default 0.7)
-    const tempFlag = parseFloat(flags['temp'] || flags['temperature'] || '0.7');
-    let agentTemperature = isNaN(tempFlag) ? 0.7 : Math.min(2.0, Math.max(0.0, tempFlag));
+    // Wave 124/455: --temp flag; default 0.1 for coding tasks (more deterministic), 0.7 for chat
+    const defaultTemp = (flags['no-tools'] === 'true' || flags['chat'] === 'true') ? 0.7 : 0.1;
+    const tempFlag = parseFloat(flags['temp'] || flags['temperature'] || String(defaultTemp));
+    let agentTemperature = isNaN(tempFlag) ? defaultTemp : Math.min(2.0, Math.max(0.0, tempFlag));
     // Wave 100: --checkpoint auto-commits to git after each write/edit tool call
     const checkpoint = flags['checkpoint'] === 'true' || flags['cp'] === 'true';
     // Wave 109: --no-tools runs code agent as pure chat (no tool use)
@@ -3800,6 +3801,8 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
     let lastToolSignature = '';  // Wave 168: loop detection — tracks last tool+args combo
     const toolCallFreq435 = new Map<string, number>();  // Wave 435: frequency map for all tool calls
     const sessionFilesTouched = new Set<string>();  // Wave 323: track files modified this session
+    // Wave 554: undo stack — records file state before each write/edit for /undo
+    const undoStack554: Array<{ path: string; content: string | null; action: string; timestamp: number }> = [];
 
     void checkForUpdate();   // background — never blocks startup
     if (!printMode) { bootSplash(); }
@@ -3849,13 +3852,22 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
                     req433.write(JSON.stringify({ name: model })); req433.end();
                 });
                 if (infoResp) {
-                    const info433 = JSON.parse(infoResp) as { modelinfo?: Record<string, string>; details?: { family?: string } };
+                    const info433 = JSON.parse(infoResp) as { modelinfo?: Record<string, string>; details?: { family?: string }; model_info?: Record<string, unknown> };
                     const arch433 = (
                         Object.entries(info433.modelinfo || {}).find(([k]) => k.endsWith('.architecture'))?.[1] ||
                         info433.details?.family || ''
                     ).toLowerCase();
                     if (arch433 && NO_TOOLS_ARCHS433.some(a => arch433.includes(a))) {
                         likelyNoTools = true;
+                    }
+                    // Wave 454: extract context_length from Ollama /api/show
+                    const allInfo454 = { ...info433.modelinfo, ...info433.model_info };
+                    const ctxEntry454 = Object.entries(allInfo454).find(([k]) => k.endsWith('.context_length'));
+                    if (ctxEntry454) {
+                        const detectedCtx454 = parseInt(String(ctxEntry454[1]), 10);
+                        if (detectedCtx454 > 0 && !printMode) {
+                            console.log('  ' + C.dim(`Model context window: ${formatNumber(detectedCtx454)} tokens`));
+                        }
                     }
                 }
             } catch { /* skip if Ollama unreachable or non-Ollama endpoint */ }
@@ -3932,7 +3944,7 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
 ## Environment
 - CWD: ${process.cwd()}
 - Platform: ${process.platform} | Node.js: ${process.version}
-- Session: ${sessionId} | Date: ${new Date().toISOString().slice(0, 10)}${noTools ? '\n- Mode: no-tools (pure chat)' : ''}${taskFlag ? `\n\n## TASK MODE (--task)\nYou are running a non-interactive task. CRITICAL RULES:\n- For tasks involving files/code/shell: use tools immediately. Do NOT describe what you will do — just do it.\n- For pure knowledge questions (math, definitions): answer directly without tools.\n- NEVER say "I would", "I'll", "Let me" — act immediately.\n- Complete the task fully. Do not stop partway or ask for input.\n- After writing/editing files, read back to confirm correctness.\n- When done, write a one-line summary of what was accomplished.` : ''}`;
+- Session: ${sessionId} | Date: ${new Date().toISOString().slice(0, 10)}${noTools ? '\n- Mode: no-tools (pure chat)' : ''}${taskFlag ? `\n\n## TASK MODE (--task)\nYou are running a non-interactive task. CRITICAL RULES:\n- For tasks involving files/code/shell: use tools immediately. Do NOT describe what you will do — just do it.\n- For pure knowledge questions (math, definitions): answer directly without tools.\n- NEVER say "I would", "I'll", "Let me" — act immediately.\n- Complete the task fully. Do not stop partway or ask for input.\n- After writing/editing files, read back to confirm correctness.\n- When done, write a one-line summary of what was accomplished.\n\n## Wave 544: Task Decomposition\nFor complex tasks (multiple files, multiple steps): break into subtasks, complete each one fully before moving to the next. After each subtask, run_shell("git add -A && git commit -m 'subtask: <desc>'") if --checkpoint is enabled. This gives you rollback points.` : ''}`;
 
     // Load workspace context (SOUL.md, USER.md, IDENTITY.md, MEMORY.md, etc.)
     const workspaceCtx = loadWorkspaceContext();
@@ -4819,6 +4831,20 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                 }
                 lastToolSignature = toolSig;
 
+                // Wave 554: capture file state before write/edit for /undo
+                if (['write_file', 'edit_file', 'patch_file', 'delete_file'].includes(tc.name)) {
+                    try {
+                        const undoArgs554 = JSON.parse(tc.args || '{}') as Record<string, string>;
+                        const undoPath554 = undoArgs554['path'] || '';
+                        if (undoPath554) {
+                            const absPath554 = path.resolve(undoPath554);
+                            const prevContent554 = fs.existsSync(absPath554) ? fs.readFileSync(absPath554, 'utf8') : null;
+                            undoStack554.push({ path: absPath554, content: prevContent554, action: tc.name, timestamp: Date.now() });
+                            if (undoStack554.length > 50) undoStack554.shift(); // cap at 50 entries
+                        }
+                    } catch { /* skip if args unparsable */ }
+                }
+
                 const toolStart = Date.now();
                 const result = await executeCodeTool(
                     { id: tcId, name: tc.name, args: tc.args },
@@ -5095,6 +5121,27 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                     updateSessionMeta(sessionId, { model, cwd: process.cwd() });
                     console.log('  ' + C.green(`\u2714 New session: ${sessionId}`));
                     console.log('  ' + C.dim(`  Previous: ${oldId} (${oldMsgCount} exchange${oldMsgCount !== 1 ? 's' : ''})`));
+                    rl!.prompt(); return;
+                }
+                case 'undo': {
+                    // Wave 554: /undo — restore last file to its pre-write/edit state
+                    const lastUndo = undoStack554.pop();
+                    if (!lastUndo) {
+                        console.log('  ' + C.yellow('\u26A0 Nothing to undo.'));
+                        rl!.prompt(); return;
+                    }
+                    try {
+                        if (lastUndo.content === null) {
+                            // File didn't exist before — delete it
+                            if (fs.existsSync(lastUndo.path)) fs.unlinkSync(lastUndo.path);
+                            console.log('  ' + C.green('\u2714 Undo: deleted ' + path.basename(lastUndo.path) + ' (was newly created)'));
+                        } else {
+                            fs.writeFileSync(lastUndo.path, lastUndo.content, 'utf8');
+                            console.log('  ' + C.green('\u2714 Undo: restored ' + path.basename(lastUndo.path) + ' to pre-' + lastUndo.action + ' state'));
+                        }
+                    } catch (e) {
+                        console.log('  ' + C.red('\u2718 Undo failed: ' + (e instanceof Error ? e.message : String(e))));
+                    }
                     rl!.prompt(); return;
                 }
                 case 'status': {
@@ -7678,6 +7725,42 @@ async function cmdCosts(gateway: string, flags: Record<string, string>): Promise
         }
     }
     console.log('');
+}
+
+// Wave 561: Draft+Review pipeline — fast model writes code, slow model reviews it
+async function cmdPipeline(gateway: string, positional: string[], flags: Record<string, string>): Promise<void> {
+    const task = positional.join(' ').trim() || flags['task'] || '';
+    if (!task) {
+        console.log('');
+        console.log('  ' + C.yellow('Usage: tentaclaw pipeline "build a REST API" --draft hermes3:8b --review qwen2.5-coder:32b'));
+        return;
+    }
+    const draftModel = flags['draft'] || flags['fast'] || '';
+    const reviewModel = flags['review'] || flags['slow'] || '';
+    if (!draftModel || !reviewModel) {
+        console.log('');
+        console.log('  ' + C.yellow('Both --draft <model> and --review <model> are required.'));
+        console.log('  ' + C.dim('  Example: tentaclaw pipeline "task" --draft hermes3:8b --review qwen2.5-coder:32b'));
+        return;
+    }
+
+    console.log('');
+    console.log('  ' + C.purple(C.bold('PIPELINE')) + C.dim(' — draft → review'));
+    console.log('  ' + C.dim('Draft: ') + C.white(draftModel));
+    console.log('  ' + C.dim('Review: ') + C.white(reviewModel));
+    console.log('');
+
+    // Step 1: Draft with fast model
+    console.log('  ' + C.teal(C.bold('STEP 1: DRAFT')) + C.dim(` — ${draftModel}`));
+    await cmdCode(gateway, { task, model: draftModel, yes: 'true' });
+
+    // Step 2: Review the changes with slow model
+    console.log('');
+    console.log('  ' + C.teal(C.bold('STEP 2: REVIEW')) + C.dim(` — ${reviewModel}`));
+    await cmdReview(gateway, { model: reviewModel, style: 'full' });
+
+    console.log('');
+    console.log('  ' + C.green('✔ Pipeline complete') + C.dim(` — draft:${draftModel} → review:${reviewModel}`));
 }
 
 // Helper: single inference call with streaming output (used by review, pr, etc.)
@@ -11019,6 +11102,15 @@ Register-ArgumentCompleter -Native -CommandName tentaclaw -ScriptBlock {
                 const failSummary378 = ((errT.stdout || '') + (errT.stderr || '')).match(/(\d+)\s+fail(?:ed|ing)?/i);
                 const failNote378 = failSummary378 ? ` (${failSummary378[1]} failed)` : '';
                 console.log(C.red(`  ✘ Tests failed${failNote378} (${elapsed2}s, exit ${errT.status ?? 1})`));
+                // Wave 549: --fix flag — pass test failures to coding agent for auto-fix
+                const autoFix549 = parsed.flags['fix'] === 'true' || parsed.flags['fix'] === '';
+                if (autoFix549) {
+                    const failOutput549 = outLines.slice(-40).join('\n');
+                    console.log('');
+                    console.log('  ' + C.purple(C.bold('AUTO-FIX')) + C.dim(' — delegating to coding agent'));
+                    await cmdCode(gateway, { task: `Tests failed. Fix the failing tests.\nTest command: ${testCmd2}\n\nTest output:\n\`\`\`\n${failOutput549.slice(0, 3000)}\n\`\`\``, yes: 'true' });
+                    return;
+                }
                 process.exit(1);
             }
             return;
@@ -11898,6 +11990,10 @@ ${projectType}
 
         case 'review': // Wave 539
             await cmdReview(gateway, parsed.flags);
+            break;
+
+        case 'pipeline': // Wave 561: draft+review pipeline
+            await cmdPipeline(gateway, parsed.positional, parsed.flags);
             break;
 
         case 'refactor': // Wave 540
