@@ -404,4 +404,14 @@ routes.get('/api/v1/models/:model/stats', (c) => {
     return c.json({ model, last_hour: { requests: hour.cnt || 0, avg_latency_ms: Math.round(hour.avg_lat || 0) }, last_24h: { requests: day.cnt || 0, avg_latency_ms: Math.round(day.avg_lat || 0) }, served_by_nodes: nodes.length });
 });
 
+routes.get('/api/v1/estimate', (c) => {
+    const qs = c.req.url.split('?')[1] || '';
+    return c.redirect('/api/v1/models/estimate-vram' + (qs ? '?' + qs : ''), 307);
+});
+
+routes.get('/api/v1/recommend', (c) => {
+    const qs = c.req.url.split('?')[1] || '';
+    return c.redirect('/api/v1/models/recommend' + (qs ? '?' + qs : ''), 307);
+});
+
 export default routes;
