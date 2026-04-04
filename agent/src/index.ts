@@ -64,6 +64,7 @@ interface AgentConfig {
     agentInterval: number;
     statsUrl: string;
     mockMode: boolean;
+    clusterSecret: string;
 }
 
 type ConfigSourceLabel = 'cli' | 'env' | 'rig.conf' | 'auto-discovery' | 'default';
@@ -241,6 +242,7 @@ async function loadConfig(): Promise<AgentConfig> {
             nodeId, farmHash, hostname, gatewayUrl, agentInterval,
             statsUrl: gatewayUrl + '/api/v1/nodes/' + nodeId + '/stats',
             mockMode: true,
+            clusterSecret: process.env['TENTACLAW_CLUSTER_SECRET'] || '',
         };
     }
 
@@ -300,6 +302,7 @@ async function loadConfig(): Promise<AgentConfig> {
             agentInterval,
             statsUrl,
             mockMode: false,
+            clusterSecret: process.env['TENTACLAW_CLUSTER_SECRET'] || rigConf['CLUSTER_SECRET'] || '',
         };
     }
 
@@ -338,6 +341,7 @@ async function loadConfig(): Promise<AgentConfig> {
             agentInterval,
             statsUrl: autoGateway + '/api/v1/nodes/' + autoNodeId + '/stats',
             mockMode: false,
+            clusterSecret: process.env['TENTACLAW_CLUSTER_SECRET'] || '',
         };
     }
     console.error('[agent] No gateway found on LAN. Set GATEWAY_URL in /etc/tentaclaw/rig.conf');
@@ -1155,7 +1159,11 @@ async function pushStats(config: AgentConfig, stats: StatsPayload): Promise<Gate
             port: url.port || (url.protocol === 'https:' ? 443 : 80),
             path: url.pathname,
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'User-Agent': 'TentaCLAW-Agent/0.1.0' },
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'TentaCLAW-Agent/0.1.0',
+                ...(config.clusterSecret ? { 'X-Cluster-Secret': config.clusterSecret } : {}),
+            },
             timeout: 10000,
         };
 
@@ -1255,7 +1263,11 @@ async function postBenchmarkResult(model: string, result: {
             port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
             path: parsed.pathname,
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'User-Agent': 'TentaCLAW-Agent/0.1.0' },
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'TentaCLAW-Agent/0.1.0',
+                ...(config.clusterSecret ? { 'X-Cluster-Secret': config.clusterSecret } : {}),
+            },
             timeout: 10000,
         }, (res) => {
             let data = '';
@@ -1874,7 +1886,10 @@ async function watchdogCheck(config: AgentConfig): Promise<void> {
                         port: parsed.port,
                         path: parsed.pathname,
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(config.clusterSecret ? { 'X-Cluster-Secret': config.clusterSecret } : {}),
+                        },
                         timeout: 5000,
                     });
                     req.write(body);
@@ -2224,12 +2239,16 @@ function startSelfHealLoop(config: AgentConfig): void {
                     });
                     const parsed = new URL(config.gatewayUrl + '/api/v1/nodes/' + encodeURIComponent(config.nodeId) + '/doctor');
                     const transport = parsed.protocol === 'https:' ? https : http;
+                    const secret = cachedConfig?.clusterSecret || '';
                     const req = transport.request({
                         hostname: parsed.hostname,
                         port: parsed.port,
                         path: parsed.pathname,
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(secret ? { 'X-Cluster-Secret': secret } : {}),
+                        },
                         timeout: 5000,
                     });
                     req.write(body);
