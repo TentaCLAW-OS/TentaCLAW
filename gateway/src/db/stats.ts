@@ -11,6 +11,20 @@ import { safeJsonParse } from './safe-json';
  * Helper: fetch all nodes with their latest stats payload.
  * Inlined here to avoid a circular dependency with nodes.ts.
  */
+function _normalizeStats(stats: any): any {
+    if (!stats) return null;
+    if (!stats.inference || typeof stats.inference !== 'object') {
+        stats.inference = { loaded_models: [], in_flight_requests: 0, tokens_generated: 0, avg_latency_ms: 0 };
+    }
+    if (!Array.isArray(stats.inference.loaded_models)) {
+        stats.inference.loaded_models = [];
+    }
+    if (!Array.isArray(stats.gpus)) {
+        stats.gpus = [];
+    }
+    return stats;
+}
+
 function _getAllNodesWithStats(): NodeWithStats[] {
     const d = getDb();
     const nodes = d.prepare('SELECT * FROM nodes ORDER BY last_seen_at DESC').all() as Node[];
@@ -20,7 +34,7 @@ function _getAllNodesWithStats(): NodeWithStats[] {
         ).get(node.id) as { payload: string } | undefined;
         return {
             ...node,
-            latest_stats: latestStat ? safeJsonParse(latestStat.payload, null) : null,
+            latest_stats: latestStat ? _normalizeStats(safeJsonParse(latestStat.payload, null)) : null,
         };
     });
 }

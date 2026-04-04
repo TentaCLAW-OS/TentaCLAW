@@ -12,6 +12,24 @@ import { recordUptimeEvent, getNodeUptime } from './misc';
 import { safeJsonParse } from './safe-json';
 
 // =============================================================================
+// Stats normalization — ensure inference field always exists
+// =============================================================================
+
+function normalizeStats(stats: any): any {
+    if (!stats) return null;
+    if (!stats.inference || typeof stats.inference !== 'object') {
+        stats.inference = { loaded_models: [], in_flight_requests: 0, tokens_generated: 0, avg_latency_ms: 0 };
+    }
+    if (!Array.isArray(stats.inference.loaded_models)) {
+        stats.inference.loaded_models = [];
+    }
+    if (!Array.isArray(stats.gpus)) {
+        stats.gpus = [];
+    }
+    return stats;
+}
+
+// =============================================================================
 // Node Operations
 // =============================================================================
 
@@ -65,7 +83,7 @@ export function getNode(nodeId: string): NodeWithStats | null {
 
     return {
         ...node,
-        latest_stats: latestStat ? safeJsonParse(latestStat.payload, null) : null,
+        latest_stats: latestStat ? normalizeStats(safeJsonParse(latestStat.payload, null)) : null,
     };
 }
 
@@ -80,7 +98,7 @@ export function getAllNodes(): NodeWithStats[] {
 
         return {
             ...node,
-            latest_stats: latestStat ? safeJsonParse(latestStat.payload, null) : null,
+            latest_stats: latestStat ? normalizeStats(safeJsonParse(latestStat.payload, null)) : null,
         };
     });
 }
@@ -96,7 +114,7 @@ export function getNodesByFarm(farmHash: string): NodeWithStats[] {
 
         return {
             ...node,
-            latest_stats: latestStat ? safeJsonParse(latestStat.payload, null) : null,
+            latest_stats: latestStat ? normalizeStats(safeJsonParse(latestStat.payload, null)) : null,
         };
     });
 }
