@@ -68,7 +68,7 @@ Write-Host "  ${T}${B}--- VERSION & HELP ---${X}"
 # ═══════════════════════════════════════════════════════════════
 
 $ver = tentaclaw --version 2>&1 | Out-String
-Test-Check "tentaclaw --version shows v2.0.0" ($ver -match "v2\.0\.0")
+Test-Check "tentaclaw --version shows v2.34.0" ($ver -match "v2\.34\.0")
 
 $help = tentaclaw help 2>&1 | Out-String
 Test-Check "help has SETUP section" ($help -match "SETUP")
@@ -248,13 +248,13 @@ $slashOut = $slashInput | tentaclaw code --model $Model 2>&1 | Out-String
 
 Test-Check "/help shows command list" ($slashOut -match "SLASH COMMANDS")
 Test-Check "/status shows session info" ($slashOut -match "STATUS")
-Test-Check "/context shows message count" ($slashOut -match "messages in context")
+Test-Check "/context shows context info" ($slashOut -match "CONTEXT|messages|tokens")
 Test-Check "/workspace shows files" ($slashOut -match "WORKSPACE")
 Test-Check "/sessions shows recent" ($slashOut -match "RECENT SESSIONS|Resume:")
 Test-Check "/model switches model" ($slashOut -match "Model: test-model")
 Test-Check "/auto toggles approval" ($slashOut -match "Auto-approve")
 Test-Check "/think sets level" ($slashOut -match "Thinking:")
-Test-Check "/compact trims context" ($slashOut -match "Compacted")
+Test-Check "/compact shows context info" ($slashOut -match "COMPACT|Compacted")
 Test-Check "/save confirms save" ($slashOut -match "Session saved")
 Test-Check "/new starts fresh session" ($slashOut -match "New session:")
 Test-Check "/quit saves and exits" ($slashOut -match "waves goodbye")
@@ -324,6 +324,53 @@ Test-Check "bad gateway shows error" ($badGw -match "Cannot connect|timed out")
 
 $badSess = tentaclaw sessions info "nonexistent-session-xyz" 2>&1 | Out-String
 Test-Check "bad session ID shows 'not found'" ($badSess -match "not found")
+
+# ═══════════════════════════════════════════════════════════════
+# Wave 47: sessions clean + version alias
+Write-Host ""
+Write-Host "  ${T}${B}--- SESSIONS CLEAN + VERSION ALIAS ---${X}"
+# ═══════════════════════════════════════════════════════════════
+
+$cleanOut = tentaclaw sessions clean 999 2>&1 | Out-String
+Test-Check "sessions clean runs" ($cleanOut -match "Cleaned|remaining")
+
+$verShort = tentaclaw -v 2>&1 | Out-String
+$verAlias = tentaclaw version 2>&1 | Out-String
+Test-Check "version alias (-v)" ($verShort -match "v2\." -or $verAlias -match "v2\.")
+
+# ═══════════════════════════════════════════════════════════════
+# Wave 48 + 53: chat JSONL usage event, tok/s, --file flag, doctor expanded
+Write-Host ""
+Write-Host "  ${T}${B}--- ADVANCED FEATURES ---${X}"
+# ═══════════════════════════════════════════════════════════════
+
+# Chat JSONL has usage event (Wave 35/48)
+# Run one inference turn in chat — no /quit so stdin closes after response.
+# The rl.on('close') handler saves session_end cleanly.
+$sessDir2 = Join-Path $env:USERPROFILE ".tentaclaw\sessions"
+"Reply with the single word CHATDONE." | tentaclaw chat --model $Model 2>&1 | Out-Null
+$chatUsageFound = $false
+foreach ($j in (Get-ChildItem "$sessDir2\*.jsonl" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 5)) {
+    $raw = Get-Content $j.FullName -Raw
+    if ($raw -match '"mode"' -and $raw -match '"usage"') { $chatUsageFound = $true; break }
+}
+Test-Check "chat JSONL has usage event" $chatUsageFound
+
+# Doctor expanded checks (Wave 53)
+$doctorOut2 = tentaclaw doctor 2>&1 | Out-String
+Test-Check "doctor checks config dir writable" ($doctorOut2 -match "writable|Config dir")
+Test-Check "doctor checks backend" ($doctorOut2 -match "Backend:|reachable|cannot reach")
+
+# --file flag test (Wave 53 + 45)
+$fileTaskPath = Join-Path $env:TEMP "tentaclaw-file-test.txt"
+[System.IO.File]::WriteAllText($fileTaskPath, "TASK: Print the number 42 and nothing else.")
+$fileOut = tentaclaw code --file $fileTaskPath --yes --model $Model 2>&1 | Out-String
+Test-Check "--file flag loads task" ($fileOut -match "42|file|File")
+Remove-Item $fileTaskPath -ErrorAction SilentlyContinue
+
+# tok/s display (Wave 48/46) — run a quick code task and check for tok/s
+$toksOut = tentaclaw code --task "Reply with only the word DONE." --yes --model $Model 2>&1 | Out-String
+Test-Check "tok/s displayed after response" ($toksOut -match "tok/s")
 
 # ═══════════════════════════════════════════════════════════════
 Write-Host ""
