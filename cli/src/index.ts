@@ -4342,10 +4342,9 @@ RULES:
                 if (dropped451 > 0) {
                     messages.length = 0;
                     messages.push(systemMsg);
-                    messages.push({
-                        role: 'user',
-                        content: `[Context trimmed: ${dropped451} earlier messages removed to stay within context window. Continue from current state.]`,
-                    });
+                    if (messages[0] && messages[0].role === 'system') {
+                        messages[0].content += '\n\n[Note: Earlier conversation was trimmed to fit context window.]';
+                    }
                     messages.push(...safeTail451);
                     if (!printMode) console.log('  ' + C.dim(`\u26A1 Context trimmed (kept last ${safeTail451.length} messages)`));
                 }
@@ -5140,7 +5139,7 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
             // Loop continues — model will respond to tool results
         }
 
-        if (!printMode) console.log('  ' + C.yellow('\u26A0 Reached maximum iterations.'));
+        if (!printMode) console.log('\n' + C.yellow('  \u26A0 Reached maximum iterations (20). Session saved.'));
     };
 
     // Non-interactive mode: --task "..." runs once and exits
