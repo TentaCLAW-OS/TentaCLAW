@@ -712,10 +712,10 @@ routes.post('/api/v1/bulk/command', async (c) => {
         targetNodes = getAllNodes().filter(n => n.status === 'online').map(n => n.id);
     }
 
-    const results: Array<{ node_id: string; status: string }> = [];
+    const results: Array<{ node_id: string; status: string; error?: string }> = [];
     for (const nodeId of targetNodes) {
         try { queueCommand(nodeId, body.action as any, body.payload); results.push({ node_id: nodeId, status: 'queued' }); }
-        catch { results.push({ node_id: nodeId, status: 'error' }); }
+        catch (e) { results.push({ node_id: nodeId, status: 'error', error: e instanceof Error ? e.message : 'unknown' }); }
     }
 
     broadcastSSE('bulk_command', { action: body.action, count: results.length });
