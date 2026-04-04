@@ -12747,7 +12747,14 @@ ${projectType}
             break;
         }
 
-case 'capacity':            await cmdCapacity(gateway);            break;        case 'suggestions':        case 'suggest':            await cmdSuggestions(gateway);            break;        case 'gpu-map':        case 'gpus':            await cmdGpuMap(gateway);            break;
+        case 'suggestions':
+        case 'suggest':
+            await cmdSuggestions(gateway);
+            break;
+        case 'gpu-map':
+        case 'gpus':
+            await cmdGpuMap(gateway);
+            break;
         case 'groups': {
             const groups = await apiGet(gateway, '/api/v1/node-groups') as Array<{ id: string; name: string; member_count: number }>;
             console.log('');
@@ -12760,24 +12767,6 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                     console.log('  ' + C.white(g.name) + C.dim(' (' + g.member_count + ' nodes) ID: ' + g.id));
                 }
             }
-            console.log('');
-            break;
-        }
-
-        case 'capacity': {
-            const cap = await apiGet(gateway, '/api/v1/capacity') as Record<string, number>;
-            console.log('');
-            console.log('  ' + C.teal(C.bold('CLUSTER CAPACITY')));
-            console.log('');
-            console.log('  ' + padRight(C.dim('Nodes'), 20) + C.white(String(cap.total_nodes || 0)));
-            console.log('  ' + padRight(C.dim('GPUs'), 20) + C.white(String(cap.total_gpus || 0)));
-            console.log('  ' + padRight(C.dim('Total VRAM'), 20) + C.teal(Math.round((cap.total_vram_mb || 0) / 1024) + ' GB'));
-            console.log('  ' + padRight(C.dim('Used VRAM'), 20) + C.yellow(Math.round((cap.used_vram_mb || 0) / 1024) + ' GB'));
-            console.log('  ' + padRight(C.dim('Free VRAM'), 20) + C.green(Math.round((cap.free_vram_mb || 0) / 1024) + ' GB'));
-            console.log('  ' + padRight(C.dim('Utilization'), 20) + C.white((cap.utilization_pct || 0) + '%'));
-            console.log('  ' + padRight(C.dim('Models Loaded'), 20) + C.white(String(cap.loaded_models || 0)));
-            console.log('  ' + padRight(C.dim('Room for 7B models'), 20) + C.teal(String(cap.max_additional_7b || 0)));
-            console.log('  ' + padRight(C.dim('Room for 70B models'), 20) + C.teal(String(cap.max_additional_70b || 0)));
             console.log('');
             break;
         }
