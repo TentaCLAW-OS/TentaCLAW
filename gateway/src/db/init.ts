@@ -16,9 +16,13 @@ import fs from 'fs';
 const DB_PATH = process.env.TENTACLAW_DB_PATH || path.join(process.cwd(), 'data', 'tentaclaw.db');
 
 let db: Database.Database;
+let _dbInitializing = false;
 
 export function getDb(): Database.Database {
-    if (!db) {
+    if (db) return db;
+    if (_dbInitializing) throw new Error('Database initialization in progress');
+    _dbInitializing = true;
+    try {
         const dir = path.dirname(DB_PATH);
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
@@ -27,10 +31,14 @@ export function getDb(): Database.Database {
         db = new Database(DB_PATH);
         db.pragma('journal_mode = WAL');
         db.pragma('foreign_keys = ON');
+        db.pragma('busy_timeout = 10000');
+        db.pragma('synchronous = NORMAL');
         initSchema(db);
         runMigrations(db);
+        return db;
+    } finally {
+        _dbInitializing = false;
     }
-    return db;
 }
 
 function initSchema(db: Database.Database): void {
@@ -418,18 +426,6 @@ const MIGRATIONS: Migration[] = [
                     target TEXT NOT NULL,
                     created_at TEXT DEFAULT (datetime('now'))
                 );
-                CREATE TABLE IF NOT EXISTS playground_history (
-                    id TEXT PRIMARY KEY,
-                    model TEXT NOT NULL,
-                    prompt_preview TEXT,
-                    response_preview TEXT,
-                    latency_ms INTEGER,
-                    tokens_in INTEGER DEFAULT 0,
-                    tokens_out INTEGER DEFAULT 0,
-                    node_id TEXT,
-                    created_at TEXT DEFAULT (datetime('now'))
-                );
-                CREATE INDEX IF NOT EXISTS idx_playground_created ON playground_history(created_at DESC);
             `);
         },
     },
@@ -610,6 +606,13 @@ const MIGRATIONS: Migration[] = [
             `);
         },
     },
+    {
+        version: 12,
+        name: 'add_users_username_index',
+        up: (db: Database.Database) => {
+            db.exec(`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`);
+        },
+    },
 ];
 
 /**
@@ -677,6 +680,22 @@ export function pruneOldStats(days: number): number {
     const result = d.prepare('DELETE FROM stats WHERE timestamp < ?').run(cutoff);
     return result.changes;
 }
+
+// =============================================================================
+// Graceful Shutdown
+// =============================================================================
+
+function closeDb(): void {
+    if (db) {
+        try {
+            db.pragma('wal_checkpoint(TRUNCATE)');
+            db.close();
+        } catch { /* already closed */ }
+        db = null as any;
+    }
+}
+process.on('SIGTERM', closeDb);
+process.on('SIGINT', closeDb);
 
 /** Re-export DB_PATH for modules that need it (e.g., auth writing password files). */
 export const dbPath = DB_PATH;
