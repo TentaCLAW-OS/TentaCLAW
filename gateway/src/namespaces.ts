@@ -356,11 +356,12 @@ export function getQuotaUsage(namespaceName: string): QuotaUsageReport | null {
     `).get(namespaceName) as { total_gpus: number };
 
     // Total VRAM from stats of nodes in namespace (latest per node)
+    // Use ram_used_mb column as a proxy — actual GPU VRAM requires JSON array iteration
+    // which SQLite can't do natively. The routing layer uses JS for accurate VRAM.
     const vramRow = d.prepare(`
-        SELECT COALESCE(SUM(vram_used), 0) as total_vram_mb
+        SELECT COALESCE(SUM(ram_used_mb), 0) as total_vram_mb
         FROM (
-            SELECT s.node_id,
-                   COALESCE(json_extract(s.payload, '$.gpus[0].vram_used_mb'), 0) as vram_used
+            SELECT s.node_id, s.ram_used_mb
             FROM stats s
             JOIN nodes n ON n.id = s.node_id
             WHERE n.namespace = ?
