@@ -122,6 +122,12 @@ routes.post('/api/v1/nodes/:nodeId/stats', async (c) => {
     if (!stats.inference || typeof stats.inference !== 'object') {
         stats.inference = { loaded_models: [], in_flight_requests: 0, tokens_generated: 0, avg_latency_ms: 0 };
     }
+    // Fallback: copy top-level models_loaded into inference.loaded_models if inference was empty
+    // Some older agents or manual API calls use models_loaded at the top level
+    const topLevelModels = (stats as any).models_loaded;
+    if (stats.inference.loaded_models.length === 0 && Array.isArray(topLevelModels) && topLevelModels.length > 0) {
+        stats.inference.loaded_models = topLevelModels;
+    }
 
     // Validate numeric fields — prevent NaN/Infinity from entering the DB
     if (!Number.isFinite(stats.toks_per_sec) || stats.toks_per_sec < 0) stats.toks_per_sec = 0;
@@ -176,6 +182,11 @@ routes.post('/api/v1/nodes/:nodeId/stats', async (c) => {
     });
 
     const commands = getPendingCommands(nodeId);
+
+    // Mark commands as sent so they aren't re-delivered on next heartbeat
+    for (const cmd of commands) {
+        ackCommand(cmd.id);
+    }
 
     if (commands.length > 0) {
         broadcastSSE('command_sent', {
