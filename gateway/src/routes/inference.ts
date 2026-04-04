@@ -681,7 +681,7 @@ routes.post('/v1/messages', async (c) => {
                     const messageDelta = {
                         type: 'message_delta',
                         delta: { stop_reason: 'end_turn', stop_sequence: null },
-                        usage: { output_tokens: outputTokens },
+                        usage: { input_tokens: inputTokens, output_tokens: outputTokens },
                     };
                     controller.enqueue(encoder.encode('event: message_delta\ndata: ' + JSON.stringify(messageDelta) + '\n\n'));
 
