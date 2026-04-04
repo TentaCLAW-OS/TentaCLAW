@@ -671,10 +671,18 @@ routes.post('/v1/messages', async (c) => {
                                         inputTokens = chunk.usage.prompt_tokens || inputTokens;
                                         outputTokens = chunk.usage.completion_tokens || outputTokens;
                                     }
-                                } catch {}
+                                } catch (parseErr) {
+                                    if (process.env.NODE_ENV !== 'production') {
+                                        console.warn('[inference] Malformed streaming chunk:', data?.slice(0, 100));
+                                    }
+                                }
                             }
                         }
-                    } catch {}
+                    } catch (streamErr) {
+                        if (process.env.NODE_ENV !== 'production') {
+                            console.warn('[inference] Streaming read error:', streamErr instanceof Error ? streamErr.message : String(streamErr));
+                        }
+                    }
 
                     controller.enqueue(encoder.encode('event: content_block_stop\ndata: ' + JSON.stringify({ type: 'content_block_stop', index: 0 }) + '\n\n'));
 
@@ -804,7 +812,10 @@ routes.post('/v1/embeddings', async (c) => {
                         });
                     }
                 }
-            } catch {
+            } catch (batchErr) {
+                if (process.env.NODE_ENV !== 'production') {
+                    console.warn('[inference] Embedding batch failed:', batchErr instanceof Error ? batchErr.message : String(batchErr));
+                }
                 for (let j = 0; j < batch.length; j++) {
                     allEmbeddings.push({
                         object: 'embedding',
