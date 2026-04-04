@@ -1976,14 +1976,18 @@ async function flushOfflineQueue(config: AgentConfig): Promise<void> {
     // Send in batches of 10
     while (recovery.offlineQueue.length > 0) {
         const batch = recovery.offlineQueue.splice(0, 10);
+        const failed: typeof batch = [];
         for (const item of batch) {
             try {
                 await pushStats(config, item.stats);
             } catch {
-                // Re-queue failed items
-                recovery.offlineQueue.unshift(...batch.filter(b => b !== item));
-                return;
+                failed.push(item);
             }
+        }
+        if (failed.length > 0) {
+            recovery.offlineQueue.unshift(...failed);
+            console.log(`[recovery] ${failed.length} items failed, will retry next cycle`);
+            return;
         }
     }
     console.log(`[recovery] Flushed ${count} buffered stats`);
