@@ -47,11 +47,13 @@ export const useClusterStore = create<ClusterState>((set, get) => ({
         const idx = state.nodes.findIndex((n) => n.id === event.node_id);
         if (idx === -1) return;
         const updated = [...state.nodes];
+        // SSE stats_update only has summary fields (node_id, hostname, gpu_count, toks_per_sec)
+        // NOT the full stats payload — preserve existing latest_stats, just update status
         updated[idx] = {
           ...updated[idx],
-          latest_stats: event.stats,
           status: 'online',
           last_seen_at: new Date().toISOString(),
+          gpu_count: event.gpu_count ?? updated[idx].gpu_count,
         };
         set({ nodes: updated });
         break;
