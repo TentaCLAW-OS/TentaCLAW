@@ -2008,7 +2008,7 @@ export function _trackModelFailure(model: string): void {
         // Auto-re-pull the model
         try {
             console.log(`[recovery] Auto-re-pulling ${model}...`);
-            execSync(`ollama pull ${model.replace(/[^a-zA-Z0-9.:_-]/g, '')} 2>&1 | tail -1`, { timeout: 300_000, encoding: 'utf-8' });
+            execFileSync('ollama', ['pull', model], { timeout: 300_000, encoding: 'utf-8' });
             recovery.modelFailures.delete(model);
             console.log(`[recovery] Re-pull of ${model} complete`);
         } catch (err) {
