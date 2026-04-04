@@ -7134,7 +7134,7 @@ async function cmdNotify(gateway: string, positional: string[], flags: Record<st
             console.error(C.red('  Usage: tentaclaw notify remove <channelId>'));
             process.exit(1);
         }
-        await apiGet(gateway, ''); // dummy - need apiDelete
+        await apiDelete(gateway, `/api/v1/notifications/channels/${channelId}`);
         console.log('  ' + C.green('\u2714') + ' Channel removed');
         return;
     }
