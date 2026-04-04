@@ -207,9 +207,11 @@ routes.post('/v1/chat/completions', async (c) => {
         if (!noCache) {
             const cached = getCachedResponse(cacheKey);
             if (cached) {
-                const result = JSON.parse(cached.response);
-                result._tentaclaw = { cached: true, tokens_saved: cached.tokens_saved };
-                return c.json(result);
+                try {
+                    const result = JSON.parse(cached.response);
+                    result._tentaclaw = { cached: true, tokens_saved: cached.tokens_saved };
+                    return c.json(result);
+                } catch { /* corrupted cache entry — skip, re-fetch */ }
             }
         }
     }
@@ -492,7 +494,7 @@ function convertToAnthropicResponse(
                 type: 'tool_use',
                 id: tc.id || 'toolu_' + Math.random().toString(36).slice(2, 12),
                 name: tc.function?.name || '',
-                input: tc.function?.arguments ? JSON.parse(tc.function.arguments) : {},
+                input: tc.function?.arguments ? (() => { try { return JSON.parse(tc.function.arguments); } catch { return {}; } })() : {},
             });
         }
     }

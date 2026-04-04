@@ -74,8 +74,8 @@ routes.get('/api/v1/export', (c) => {
         version: '0.1.0',
         exported_at: new Date().toISOString(),
         nodes,
-        flight_sheets: (flightSheets as any[]).map(fs => ({ ...fs, targets: JSON.parse(fs.targets) })),
-        schedules: (schedules as any[]).map(s => ({ ...s, config: JSON.parse(s.config) })),
+        flight_sheets: (flightSheets as any[]).map(fs => { try { return { ...fs, targets: JSON.parse(fs.targets) }; } catch { return { ...fs, targets: [] }; } }),
+        schedules: (schedules as any[]).map(s => { try { return { ...s, config: JSON.parse(s.config) }; } catch { return { ...s, config: {} }; } }),
     });
 });
 
