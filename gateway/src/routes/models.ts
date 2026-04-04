@@ -332,17 +332,7 @@ routes.post('/api/v1/deploy/all', async (c) => {
     return c.json({ model: body.model, vram_estimate_mb: vramNeeded, deployed, skipped, results });
 });
 
-// Per-model rate tracking
-routes.get('/api/v1/models/:model/stats', (c) => {
-    const model = decodeURIComponent(c.req.param('model'));
-    const d = getDb();
-    const hour = d.prepare("SELECT COUNT(*) as cnt, AVG(latency_ms) as avg_lat FROM inference_log WHERE model = ? AND created_at >= datetime('now', '-1 hour')").get(model) as any || {};
-    const day = d.prepare("SELECT COUNT(*) as cnt, AVG(latency_ms) as avg_lat FROM inference_log WHERE model = ? AND created_at >= datetime('now', '-24 hours')").get(model) as any || {};
-    const nodes = d.prepare("SELECT DISTINCT node_id FROM inference_log WHERE model = ?").all(model) as any[];
-    return c.json({ model, last_hour: { requests: hour.cnt || 0, avg_latency_ms: Math.round(hour.avg_lat || 0) }, last_24h: { requests: day.cnt || 0, avg_latency_ms: Math.round(day.avg_lat || 0) }, served_by_nodes: nodes.length });
-});
-
-// Model coverage
+// Model coverage — MUST be before :model wildcard
 routes.get('/api/v1/models/coverage', (c) => {
     const models = getClusterModels();
     const onlineCount = getAllNodes().filter(n => n.status === 'online').length;
@@ -354,7 +344,7 @@ routes.get('/api/v1/models/coverage', (c) => {
     return c.json({ total_models: coverage.length, online_nodes: onlineCount, avg_coverage_pct: avgCoverage, redundant_models: coverage.filter(m => m.redundant).length, models: coverage });
 });
 
-// VRAM estimation endpoint
+// VRAM estimation endpoint — MUST be before :model wildcard
 routes.get('/api/v1/models/estimate-vram', (c) => {
     const model = c.req.query('model');
     if (!model) return c.json({ error: 'model query parameter required' }, 400);
@@ -373,7 +363,7 @@ routes.get('/api/v1/models/estimate-vram', (c) => {
     });
 });
 
-// Model recommendations based on cluster VRAM
+// Model recommendations based on cluster VRAM — MUST be before :model wildcard
 routes.get('/api/v1/models/recommend', (c) => {
     const vramParam = c.req.query('vram_mb');
     let availableVram: number;
@@ -381,7 +371,7 @@ routes.get('/api/v1/models/recommend', (c) => {
         availableVram = parseInt(vramParam);
     } else {
         const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
-        if (nodes.length === 0) return c.json([]);
+        if (nodes.length === 0) return c.json({ recommendations: [], available_vram_mb: 0, message: 'No nodes online' });
         // Use the largest single-node VRAM as the budget
         availableVram = Math.max(...nodes.map(n => {
             const stats = n.latest_stats!;
@@ -400,7 +390,18 @@ routes.get('/api/v1/models/recommend', (c) => {
         { model: 'deepseek-coder-v2:16b', quantization: 'Q4_K_M', vram_required_mb: 10240, use_case: 'code', description: 'DeepSeek Coder V2 — advanced coding' },
         { model: 'llama3.1:70b', quantization: 'Q4_K_M', vram_required_mb: 41984, use_case: 'production', description: 'Meta Llama 3.1 70B — production quality' },
     ];
-    return c.json(catalog.filter(m => m.vram_required_mb <= availableVram));
+    const recommendations = catalog.filter(m => m.vram_required_mb <= availableVram);
+    return c.json({ recommendations, available_vram_mb: availableVram, count: recommendations.length });
+});
+
+// Per-model rate tracking — wildcard MUST come after specific /models/* routes
+routes.get('/api/v1/models/:model/stats', (c) => {
+    const model = decodeURIComponent(c.req.param('model'));
+    const d = getDb();
+    const hour = d.prepare("SELECT COUNT(*) as cnt, AVG(latency_ms) as avg_lat FROM inference_log WHERE model = ? AND created_at >= datetime('now', '-1 hour')").get(model) as any || {};
+    const day = d.prepare("SELECT COUNT(*) as cnt, AVG(latency_ms) as avg_lat FROM inference_log WHERE model = ? AND created_at >= datetime('now', '-24 hours')").get(model) as any || {};
+    const nodes = d.prepare("SELECT DISTINCT node_id FROM inference_log WHERE model = ?").all(model) as any[];
+    return c.json({ model, last_hour: { requests: hour.cnt || 0, avg_latency_ms: Math.round(hour.avg_lat || 0) }, last_24h: { requests: day.cnt || 0, avg_latency_ms: Math.round(day.avg_lat || 0) }, served_by_nodes: nodes.length });
 });
 
 export default routes;

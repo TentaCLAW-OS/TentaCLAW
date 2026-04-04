@@ -12785,7 +12785,8 @@ case 'capacity':            await cmdCapacity(gateway);            break;       
                 break;
             }
             const recUrl = vram ? `/api/v1/models/recommend?vram_mb=${vram}` : '/api/v1/models/recommend';
-            const recs = await apiGet(gateway, recUrl) as Array<{ model: string; quantization: string; vram_required_mb: number; use_case: string; description: string }>;
+            const recResp = await apiGet(gateway, recUrl) as { recommendations: Array<{ model: string; quantization: string; vram_required_mb: number; use_case: string; description: string }>; available_vram_mb: number; count: number } | Array<any>;
+            const recs = Array.isArray(recResp) ? recResp : recResp.recommendations;
             console.log('');
             console.log('  ' + C.teal(C.bold('RECOMMENDED MODELS')) + (vram ? C.dim(` (for ${vram} MB VRAM)`) : C.dim(' (for your cluster)')));
             console.log('');
