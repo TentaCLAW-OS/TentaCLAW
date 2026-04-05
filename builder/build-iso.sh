@@ -243,6 +243,9 @@ install_packages() {
     # Copy DNS config
     cp /etc/resolv.conf "$ROOTFS/etc/resolv.conf" 2>/dev/null || true
 
+    # Add universe repo for full package availability
+    chroot "$ROOTFS" bash -c 'echo "deb http://archive.ubuntu.com/ubuntu noble main universe" > /etc/apt/sources.list'
+
     # Update package lists
     chroot "$ROOTFS" apt-get update -qq
 
@@ -273,12 +276,7 @@ install_packages() {
 
         # Boot
         linux-image-generic
-        linux-modules-extra-generic    # Broadcom, Mellanox, Intel server NIC drivers
         initramfs-tools
-
-        # Live boot support
-        casper
-        squashfs-tools
 
         # SSH
         openssh-server
@@ -290,13 +288,8 @@ install_packages() {
         dmidecode
         smartmontools
         nvme-cli
-        ipmitool                       # IPMI/BMC for server management
-        freeipmi-tools
-
         # Security hardening
         ufw
-        fail2ban
-        unattended-upgrades
         apparmor
         apparmor-utils
 
@@ -852,14 +845,12 @@ EOF
         -as mkisofs \
         -r \
         -J \
-        -joliet-level 3 \
-        -isohybrid-mbr /usr/lib/syslinux/bios/mbr.bin \
-        -partition_offset 16 \
+        -joliet-long \
         -V "TENTACLAW" \
         -appid "TentaCLAW OS" \
         -publisher "TentaCLAW Project" \
         -p "built by build-iso.sh" \
-        -preparerer "TentaCLAW" \
+        -preparer "TentaCLAW" \
         -o "$OUTPUT_FILE" \
         "$ISO_ROOT" \
         2>&1 | while read -r line; do
