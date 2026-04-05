@@ -2132,7 +2132,7 @@ function checkMemoryLeak(): void {
         const last10 = recovery.rssHistory.slice(-10).reduce((a, b) => a + b, 0) / 10;
         const growthPct = ((last10 - first10) / first10) * 100;
 
-        if (growthPct > 50) {
+        if (growthPct > 200) {
             console.log(`[recovery] Memory leak suspected: RSS grew ${growthPct.toFixed(0)}% over 10 min (${Math.round(first10 / 1048576)}MB → ${Math.round(last10 / 1048576)}MB)`);
             // Force GC if available
             if (global.gc) {
