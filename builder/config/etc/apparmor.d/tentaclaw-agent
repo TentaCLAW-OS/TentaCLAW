@@ -1,0 +1,55 @@
+# TentaCLAW Agent — AppArmor Profile
+# Restricts the agent to only what it needs
+
+#include <tunables/global>
+
+/opt/tentaclaw/agent/dist/agent/src/index.js {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+  #include <abstractions/ssl_certs>
+
+  # Node.js runtime
+  /usr/bin/node ix,
+  /usr/local/bin/node ix,
+
+  # Agent code and dependencies
+  /opt/tentaclaw/** r,
+  /opt/tentaclaw/agent/** r,
+  /opt/tentaclaw/agent/node_modules/** r,
+
+  # Config
+  /etc/tentaclaw/** r,
+
+  # Runtime state
+  /var/run/tentaclaw/** rw,
+  /var/log/tentaclaw/** rw,
+  /var/lib/tentaclaw/** rw,
+
+  # System info (read-only)
+  /sys/class/drm/** r,
+  /sys/class/hwmon/** r,
+  /sys/devices/** r,
+  /proc/stat r,
+  /proc/meminfo r,
+  /proc/cpuinfo r,
+  /proc/uptime r,
+  /proc/loadavg r,
+  /proc/version r,
+  /proc/sys/kernel/hostname r,
+
+  # GPU tools
+  /usr/bin/nvidia-smi ix,
+  /usr/bin/rocm-smi ix,
+  /usr/local/bin/ollama ix,
+
+  # Network (agent needs to talk to gateway)
+  network inet stream,
+  network inet dgram,
+  network inet6 stream,
+  network inet6 dgram,
+
+  # Deny dangerous operations
+  deny /boot/** w,
+  deny /etc/shadow r,
+  deny /etc/gshadow r,
+}

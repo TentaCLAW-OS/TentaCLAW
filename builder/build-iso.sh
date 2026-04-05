@@ -169,7 +169,7 @@ check_deps() {
             if ! command -v qemu-aarch64-static &>/dev/null; then
                 missing+=("qemu-aarch64-static")
             fi
-        done
+        fi
     else
         local tools="debootstrap xorriso xz gzip tar"
         for tool in $tools; do
@@ -257,25 +257,48 @@ install_packages() {
         jq
         vim-tiny
         gnupg
+        ca-certificates
+        locales
+        tzdata
 
-        # Network
+        # Network — works on any hardware (server NICs, USB ethernet, WiFi)
         network-manager
         net-tools
         iputils-ping
         dnsutils
         iproute2
+        wpasupplicant
+        wireless-tools
+        ethtool
 
         # Boot
         linux-image-generic
+        linux-modules-extra-generic    # Broadcom, Mellanox, Intel server NIC drivers
         initramfs-tools
+
+        # Live boot support
+        casper
+        squashfs-tools
 
         # SSH
         openssh-server
 
-        # Hardware
+        # Hardware detection — works on any hardware
         pciutils
         usbutils
         lshw
+        dmidecode
+        smartmontools
+        nvme-cli
+        ipmitool                       # IPMI/BMC for server management
+        freeipmi-tools
+
+        # Security hardening
+        ufw
+        fail2ban
+        unattended-upgrades
+        apparmor
+        apparmor-utils
 
         # Misc
         dbus
@@ -309,17 +332,29 @@ install_gpu_drivers() {
     mount -t sysfs sys "$ROOTFS/sys"
     mount --bind /dev "$ROOTFS/dev" 2>/dev/null || mount -t devpts devpts "$ROOTFS/dev/pts"
 
-    # NVIDIA driver (will be installed on first boot if not here)
-    # For ISO, we include the driver metapackage
-    log "Installing NVIDIA driver (will complete on first boot with GPU)..."
+    # NVIDIA driver — use 550 series for Ubuntu 24.04 (Noble) compatibility
+    log "Installing NVIDIA driver 550 (will complete on first boot with GPU)..."
     chroot "$ROOTFS" apt-get install -y -qq \
-        nvidia-driver-535 \
-        nvidia-dkms-535 \
-        nvidia-utils-535 \
-        2>&1 | tail -3 || log_warn "NVIDIA driver install failed (expected in chroot)"
+        nvidia-driver-550 \
+        nvidia-dkms-550 \
+        nvidia-utils-550 \
+        nvidia-cuda-toolkit \
+        2>&1 | tail -3 || log_warn "NVIDIA driver install failed (expected in chroot — will install on first boot)"
 
-    # AMD ROCm (optional)
-    log "AMD ROCm will be installed on first boot if AMD GPU detected"
+    # AMD ROCm — add repository for first-boot install
+    log "Adding AMD ROCm repository..."
+    chroot "$ROOTFS" bash -c '
+        mkdir -p /etc/apt/keyrings
+        wget -qO - https://repo.radeon.com/rocm/rocm.gpg.key | gpg --dearmor -o /etc/apt/keyrings/rocm.gpg 2>/dev/null || true
+        echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.gpg] https://repo.radeon.com/rocm/apt/6.3 noble main" > /etc/apt/sources.list.d/rocm.list 2>/dev/null || true
+    ' 2>&1 | tail -3 || log_warn "ROCm repo setup failed (will configure on first boot)"
+
+    # Intel Arc GPU — Level Zero runtime
+    log "Adding Intel GPU packages..."
+    chroot "$ROOTFS" apt-get install -y -qq \
+        intel-opencl-icd \
+        intel-level-zero-gpu \
+        2>&1 | tail -3 || log_warn "Intel GPU packages not available (will install on first boot if Intel Arc detected)"
 
     # Cleanup
     umount "$ROOTFS/proc" 2>/dev/null || true
@@ -653,19 +688,44 @@ create_bootloader() {
 
     cat > "$ISO_ROOT/boot/grub/grub.cfg" << 'GRUBEOF'
 # TentaCLAW OS — GRUB Configuration
-set timeout=5
+set timeout=10
 set default=0
 
-menuentry "TentaCLAW OS" {
-    echo "Loading TentaCLAW OS..."
-    linux /boot/vmlinuz tentaclaw.mode=iso ip=dhcp quiet
-    initrd /boot/initrd.img
+insmod all_video
+insmod gfxterm
+
+menuentry "TentaCLAW OS — Live (Try without installing)" {
+    echo "Loading TentaCLAW OS live session..."
+    linux /casper/vmlinuz boot=casper tentaclaw.mode=live ip=dhcp quiet splash
+    initrd /casper/initrd
 }
 
-menuentry "TentaCLAW OS (debug)" {
-    echo "Loading TentaCLAW OS (debug mode)..."
-    linux /boot/vmlinuz tentaclaw.mode=iso ip=dhcp debug tentaclaw.init=sh
-    initrd /boot/initrd.img
+menuentry "TentaCLAW OS — Install to Disk" {
+    echo "Loading TentaCLAW OS installer..."
+    linux /casper/vmlinuz boot=casper tentaclaw.mode=install ip=dhcp quiet
+    initrd /casper/initrd
+}
+
+menuentry "TentaCLAW OS — Live (copy to RAM, remove USB)" {
+    echo "Loading TentaCLAW OS into RAM..."
+    linux /casper/vmlinuz boot=casper toram tentaclaw.mode=live ip=dhcp quiet
+    initrd /casper/initrd
+}
+
+menuentry "TentaCLAW OS — Safe Graphics (no GPU drivers)" {
+    echo "Loading with safe graphics..."
+    linux /casper/vmlinuz boot=casper tentaclaw.mode=live ip=dhcp nomodeset quiet
+    initrd /casper/initrd
+}
+
+menuentry "TentaCLAW OS — Debug Shell" {
+    echo "Loading debug shell..."
+    linux /casper/vmlinuz boot=casper tentaclaw.mode=live ip=dhcp debug systemd.unit=multi-user.target
+    initrd /casper/initrd
+}
+
+menuentry "Boot from first hard disk" {
+    chainloader (hd0)+1
 }
 GRUBEOF
 
@@ -699,14 +759,18 @@ EFIDUMMY
 
     # Create EFI config
     cat > "$ISO_ROOT/EFI/BOOT/grub.cfg" << 'EOF'
-set timeout=5
+set timeout=10
 search --label TENTACLAW
 set default=0
 
-menuentry "TentaCLAW OS" {
-    echo "Loading TentaCLAW OS..."
-    linux /boot/vmlinuz tentaclaw.mode=iso ip=dhcp quiet
-    initrd /boot/initrd.img
+menuentry "TentaCLAW OS — Live" {
+    linux /casper/vmlinuz boot=casper tentaclaw.mode=live ip=dhcp quiet splash
+    initrd /casper/initrd
+}
+
+menuentry "TentaCLAW OS — Install" {
+    linux /casper/vmlinuz boot=casper tentaclaw.mode=install ip=dhcp quiet
+    initrd /casper/initrd
 }
 EOF
 
@@ -726,6 +790,37 @@ EOF
 # Create ISO9660 Filesystem
 # =============================================================================
 
+create_squashfs() {
+    log_step "Creating SquashFS live filesystem"
+
+    # Create casper directory for live boot
+    mkdir -p "$ISO_ROOT/casper"
+
+    # Compress rootfs to squashfs
+    log "Compressing rootfs to squashfs (this takes a while)..."
+    mksquashfs "$ROOTFS" "$ISO_ROOT/casper/filesystem.squashfs" \
+        -comp xz -b 1M -Xdict-size 100% \
+        -no-recovery -processors "$(nproc)" \
+        2>&1 | tail -3
+
+    # Create filesystem manifest (for installer)
+    chroot "$ROOTFS" dpkg-query -W --showformat='${Package} ${Version}\n' \
+        > "$ISO_ROOT/casper/filesystem.manifest" 2>/dev/null || true
+
+    # Record size
+    du -sx --block-size=1 "$ROOTFS" | cut -f1 > "$ISO_ROOT/casper/filesystem.size" 2>/dev/null || echo "0" > "$ISO_ROOT/casper/filesystem.size"
+
+    # Copy kernel + initrd for casper live boot
+    local kver
+    kver=$(ls "$ROOTFS/boot/" | grep "vmlinuz-" | head -1 | sed 's/vmlinuz-//')
+    if [ -n "$kver" ]; then
+        cp "$ROOTFS/boot/vmlinuz-${kver}" "$ISO_ROOT/casper/vmlinuz"
+        cp "$ROOTFS/boot/initrd.img-${kver}" "$ISO_ROOT/casper/initrd" 2>/dev/null || true
+    fi
+
+    log_success "SquashFS created ($(du -sh "$ISO_ROOT/casper/filesystem.squashfs" 2>/dev/null | cut -f1))"
+}
+
 create_iso() {
     log_step "Creating ISO9660 filesystem"
 
@@ -734,8 +829,9 @@ create_iso() {
 
     # Create disk info
     echo "TentaCLAW OS ${VERSION}" > "$ISO_ROOT/.disk/info"
-    echo "amd64" > "$ISO_ROOT/.disk/arch"
+    echo "$ARCH" > "$ISO_ROOT/.disk/arch"
     touch "$ISO_ROOT/.disk/base_installable"
+    touch "$ISO_ROOT/.disk/casper-uuid-generic"
 
     # Create isolinux for BIOS boot
     mkdir -p "$ISO_ROOT/isolinux"
@@ -845,6 +941,7 @@ main() {
     fi
 
     install_scripts
+    create_squashfs
     create_initrd
     install_kernel
     create_bootloader
