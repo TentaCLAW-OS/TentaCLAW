@@ -1,0 +1,1857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation — TentaCLAW OS</title>
+  <meta name="description" content="TentaCLAW OS documentation. Installation, configuration, API reference, CLI commands, agent setup, and troubleshooting.">
+  <meta name="theme-color" content="#060910">
+  <meta property="og:title" content="Documentation — TentaCLAW OS">
+  <meta property="og:description" content="Complete documentation for TentaCLAW OS — the open-source operating system for AI inference.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.tentaclaw.io/docs">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       TentaCLAW OS — Documentation Page Styles
+       ============================================================ */
+
+    :root {
+      --bg:        #060910;
+      --bg-raised: #0a0f18;
+      --surface:   #0e1520;
+      --panel:     #121a28;
+      --border:    rgba(0,255,255,0.10);
+      --border-dim:rgba(255,255,255,0.06);
+      --border-hover:rgba(0,255,255,0.25);
+      --cyan:      #00ffff;
+      --cyan-glow: rgba(0,255,255,0.25);
+      --cyan-dim:  rgba(0,255,255,0.06);
+      --purple:    #8c00c8;
+      --purple-light:#a855f7;
+      --purple-glow:rgba(140,0,200,0.20);
+      --purple-dim:rgba(140,0,200,0.08);
+      --teal:      #008c8c;
+      --teal-bright:#00d4aa;
+      --green:     #00ff88;
+      --amber:     #f59e0b;
+      --red:       #ef4444;
+      --text:      #e8edf5;
+      --text-secondary:#94a3b8;
+      --dim:       #5a6a82;
+      --muted:     #3a4a5f;
+      --sidebar-w: 280px;
+    }
+
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior:smooth; font-size:16px; scroll-padding-top:80px; }
+    body {
+      font-family:'Inter',system-ui,-apple-system,sans-serif;
+      background:var(--bg); color:var(--text);
+      overflow-x:hidden; -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale; line-height:1.7;
+    }
+    h1,h2,h3,h4,h5,h6 { font-family:'Space Grotesk',sans-serif; line-height:1.2; }
+    ::selection { background:var(--purple); color:#fff; }
+    a { color:var(--cyan); text-decoration:none; transition:color 0.2s ease; }
+    a:hover { color:#fff; }
+
+    /* --- Grid Overlay --- */
+    .grid-overlay {
+      position:fixed; inset:0; z-index:0; pointer-events:none;
+      background-image:
+        linear-gradient(rgba(0,255,255,0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,255,0.018) 1px, transparent 1px);
+      background-size:64px 64px;
+      mask-image:radial-gradient(ellipse 80% 60% at 50% 20%, black 0%, transparent 70%);
+      -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 20%, black 0%, transparent 70%);
+    }
+
+    .glow-orb {
+      position:fixed; border-radius:50%; pointer-events:none; z-index:0;
+      filter:blur(120px); opacity:0.35;
+    }
+    .glow-orb.cyan  { width:600px; height:600px; background:var(--cyan); top:-200px; right:-100px; opacity:0.08; }
+    .glow-orb.purple { width:500px; height:500px; background:var(--purple); bottom:10%; left:-150px; opacity:0.07; }
+
+    /* ============================================================
+       NAVIGATION
+       ============================================================ */
+    nav {
+      position:fixed; top:0; left:0; right:0; z-index:1000;
+      padding:16px 0;
+      background:rgba(6,9,16,0.75);
+      backdrop-filter:blur(20px) saturate(1.4);
+      -webkit-backdrop-filter:blur(20px) saturate(1.4);
+      border-bottom:1px solid var(--border-dim);
+      transition:background 0.3s, padding 0.3s;
+    }
+    nav.scrolled { padding:10px 0; background:rgba(6,9,16,0.92); }
+    .nav-inner {
+      max-width:1400px; margin:0 auto; padding:0 24px;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .nav-logo {
+      display:flex; align-items:center; gap:10px;
+      font-family:'Space Grotesk',sans-serif; font-size:20px;
+      font-weight:700; color:var(--text); text-decoration:none;
+    }
+    .nav-logo .logo-icon { width:32px; height:32px; display:flex; align-items:center; justify-content:center; }
+    .nav-logo .logo-icon svg { width:32px; height:32px; }
+    .nav-logo .accent { color:var(--cyan); }
+    .nav-links { display:flex; align-items:center; gap:32px; list-style:none; }
+    .nav-links a {
+      color:var(--dim); font-size:14px; font-weight:500; transition:color 0.2s;
+    }
+    .nav-links a:hover { color:var(--text); }
+    .nav-links a.active { color:var(--cyan); }
+    .nav-cta {
+      padding:8px 20px; border-radius:8px; font-size:13px; font-weight:600;
+      background:rgba(0,255,255,0.08); border:1px solid rgba(0,255,255,0.2);
+      color:var(--cyan); transition:all 0.25s;
+    }
+    .nav-cta:hover {
+      background:rgba(0,255,255,0.15); border-color:var(--cyan);
+      color:var(--cyan); box-shadow:0 0 20px rgba(0,255,255,0.1);
+    }
+    .nav-hamburger {
+      display:none; background:none; border:none; cursor:pointer;
+      padding:4px; color:var(--dim);
+    }
+    .nav-hamburger svg { width:24px; height:24px; }
+
+    /* ============================================================
+       DOCS LAYOUT
+       ============================================================ */
+    .docs-layout {
+      display:flex; min-height:100vh; padding-top:64px;
+      position:relative; z-index:1;
+    }
+
+    /* --- Sidebar --- */
+    .docs-sidebar {
+      position:fixed; top:64px; left:0; bottom:0;
+      width:var(--sidebar-w); padding:24px 0;
+      background:rgba(10,15,24,0.85);
+      backdrop-filter:blur(16px);
+      border-right:1px solid var(--border-dim);
+      overflow-y:auto; z-index:100;
+      scrollbar-width:thin;
+      scrollbar-color:var(--muted) transparent;
+    }
+    .docs-sidebar::-webkit-scrollbar { width:4px; }
+    .docs-sidebar::-webkit-scrollbar-track { background:transparent; }
+    .docs-sidebar::-webkit-scrollbar-thumb { background:var(--muted); border-radius:4px; }
+
+    .sidebar-section { margin-bottom:8px; }
+    .sidebar-section-title {
+      display:block; padding:8px 24px; font-size:11px; font-weight:700;
+      text-transform:uppercase; letter-spacing:0.1em; color:var(--dim);
+      font-family:'Space Grotesk',sans-serif;
+    }
+    .sidebar-link {
+      display:block; padding:6px 24px 6px 28px; font-size:13.5px;
+      color:var(--text-secondary); transition:all 0.15s; border-left:2px solid transparent;
+    }
+    .sidebar-link:hover {
+      color:var(--text); background:rgba(0,255,255,0.03);
+      border-left-color:rgba(0,255,255,0.3);
+    }
+    .sidebar-link.active {
+      color:var(--cyan); background:rgba(0,255,255,0.05);
+      border-left-color:var(--cyan);
+    }
+
+    /* Sidebar mobile toggle */
+    .sidebar-toggle {
+      display:none; position:fixed; bottom:24px; right:24px;
+      z-index:1001; width:48px; height:48px; border-radius:12px;
+      background:var(--panel); border:1px solid var(--border);
+      color:var(--cyan); cursor:pointer; align-items:center;
+      justify-content:center;
+      box-shadow:0 4px 24px rgba(0,0,0,0.4);
+    }
+    .sidebar-toggle svg { width:20px; height:20px; }
+
+    /* --- Content --- */
+    .docs-content {
+      margin-left:var(--sidebar-w); flex:1; min-width:0;
+      padding:40px 48px 80px; max-width:900px;
+    }
+
+    /* ============================================================
+       CONTENT TYPOGRAPHY
+       ============================================================ */
+    .doc-section { margin-bottom:64px; }
+    .doc-section h1 {
+      font-size:2rem; font-weight:800; margin-bottom:8px;
+      letter-spacing:-1px;
+      background:linear-gradient(135deg, var(--cyan) 0%, var(--teal-bright) 50%, var(--purple-light) 100%);
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      background-clip:text;
+    }
+    .doc-section h2 {
+      font-size:1.5rem; font-weight:700; margin:48px 0 16px;
+      padding-bottom:8px; border-bottom:1px solid var(--border-dim);
+      color:var(--text); letter-spacing:-0.5px;
+    }
+    .doc-section h2 .anchor {
+      color:var(--muted); font-weight:400; margin-left:8px;
+      opacity:0; transition:opacity 0.2s; font-size:0.8em;
+    }
+    .doc-section h2:hover .anchor { opacity:1; }
+    .doc-section h3 {
+      font-size:1.15rem; font-weight:600; margin:32px 0 12px;
+      color:var(--text);
+    }
+    .doc-section h4 {
+      font-size:0.95rem; font-weight:600; margin:24px 0 8px;
+      color:var(--text-secondary);
+    }
+    .doc-section p {
+      margin-bottom:16px; color:var(--text-secondary); line-height:1.8;
+    }
+    .doc-section ul, .doc-section ol {
+      margin:0 0 16px 20px; color:var(--text-secondary);
+    }
+    .doc-section li { margin-bottom:6px; line-height:1.7; }
+    .doc-section strong { color:var(--text); font-weight:600; }
+
+    /* Inline code */
+    .doc-section code {
+      font-family:'JetBrains Mono',monospace; font-size:0.85em;
+      background:rgba(0,255,255,0.06); border:1px solid rgba(0,255,255,0.1);
+      padding:2px 7px; border-radius:4px; color:var(--cyan);
+      white-space:nowrap;
+    }
+
+    /* Code blocks */
+    .code-block {
+      position:relative; margin:16px 0 24px;
+      background:var(--bg-raised); border:1px solid var(--border-dim);
+      border-radius:12px; overflow:hidden;
+    }
+    .code-block-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 16px; background:rgba(255,255,255,0.02);
+      border-bottom:1px solid var(--border-dim);
+    }
+    .code-block-lang {
+      font-family:'JetBrains Mono',monospace; font-size:11px;
+      color:var(--dim); text-transform:uppercase; letter-spacing:0.05em;
+    }
+    .code-copy-btn {
+      background:none; border:1px solid var(--border-dim);
+      color:var(--dim); cursor:pointer; padding:4px 10px;
+      border-radius:6px; font-size:11px; font-family:'Inter',sans-serif;
+      transition:all 0.2s; display:flex; align-items:center; gap:4px;
+    }
+    .code-copy-btn:hover {
+      color:var(--cyan); border-color:var(--border-hover);
+      background:rgba(0,255,255,0.04);
+    }
+    .code-copy-btn.copied { color:var(--green); border-color:rgba(0,255,136,0.3); }
+    .code-copy-btn svg { width:14px; height:14px; }
+    .code-block pre {
+      margin:0; padding:16px 20px; overflow-x:auto;
+      font-family:'JetBrains Mono',monospace; font-size:13px;
+      line-height:1.65; color:var(--text-secondary);
+      scrollbar-width:thin; scrollbar-color:var(--muted) transparent;
+    }
+    .code-block pre::-webkit-scrollbar { height:4px; }
+    .code-block pre::-webkit-scrollbar-thumb { background:var(--muted); border-radius:4px; }
+
+    /* Syntax highlighting classes */
+    .code-block .cm { color:var(--dim); }
+    .code-block .kw { color:var(--purple-light); }
+    .code-block .str { color:var(--green); }
+    .code-block .fn { color:var(--cyan); }
+    .code-block .num { color:var(--amber); }
+    .code-block .op { color:var(--text-secondary); }
+    .code-block .var { color:var(--teal-bright); }
+
+    /* Tables */
+    .doc-table-wrap { overflow-x:auto; margin:16px 0 24px; border-radius:12px; border:1px solid var(--border-dim); }
+    .doc-table {
+      width:100%; border-collapse:collapse; font-size:13.5px;
+    }
+    .doc-table thead { background:rgba(0,255,255,0.04); }
+    .doc-table th {
+      padding:12px 16px; text-align:left; font-weight:600;
+      font-size:12px; text-transform:uppercase; letter-spacing:0.05em;
+      color:var(--dim); border-bottom:1px solid var(--border-dim);
+      font-family:'Space Grotesk',sans-serif;
+    }
+    .doc-table td {
+      padding:10px 16px; border-bottom:1px solid rgba(255,255,255,0.03);
+      color:var(--text-secondary); vertical-align:top;
+    }
+    .doc-table tr:last-child td { border-bottom:none; }
+    .doc-table tr:hover td { background:rgba(0,255,255,0.02); }
+    .doc-table code {
+      font-size:0.82em; white-space:nowrap;
+    }
+
+    /* Callout boxes */
+    .callout {
+      margin:20px 0; padding:16px 20px; border-radius:10px;
+      border-left:3px solid; font-size:14px;
+    }
+    .callout p { margin-bottom:0; }
+    .callout-info {
+      background:rgba(0,255,255,0.04); border-color:var(--cyan);
+    }
+    .callout-info .callout-title { color:var(--cyan); }
+    .callout-warn {
+      background:rgba(245,158,11,0.06); border-color:var(--amber);
+    }
+    .callout-warn .callout-title { color:var(--amber); }
+    .callout-danger {
+      background:rgba(239,68,68,0.06); border-color:var(--red);
+    }
+    .callout-danger .callout-title { color:var(--red); }
+    .callout-title {
+      font-weight:700; font-size:12px; text-transform:uppercase;
+      letter-spacing:0.05em; margin-bottom:6px;
+      font-family:'Space Grotesk',sans-serif;
+    }
+
+    /* Keyboard shortcuts */
+    kbd {
+      display:inline-block; padding:2px 7px; font-size:11px;
+      font-family:'JetBrains Mono',monospace;
+      background:var(--surface); border:1px solid var(--border-dim);
+      border-radius:4px; color:var(--text-secondary);
+      box-shadow:0 1px 2px rgba(0,0,0,0.3);
+    }
+
+    /* Badge */
+    .badge {
+      display:inline-block; padding:2px 8px; border-radius:4px;
+      font-size:11px; font-weight:600; text-transform:uppercase;
+      letter-spacing:0.04em;
+    }
+    .badge-get { background:rgba(0,255,136,0.1); color:var(--green); }
+    .badge-post { background:rgba(140,0,200,0.15); color:var(--purple-light); }
+    .badge-delete { background:rgba(239,68,68,0.12); color:var(--red); }
+    .badge-put { background:rgba(245,158,11,0.12); color:var(--amber); }
+
+    /* Section hero */
+    .doc-hero {
+      padding:40px 0 24px; margin-bottom:24px;
+      border-bottom:1px solid var(--border-dim);
+    }
+    .doc-hero p {
+      font-size:1.05rem; color:var(--text-secondary); max-width:640px;
+    }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    footer {
+      border-top:1px solid var(--border-dim); padding:48px 24px 32px;
+      margin-left:var(--sidebar-w);
+    }
+    .footer-inner {
+      max-width:900px; display:flex; gap:48px; flex-wrap:wrap;
+      margin-bottom:32px;
+    }
+    .footer-brand { max-width:300px; }
+    .footer-logo {
+      display:flex; align-items:center; gap:8px;
+      font-family:'Space Grotesk',sans-serif; font-size:18px;
+      font-weight:700; margin-bottom:12px;
+    }
+    .footer-logo .accent { color:var(--cyan); }
+    .footer-tagline { color:var(--dim); font-size:13px; line-height:1.6; }
+    .footer-links-group { }
+    .footer-links-title {
+      font-family:'Space Grotesk',sans-serif; font-size:12px;
+      font-weight:700; text-transform:uppercase; letter-spacing:0.08em;
+      color:var(--text-secondary); margin-bottom:12px;
+    }
+    .footer-links { list-style:none; display:flex; flex-direction:column; gap:10px; }
+    .footer-links a { color:var(--dim); font-size:14px; }
+    .footer-links a:hover { color:var(--cyan); }
+    .footer-bottom {
+      display:flex; justify-content:space-between; align-items:center;
+      padding-top:24px; border-top:1px solid var(--border-dim);
+    }
+    .footer-bottom-text { display:flex; flex-direction:column; gap:4px; }
+    .footer-bottom-text .motto { font-size:13px; color:var(--dim); font-style:italic; }
+    .footer-bottom-text .founder { font-size:12px; color:var(--muted); }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width:1024px) {
+      .docs-content { padding:32px 32px 80px; }
+    }
+    @media (max-width:768px) {
+      .nav-links { display:none; }
+      .nav-hamburger { display:block; }
+      .nav-links.open {
+        display:flex; flex-direction:column;
+        position:absolute; top:100%; left:0; right:0;
+        background:rgba(6,9,16,0.95); backdrop-filter:blur(20px);
+        padding:20px 24px; gap:16px;
+        border-bottom:1px solid var(--border-dim);
+      }
+      .docs-sidebar {
+        transform:translateX(-100%); transition:transform 0.3s ease;
+        width:280px;
+      }
+      .docs-sidebar.open { transform:translateX(0); }
+      .sidebar-toggle { display:flex; }
+      .docs-content { margin-left:0; padding:24px 20px 80px; }
+      footer { margin-left:0; }
+      .footer-inner { flex-direction:column; }
+      .footer-bottom { flex-direction:column; text-align:center; gap:12px; }
+    }
+    @media (max-width:480px) {
+      .doc-section h1 { font-size:1.6rem; }
+      .doc-section h2 { font-size:1.25rem; }
+      .code-block pre { font-size:12px; padding:12px 14px; }
+    }
+
+    /* Sidebar overlay on mobile */
+    .sidebar-overlay {
+      display:none; position:fixed; inset:0; z-index:99;
+      background:rgba(0,0,0,0.5); backdrop-filter:blur(4px);
+    }
+    .sidebar-overlay.active { display:block; }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient effects -->
+  <div class="grid-overlay" aria-hidden="true"></div>
+  <div class="glow-orb cyan" aria-hidden="true"></div>
+  <div class="glow-orb purple" aria-hidden="true"></div>
+
+  <!-- ============================================================
+       NAVIGATION
+       ============================================================ -->
+  <nav>
+    <div class="nav-inner">
+      <a href="https://www.tentaclaw.io" class="nav-logo">
+        <span class="logo-icon">
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00d4aa"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient>
+              <linearGradient id="logo-grad2" x1="100%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#00d4aa"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient>
+              <radialGradient id="logo-body" cx="50%" cy="40%" r="55%"><stop offset="0%" stop-color="#00d4aa" stop-opacity="0.9"/><stop offset="100%" stop-color="#0a2a22"/></radialGradient>
+            </defs>
+            <ellipse cx="32" cy="22" rx="16" ry="14" fill="url(#logo-body)"/>
+            <ellipse cx="32" cy="22" rx="16" ry="14" stroke="url(#logo-grad)" stroke-width="1.2" fill="none"/>
+            <ellipse cx="26" cy="19" rx="4" ry="4.5" fill="#0d1117" stroke="url(#logo-grad)" stroke-width="0.8"/>
+            <ellipse cx="38" cy="19" rx="4" ry="4.5" fill="#0d1117" stroke="url(#logo-grad)" stroke-width="0.8"/>
+            <ellipse cx="26" cy="19.5" rx="2" ry="2.5" fill="url(#logo-grad)"/>
+            <ellipse cx="38" cy="19.5" rx="2" ry="2.5" fill="url(#logo-grad)"/>
+            <circle cx="25" cy="18" r="0.9" fill="white" opacity="0.85"/>
+            <circle cx="37" cy="18" r="0.9" fill="white" opacity="0.85"/>
+            <path d="M27 25 Q32 29 37 25" stroke="url(#logo-grad)" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+            <path d="M18 32 C12 36 8 42 10 50 C11 54 14 55 13 58" stroke="url(#logo-grad)" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+            <path d="M22 35 C18 40 16 47 18 53 C19 57 22 57 21 60" stroke="url(#logo-grad2)" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <path d="M26 36 C24 42 23 49 25 54 C26 58 28 58 28 62" stroke="url(#logo-grad)" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+            <path d="M30 36 C29 43 29 50 30 55 C31 59 32 60 32 63" stroke="url(#logo-grad2)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+            <path d="M34 36 C35 43 35 50 34 55 C33 59 32 60 32 63" stroke="url(#logo-grad)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+            <path d="M38 36 C40 42 41 49 39 54 C38 58 36 58 36 62" stroke="url(#logo-grad2)" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+            <path d="M42 35 C46 40 48 47 46 53 C45 57 42 57 43 60" stroke="url(#logo-grad)" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <path d="M46 32 C52 36 56 42 54 50 C53 54 50 55 51 58" stroke="url(#logo-grad2)" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          </svg>
+        </span>
+        Tenta<span class="accent">CLAW</span>
+      </a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="https://www.tentaclaw.io/#features">Features</a></li>
+        <li><a href="https://www.tentaclaw.io/#dashboard">Dashboard</a></li>
+        <li><a href="https://www.tentaclaw.io/pricing">Pricing</a></li>
+        <li><a href="docs.html" class="active">Docs</a></li>
+        <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://www.tentaclaw.io/#install" class="nav-cta">Get Started</a></li>
+      </ul>
+      <button class="nav-hamburger" id="navHamburger" aria-label="Toggle navigation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Sidebar overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- ============================================================
+       DOCS LAYOUT
+       ============================================================ -->
+  <div class="docs-layout">
+
+    <!-- Sidebar -->
+    <aside class="docs-sidebar" id="docsSidebar">
+      <div class="sidebar-section">
+        <span class="sidebar-section-title">Getting Started</span>
+        <a href="#overview" class="sidebar-link active">Overview</a>
+        <a href="#system-requirements" class="sidebar-link">System Requirements</a>
+        <a href="#quick-install" class="sidebar-link">Quick Install</a>
+        <a href="#windows-cli" class="sidebar-link">Windows CLI</a>
+        <a href="#first-boot" class="sidebar-link">First Boot</a>
+      </div>
+      <div class="sidebar-section">
+        <span class="sidebar-section-title">Dashboard</span>
+        <a href="#accessing-dashboard" class="sidebar-link">Accessing the Dashboard</a>
+        <a href="#login-api-keys" class="sidebar-link">Login &amp; API Keys</a>
+        <a href="#dashboard-pages" class="sidebar-link">Pages Overview</a>
+        <a href="#keyboard-shortcuts" class="sidebar-link">Keyboard Shortcuts</a>
+        <a href="#themes" class="sidebar-link">Themes</a>
+      </div>
+      <div class="sidebar-section">
+        <span class="sidebar-section-title">Gateway API</span>
+        <a href="#api-overview" class="sidebar-link">API Overview</a>
+        <a href="#authentication" class="sidebar-link">Authentication</a>
+        <a href="#api-endpoints" class="sidebar-link">Endpoints</a>
+        <a href="#sse-events" class="sidebar-link">SSE Events</a>
+        <a href="#openai-compat" class="sidebar-link">OpenAI Compatibility</a>
+      </div>
+      <div class="sidebar-section">
+        <span class="sidebar-section-title">CLI Reference</span>
+        <a href="#cli-install" class="sidebar-link">Installation</a>
+        <a href="#cli-commands" class="sidebar-link">Commands</a>
+        <a href="#cli-code-agent" class="sidebar-link">Code Agent</a>
+        <a href="#cli-slash-commands" class="sidebar-link">Slash Commands</a>
+      </div>
+      <div class="sidebar-section">
+        <span class="sidebar-section-title">Agent</span>
+        <a href="#agent-overview" class="sidebar-link">Overview</a>
+        <a href="#agent-config" class="sidebar-link">Configuration</a>
+        <a href="#agent-env-vars" class="sidebar-link">Environment Variables</a>
+        <a href="#agent-discovery" class="sidebar-link">Auto-Discovery</a>
+      </div>
+      <div class="sidebar-section">
+        <span class="sidebar-section-title">TentaCLAW OS (ISO)</span>
+        <a href="#iso-overview" class="sidebar-link">Overview</a>
+        <a href="#iso-download" class="sidebar-link">Download</a>
+        <a href="#iso-features" class="sidebar-link">Features</a>
+        <a href="#iso-cloud" class="sidebar-link">Cloud Images</a>
+        <a href="#iso-build" class="sidebar-link">Building from Source</a>
+      </div>
+      <div class="sidebar-section">
+        <span class="sidebar-section-title">Configuration</span>
+        <a href="#config-env-vars" class="sidebar-link">Environment Variables</a>
+        <a href="#config-database" class="sidebar-link">Database</a>
+        <a href="#config-thermal" class="sidebar-link">Thermal Thresholds</a>
+        <a href="#config-rate-limiting" class="sidebar-link">Rate Limiting</a>
+        <a href="#config-auth" class="sidebar-link">Auth Settings</a>
+      </div>
+      <div class="sidebar-section">
+        <span class="sidebar-section-title">Troubleshooting</span>
+        <a href="#ts-node-offline" class="sidebar-link">Node Showing Offline</a>
+        <a href="#ts-gpu-not-detected" class="sidebar-link">GPU Not Detected</a>
+        <a href="#ts-dashboard" class="sidebar-link">Dashboard Not Loading</a>
+        <a href="#ts-websocket" class="sidebar-link">WebSocket Issues</a>
+        <a href="#ts-memory" class="sidebar-link">Memory Issues</a>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <main class="docs-content">
+
+      <!-- ======== GETTING STARTED ======== -->
+      <section class="doc-section" id="getting-started">
+        <div class="doc-hero">
+          <h1>TentaCLAW OS Documentation</h1>
+          <p>Everything you need to deploy, configure, and operate your AI inference cluster.</p>
+        </div>
+
+        <h2 id="overview">Overview <a href="#overview" class="anchor">#</a></h2>
+        <p>
+          TentaCLAW OS is an open-source operating system for AI inference. It turns scattered GPUs &mdash; across racks, rooms, or continents &mdash; into a single self-healing inference cluster with smart routing, a real-time dashboard, and an OpenAI-compatible API. Install it on bare metal or VMs, plug in your GPUs, and start serving models in minutes. No Kubernetes. No YAML mountains. Just GPUs doing work.
+        </p>
+
+        <h2 id="system-requirements">System Requirements <a href="#system-requirements" class="anchor">#</a></h2>
+        <h3>Gateway (Control Plane)</h3>
+        <ul>
+          <li><strong>OS:</strong> Ubuntu 22.04 / 24.04 LTS, or RHEL 8 / 9 (and derivatives: Rocky, Alma, CentOS Stream)</li>
+          <li><strong>Runtime:</strong> Node.js 20+ (auto-installed by the installer if missing)</li>
+          <li><strong>RAM:</strong> 1 GB minimum (the gateway itself is lightweight)</li>
+          <li><strong>Disk:</strong> 500 MB for the application + space for the SQLite database</li>
+          <li><strong>Network:</strong> Reachable by all agent nodes on port 8080 (configurable)</li>
+        </ul>
+        <h3>Agent Nodes (GPU Workers)</h3>
+        <ul>
+          <li><strong>OS:</strong> Ubuntu 22.04 / 24.04 LTS, or RHEL 8 / 9</li>
+          <li><strong>GPU:</strong> NVIDIA GPU with proprietary drivers installed (<code>nvidia-smi</code> must work)</li>
+          <li><strong>Runtime:</strong> Node.js 20+</li>
+          <li><strong>Network:</strong> Outbound access to the gateway on port 8080</li>
+        </ul>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Tip</div>
+          <p>You can run the gateway and an agent on the same machine. The gateway does not require a GPU.</p>
+        </div>
+
+        <h2 id="quick-install">Quick Install <a href="#quick-install" class="anchor">#</a></h2>
+        <p>The fastest way to get TentaCLAW running is the one-line installer. It handles OS detection, Node.js setup, cloning, building, and systemd service creation.</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy="curl -fsSL https://tentaclaw.io/install | bash">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>curl -fsSL https://tentaclaw.io/install | bash</pre>
+        </div>
+
+        <p>The installer will:</p>
+        <ol>
+          <li>Detect your OS (Debian/Ubuntu or RHEL family)</li>
+          <li>Install Node.js 20+ via NodeSource if not present</li>
+          <li>Install git if not present</li>
+          <li>Clone (or update) the repo to <code>/opt/tentaclaw</code></li>
+          <li>Run <code>npm install</code> from the monorepo root</li>
+          <li>Build the gateway: <code>npm run build --workspace=gateway</code></li>
+          <li>Build the dashboard: <code>npm run build --workspace=dashboard</code></li>
+          <li>Create a systemd service with the correct <code>ExecStart</code> and <code>WorkingDirectory</code></li>
+        </ol>
+
+        <div class="callout callout-warn">
+          <div class="callout-title">Important</div>
+          <p>The gateway entry point is <code>dist/gateway/src/index.js</code> (not <code>dist/index.js</code>). This is because <code>tsconfig</code> uses <code>rootDir: ".."</code> which shifts the output directory structure.</p>
+        </div>
+
+        <h2 id="windows-cli">Windows CLI <a href="#windows-cli" class="anchor">#</a></h2>
+        <p>On Windows, install the TentaCLAW CLI with PowerShell:</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">powershell</span>
+            <button class="code-copy-btn" data-copy="irm https://tentaclaw.io/install.ps1 | iex">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>irm https://tentaclaw.io/install.ps1 | iex</pre>
+        </div>
+
+        <p>This installs the <code>tentaclaw</code> CLI globally. Point it at your gateway:</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">powershell</span>
+            <button class="code-copy-btn" data-copy='$env:TENTACLAW_GATEWAY = "http://your-gateway:8080"
+tentaclaw status'>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>$env:TENTACLAW_GATEWAY = "http://your-gateway:8080"
+tentaclaw status</pre>
+        </div>
+
+        <h2 id="first-boot">First Boot <a href="#first-boot" class="anchor">#</a></h2>
+        <p>After installation, the gateway starts automatically via systemd. Here is what happens on first boot:</p>
+        <ol>
+          <li><strong>Database initialization:</strong> SQLite database is created at <code>./data/tentaclaw.db</code> (or the path in <code>TENTACLAW_DB_PATH</code>). Migrations run automatically.</li>
+          <li><strong>Cluster secret generation:</strong> A 256-bit secret is auto-generated and stored. Agents must present this secret via the <code>X-Cluster-Secret</code> header to register.</li>
+          <li><strong>Dashboard served:</strong> The built dashboard is served from <code>/dashboard/</code> on the gateway port.</li>
+          <li><strong>Agent discovery:</strong> Agents on the same subnet will auto-discover the gateway via UDP broadcast on port 41338. Agents on remote networks need <code>TENTACLAW_GATEWAY_URL</code> set explicitly.</li>
+          <li><strong>GPU detection:</strong> Each agent detects NVIDIA GPUs via <code>nvidia-smi</code> and reports stats (VRAM, temperature, utilization) to the gateway every 10 seconds.</li>
+        </ol>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy="# Check the gateway service status
+sudo systemctl status tentaclaw
+
+# View live logs
+sudo journalctl -u tentaclaw -f
+
+# Open the dashboard
+# Navigate to http://your-server-ip:8080/dashboard/">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="cm"># Check the gateway service status</span>
+sudo systemctl status tentaclaw
+
+<span class="cm"># View live logs</span>
+sudo journalctl -u tentaclaw -f
+
+<span class="cm"># Open the dashboard</span>
+<span class="cm"># Navigate to http://your-server-ip:8080/dashboard/</span></pre>
+        </div>
+      </section>
+
+      <!-- ======== DASHBOARD ======== -->
+      <section class="doc-section" id="dashboard">
+        <h1>Dashboard</h1>
+
+        <h2 id="accessing-dashboard">Accessing the Dashboard <a href="#accessing-dashboard" class="anchor">#</a></h2>
+        <p>The dashboard is a single-page application served by the gateway at:</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">url</span>
+            <button class="code-copy-btn" data-copy="http://your-gateway:8080/dashboard/">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>http://your-gateway:8080/dashboard/</pre>
+        </div>
+
+        <p>The dashboard connects to the gateway API and receives real-time updates via Server-Sent Events (SSE). No additional configuration is required &mdash; it auto-detects the gateway URL from the page origin.</p>
+
+        <h2 id="login-api-keys">Login &amp; API Keys <a href="#login-api-keys" class="anchor">#</a></h2>
+        <p>On first access, the dashboard will prompt you to create an admin API key. You can also set a master key via environment variable:</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy='# Set a master API key (bypasses DB auth checks)
+export TENTACLAW_API_KEY="your-secret-key-here"
+
+# Or disable auth entirely for development
+export TENTACLAW_NO_AUTH="true"'>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="cm"># Set a master API key (bypasses DB auth checks)</span>
+<span class="kw">export</span> <span class="var">TENTACLAW_API_KEY</span>=<span class="str">"your-secret-key-here"</span>
+
+<span class="cm"># Or disable auth entirely for development</span>
+<span class="kw">export</span> <span class="var">TENTACLAW_NO_AUTH</span>=<span class="str">"true"</span></pre>
+        </div>
+
+        <p>API keys are SHA-256 hashed in the database and support three scopes:</p>
+        <ul>
+          <li><strong>read</strong> &mdash; View nodes, stats, models</li>
+          <li><strong>write</strong> &mdash; Deploy models, send commands, manage flight sheets</li>
+          <li><strong>admin</strong> &mdash; Full access including key management and cluster configuration</li>
+        </ul>
+
+        <h2 id="dashboard-pages">Pages Overview <a href="#dashboard-pages" class="anchor">#</a></h2>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr><th>Page</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>Summary</strong></td><td>Fleet overview: total nodes, GPUs, VRAM capacity, health grade (A/B/C/D/F), active models, and request throughput.</td></tr>
+              <tr><td><strong>GPUs</strong></td><td>Detailed GPU inventory across all nodes. Temperature, utilization, VRAM usage, and power draw per card.</td></tr>
+              <tr><td><strong>Models</strong></td><td>Deploy, remove, and manage models across the cluster. View which nodes have which models loaded.</td></tr>
+              <tr><td><strong>Inference</strong></td><td>Real-time inference metrics: requests/sec, latency percentiles, token throughput, and routing decisions.</td></tr>
+              <tr><td><strong>Metrics</strong></td><td>Historical charts for GPU utilization, temperature, VRAM usage, and inference performance.</td></tr>
+              <tr><td><strong>Terminal</strong></td><td>WebSocket-based shell access to individual nodes directly from the browser.</td></tr>
+              <tr><td><strong>Chat</strong></td><td>Talk to your cluster. Send prompts through the OpenAI-compatible endpoint and see responses in real time.</td></tr>
+              <tr><td><strong>Alerts</strong></td><td>Monitoring alerts: GPU thermal warnings, node disconnections, high error rates, and custom rules.</td></tr>
+              <tr><td><strong>Flight Sheets</strong></td><td>Declarative GPU assignment profiles. Define which models run on which GPUs and apply in one click.</td></tr>
+              <tr><td><strong>Settings</strong></td><td>Gateway configuration, API key management, cluster secret rotation, and theme selection.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="keyboard-shortcuts">Keyboard Shortcuts <a href="#keyboard-shortcuts" class="anchor">#</a></h2>
+        <p>The dashboard supports vim-style sequential keybinds (press <kbd>g</kbd> then a second key within 800ms):</p>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr><th>Keybind</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><kbd>g</kbd> <kbd>s</kbd></td><td>Go to Summary tab</td></tr>
+              <tr><td><kbd>g</kbd> <kbd>g</kbd></td><td>Go to GPUs tab</td></tr>
+              <tr><td><kbd>g</kbd> <kbd>m</kbd></td><td>Go to Models tab</td></tr>
+              <tr><td><kbd>g</kbd> <kbd>i</kbd></td><td>Go to Inference tab</td></tr>
+              <tr><td><kbd>g</kbd> <kbd>c</kbd></td><td>Go to Chat tab</td></tr>
+              <tr><td><kbd>g</kbd> <kbd>a</kbd></td><td>Go to Alerts tab</td></tr>
+              <tr><td><kbd>g</kbd> <kbd>t</kbd></td><td>Go to Terminal tab</td></tr>
+              <tr><td><kbd>Ctrl</kbd>+<kbd>B</kbd></td><td>Toggle left sidebar</td></tr>
+              <tr><td><kbd>Ctrl</kbd>+<kbd>J</kbd></td><td>Toggle right panel</td></tr>
+              <tr><td><kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Open command palette</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Easter eggs</div>
+          <p>Try typing <code>/who</code>, <code>/party</code>, or <code>/meaning</code> in the command palette.</p>
+        </div>
+
+        <h2 id="themes">Themes <a href="#themes" class="anchor">#</a></h2>
+        <p>The dashboard ships with 8 built-in themes, persisted to <code>localStorage</code>. Switch themes from the Settings page or via the command palette. Themes are defined in <code>dashboard/src/lib/themes.ts</code>.</p>
+      </section>
+
+      <!-- ======== GATEWAY API ======== -->
+      <section class="doc-section" id="gateway-api">
+        <h1>Gateway API</h1>
+
+        <h2 id="api-overview">API Overview <a href="#api-overview" class="anchor">#</a></h2>
+        <p>The gateway exposes a RESTful API on the configured port (default <code>8080</code>). All JSON responses use <strong>wrapped objects</strong> &mdash; never bare arrays. For example, the nodes endpoint returns <code>{ "nodes": [] }</code>, not <code>[]</code>.</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">url</span>
+            <button class="code-copy-btn" data-copy="http://your-gateway:8080">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>http://your-gateway:8080</pre>
+        </div>
+
+        <h2 id="authentication">Authentication <a href="#authentication" class="anchor">#</a></h2>
+        <p>The API supports two authentication methods:</p>
+
+        <h3>API Key (Bearer Token)</h3>
+        <p>Pass your API key in the <code>Authorization</code> header:</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy='curl -H "Authorization: Bearer tk_your_api_key" \
+  http://your-gateway:8080/api/v1/nodes'>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>curl -H <span class="str">"Authorization: Bearer tk_your_api_key"</span> \
+  http://your-gateway:8080/api/v1/nodes</pre>
+        </div>
+
+        <h3>Cluster Secret (Agent Auth)</h3>
+        <p>Agents authenticate using the <code>X-Cluster-Secret</code> header. This secret is auto-generated on first boot and stored in the database.</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy='curl -H "X-Cluster-Secret: your-cluster-secret" \
+  http://your-gateway:8080/api/v1/nodes'>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>curl -H <span class="str">"X-Cluster-Secret: your-cluster-secret"</span> \
+  http://your-gateway:8080/api/v1/nodes</pre>
+        </div>
+
+        <div class="callout callout-warn">
+          <div class="callout-title">Security</div>
+          <p>After 5 failed authentication attempts from the same IP, that IP is blocked for 15 minutes (configurable via <code>AUTH_BLOCK_DURATION_MS</code>).</p>
+        </div>
+
+        <h2 id="api-endpoints">Endpoints <a href="#api-endpoints" class="anchor">#</a></h2>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr><th>Method</th><th>Endpoint</th><th>Description</th><th>Response Shape</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/api/v1/nodes</code></td>
+                <td>List all registered nodes with latest stats</td>
+                <td><code>{ nodes: [] }</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/api/v1/nodes/hot</code></td>
+                <td>Nodes with GPUs above thermal threshold</td>
+                <td><code>{ hot_nodes: [], count: N }</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/api/v1/nodes/idle</code></td>
+                <td>Nodes with low GPU utilization</td>
+                <td><code>{ idle_nodes: [], count: N }</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/api/v1/nodes/:nodeId</code></td>
+                <td>Single node details</td>
+                <td><code>{ node: {} }</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/api/v1/capacity</code></td>
+                <td>Cluster-wide capacity summary</td>
+                <td>Uses <code>_mb</code> suffix fields</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/api/v1/benchmarks</code></td>
+                <td>Benchmark results across nodes</td>
+                <td><code>{ benchmarks: [] }</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/api/v1/models</code></td>
+                <td>List all deployed models</td>
+                <td><code>{ models: [] }</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/api/v1/alerts</code></td>
+                <td>Active alerts</td>
+                <td><code>{ alerts: [] }</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/api/v1/flight-sheets</code></td>
+                <td>GPU assignment profiles</td>
+                <td><code>{ flight_sheets: [] }</code></td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-post">POST</span></td>
+                <td><code>/v1/chat/completions</code></td>
+                <td>OpenAI-compatible inference endpoint</td>
+                <td>OpenAI format + <code>_tentaclaw</code> metadata</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-get">GET</span></td>
+                <td><code>/api/v1/events</code></td>
+                <td>Server-Sent Events stream</td>
+                <td>SSE stream</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Note</div>
+          <p>The capacity endpoint uses <code>_mb</code> suffixes for memory fields (e.g., <code>total_vram_mb</code>, <code>used_vram_mb</code>), not <code>_gb</code>. This is by design for precision.</p>
+        </div>
+
+        <h2 id="sse-events">SSE Events <a href="#sse-events" class="anchor">#</a></h2>
+        <p>Connect to <code>GET /api/v1/events</code> for real-time cluster updates. The event stream emits the following event types:</p>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr><th>Event</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>node_online</code></td><td>A new node registered or came back online</td></tr>
+              <tr><td><code>node_offline</code></td><td>A node has not reported in within the stale timeout</td></tr>
+              <tr><td><code>stats_update</code></td><td>Fresh GPU stats received from an agent</td></tr>
+              <tr><td><code>alert</code></td><td>A new alert was triggered (thermal, error, etc.)</td></tr>
+              <tr><td><code>model_loaded</code></td><td>A model was successfully loaded on a node</td></tr>
+              <tr><td><code>model_unloaded</code></td><td>A model was removed from a node</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">javascript</span>
+            <button class="code-copy-btn" data-copy='const events = new EventSource("/api/v1/events");
+
+events.addEventListener("stats_update", (e) => {
+  const data = JSON.parse(e.data);
+  console.log("Node:", data.node_id, "GPUs:", data.gpus.length);
+});
+
+events.addEventListener("alert", (e) => {
+  const alert = JSON.parse(e.data);
+  console.log("Alert:", alert.severity, alert.message);
+});'>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="kw">const</span> events = <span class="kw">new</span> <span class="fn">EventSource</span>(<span class="str">"/api/v1/events"</span>);
+
+events.<span class="fn">addEventListener</span>(<span class="str">"stats_update"</span>, (e) => {
+  <span class="kw">const</span> data = JSON.<span class="fn">parse</span>(e.data);
+  console.<span class="fn">log</span>(<span class="str">"Node:"</span>, data.node_id, <span class="str">"GPUs:"</span>, data.gpus.length);
+});
+
+events.<span class="fn">addEventListener</span>(<span class="str">"alert"</span>, (e) => {
+  <span class="kw">const</span> alert = JSON.<span class="fn">parse</span>(e.data);
+  console.<span class="fn">log</span>(<span class="str">"Alert:"</span>, alert.severity, alert.message);
+});</pre>
+        </div>
+
+        <div class="callout callout-warn">
+          <div class="callout-title">Note</div>
+          <p>The SSE client list is stored in-memory. Restarting the gateway disconnects all SSE clients. Clients should implement automatic reconnection.</p>
+        </div>
+
+        <h2 id="openai-compat">OpenAI Compatibility <a href="#openai-compat" class="anchor">#</a></h2>
+        <p>The <code>POST /v1/chat/completions</code> endpoint is fully compatible with the OpenAI API format. You can use the official OpenAI SDK or any compatible client by pointing it at your gateway:</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">python</span>
+            <button class="code-copy-btn" data-copy='from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://your-gateway:8080/v1",
+    api_key="your-api-key",
+)
+
+response = client.chat.completions.create(
+    model="llama-3.1-8b",
+    messages=[{"role": "user", "content": "Hello!"}],
+)
+print(response.choices[0].message.content)'>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="kw">from</span> openai <span class="kw">import</span> OpenAI
+
+client = OpenAI(
+    base_url=<span class="str">"http://your-gateway:8080/v1"</span>,
+    api_key=<span class="str">"your-api-key"</span>,
+)
+
+response = client.chat.completions.create(
+    model=<span class="str">"llama-3.1-8b"</span>,
+    messages=[{<span class="str">"role"</span>: <span class="str">"user"</span>, <span class="str">"content"</span>: <span class="str">"Hello!"</span>}],
+)
+<span class="fn">print</span>(response.choices[<span class="num">0</span>].message.content)</pre>
+        </div>
+
+        <p>TentaCLAW adds a <code>_tentaclaw</code> field to the response with routing metadata (which node served the request, latency breakdown, etc.). This field is ignored by standard OpenAI clients.</p>
+      </section>
+
+      <!-- ======== CLI REFERENCE ======== -->
+      <section class="doc-section" id="cli-reference">
+        <h1>CLI Reference</h1>
+
+        <h2 id="cli-install">Installation <a href="#cli-install" class="anchor">#</a></h2>
+
+        <h3>Linux / macOS</h3>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy="curl -fsSL https://tentaclaw.io/install-cli | bash">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>curl -fsSL https://tentaclaw.io/install-cli | bash</pre>
+        </div>
+
+        <h3>Windows</h3>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">powershell</span>
+            <button class="code-copy-btn" data-copy="irm https://tentaclaw.io/install.ps1 | iex">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>irm https://tentaclaw.io/install.ps1 | iex</pre>
+        </div>
+
+        <h3>From Source</h3>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy="npm run build --workspace=cli
+npm install -g --force ./cli">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>npm run build --workspace=cli
+npm install -g --force ./cli</pre>
+        </div>
+
+        <h3>Configuration</h3>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy='# Point the CLI at your gateway
+export TENTACLAW_GATEWAY="http://your-gateway:8080"
+
+# Set API key for authenticated requests
+export TENTACLAW_API_KEY="your-api-key"'>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="cm"># Point the CLI at your gateway</span>
+<span class="kw">export</span> <span class="var">TENTACLAW_GATEWAY</span>=<span class="str">"http://your-gateway:8080"</span>
+
+<span class="cm"># Set API key for authenticated requests</span>
+<span class="kw">export</span> <span class="var">TENTACLAW_API_KEY</span>=<span class="str">"your-api-key"</span></pre>
+        </div>
+
+        <h2 id="cli-commands">Commands <a href="#cli-commands" class="anchor">#</a></h2>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr><th>Command</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>tentaclaw status</code></td><td>Show cluster health summary: nodes, GPUs, models, health grade</td></tr>
+              <tr><td><code>tentaclaw nodes</code></td><td>List all registered nodes with status and GPU count</td></tr>
+              <tr><td><code>tentaclaw gpus</code></td><td>List all GPUs across the cluster with temperature, utilization, and VRAM</td></tr>
+              <tr><td><code>tentaclaw models</code></td><td>List deployed models. Subcommands: <code>deploy</code>, <code>remove</code>, <code>list</code></td></tr>
+              <tr><td><code>tentaclaw ssh &lt;node&gt;</code></td><td>Open a WebSocket shell session to a specific node</td></tr>
+              <tr><td><code>tentaclaw benchmark</code></td><td>Run inference benchmarks across the cluster</td></tr>
+              <tr><td><code>tentaclaw alerts</code></td><td>View active alerts. Subcommands: <code>list</code>, <code>ack</code>, <code>rules</code></td></tr>
+              <tr><td><code>tentaclaw capacity</code></td><td>Show cluster-wide VRAM and compute capacity</td></tr>
+              <tr><td><code>tentaclaw code</code></td><td>Launch the AI coding agent (see below)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="cli-code-agent">Code Agent <a href="#cli-code-agent" class="anchor">#</a></h2>
+        <p><code>tentaclaw code</code> launches an interactive AI coding agent powered by your cluster's local models. No cloud API keys required &mdash; inference runs on your own GPUs.</p>
+
+        <h3>Workspace</h3>
+        <p>The code agent uses a workspace at <code>~/.tentaclaw/workspace/</code> containing:</p>
+        <ul>
+          <li><code>SOUL.md</code> &mdash; Agent personality and behavior instructions</li>
+          <li><code>USER.md</code> &mdash; Your profile (name, role, preferences)</li>
+          <li><code>IDENTITY.md</code> &mdash; Agent identity definition</li>
+          <li><code>MEMORY.md</code> &mdash; Persistent memory (auto-updated by the agent)</li>
+          <li><code>AGENTS.md</code> &mdash; Multi-agent configuration</li>
+          <li><code>TOOLS.md</code> &mdash; Available tool definitions</li>
+          <li><code>BOOTSTRAP.md</code> &mdash; First-run onboarding (auto-deleted after first session)</li>
+        </ul>
+
+        <h3>Sessions</h3>
+        <p>Sessions are stored as JSONL event logs in <code>~/.tentaclaw/sessions/</code>. Resume a previous session with:</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy="tentaclaw code --resume <session-id>">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>tentaclaw code --resume &lt;session-id&gt;</pre>
+        </div>
+
+        <h3>Available Tools</h3>
+        <p>The code agent has access to the following tools:</p>
+        <ul>
+          <li><code>read_file</code> &mdash; Read file contents</li>
+          <li><code>write_file</code> &mdash; Write a complete file</li>
+          <li><code>edit_file</code> &mdash; Surgical text replacement within a file</li>
+          <li><code>list_dir</code> &mdash; List directory contents</li>
+          <li><code>search_files</code> &mdash; Search file contents with regex</li>
+          <li><code>run_shell</code> &mdash; Execute shell commands</li>
+        </ul>
+
+        <h3>Shell Shortcut</h3>
+        <p>Prefix any command with <code>!</code> to run it directly in the shell without going through the LLM:</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">text</span>
+            <button class="code-copy-btn" data-copy="! git status">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>! git status
+! npm test</pre>
+        </div>
+
+        <h2 id="cli-slash-commands">Slash Commands <a href="#cli-slash-commands" class="anchor">#</a></h2>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr><th>Command</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>/quit</code></td><td>Exit the code agent (saves session)</td></tr>
+              <tr><td><code>/new</code></td><td>Start a new session</td></tr>
+              <tr><td><code>/status</code></td><td>Show token counts and session info</td></tr>
+              <tr><td><code>/sessions</code></td><td>List all saved sessions</td></tr>
+              <tr><td><code>/save</code></td><td>Save current session</td></tr>
+              <tr><td><code>/export</code></td><td>Export session to file</td></tr>
+              <tr><td><code>/clear</code></td><td>Clear conversation history</td></tr>
+              <tr><td><code>/compact</code></td><td>Compact context (summarize and reduce tokens)</td></tr>
+              <tr><td><code>/context</code></td><td>Show current context files</td></tr>
+              <tr><td><code>/model</code></td><td>Switch the active model</td></tr>
+              <tr><td><code>/auto</code></td><td>Toggle auto-approval for tool calls</td></tr>
+              <tr><td><code>/think</code></td><td>Enable extended thinking mode</td></tr>
+              <tr><td><code>/workspace</code></td><td>Show workspace file status</td></tr>
+              <tr><td><code>/help</code></td><td>Show help and available commands</td></tr>
+              <tr><td><code>/cd</code></td><td>Change working directory</td></tr>
+              <tr><td><code>/cwd</code></td><td>Print current working directory</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ======== AGENT CONFIGURATION ======== -->
+      <section class="doc-section" id="agent">
+        <h1>Agent Configuration</h1>
+
+        <h2 id="agent-overview">Overview <a href="#agent-overview" class="anchor">#</a></h2>
+        <p>The TentaCLAW agent runs on each GPU node in your cluster. It collects GPU statistics (temperature, VRAM, utilization, power draw) and reports them to the gateway at a configurable interval (default: every 10 seconds). It also executes commands from the gateway such as loading models, running benchmarks, and providing WebSocket shell access.</p>
+
+        <h3>Starting the Agent</h3>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy="cd /opt/tentaclaw/agent
+node dist/agent/src/index.js">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="cm"># Navigate to the agent directory</span>
+<span class="kw">cd</span> /opt/tentaclaw/agent
+
+<span class="cm"># Start the agent</span>
+node dist/agent/src/index.js</pre>
+        </div>
+
+        <h2 id="agent-config">Configuration <a href="#agent-config" class="anchor">#</a></h2>
+        <p>Agents can be configured via environment variables or a config file at <code>/etc/tentaclaw/rig.conf</code>.</p>
+
+        <h3>Config File Format</h3>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">ini</span>
+            <button class="code-copy-btn" data-copy="# /etc/tentaclaw/rig.conf
+# TentaCLAW Agent Configuration
+
+TENTACLAW_GATEWAY_URL=http://gateway-ip:8080
+TENTACLAW_NODE_ID=gpu-node-01
+TENTACLAW_CLUSTER_SECRET=your-cluster-secret
+TENTACLAW_INTERVAL=10000
+TENTACLAW_HOSTNAME=Octopod-1">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="cm"># /etc/tentaclaw/rig.conf</span>
+<span class="cm"># TentaCLAW Agent Configuration</span>
+
+<span class="var">TENTACLAW_GATEWAY_URL</span>=http://gateway-ip:8080
+<span class="var">TENTACLAW_NODE_ID</span>=gpu-node-01
+<span class="var">TENTACLAW_CLUSTER_SECRET</span>=your-cluster-secret
+<span class="var">TENTACLAW_INTERVAL</span>=10000
+<span class="var">TENTACLAW_HOSTNAME</span>=Octopod-1</pre>
+        </div>
+
+        <h2 id="agent-env-vars">Environment Variables <a href="#agent-env-vars" class="anchor">#</a></h2>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>TENTACLAW_GATEWAY_URL</code></td><td>Auto-discover</td><td>Gateway URL. Required for remote networks; local subnets use auto-discovery.</td></tr>
+              <tr><td><code>TENTACLAW_NODE_ID</code></td><td>Auto-generated</td><td>Unique identifier for this node.</td></tr>
+              <tr><td><code>TENTACLAW_FARM_HASH</code></td><td>&mdash;</td><td>Farm identifier for grouping nodes.</td></tr>
+              <tr><td><code>TENTACLAW_HOSTNAME</code></td><td>OS hostname</td><td>Display name for this node. Proxmox nodes with <code>pve</code> prefix are displayed as Octopods.</td></tr>
+              <tr><td><code>TENTACLAW_INTERVAL</code></td><td><code>10000</code></td><td>Stats reporting interval in milliseconds.</td></tr>
+              <tr><td><code>TENTACLAW_CLUSTER_SECRET</code></td><td>&mdash;</td><td>Must match the gateway's cluster secret.</td></tr>
+              <tr><td><code>TENTACLAW_MOCK</code></td><td><code>false</code></td><td>Enable mock GPU mode for development (no real GPU needed).</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="agent-discovery">Auto-Discovery <a href="#agent-discovery" class="anchor">#</a></h2>
+        <p>When <code>TENTACLAW_GATEWAY_URL</code> is not set, the agent attempts to find the gateway automatically:</p>
+        <ol>
+          <li><strong>UDP broadcast</strong> on port <strong>41338</strong> &mdash; the gateway responds with its address</li>
+          <li><strong>Subnet scan</strong> as fallback &mdash; scans common ports on the local subnet (slower, approximately 5 seconds)</li>
+        </ol>
+
+        <div class="callout callout-info">
+          <div class="callout-title">Tip</div>
+          <p>For production deployments, always set <code>TENTACLAW_GATEWAY_URL</code> explicitly. Auto-discovery is convenient for development but adds startup latency and can fail across VLANs.</p>
+        </div>
+
+        <h3>Mock Mode</h3>
+        <p>For development and testing without a real GPU, enable mock mode:</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy="TENTACLAW_MOCK=true node dist/agent/src/index.js">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="var">TENTACLAW_MOCK</span>=true node dist/agent/src/index.js</pre>
+        </div>
+
+        <p>This simulates 2 fake GPUs with random temperature, utilization, and VRAM values. Useful for testing the dashboard and API without hardware.</p>
+      </section>
+
+      <!-- ======== TENTACLAW OS (ISO) ======== -->
+      <section class="doc-section" id="tentaclaw-os-iso">
+        <h1>TentaCLAW OS (ISO)</h1>
+
+        <h2 id="iso-overview">Overview <a href="#iso-overview" class="anchor">#</a></h2>
+        <p>TentaCLAW OS is a custom Ubuntu 24.04-based Linux distribution with TentaCLAW pre-installed and pre-configured. Boot from USB or ISO, and your machine becomes an inference node immediately &mdash; no manual installation required.</p>
+
+        <h2 id="iso-download">Download <a href="#iso-download" class="anchor">#</a></h2>
+        <p>Download the latest ISO from GitHub Releases:</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">url</span>
+            <button class="code-copy-btn" data-copy="https://github.com/TentaCLAW-OS/TentaCLAW/releases">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre>https://github.com/TentaCLAW-OS/TentaCLAW/releases</pre>
+        </div>
+
+        <p>The ISO is approximately 1.6 GB and includes a live environment for testing before installation.</p>
+
+        <h2 id="iso-features">Features <a href="#iso-features" class="anchor">#</a></h2>
+        <ul>
+          <li><strong>Auto-detect GPUs:</strong> NVIDIA drivers and CUDA runtime pre-installed. GPUs are detected and configured on boot.</li>
+          <li><strong>Pre-configured systemd service:</strong> The TentaCLAW gateway and agent start automatically.</li>
+          <li><strong>Dashboard accessible out of the box:</strong> Navigate to port 8080 after boot.</li>
+          <li><strong>Minimal footprint:</strong> Stripped-down Ubuntu base &mdash; no desktop environment, office suite, or unnecessary packages.</li>
+          <li><strong>Auto-updates:</strong> Optional automatic updates from the TentaCLAW repository.</li>
+        </ul>
+
+        <h2 id="iso-cloud">Cloud Images <a href="#iso-cloud" class="anchor">#</a></h2>
+        <p>Pre-built cloud images are available for major providers:</p>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr><th>Provider</th><th>Format</th><th>GPU Instance Types</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>AWS</strong></td><td>AMI</td><td>p3, p4d, g4dn, g5 instances</td></tr>
+              <tr><td><strong>GCP</strong></td><td>Disk Image</td><td>a2, g2 machine types</td></tr>
+              <tr><td><strong>Azure</strong></td><td>VHD</td><td>NC, ND, NV series</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="iso-build">Building from Source <a href="#iso-build" class="anchor">#</a></h2>
+        <p>Build your own ISO from the builder directory:</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy="# Requires root and an Ubuntu host
+cd builder
+sudo ./build-iso.sh
+
+# Output: builder/output/tentaclaw-os-*.iso">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="cm"># Requires root and an Ubuntu host</span>
+<span class="kw">cd</span> builder
+sudo ./build-iso.sh
+
+<span class="cm"># Output: builder/output/tentaclaw-os-*.iso</span></pre>
+        </div>
+
+        <div class="callout callout-warn">
+          <div class="callout-title">Requirements</div>
+          <p>Building the ISO requires an Ubuntu host with <code>debootstrap</code>, <code>squashfs-tools</code>, <code>xorriso</code>, and approximately 10 GB of free disk space.</p>
+        </div>
+      </section>
+
+      <!-- ======== CONFIGURATION REFERENCE ======== -->
+      <section class="doc-section" id="configuration">
+        <h1>Configuration Reference</h1>
+
+        <h2 id="config-env-vars">Gateway Environment Variables <a href="#config-env-vars" class="anchor">#</a></h2>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>TENTACLAW_PORT</code></td><td><code>8080</code></td><td>Port the gateway listens on.</td></tr>
+              <tr><td><code>TENTACLAW_HOST</code></td><td><code>0.0.0.0</code></td><td>Bind address.</td></tr>
+              <tr><td><code>TENTACLAW_DB_PATH</code></td><td><code>./data/tentaclaw.db</code></td><td>Path to the SQLite database file.</td></tr>
+              <tr><td><code>TENTACLAW_API_KEY</code></td><td>&mdash;</td><td>Master API key. Bypasses database auth checks.</td></tr>
+              <tr><td><code>TENTACLAW_CLUSTER_SECRET</code></td><td>Auto-generated</td><td>Shared secret for agent authentication.</td></tr>
+              <tr><td><code>TENTACLAW_NO_AUTH</code></td><td><code>false</code></td><td>Set to <code>true</code> to disable all authentication (dev only).</td></tr>
+              <tr><td><code>TENTACLAW_RATE_LIMIT</code></td><td><code>60</code></td><td>API rate limit in requests per minute.</td></tr>
+              <tr><td><code>TENTACLAW_CHAT_RATE_LIMIT</code></td><td><code>60</code></td><td>Chat/inference endpoint rate limit (requests per minute).</td></tr>
+              <tr><td><code>NODE_STALE_TIMEOUT_SECS</code></td><td><code>90</code></td><td>Seconds before marking a node as offline.</td></tr>
+              <tr><td><code>FLEET_DRAIN_TIMEOUT_MS</code></td><td><code>120000</code></td><td>Maximum wait time for graceful fleet drain (ms).</td></tr>
+              <tr><td><code>AUTH_BLOCK_DURATION_MS</code></td><td><code>900000</code></td><td>IP block duration after 5 failed auth attempts (ms). Default 15 min.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="config-database">Database <a href="#config-database" class="anchor">#</a></h2>
+        <p>TentaCLAW uses SQLite with WAL (Write-Ahead Logging) mode and foreign keys enabled. The database is stored at the path specified by <code>TENTACLAW_DB_PATH</code>.</p>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy='# Default location
+./data/tentaclaw.db
+
+# Custom location
+export TENTACLAW_DB_PATH="/var/lib/tentaclaw/cluster.db"
+
+# In-memory (for testing)
+export TENTACLAW_DB_PATH=":memory:"'>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="cm"># Default location</span>
+./data/tentaclaw.db
+
+<span class="cm"># Custom location</span>
+<span class="kw">export</span> <span class="var">TENTACLAW_DB_PATH</span>=<span class="str">"/var/lib/tentaclaw/cluster.db"</span>
+
+<span class="cm"># In-memory (for testing)</span>
+<span class="kw">export</span> <span class="var">TENTACLAW_DB_PATH</span>=<span class="str">":memory:"</span></pre>
+        </div>
+
+        <p>Migrations are applied automatically on boot via <code>runMigrations()</code> in <code>gateway/src/db/init.ts</code>. You never need to run migrations manually.</p>
+
+        <p>Domain modules:</p>
+        <ul>
+          <li><code>db/nodes.ts</code> &mdash; Node registration and status</li>
+          <li><code>db/models.ts</code> &mdash; Model deployment tracking</li>
+          <li><code>db/stats.ts</code> &mdash; GPU statistics storage</li>
+          <li><code>db/auth.ts</code> &mdash; API key management and auth state</li>
+        </ul>
+
+        <h2 id="config-thermal">Thermal Thresholds <a href="#config-thermal" class="anchor">#</a></h2>
+        <p>GPU temperature thresholds control alerting and the "hot nodes" classification:</p>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>GPU_TEMP_CRITICAL_C</code></td><td><code>90</code></td><td>Critical temperature. Triggers immediate alert.</td></tr>
+              <tr><td><code>GPU_TEMP_HOT_C</code></td><td><code>85</code></td><td>Hot threshold. Node appears in <code>/nodes/hot</code>.</td></tr>
+              <tr><td><code>GPU_TEMP_WARM_C</code></td><td><code>75</code></td><td>Warm threshold. Advisory only.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="config-rate-limiting">Rate Limiting <a href="#config-rate-limiting" class="anchor">#</a></h2>
+        <p>Rate limits are enforced per API key (or per IP for unauthenticated requests):</p>
+        <ul>
+          <li><strong>General API:</strong> <code>TENTACLAW_RATE_LIMIT</code> &mdash; default 60 requests per minute</li>
+          <li><strong>Chat/Inference:</strong> <code>TENTACLAW_CHAT_RATE_LIMIT</code> &mdash; default 60 requests per minute</li>
+        </ul>
+        <p>Rate-limited responses return HTTP <code>429 Too Many Requests</code> with a <code>Retry-After</code> header.</p>
+
+        <h2 id="config-auth">Auth Settings <a href="#config-auth" class="anchor">#</a></h2>
+        <p>Authentication behavior can be customized:</p>
+        <ul>
+          <li><strong>Disable all auth:</strong> <code>TENTACLAW_NO_AUTH=true</code> &mdash; useful for development and trusted networks</li>
+          <li><strong>Master key:</strong> <code>TENTACLAW_API_KEY</code> &mdash; a single key that bypasses all DB-based auth checks</li>
+          <li><strong>IP blocking:</strong> After 5 consecutive failed auth attempts, the IP is blocked for <code>AUTH_BLOCK_DURATION_MS</code> (default 15 minutes)</li>
+          <li><strong>API key scopes:</strong> Keys are created with <code>read</code>, <code>write</code>, or <code>admin</code> scope</li>
+          <li><strong>Key storage:</strong> API keys are SHA-256 hashed before storage &mdash; the plaintext is only shown once at creation time</li>
+        </ul>
+      </section>
+
+      <!-- ======== TROUBLESHOOTING ======== -->
+      <section class="doc-section" id="troubleshooting">
+        <h1>Troubleshooting</h1>
+
+        <h2 id="ts-node-offline">Node Showing Offline <a href="#ts-node-offline" class="anchor">#</a></h2>
+        <p>If a node appears offline in the dashboard but the machine is running:</p>
+        <ol>
+          <li><strong>Check the agent process:</strong> <code>systemctl status tentaclaw-agent</code></li>
+          <li><strong>Check network connectivity:</strong> Can the agent reach the gateway on port 8080?</li>
+          <li><strong>Check the cluster secret:</strong> The agent's <code>TENTACLAW_CLUSTER_SECRET</code> must match the gateway's. A mismatch results in silent rejection.</li>
+          <li><strong>Check the stale timeout:</strong> The default is 90 seconds (<code>NODE_STALE_TIMEOUT_SECS</code>). If the agent's reporting interval is longer than this, the node will flap between online and offline.</li>
+        </ol>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy="# Verify agent connectivity
+curl -s http://gateway-ip:8080/api/v1/nodes | jq .
+
+# Check agent logs
+journalctl -u tentaclaw-agent -f">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="cm"># Verify agent connectivity</span>
+curl -s http://gateway-ip:8080/api/v1/nodes | jq .
+
+<span class="cm"># Check agent logs</span>
+journalctl -u tentaclaw-agent -f</pre>
+        </div>
+
+        <h2 id="ts-gpu-not-detected">GPU Not Detected <a href="#ts-gpu-not-detected" class="anchor">#</a></h2>
+        <p>If the agent starts but reports zero GPUs:</p>
+        <ol>
+          <li><strong>Verify NVIDIA drivers:</strong> Run <code>nvidia-smi</code>. If it fails, install drivers first.</li>
+          <li><strong>Check permissions:</strong> The agent process needs access to <code>/dev/nvidia*</code> devices.</li>
+          <li><strong>Check for driver mismatch:</strong> Ensure the kernel module version matches the userspace driver version.</li>
+        </ol>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy="# Verify NVIDIA drivers are working
+nvidia-smi
+
+# Check kernel module
+lsmod | grep nvidia
+
+# Test with mock mode to confirm agent otherwise works
+TENTACLAW_MOCK=true node dist/agent/src/index.js">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="cm"># Verify NVIDIA drivers are working</span>
+nvidia-smi
+
+<span class="cm"># Check kernel module</span>
+lsmod | grep nvidia
+
+<span class="cm"># Test with mock mode to confirm agent otherwise works</span>
+<span class="var">TENTACLAW_MOCK</span>=true node dist/agent/src/index.js</pre>
+        </div>
+
+        <h2 id="ts-dashboard">Dashboard Not Loading <a href="#ts-dashboard" class="anchor">#</a></h2>
+        <p>If the dashboard URL returns a 404 or blank page:</p>
+        <ol>
+          <li><strong>Check the build:</strong> The dashboard must be built with <code>npm run build --workspace=dashboard</code>. The Vite build outputs to <code>gateway/public/</code>.</li>
+          <li><strong>Verify files exist:</strong> Check that <code>gateway/public/index.html</code> exists.</li>
+          <li><strong>Check the gateway logs:</strong> Look for errors related to static file serving.</li>
+        </ol>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy="# Rebuild the dashboard
+npm run build --workspace=dashboard
+
+# Verify output exists
+ls -la gateway/public/
+
+# Restart the gateway
+sudo systemctl restart tentaclaw">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="cm"># Rebuild the dashboard</span>
+npm run build --workspace=dashboard
+
+<span class="cm"># Verify output exists</span>
+ls -la gateway/public/
+
+<span class="cm"># Restart the gateway</span>
+sudo systemctl restart tentaclaw</pre>
+        </div>
+
+        <h2 id="ts-websocket">WebSocket Issues <a href="#ts-websocket" class="anchor">#</a></h2>
+        <p>WebSocket connections (used for terminal access and real-time agent communication) can fail for several reasons:</p>
+        <ul>
+          <li><strong>Cluster secret mismatch:</strong> Agent WebSocket connections use <code>X-Cluster-Secret</code>. Dashboard connections use the session or API key. Verify both match.</li>
+          <li><strong>Reverse proxy:</strong> If you have nginx or a load balancer in front of the gateway, ensure WebSocket upgrade headers are passed through.</li>
+          <li><strong>Firewall:</strong> WebSocket connections use the same port as HTTP (8080) but require the <code>Upgrade</code> header to pass through.</li>
+        </ul>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">nginx</span>
+            <button class="code-copy-btn" data-copy='# Nginx config for WebSocket passthrough
+location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}'>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="cm"># Nginx config for WebSocket passthrough</span>
+location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}</pre>
+        </div>
+
+        <h2 id="ts-memory">Memory Issues <a href="#ts-memory" class="anchor">#</a></h2>
+        <p>If the agent or gateway shows increasing memory usage:</p>
+        <ul>
+          <li><strong>WebSocket reconnect loop:</strong> A known issue in earlier versions caused WebSocket reconnections to leak memory. This has been fixed &mdash; ensure you are on the latest version.</li>
+          <li><strong>HTTP socket pooling:</strong> The agent now properly manages HTTP socket pools to prevent connection accumulation.</li>
+          <li><strong>SSE client list:</strong> The gateway's in-memory SSE client list grows with connected clients. This is normal, but disconnected clients should be pruned automatically.</li>
+          <li><strong>Memory leak threshold:</strong> The agent monitors its own memory usage and logs a warning if memory grows beyond 200% of the initial baseline.</li>
+        </ul>
+
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="code-block-lang">bash</span>
+            <button class="code-copy-btn" data-copy="# Check agent memory usage
+ps aux | grep tentaclaw
+
+# Update to latest version
+cd /opt/tentaclaw
+git pull
+npm install
+npm run build --workspace=gateway
+npm run build --workspace=agent
+sudo systemctl restart tentaclaw">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copy
+            </button>
+          </div>
+          <pre><span class="cm"># Check agent memory usage</span>
+ps aux | grep tentaclaw
+
+<span class="cm"># Update to latest version</span>
+<span class="kw">cd</span> /opt/tentaclaw
+git pull
+npm install
+npm run build --workspace=gateway
+npm run build --workspace=agent
+sudo systemctl restart tentaclaw</pre>
+        </div>
+
+        <div class="callout callout-danger">
+          <div class="callout-title">Still stuck?</div>
+          <p>Open an issue on <a href="https://github.com/TentaCLAW-OS/TentaCLAW/issues" target="_blank" rel="noopener">GitHub</a> or ask in <a href="https://discord.gg/tentaclaw" target="_blank" rel="noopener">Discord</a>. Include your gateway version, OS, and relevant log output.</p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Mobile sidebar toggle -->
+  <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle documentation sidebar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <svg viewBox="0 0 32 32" fill="none" width="24" height="24">
+            <circle cx="16" cy="16" r="6" fill="url(#fg2)"/>
+            <path d="M16 2L16 10M16 22L16 30M2 16L10 16M22 16L30 16M5.8 5.8L11.4 11.4M20.6 20.6L26.2 26.2M5.8 26.2L11.4 20.6M20.6 11.4L26.2 5.8" stroke="url(#fg2)" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+            <defs><linearGradient id="fg2" x1="0" y1="0" x2="32" y2="32"><stop offset="0%" stop-color="#00ffff"/><stop offset="100%" stop-color="#8c00c8"/></linearGradient></defs>
+          </svg>
+          Tenta<span class="accent">CLAW</span>
+        </div>
+        <p class="footer-tagline">
+          The open-source operating system for AI inference.
+          Turn any GPU into a production inference node.
+        </p>
+      </div>
+
+      <div class="footer-links-group">
+        <div class="footer-links-title">Product</div>
+        <ul class="footer-links">
+          <li><a href="https://www.tentaclaw.io/#features">Features</a></li>
+          <li><a href="https://www.tentaclaw.io/#dashboard">Dashboard</a></li>
+          <li><a href="https://www.tentaclaw.io/#install">Install</a></li>
+          <li><a href="https://www.tentaclaw.io/pricing">Pricing</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-links-group">
+        <div class="footer-links-title">Resources</div>
+        <ul class="footer-links">
+          <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="docs.html">Documentation</a></li>
+          <li><a href="https://discord.gg/tentaclaw" target="_blank" rel="noopener">Discord</a></li>
+          <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW/issues" target="_blank" rel="noopener">Report Issue</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-links-group">
+        <div class="footer-links-title">Community</div>
+        <ul class="footer-links">
+          <li><a href="https://twitter.com/tentaclaw_os" target="_blank" rel="noopener">Twitter / X</a></li>
+          <li><a href="https://discord.gg/tentaclaw" target="_blank" rel="noopener">Discord</a></li>
+          <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="footer-bottom-text">
+        <span class="motto">"Eight arms. One mind. Zero compromises."</span>
+        <span class="founder">Founded by Alexander Ivy</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================
+       JAVASCRIPT
+       ============================================================ -->
+  <script>
+    // --- Nav scroll effect ---
+    var navEl = document.querySelector('nav');
+    window.addEventListener('scroll', function() {
+      navEl.classList.toggle('scrolled', window.scrollY > 40);
+    }, { passive: true });
+
+    // --- Mobile nav toggle ---
+    var hamburger = document.getElementById('navHamburger');
+    var navLinks = document.getElementById('navLinks');
+    hamburger.addEventListener('click', function() {
+      navLinks.classList.toggle('open');
+    });
+    navLinks.querySelectorAll('a').forEach(function(link) {
+      link.addEventListener('click', function() { navLinks.classList.remove('open'); });
+    });
+
+    // --- Sidebar mobile toggle ---
+    var sidebar = document.getElementById('docsSidebar');
+    var sidebarToggle = document.getElementById('sidebarToggle');
+    var sidebarOverlay = document.getElementById('sidebarOverlay');
+
+    function openSidebar() {
+      sidebar.classList.add('open');
+      sidebarOverlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      sidebarOverlay.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    sidebarToggle.addEventListener('click', function() {
+      if (sidebar.classList.contains('open')) {
+        closeSidebar();
+      } else {
+        openSidebar();
+      }
+    });
+    sidebarOverlay.addEventListener('click', closeSidebar);
+
+    // Close sidebar on link click (mobile)
+    sidebar.querySelectorAll('.sidebar-link').forEach(function(link) {
+      link.addEventListener('click', function() {
+        if (window.innerWidth <= 768) closeSidebar();
+      });
+    });
+
+    // --- Active sidebar link tracking ---
+    var sidebarLinks = document.querySelectorAll('.sidebar-link');
+    var sections = [];
+
+    sidebarLinks.forEach(function(link) {
+      var id = link.getAttribute('href').replace('#', '');
+      var el = document.getElementById(id);
+      if (el) sections.push({ id: id, el: el, link: link });
+    });
+
+    function updateActiveLink() {
+      var scrollY = window.scrollY + 100;
+      var current = sections[0];
+
+      for (var i = 0; i < sections.length; i++) {
+        if (sections[i].el.offsetTop <= scrollY) {
+          current = sections[i];
+        }
+      }
+
+      sidebarLinks.forEach(function(l) { l.classList.remove('active'); });
+      if (current) current.link.classList.add('active');
+    }
+
+    window.addEventListener('scroll', updateActiveLink, { passive: true });
+    updateActiveLink();
+
+    // --- Copy code button ---
+    // Uses data-copy attribute for safe text copying (no innerHTML)
+    document.querySelectorAll('.code-copy-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var textToCopy = btn.getAttribute('data-copy');
+        if (!textToCopy) {
+          textToCopy = btn.closest('.code-block').querySelector('pre').textContent;
+        }
+        navigator.clipboard.writeText(textToCopy).then(function() {
+          var svgEl = btn.querySelector('svg');
+          var originalPath = svgEl.outerHTML;
+          btn.classList.add('copied');
+          btn.textContent = '';
+          var checkSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          checkSvg.setAttribute('viewBox', '0 0 24 24');
+          checkSvg.setAttribute('fill', 'none');
+          checkSvg.setAttribute('stroke', 'currentColor');
+          checkSvg.setAttribute('stroke-width', '2');
+          checkSvg.setAttribute('stroke-linecap', 'round');
+          var polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+          polyline.setAttribute('points', '20 6 9 17 4 12');
+          checkSvg.appendChild(polyline);
+          btn.appendChild(checkSvg);
+          btn.appendChild(document.createTextNode(' Copied'));
+          setTimeout(function() {
+            btn.classList.remove('copied');
+            btn.textContent = '';
+            var copySvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            copySvg.setAttribute('viewBox', '0 0 24 24');
+            copySvg.setAttribute('fill', 'none');
+            copySvg.setAttribute('stroke', 'currentColor');
+            copySvg.setAttribute('stroke-width', '2');
+            copySvg.setAttribute('stroke-linecap', 'round');
+            var rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', '9');
+            rect.setAttribute('y', '9');
+            rect.setAttribute('width', '13');
+            rect.setAttribute('height', '13');
+            rect.setAttribute('rx', '2');
+            var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', 'M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1');
+            copySvg.appendChild(rect);
+            copySvg.appendChild(path);
+            btn.appendChild(copySvg);
+            btn.appendChild(document.createTextNode(' Copy'));
+          }, 2000);
+        });
+      });
+    });
+
+    // --- Smooth scroll for anchor links ---
+    document.querySelectorAll('a[href^="#"]').forEach(function(anchor) {
+      anchor.addEventListener('click', function(e) {
+        var targetId = this.getAttribute('href').slice(1);
+        var target = document.getElementById(targetId);
+        if (target) {
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          history.pushState(null, '', this.getAttribute('href'));
+        }
+      });
+    });
+  </script>
+</body>
+</html>

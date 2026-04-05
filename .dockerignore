@@ -1,12 +1,2 @@
 node_modules
-dist
-*.md
-.git
-iso
-pxe
-builder
-agent/node_modules
-agent/dist
-gateway/node_modules
-gateway/dist
-gateway/data
+package-lock.json
