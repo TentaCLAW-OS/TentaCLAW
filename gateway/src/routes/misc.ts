@@ -541,7 +541,7 @@ routes.get('/api/v1/doctor', async (c) => {
     const d = getDb();
 
     const allNodes = getAllNodes();
-    const staleThreshold = 90;
+    const staleThreshold = parseInt(process.env.NODE_STALE_TIMEOUT_SECS || '90', 10) || 90;
     const now = Date.now();
     let staleFixed = 0;
     for (const node of allNodes) {
@@ -826,6 +826,9 @@ routes.post('/api/v1/webhooks', async (c) => {
         secret: body.secret || undefined, enabled: body.enabled !== false,
         created_at: new Date().toISOString(),
     };
+    if (webhooks.length >= 50) {
+        return c.json({ error: 'Maximum 50 webhooks. Delete old ones first.' }, 400);
+    }
     webhooks.push(wh);
     return c.json(wh, 201);
 });

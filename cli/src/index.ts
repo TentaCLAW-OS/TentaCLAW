@@ -96,9 +96,31 @@ function saveConfig(config: TentaclawConfig): void {
     const dir = getConfigDir();
     fs.mkdirSync(dir, { recursive: true });
     const cfgPath = getConfigPath();
+    // Backup existing config before overwriting
+    if (fs.existsSync(cfgPath)) {
+        try { fs.copyFileSync(cfgPath, cfgPath + '.bak'); } catch { /* ok */ }
+    }
     const tmpPath = cfgPath + '.tmp';
     fs.writeFileSync(tmpPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
-    fs.renameSync(tmpPath, cfgPath);
+    // Atomic rename — retry on Windows where antivirus/indexer can lock files
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            fs.renameSync(tmpPath, cfgPath);
+            return;
+        } catch {
+            if (attempt < 2) {
+                // Brief sync wait before retry (Windows file lock release)
+                const start = Date.now();
+                while (Date.now() - start < 100) { /* spin */ }
+            }
+        }
+    }
+    // Fallback: direct write if rename keeps failing
+    try {
+        const content = fs.readFileSync(tmpPath, 'utf8');
+        fs.writeFileSync(cfgPath, content, 'utf8');
+        fs.unlinkSync(tmpPath);
+    } catch { /* last resort — tmp file left behind */ }
 }
 
 /** Resolve inference endpoint + auth headers from config */
@@ -142,6 +164,8 @@ type LocalBackend = 'ollama' | 'lmstudio' | 'llamafile' | 'vllm' | 'tabbyapi' | 
 
 // Module-level — set once during cmdCode startup, read by bodyStr builder and capability matrix
 let _detectedBackend: LocalBackend = 'unknown';
+// Wave 454: actual model context length from Ollama /api/show (0 = not detected, use BACKEND_CAPS default)
+let _ollamaModelCtx: number = 0;
 
 async function detectLocalBackend(baseUrl: string, configProvider?: string): Promise<LocalBackend> {
     // Cloud providers — identify by config, no probing needed
@@ -1496,7 +1520,7 @@ async function cmdCommand(gateway: string, nodeId: string, action: string, flags
 
     const body: Record<string, unknown> = { action };
     if (flags['model']) body['model'] = flags['model'];
-    if (flags['gpu']) body['gpu'] = parseInt(flags['gpu']);
+    if (flags['gpu']) body['gpu'] = parseInt(flags['gpu'], 10) || 0;
     if (flags['profile']) body['profile'] = flags['profile'];
     if (flags['priority']) body['priority'] = flags['priority'];
 
@@ -2005,7 +2029,8 @@ async function cmdChat(gateway: string, flags: Record<string, string>): Promise<
                     else {
                         console.log('');
                         for (const s of sessions) {
-                            const ts = new Date(s.createdAt || '').toLocaleString();
+                            const tsDate = new Date(s.createdAt || 0);
+                            const ts = isNaN(tsDate.getTime()) ? 'unknown' : tsDate.toLocaleString();
                             console.log('  ' + C.dim(s.sessionId.slice(0, 8)) + '  ' + C.white(s.label || s.model || 'chat') + '  ' + C.dim(ts) + (s.messageCount ? C.dim(`  ${s.messageCount} msgs`) : ''));
                         }
                         console.log('');
@@ -3674,8 +3699,9 @@ async function checkForUpdate(): Promise<void> {
         const cacheFile = path.join(getConfigDir(), 'update-check.json');
         // Check cache (valid for 24h)
         if (fs.existsSync(cacheFile)) {
-            const cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8')) as { checkedAt: string; latestVersion: string };
-            const age = Date.now() - new Date(cached.checkedAt).getTime();
+            let cached: { checkedAt: string; latestVersion: string };
+            try { cached = JSON.parse(fs.readFileSync(cacheFile, 'utf8')); } catch { cached = { checkedAt: '', latestVersion: '' }; }
+            const age = Date.now() - new Date(cached.checkedAt || 0).getTime();
             if (age < 86_400_000) {
                 if (cached.latestVersion && cached.latestVersion !== `v${CLI_VERSION}`) {
                     console.log('  ' + C.yellow(`\u2605 Update available: ${cached.latestVersion}`) + C.dim('  \u2192  tentaclaw update'));
@@ -3749,6 +3775,18 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
         'rubber-duck': '\n\n## Persona: Rubber Duck\nHelp the user think through problems by asking clarifying questions. Don\'t jump to solutions. Make them reason through it.',
     };
     const personaPromptExtra = personaFlag && PERSONA_PROMPTS[personaFlag] ? PERSONA_PROMPTS[personaFlag] : '';
+
+    // Wave 542: --specialist <type> routes to task-specialized model
+    // Types: code, math, reasoning, creative, fast — adjusts model + system prompt
+    const specialistFlag = flags['specialist'] || flags['spec'] || '';
+    const SPECIALIST_MODELS: Record<string, { modelHint: string; promptExtra: string }> = {
+        code:      { modelHint: 'coder',     promptExtra: '\n\nYou are a coding specialist. Focus exclusively on writing correct, efficient, well-tested code. Use tools aggressively.' },
+        math:      { modelHint: 'math',      promptExtra: '\n\nYou are a math and reasoning specialist. Show your work step by step. Verify calculations before presenting answers.' },
+        reasoning: { modelHint: 'reasoning',  promptExtra: '\n\nYou are a reasoning specialist. Think step by step. Consider edge cases. Verify your logic chain before answering.' },
+        creative:  { modelHint: 'creative',   promptExtra: '\n\nYou are a creative writing specialist. Focus on clarity, style, and engaging prose. Vary sentence structure.' },
+        fast:      { modelHint: '3b',         promptExtra: '\n\nBe extremely fast and concise. Short answers. No elaboration unless asked.' },
+    };
+    const specialistConfig = specialistFlag ? SPECIALIST_MODELS[specialistFlag] : null;
 
     // Wave 562: --consensus runs the prompt on 3 models and picks the most consistent answer
     const consensusFlag = flags['consensus'] === 'true' || flags['consensus'] === '';
@@ -3872,6 +3910,7 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
 
     // Wave 446: detect which local backend is running — drives capability matrix in Wave 447
     _detectedBackend = await detectLocalBackend(inferenceUrl, config?.provider);
+    _ollamaModelCtx = 0; // Wave 454: reset per session — will be populated from /api/show below
     const backendDisplayName: Record<LocalBackend, string> = {
         ollama: 'Ollama (local)', lmstudio: 'LM Studio (local)', llamafile: 'llamafile (local)',
         vllm: 'vllm (local)', tabbyapi: 'tabbyAPI (local)',
@@ -3961,13 +4000,16 @@ async function cmdCode(gateway: string, flags: Record<string, string>): Promise<
                     if (arch433 && NO_TOOLS_ARCHS433.some(a => arch433.includes(a))) {
                         likelyNoTools = true;
                     }
-                    // Wave 454: extract context_length from Ollama /api/show
+                    // Wave 454: extract context_length from Ollama /api/show — use actual model ctx, not hardcoded 32K
                     const allInfo454 = { ...info433.modelinfo, ...info433.model_info };
                     const ctxEntry454 = Object.entries(allInfo454).find(([k]) => k.endsWith('.context_length'));
                     if (ctxEntry454) {
                         const detectedCtx454 = parseInt(String(ctxEntry454[1]), 10);
-                        if (detectedCtx454 > 0 && !printMode) {
-                            console.log('  ' + C.dim(`Model context window: ${formatNumber(detectedCtx454)} tokens`));
+                        if (detectedCtx454 > 0) {
+                            _ollamaModelCtx = detectedCtx454;
+                            if (!printMode) {
+                                console.log('  ' + C.dim(`context  `) + C.white(formatNumber(detectedCtx454) + ' tokens') + (detectedCtx454 <= 4096 ? C.yellow('  (small — consider /compact often)') : ''));
+                            }
                         }
                     }
                 }
@@ -4175,6 +4217,36 @@ RULES:
     // Wave 560: inject persona modifier
     if (personaPromptExtra) systemPrompt += personaPromptExtra;
 
+    // Wave 542: inject specialist prompt modifier + attempt model routing
+    if (specialistConfig) {
+        systemPrompt += specialistConfig.promptExtra;
+        // Try to auto-select a model that matches the specialist hint
+        // Only override if user didn't explicitly set a model
+        if (!flags['model'] && !flags['m']) {
+            const config542 = loadConfig();
+            if (config542?.provider === 'ollama') {
+                // Check if a model matching the hint is available
+                try {
+                    const tagsResp542 = await new Promise<string>((resolve) => {
+                        const parsed542 = new URL(inferenceUrl.replace(/\/+$/, '') + '/api/tags');
+                        const lib542 = parsed542.protocol === 'https:' ? https : http;
+                        const r542 = lib542.request({ hostname: parsed542.hostname, port: Number(parsed542.port) || 80, path: parsed542.pathname, method: 'GET', timeout: 2000 }, (res542) => {
+                            let buf = ''; res542.on('data', (c: Buffer) => { buf += c.toString(); }); res542.on('end', () => resolve(buf));
+                        }); r542.on('error', () => resolve('')); r542.on('timeout', () => { r542.destroy(); resolve(''); }); r542.end();
+                    });
+                    if (tagsResp542) {
+                        const tags542 = JSON.parse(tagsResp542) as { models?: Array<{ name: string }> };
+                        const match542 = (tags542.models || []).find(m => m.name.toLowerCase().includes(specialistConfig.modelHint));
+                        if (match542) {
+                            model = match542.name;
+                            if (!printMode) console.log('  ' + C.dim(`specialist: ${specialistFlag} \u2192 ${model}`));
+                        }
+                    }
+                } catch { /* keep current model */ }
+            }
+        }
+    }
+
     // Wave 562: consensus mode — instruct agent to consider multiple approaches before committing
     if (consensusFlag) {
         systemPrompt += '\n\n## Consensus Mode\nBefore committing to any implementation approach, briefly consider 2–3 alternatives and explain why you chose the path you did. Do this inline — no need for a separate section.';
@@ -4183,6 +4255,27 @@ RULES:
     // Wave 567: quantize-aware mode — remind agent to consider VRAM and quantization
     if (quantizeAwareFlag) {
         systemPrompt += '\n\n## Quantize-Aware Mode\nWhen recommending or writing code that loads, fine-tunes, or serves models, always factor in quantization (GGUF Q4_K_M, AWQ, GPTQ, bitsandbytes). Prefer approaches that run within typical home-lab VRAM (8–24 GB per GPU).';
+    }
+
+    // Wave 544: Task decomposition mode — auto-split large tasks into subtasks
+    const planFlag544 = flags['plan'] === 'true' || flags['plan'] === '' || flags['decompose'] === 'true';
+    if (planFlag544) {
+        systemPrompt += `\n\n## Task Decomposition Mode (--plan)
+When given a large task, ALWAYS decompose it before starting:
+1. First, output a numbered plan with 3-8 discrete subtasks
+2. Each subtask should be independently verifiable
+3. After outputting the plan, ask "Proceed with step 1?" and wait for confirmation
+4. After completing each step, mark it done and move to the next
+5. If a step fails, stop and report — don't skip ahead
+6. After all steps complete, verify the full task end-to-end
+
+Format the plan as:
+\`\`\`
+Plan:
+  [1] <subtask description>
+  [2] <subtask description>
+  ...
+\`\`\``;
     }
 
     // Wave 545: TDD mode — write tests first, then implementation
@@ -4338,10 +4431,11 @@ RULES:
                 break;
             }
 
-            // Wave 451: context auto-trim for local backends — prevent silent context overflow
-            // Local models have hard context limits (2K–32K); long sessions overflow silently without this.
+            // Wave 451+454: context auto-trim for local backends — prevent silent context overflow
+            // Wave 454: trim earlier for small context models (≤8K → trim at 12 msgs, else 22)
             const LOCAL_BACKENDS_451: LocalBackend[] = ['ollama', 'lmstudio', 'llamafile', 'tabbyapi', 'unknown'];
-            if (LOCAL_BACKENDS_451.includes(_detectedBackend) && messages.length > 22) {
+            const trimThreshold454 = (_ollamaModelCtx > 0 && _ollamaModelCtx <= 8192) ? 12 : 22;
+            if (LOCAL_BACKENDS_451.includes(_detectedBackend) && messages.length > trimThreshold454) {
                 const systemMsg = messages[0]!;                 // always keep system prompt
                 const tail451 = messages.slice(-12);            // always keep last 12 messages
                 // Find first 'user' role in tail to avoid starting on an orphaned tool result
@@ -4395,9 +4489,9 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                 stream: true,
                 temperature: agentTemperature,  // Wave 73: /think sets this
                 ...(maxTokensFlag > 0 ? { max_tokens: maxTokensFlag } : {}),  // Wave 271
-                // Wave 448: Ollama num_ctx injection — override the default 2048/4096 token context window
-                ...(caps447.numCtxParam === 'ollama' && caps447.defaultCtx > 0
-                    ? { options: { num_ctx: caps447.defaultCtx } }
+                // Wave 448+454: Ollama num_ctx injection — use detected model ctx from /api/show, fallback to 32K default
+                ...(caps447.numCtxParam === 'ollama'
+                    ? { options: { num_ctx: _ollamaModelCtx > 0 ? _ollamaModelCtx : caps447.defaultCtx } }
                     : {}),
             });
 
@@ -4649,6 +4743,57 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                 req.end();
             });
 
+            // Wave 459: SSE reconnect on stream drop — 1 retry for local backends only
+            const isLocalBackend459 = ['ollama', 'lmstudio', 'llamafile', 'tabbyapi', 'unknown'].includes(_detectedBackend);
+            const isStreamDrop459 = /ECONNRESET|EPIPE|socket hang up|aborted/i.test(streamState.error);
+            if (isLocalBackend459 && isStreamDrop459 && !fullContent) {
+                // Stream dropped before any content — retry once
+                if (!printMode) console.log('\n  ' + C.yellow('\u26A1 Connection dropped \u2014 retrying...'));
+                streamState.error = '';
+                streamState.finishReason = '';
+                await new Promise<void>((resolve) => {
+                    const parsed459 = new URL(url);
+                    const lib459 = parsed459.protocol === 'https:' ? https : http;
+                    const req459 = lib459.request({
+                        hostname: parsed459.hostname,
+                        port: Number(parsed459.port) || (parsed459.protocol === 'https:' ? 443 : 80),
+                        path: parsed459.pathname,
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Content-Length': Buffer.byteLength(bodyStr),
+                            ...inferenceHeaders,
+                        },
+                    }, (res459) => {
+                        let buf459 = '';
+                        res459.on('data', (chunk: Buffer) => {
+                            const text459 = chunk.toString();
+                            buf459 += text459;
+                            // Simple SSE parse — extract content deltas
+                            for (const line of text459.split('\n')) {
+                                if (!line.startsWith('data: ') || line.includes('[DONE]')) continue;
+                                try {
+                                    const ev459 = JSON.parse(line.slice(6)) as { choices?: Array<{ delta?: { content?: string }; finish_reason?: string }> };
+                                    const delta459 = ev459.choices?.[0]?.delta?.content;
+                                    if (delta459) {
+                                        fullContent += delta459;
+                                        if (!printMode) process.stdout.write(delta459);
+                                    }
+                                    const fr459 = ev459.choices?.[0]?.finish_reason;
+                                    if (fr459) streamState.finishReason = fr459;
+                                } catch { /* skip */ }
+                            }
+                        });
+                        res459.on('end', () => resolve());
+                        res459.on('error', (e) => { streamState.error = e.message; resolve(); });
+                    });
+                    req459.setTimeout(120_000, () => { req459.destroy(); streamState.error = 'Retry timed out after 120s.'; resolve(); });
+                    req459.on('error', (e) => { streamState.error = e.message; resolve(); });
+                    req459.write(bodyStr);
+                    req459.end();
+                });
+            }
+
             // Error recovery: save partial content if stream broke
             // Wave 448: surface context overflow before checking for other errors
             if (!printMode && (streamState.finishReason === 'length' || streamState.finishReason === 'max_tokens')) {
@@ -4664,7 +4809,29 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
 
             if (streamState.error) {
                 console.log('\n');
-                console.log('  ' + C.red('\u26A0 Stream interrupted: ' + streamState.error));
+                // Wave 458: distinguish empty vs timeout vs connection error for actionable recovery
+                const isTimeout458 = streamState.error.includes('No response after');
+                const isConnRefused458 = /ECONNREFUSED|ECONNRESET|ENOTFOUND|EHOSTUNREACH|EPIPE/.test(streamState.error);
+                const isModelError458 = /model.*not found|does not exist|pull.*first/i.test(streamState.error);
+                if (isTimeout458) {
+                    console.log('  ' + C.red('\u26A0 Timeout — no response from backend'));
+                    console.log('  ' + C.dim('  This usually means the model is loading into VRAM.'));
+                    console.log('  ' + C.dim('  Wait 30–60s and try again, or check: ollama ps'));
+                } else if (isConnRefused458) {
+                    console.log('  ' + C.red('\u26A0 Connection failed — backend is not running'));
+                    console.log('  ' + C.dim('  Start your local backend:'));
+                    if (_detectedBackend === 'ollama' || inferenceUrl.includes('11434')) {
+                        console.log('  ' + C.cyan('    ollama serve'));
+                    } else {
+                        console.log('  ' + C.cyan('    Check that your inference server is running at ' + inferenceUrl));
+                    }
+                } else if (isModelError458) {
+                    console.log('  ' + C.red(`\u26A0 Model "${model}" not available`));
+                    console.log('  ' + C.dim('  Install it:'));
+                    console.log('  ' + C.cyan(`    ollama pull ${model}`));
+                } else {
+                    console.log('  ' + C.red('\u26A0 Stream error: ' + streamState.error));
+                }
                 // Wave 427: auto-detect "does not support tools" and offer graceful fallback
                 if (/does not support tools|tool_use.*not supported|function.*call.*not.*support/i.test(streamState.error) && !noTools) {
                     console.log('');
@@ -5143,7 +5310,8 @@ IMPORTANT: Use relative paths from the current directory. Do not create subdirec
                         const displayPath = relPath || path.basename(fp || 'files');
                         const verb = tc.name === 'write_file' ? 'write' : tc.name === 'edit_file' ? 'edit' : tc.name === 'delete_file' ? 'delete' : tc.name.replace('_', ' ');
                         const commitMsg = `tentaclaw(${verb}): ${displayPath}`;
-                        execSync(`git add -A && git commit -m "${commitMsg.replace(/"/g, "'")} [checkpoint]"`, { cwd: process.cwd(), stdio: 'ignore' });
+                        const safeMsg = commitMsg.replace(/[`$"\\]/g, '');
+                        execSync(`git add -A && git commit -m "${safeMsg} [checkpoint]"`, { cwd: process.cwd(), stdio: 'ignore' });
                         if (!printMode) console.log('  ' + C.dim(`\u{1F4BE} ${commitMsg}`));
                     } catch { /* git not available or nothing to commit */ }
                 }
@@ -6151,7 +6319,7 @@ List the steps you'll take. Be specific about which files you'll read, modify, o
                         const diffCtxN374 = diffCtxMatch374 ? `-U${diffCtxMatch374[1]}` : '';
                         const cleanDiffArg374 = diffArg.replace(/(?:--context|-C)[= ]?\d+/, '').trim();
                         // /diff --staged  → staged changes; /diff <file> → specific file; /diff → unstaged
-                        const gitArgs = cleanDiffArg374 === '--staged' || cleanDiffArg374 === '--cached' ? '--cached' : cleanDiffArg374;
+                        const gitArgs = cleanDiffArg374 === '--staged' || cleanDiffArg374 === '--cached' ? '--cached' : cleanDiffArg374.replace(/[`$\\;|&()]/g, '');
                         let diffOut: string;
                         try {
                             diffOut = execSync(`git diff ${diffCtxN374} ${gitArgs}`.trim(), { encoding: 'utf8', stdio: 'pipe', cwd: process.cwd() }).trim();
@@ -6340,7 +6508,7 @@ List the steps you'll take. Be specific about which files you'll read, modify, o
                                 const more = changedFiles.length > 3 ? ` (+${changedFiles.length - 3})` : '';
                                 commitMsg = `update: ${fileStr}${more}` + (dirs.length > 1 ? ` [${dirs.slice(0, 3).join(', ')}]` : '');
                             }
-                            execSync(`git add -A && git commit -m "${commitMsg.replace(/"/g, "'")}"`, { encoding: 'utf8', stdio: 'pipe' });
+                            execSync(`git add -A && git commit -m "${commitMsg.replace(/[`$"\\]/g, '')}"`, { encoding: 'utf8', stdio: 'pipe' });
                             console.log('  ' + C.green(`\u2714 Committed ${changedFiles.length} file${changedFiles.length !== 1 ? 's' : ''}: "${commitMsg}"`));
                         }
                     } catch (e) {
@@ -6358,7 +6526,7 @@ List the steps you'll take. Be specific about which files you'll read, modify, o
                             console.log('  ' + C.dim('Nothing to commit — working tree clean.'));
                         } else {
                             const msg = arg.trim() || `checkpoint: TentaCLAW session ${sessionId.slice(0, 8)}`;
-                            execSync(`git add -A && git commit -m "${msg.replace(/"/g, "'")}"`, { encoding: 'utf8', stdio: 'pipe' });
+                            execSync(`git add -A && git commit -m "${msg.replace(/[`$"\\]/g, '')}"`, { encoding: 'utf8', stdio: 'pipe' });
                             const files = statusOut.split('\n').length;
                             console.log('  ' + C.green(`\u2714 Checkpoint committed: ${files} file${files !== 1 ? 's' : ''} — "${msg}"`));
                         }
@@ -6552,11 +6720,11 @@ List the steps you'll take. Be specific about which files you'll read, modify, o
                             console.log('');
                         } else if (sub.startsWith('add ') || sub === 'add') {
                             const target = sub.slice(4).trim() || '-A';
-                            execSync(`git add ${target}`, { encoding: 'utf8', stdio: 'pipe' });
+                            execSync(`git add ${JSON.stringify(target)}`, { encoding: 'utf8', stdio: 'pipe' });
                             console.log('  ' + C.green(`\u2714 Staged: ${target}`));
                         } else if (sub.startsWith('commit ')) {
                             const msg = sub.slice(7).trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
-                            execSync(`git commit -m "${msg.replace(/"/g, "'")}"`, { encoding: 'utf8', stdio: 'pipe' });
+                            execSync(`git commit -m "${msg.replace(/[`$"\\]/g, '')}"`, { encoding: 'utf8', stdio: 'pipe' });
                             console.log('  ' + C.green(`\u2714 Committed: "${msg}"`));
                         } else if (sub === 'stash') {
                             execSync('git stash', { encoding: 'utf8', stdio: 'pipe' });
@@ -6589,12 +6757,13 @@ List the steps you'll take. Be specific about which files you'll read, modify, o
                             console.log('');
                         } else if (branchArg.startsWith('new ') || branchArg.startsWith('-b ')) {
                             // Create new branch
-                            const name = branchArg.replace(/^new |^-b /, '').trim();
-                            execSync(`git checkout -b ${name}`, { encoding: 'utf8', stdio: 'pipe' });
-                            console.log('  ' + C.green(`✔ Created and switched to branch: ${name}`));
+                            const name = branchArg.replace(/^new |^-b /, '').trim().replace(/[^a-zA-Z0-9._\-/]/g, '');
+                            execSync(`git checkout -b ${JSON.stringify(name)}`, { encoding: 'utf8', stdio: 'pipe' });
+                            console.log('  ' + C.green(`\u2714 Created and switched to branch: ${name}`));
                         } else {
                             // Switch to existing branch
-                            execSync(`git checkout ${branchArg}`, { encoding: 'utf8', stdio: 'pipe' });
+                            const safeBranch = branchArg.replace(/[^a-zA-Z0-9._\-/]/g, '');
+                            execSync(`git checkout ${JSON.stringify(safeBranch)}`, { encoding: 'utf8', stdio: 'pipe' });
                             console.log('  ' + C.green(`✔ Switched to branch: ${branchArg} (was: ${current})`));
                         }
                     } catch (e) {
@@ -7658,6 +7827,51 @@ async function cmdReview(_gateway: string, flags: Record<string, string>): Promi
     console.log('');
 }
 
+// Wave 548 — tentaclaw changelog [--n N] — AI-summarized git log
+async function cmdChangelog(flags: Record<string, string>): Promise<void> {
+    const config = loadConfig();
+    if (!config) { console.log(C.red('  No config. Run: tentaclaw setup')); return; }
+
+    const n = parseInt(flags['n'] || '20', 10) || 20;
+    let gitLog = '';
+    try {
+        gitLog = execSync(`git log --oneline --no-decorate -${n}`, { encoding: 'utf8', stdio: 'pipe' }).trim();
+    } catch { /* not a git repo */ }
+
+    if (!gitLog) {
+        console.log('');
+        console.log('  ' + C.yellow('\u26A0') + '  No git history found.');
+        console.log('');
+        return;
+    }
+
+    // Also get stat for richer context
+    let gitStat = '';
+    try {
+        gitStat = execSync(`git log --stat --no-decorate -${Math.min(n, 10)}`, { encoding: 'utf8', stdio: 'pipe' }).trim();
+    } catch { /* ok */ }
+
+    const prompt = `Summarize this git log into a concise human-readable changelog. Group related commits together. Highlight: new features, bug fixes, breaking changes, and improvements. Use clear section headers.
+
+Git log (${n} most recent commits):
+\`\`\`
+${gitLog}
+\`\`\`
+
+${gitStat ? `Detailed stats (last ${Math.min(n, 10)}):\n\`\`\`\n${gitStat.slice(0, 8000)}\n\`\`\`` : ''}`;
+
+    console.log('');
+    console.log('  ' + C.purple(C.bold('Changelog')) + C.dim(` \u2014 last ${n} commits`));
+    console.log('');
+
+    const resolved = resolveInferenceFromConfig(config);
+    const logModel = flags['model'] || config.model;
+    const body = JSON.stringify({ model: logModel, messages: [{ role: 'user', content: prompt }], stream: true, temperature: 0.3 });
+
+    await streamOneshot(resolved.url, resolved.headers, body, logModel);
+    console.log('');
+}
+
 // Wave 540 — tentaclaw refactor <pattern> [--dry-run]
 async function cmdRefactor(gateway: string, positional: string[], flags: Record<string, string>): Promise<void> {
     const pattern = positional.join(' ').trim();
@@ -7698,7 +7912,7 @@ async function cmdPr(_gateway: string, flags: Record<string, string>): Promise<v
     const config = loadConfig();
     if (!config) { console.log(C.red('  No config. Run: tentaclaw setup')); return; }
 
-    const baseBranch = flags['base'] || flags['b'] || 'main';
+    const baseBranch = (flags['base'] || flags['b'] || 'main').replace(/[`$\\;|&()]/g, '');
     const titleFlag = flags['title'] || '';
     const dryRun = flags['dry-run'] === 'true';
 
@@ -8022,6 +8236,100 @@ async function cmdPipeline(gateway: string, positional: string[], flags: Record<
     console.log('  ' + C.green('✔ Pipeline complete') + C.dim(` — draft:${draftModel} → review:${reviewModel}`));
 }
 
+// Wave 563 — Model tournament: run same prompt on N models, compare outputs
+async function cmdTournament(flags: Record<string, string>, positional: string[]): Promise<void> {
+    const config = loadConfig();
+    if (!config) { console.log(C.red('  No config. Run: tentaclaw setup')); return; }
+
+    const prompt = positional.join(' ').trim();
+    if (!prompt) {
+        console.log('');
+        console.log('  ' + C.yellow('Usage: tentaclaw tournament "explain closures in JavaScript" --models model1,model2,model3'));
+        return;
+    }
+
+    const modelsStr = flags['models'] || flags['m'] || '';
+    if (!modelsStr) {
+        console.log('');
+        console.log('  ' + C.yellow('--models <model1,model2,...> required'));
+        console.log('  ' + C.dim('  Example: tentaclaw tournament "question" --models hermes3:8b,qwen2.5-coder:7b,llama3.1:8b'));
+        return;
+    }
+
+    const models563 = modelsStr.split(',').map(m => m.trim()).filter(Boolean);
+    if (models563.length < 2) {
+        console.log(C.yellow('  Need at least 2 models for a tournament.'));
+        return;
+    }
+
+    console.log('');
+    console.log('  ' + C.purple(C.bold('TOURNAMENT')) + C.dim(` — ${models563.length} models competing`));
+    console.log('');
+
+    const resolved = resolveInferenceFromConfig(config);
+    const results563: Array<{ model: string; response: string; latencyMs: number; tokens: number }> = [];
+
+    for (const m of models563) {
+        console.log('  ' + C.teal(`[${m}]`) + C.dim(' generating...'));
+        const startMs = Date.now();
+        let response = '';
+        let tokens = 0;
+
+        try {
+            const https563 = await import('https');
+            const http563 = await import('http');
+            const body563 = JSON.stringify({ model: m, messages: [{ role: 'user', content: prompt }], stream: true, max_tokens: 500, temperature: 0.3 });
+
+            await new Promise<void>((resolve) => {
+                const parsed563 = new URL(resolved.url.replace(/\/+$/, '') + '/v1/chat/completions');
+                const lib563 = parsed563.protocol === 'https:' ? https563 : http563;
+                const req563 = lib563.request({
+                    hostname: parsed563.hostname,
+                    port: Number(parsed563.port) || (parsed563.protocol === 'https:' ? 443 : 80),
+                    path: parsed563.pathname, method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body563), ...resolved.headers },
+                }, (res563) => {
+                    res563.on('data', (chunk: Buffer) => {
+                        for (const line of chunk.toString().split('\n')) {
+                            if (!line.startsWith('data: ') || line.includes('[DONE]')) continue;
+                            try {
+                                const ev563 = JSON.parse(line.slice(6)) as { choices?: Array<{ delta?: { content?: string } }> };
+                                if (ev563.choices?.[0]?.delta?.content) {
+                                    response += ev563.choices[0].delta.content;
+                                    tokens++;
+                                }
+                            } catch { /* skip */ }
+                        }
+                    });
+                    res563.on('end', () => resolve());
+                    res563.on('error', () => resolve());
+                });
+                req563.setTimeout(60_000, () => { req563.destroy(); resolve(); });
+                req563.on('error', () => resolve());
+                req563.write(body563);
+                req563.end();
+            });
+        } catch { /* skip model */ }
+
+        const latencyMs = Date.now() - startMs;
+        results563.push({ model: m, response: response.trim(), latencyMs, tokens });
+        const preview = response.trim().slice(0, 80).replace(/\n/g, ' ');
+        console.log('  ' + C.dim(`  ${latencyMs}ms, ${tokens} tok: `) + C.white(preview + (response.length > 80 ? '...' : '')));
+    }
+
+    console.log('');
+    console.log('  ' + C.bold('Results:'));
+    // Sort by response length (proxy for effort/quality), then by speed
+    results563.sort((a, b) => b.tokens - a.tokens || a.latencyMs - b.latencyMs);
+    for (let i = 0; i < results563.length; i++) {
+        const r = results563[i]!;
+        const medal = i === 0 ? C.green('\u2605 ') : '  ';
+        const tokPerSec = r.latencyMs > 0 ? (r.tokens / (r.latencyMs / 1000)).toFixed(1) : '0';
+        console.log('  ' + medal + C.white(padRight(r.model, 28)) + C.cyan(padRight(tokPerSec + ' tok/s', 14)) + C.dim(r.latencyMs + 'ms'));
+    }
+    console.log('');
+}
+
 // Helper: single inference call with streaming output (used by review, pr, etc.)
 async function streamOneshot(inferenceUrl: string, headers: Record<string, string>, bodyStr: string, _model: string): Promise<void> {
     const https = await import('https');
@@ -8145,8 +8453,8 @@ async function cmdApiKey(gateway: string, positional: string[], flags: Record<st
     if (sub === 'revoke') {
         const keyId = positional[1];
         if (!keyId) { console.error(C.red('  Usage: tentaclaw apikey revoke <id>')); process.exit(1); }
-        await apiGet(gateway, ''); // placeholder - need delete method
-        console.log('  ' + C.green('\u2714') + ' Key revoked');
+        await apiDelete(gateway, `/api/v1/apikeys/${encodeURIComponent(keyId)}`);
+        console.log('  ' + C.green('\u2714') + ' Key ' + C.white(keyId) + ' revoked');
         return;
     }
 }
@@ -9212,7 +9520,7 @@ async function apiProbeWithHeaders(baseUrl: string, apiPath: string, headers: Re
 // Standalone Models — `tentaclaw models` with config fallback
 // =============================================================================
 
-async function cmdModelsStandalone(filter = ''): Promise<void> {
+async function cmdModelsStandalone(filter = '', showStatus = false): Promise<void> {
     const config = loadConfig();
     if (!config) {
         console.log('');
@@ -9226,6 +9534,35 @@ async function cmdModelsStandalone(filter = ''): Promise<void> {
     console.log('');
     console.log('  ' + C.teal(C.bold('MODELS')) + C.dim(` \u2014 ${config.provider} (${url})`));
     console.log('');
+
+    // Wave 456: --status flag — show which models are currently loaded in VRAM (Ollama only)
+    if (showStatus) {
+        if (config.provider === 'ollama') {
+            const psResp456 = await apiProbeWithHeaders(url, '/api/ps', headers) as { models?: Array<{ name: string; size: number; size_vram: number; expires_at?: string; details?: { parameter_size?: string; quantization_level?: string } }> } | null;
+            const loaded456 = psResp456?.models || [];
+            if (loaded456.length === 0) {
+                console.log(C.yellow('  No models currently loaded in VRAM.'));
+                console.log(C.dim('  Models load on first inference request.'));
+            } else {
+                console.log('  ' + C.bold('Loaded in VRAM:'));
+                for (const m of loaded456) {
+                    const vramMb = Math.round(m.size_vram / 1048576);
+                    const vramStr = vramMb > 1024 ? (vramMb / 1024).toFixed(1) + ' GB' : vramMb + ' MB';
+                    const params = m.details?.parameter_size || '';
+                    const quant = m.details?.quantization_level || '';
+                    const tag = [params, quant].filter(Boolean).join(', ');
+                    const expires = m.expires_at ? C.dim(' unloads ' + new Date(m.expires_at).toLocaleTimeString()) : '';
+                    console.log('  ' + C.green('\u25CF ') + C.white(padRight(m.name, 30)) + C.dim(padRight(tag, 20)) + C.cyan(vramStr) + expires);
+                }
+            }
+            console.log('');
+            if (!filter) return;
+        } else {
+            console.log(C.yellow('  --status is only supported for Ollama backends.'));
+            console.log('');
+            return;
+        }
+    }
 
     if (config.provider === 'ollama') {
         // Use Ollama's native /api/tags for richer info
@@ -9664,7 +10001,7 @@ async function cmdSessionsCli(positional: string[], flags: Record<string, string
 // Standalone Doctor — health check without gateway
 // =============================================================================
 
-async function cmdDoctorStandalone(): Promise<void> {
+async function cmdDoctorStandalone(localDeep = false): Promise<void> {
     console.log('');
     console.log('  ' + C.teal(C.bold('DOCTOR')) + C.dim(' \u2014 standalone health check'));
     console.log('');
@@ -9807,10 +10144,451 @@ async function cmdDoctorStandalone(): Promise<void> {
         }
     }
 
+    // Wave 457: deep local backend diagnostics with --local flag
+    if (localDeep && config) {
+        console.log('');
+        console.log('  ' + C.teal(C.bold('LOCAL BACKEND DIAGNOSTICS')));
+        console.log('');
+        const { url: localUrl457, headers: localHeaders457 } = resolveInferenceFromConfig(config);
+        const backend457 = await detectLocalBackend(localUrl457, config.provider);
+        console.log('  ' + C.dim('Backend:  ') + C.white(backend457));
+
+        if (backend457 === 'ollama') {
+            // VRAM usage — loaded models
+            const ps457 = await apiProbeWithHeaders(localUrl457, '/api/ps', localHeaders457) as { models?: Array<{ name: string; size_vram: number }> } | null;
+            const loaded457 = ps457?.models || [];
+            let totalVram457 = 0;
+            for (const m of loaded457) totalVram457 += m.size_vram;
+            console.log('  ' + C.dim('Loaded:   ') + (loaded457.length > 0
+                ? C.green(loaded457.map(m => m.name).join(', ') + ` (${(totalVram457 / 1073741824).toFixed(1)} GB VRAM)`)
+                : C.dim('none')));
+
+            // Model context length
+            const show457 = await apiProbeWithHeaders(localUrl457, '/api/show', localHeaders457) as { modelinfo?: Record<string, unknown>; model_info?: Record<string, unknown> } | null;
+            if (!show457) {
+                // POST /api/show requires model name — probe with the configured model
+                try {
+                    const showResp457 = await new Promise<string>((resolve) => {
+                        const parsed457 = new URL(localUrl457.replace(/\/+$/, '') + '/api/show');
+                        const lib457 = parsed457.protocol === 'https:' ? https : http;
+                        const req457 = lib457.request({ hostname: parsed457.hostname, port: Number(parsed457.port) || 80, path: parsed457.pathname, method: 'POST', headers: { 'Content-Type': 'application/json', ...localHeaders457 }, timeout: 3000 }, (res457) => {
+                            let buf = ''; res457.on('data', (c: Buffer) => { buf += c.toString(); }); res457.on('end', () => resolve(buf));
+                        }); req457.on('error', () => resolve('')); req457.on('timeout', () => { req457.destroy(); resolve(''); });
+                        req457.write(JSON.stringify({ name: config.model })); req457.end();
+                    });
+                    if (showResp457) {
+                        const info457 = JSON.parse(showResp457) as { modelinfo?: Record<string, unknown>; model_info?: Record<string, unknown> };
+                        const allInfo457 = { ...info457.modelinfo, ...info457.model_info };
+                        const ctxEntry457 = Object.entries(allInfo457).find(([k]) => k.endsWith('.context_length'));
+                        if (ctxEntry457) {
+                            const ctx457 = parseInt(String(ctxEntry457[1]), 10);
+                            if (ctx457 > 0) {
+                                console.log('  ' + C.dim('Context:  ') + C.white(formatNumber(ctx457) + ' tokens') + (ctx457 <= 4096 ? C.yellow(' (small)') : C.green(' (good)')));
+                                ok++;
+                            }
+                        }
+                    }
+                } catch { /* ok */ }
+            }
+
+            // Quick inference test — 1 token
+            console.log('  ' + C.dim('Testing inference...'));
+            const inferStart457 = Date.now();
+            try {
+                const testResp457 = await new Promise<string>((resolve) => {
+                    const parsed457 = new URL(localUrl457.replace(/\/+$/, '') + '/v1/chat/completions');
+                    const lib457 = parsed457.protocol === 'https:' ? https : http;
+                    const testBody457 = JSON.stringify({ model: config.model, messages: [{ role: 'user', content: 'Say "ok"' }], max_tokens: 3, stream: false });
+                    const req457 = lib457.request({ hostname: parsed457.hostname, port: Number(parsed457.port) || 80, path: parsed457.pathname, method: 'POST', headers: { 'Content-Type': 'application/json', ...localHeaders457 }, timeout: 30000 }, (res457) => {
+                        let buf = ''; res457.on('data', (c: Buffer) => { buf += c.toString(); }); res457.on('end', () => resolve(buf));
+                    }); req457.on('error', () => resolve('')); req457.on('timeout', () => { req457.destroy(); resolve(''); });
+                    req457.write(testBody457); req457.end();
+                });
+                const inferMs457 = Date.now() - inferStart457;
+                if (testResp457) {
+                    console.log('  ' + C.green('\u2714') + ` Inference: ${config.model} responded in ${inferMs457}ms`);
+                    if (inferMs457 > 10000) console.log('    ' + C.yellow('  Slow — model was likely loading into VRAM'));
+                    ok++;
+                } else {
+                    console.log('  ' + C.red('\u2718') + ' Inference: no response (timeout)');
+                    issues++;
+                }
+            } catch {
+                console.log('  ' + C.red('\u2718') + ' Inference: failed');
+                issues++;
+            }
+        } else if (backend457 !== 'openai' && backend457 !== 'openrouter') {
+            // Non-Ollama local backend — basic inference test
+            console.log('  ' + C.dim('Testing inference...'));
+            const inferStart457b = Date.now();
+            try {
+                const testResp457b = await new Promise<string>((resolve) => {
+                    const parsed457b = new URL(localUrl457.replace(/\/+$/, '') + '/v1/chat/completions');
+                    const lib457b = parsed457b.protocol === 'https:' ? https : http;
+                    const testBody457b = JSON.stringify({ model: config.model, messages: [{ role: 'user', content: 'Say "ok"' }], max_tokens: 3, stream: false });
+                    const req457b = lib457b.request({ hostname: parsed457b.hostname, port: Number(parsed457b.port) || 80, path: parsed457b.pathname, method: 'POST', headers: { 'Content-Type': 'application/json', ...localHeaders457 }, timeout: 15000 }, (res457b) => {
+                        let buf = ''; res457b.on('data', (c: Buffer) => { buf += c.toString(); }); res457b.on('end', () => resolve(buf));
+                    }); req457b.on('error', () => resolve('')); req457b.on('timeout', () => { req457b.destroy(); resolve(''); });
+                    req457b.write(testBody457b); req457b.end();
+                });
+                const inferMs457b = Date.now() - inferStart457b;
+                if (testResp457b) {
+                    console.log('  ' + C.green('\u2714') + ` Inference: responded in ${inferMs457b}ms`);
+                    ok++;
+                } else {
+                    console.log('  ' + C.red('\u2718') + ' Inference: no response');
+                    issues++;
+                }
+            } catch {
+                console.log('  ' + C.red('\u2718') + ' Inference: failed');
+                issues++;
+            }
+        }
+    }
+
     console.log('');
     console.log(issues === 0
         ? '  ' + C.green(C.bold(`\u2714 All ${ok} checks passed.`))
         : '  ' + C.yellow(`${ok} passed, ${issues} issue${issues > 1 ? 's' : ''}.`));
+    console.log('');
+}
+
+// =============================================================================
+// Wave 460: Local Benchmark — `tentaclaw bench --local`
+// Quick 5-prompt benchmark: measures TTFT and tok/s for your local model
+// =============================================================================
+
+async function cmdBenchLocal(): Promise<void> {
+    const config = loadConfig();
+    if (!config) {
+        console.log('');
+        console.log(C.yellow('  No configuration found.'));
+        console.log(C.dim('  Run: tentaclaw setup'));
+        console.log('');
+        return;
+    }
+
+    const { url: benchUrl460, headers: benchHeaders460 } = resolveInferenceFromConfig(config);
+    const model460 = config.model;
+    console.log('');
+    console.log('  ' + C.teal(C.bold('BENCHMARK')) + C.dim(` \u2014 ${model460} via ${config.provider}`));
+    console.log('');
+
+    const prompts460 = [
+        { label: 'Short answer', msg: 'What is 2+2? Answer with just the number.' },
+        { label: 'Code gen', msg: 'Write a Python function that checks if a string is a palindrome. Just the code, no explanation.' },
+        { label: 'Reasoning', msg: 'A farmer has 17 sheep. All but 9 run away. How many are left? Think step by step, answer in one sentence.' },
+        { label: 'Creative', msg: 'Write a haiku about debugging code.' },
+        { label: 'Long output', msg: 'Explain how a hash table works in 100 words.' },
+    ];
+
+    const results460: Array<{ label: string; ttftMs: number; totalMs: number; tokens: number; tokPerSec: number }> = [];
+
+    for (let i = 0; i < prompts460.length; i++) {
+        const p = prompts460[i]!;
+        process.stdout.write('  ' + C.dim(`[${i + 1}/${prompts460.length}] `) + C.white(padRight(p.label, 14)));
+
+        const startMs = Date.now();
+        let firstTokenMs = 0;
+        let tokenCount = 0;
+        let error460 = '';
+
+        await new Promise<void>((resolve) => {
+            const parsed460 = new URL(benchUrl460.replace(/\/+$/, '') + '/v1/chat/completions');
+            const lib460 = parsed460.protocol === 'https:' ? https : http;
+            const body460 = JSON.stringify({
+                model: model460,
+                messages: [{ role: 'user', content: p.msg }],
+                stream: true,
+                max_tokens: 150,
+                ...(config.provider === 'ollama' ? { options: { num_ctx: _ollamaModelCtx > 0 ? _ollamaModelCtx : 32768 } } : {}),
+            });
+            const req460 = lib460.request({
+                hostname: parsed460.hostname,
+                port: Number(parsed460.port) || (parsed460.protocol === 'https:' ? 443 : 80),
+                path: parsed460.pathname,
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body460), ...benchHeaders460 },
+            }, (res460) => {
+                res460.on('data', (chunk: Buffer) => {
+                    const text460 = chunk.toString();
+                    for (const line of text460.split('\n')) {
+                        if (!line.startsWith('data: ') || line.includes('[DONE]')) continue;
+                        try {
+                            const ev460 = JSON.parse(line.slice(6)) as { choices?: Array<{ delta?: { content?: string } }> };
+                            if (ev460.choices?.[0]?.delta?.content) {
+                                if (!firstTokenMs) firstTokenMs = Date.now();
+                                tokenCount++;
+                            }
+                        } catch { /* skip */ }
+                    }
+                });
+                res460.on('end', () => resolve());
+                res460.on('error', (e) => { error460 = e.message; resolve(); });
+            });
+            req460.setTimeout(60_000, () => { req460.destroy(); error460 = 'timeout'; resolve(); });
+            req460.on('error', (e) => { error460 = e.message; resolve(); });
+            req460.write(body460);
+            req460.end();
+        });
+
+        const totalMs = Date.now() - startMs;
+        const ttftMs = firstTokenMs ? firstTokenMs - startMs : totalMs;
+        const genMs = firstTokenMs ? totalMs - ttftMs : totalMs;
+        const tokPerSec = genMs > 0 ? (tokenCount / (genMs / 1000)) : 0;
+
+        if (error460) {
+            console.log(C.red(`error: ${error460}`));
+        } else {
+            results460.push({ label: p.label, ttftMs, totalMs, tokens: tokenCount, tokPerSec });
+            console.log(
+                C.dim('TTFT ') + C.cyan(padRight(ttftMs + 'ms', 8)) +
+                C.dim('tok/s ') + C.green(padRight(tokPerSec.toFixed(1), 8)) +
+                C.dim(`(${tokenCount} tokens, ${totalMs}ms)`)
+            );
+        }
+    }
+
+    if (results460.length > 0) {
+        const avgTtft = Math.round(results460.reduce((s, r) => s + r.ttftMs, 0) / results460.length);
+        const avgTokSec = results460.reduce((s, r) => s + r.tokPerSec, 0) / results460.length;
+        const totalTokens = results460.reduce((s, r) => s + r.tokens, 0);
+        console.log('');
+        console.log('  ' + C.bold('Summary:'));
+        console.log('  ' + C.dim('Avg TTFT:  ') + C.cyan(avgTtft + 'ms'));
+        console.log('  ' + C.dim('Avg tok/s: ') + C.green(avgTokSec.toFixed(1)));
+        console.log('  ' + C.dim('Total:     ') + C.white(totalTokens + ' tokens'));
+        if (avgTokSec < 5) {
+            console.log('  ' + C.yellow('\u26A0 Slow — consider a smaller model or check GPU offloading'));
+        } else if (avgTokSec > 30) {
+            console.log('  ' + C.green('\u2714 Fast — good throughput for interactive coding'));
+        }
+    }
+    console.log('');
+}
+
+// =============================================================================
+// Wave 533/534/565: Codebase Indexing + Semantic Search
+// TF-IDF based file index for fast project search. Upgradeable to embeddings.
+// =============================================================================
+
+interface FileIndex {
+    path: string;
+    tokens: string[];
+    size: number;
+    language: string;
+    lastModified: number;
+}
+
+interface CodebaseIndex {
+    version: number;
+    created_at: string;
+    root: string;
+    files: FileIndex[];
+    idf: Record<string, number>;  // inverse document frequency per token
+}
+
+const CODE_EXTENSIONS = new Set([
+    '.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.c', '.cpp', '.h',
+    '.rb', '.php', '.swift', '.kt', '.scala', '.zig', '.lua', '.sh', '.bash',
+    '.css', '.scss', '.html', '.vue', '.svelte', '.md', '.json', '.yaml', '.yml',
+    '.toml', '.sql', '.graphql', '.proto', '.dockerfile',
+]);
+
+const IGNORE_DIRS = new Set([
+    'node_modules', '.git', 'dist', 'build', 'target', '.next', '.nuxt',
+    '__pycache__', '.venv', 'venv', '.tox', 'coverage', '.cache', '.turbo',
+]);
+
+function tokenizeFile(content: string): string[] {
+    // Split on word boundaries, camelCase, snake_case, and common delimiters
+    return content
+        .toLowerCase()
+        .replace(/([a-z])([A-Z])/g, '$1 $2')  // camelCase split
+        .split(/[^a-z0-9]+/)
+        .filter(t => t.length > 2 && t.length < 40);
+}
+
+function detectLanguage(filePath: string): string {
+    const ext = path.extname(filePath).toLowerCase();
+    const langMap: Record<string, string> = {
+        '.ts': 'typescript', '.tsx': 'typescript', '.js': 'javascript', '.jsx': 'javascript',
+        '.py': 'python', '.go': 'go', '.rs': 'rust', '.java': 'java', '.c': 'c', '.cpp': 'cpp',
+        '.rb': 'ruby', '.php': 'php', '.swift': 'swift', '.kt': 'kotlin', '.scala': 'scala',
+        '.md': 'markdown', '.json': 'json', '.yaml': 'yaml', '.yml': 'yaml', '.sql': 'sql',
+        '.sh': 'shell', '.bash': 'shell', '.html': 'html', '.css': 'css', '.vue': 'vue',
+    };
+    return langMap[ext] || 'unknown';
+}
+
+function buildCodebaseIndex(rootDir: string, maxFiles = 5000): CodebaseIndex {
+    const files: FileIndex[] = [];
+    const docFreq: Record<string, number> = {};
+
+    function walk(dir: string, depth: number): void {
+        if (depth > 10 || files.length >= maxFiles) return;
+        let entries: string[];
+        try { entries = fs.readdirSync(dir); } catch { return; }
+        for (const entry of entries) {
+            if (entry.startsWith('.') && entry !== '.clawcode') continue;
+            if (IGNORE_DIRS.has(entry)) continue;
+            const fullPath = path.join(dir, entry);
+            let stat: fs.Stats;
+            try { stat = fs.statSync(fullPath); } catch { continue; }
+            if (stat.isDirectory()) {
+                walk(fullPath, depth + 1);
+            } else if (stat.isFile()) {
+                const ext = path.extname(entry).toLowerCase();
+                if (!CODE_EXTENSIONS.has(ext)) continue;
+                if (stat.size > 500_000) continue; // skip very large files
+                try {
+                    const content = fs.readFileSync(fullPath, 'utf8');
+                    const tokens = tokenizeFile(content);
+                    const relPath = path.relative(rootDir, fullPath).replace(/\\/g, '/');
+                    files.push({
+                        path: relPath,
+                        tokens,
+                        size: stat.size,
+                        language: detectLanguage(entry),
+                        lastModified: stat.mtimeMs,
+                    });
+                    // Count unique tokens per document for IDF
+                    const unique = new Set(tokens);
+                    for (const t of unique) {
+                        docFreq[t] = (docFreq[t] || 0) + 1;
+                    }
+                } catch { /* unreadable file */ }
+            }
+        }
+    }
+
+    walk(rootDir, 0);
+
+    // Compute IDF: log(N / df)
+    const N = files.length || 1;
+    const idf: Record<string, number> = {};
+    for (const [token, df] of Object.entries(docFreq)) {
+        idf[token] = Math.log(N / df);
+    }
+
+    return { version: 1, created_at: new Date().toISOString(), root: rootDir, files, idf };
+}
+
+function searchIndex(index: CodebaseIndex, query: string, topK = 10): Array<{ path: string; score: number; language: string }> {
+    const queryTokens = tokenizeFile(query);
+    const queryTf: Record<string, number> = {};
+    for (const t of queryTokens) {
+        queryTf[t] = (queryTf[t] || 0) + 1;
+    }
+
+    const results: Array<{ path: string; score: number; language: string }> = [];
+
+    for (const file of index.files) {
+        const fileTf: Record<string, number> = {};
+        for (const t of file.tokens) {
+            fileTf[t] = (fileTf[t] || 0) + 1;
+        }
+
+        // TF-IDF cosine similarity
+        let dotProduct = 0;
+        let queryNorm = 0;
+        let fileNorm = 0;
+
+        for (const t of Object.keys(queryTf)) {
+            const qtfidf = queryTf[t]! * (index.idf[t] || 0);
+            const ftfidf = (fileTf[t] || 0) * (index.idf[t] || 0);
+            dotProduct += qtfidf * ftfidf;
+            queryNorm += qtfidf * qtfidf;
+        }
+
+        for (const t of Object.keys(fileTf)) {
+            const ftfidf = fileTf[t]! * (index.idf[t] || 0);
+            fileNorm += ftfidf * ftfidf;
+        }
+
+        const denom = Math.sqrt(queryNorm) * Math.sqrt(fileNorm);
+        const score = denom > 0 ? dotProduct / denom : 0;
+
+        if (score > 0.01) {
+            results.push({ path: file.path, score, language: file.language });
+        }
+    }
+
+    results.sort((a, b) => b.score - a.score);
+    return results.slice(0, topK);
+}
+
+async function cmdIndex(): Promise<void> {
+    const rootDir = process.cwd();
+    console.log('');
+    console.log('  ' + C.teal(C.bold('INDEXING')) + C.dim(` \u2014 ${rootDir}`));
+    console.log('');
+
+    const startMs = Date.now();
+    const index = buildCodebaseIndex(rootDir);
+    const elapsedMs = Date.now() - startMs;
+
+    // Save index to .tentaclaw/index.json
+    const indexDir = path.join(rootDir, '.tentaclaw');
+    if (!fs.existsSync(indexDir)) fs.mkdirSync(indexDir, { recursive: true });
+    fs.writeFileSync(path.join(indexDir, 'index.json'), JSON.stringify(index));
+
+    // Language breakdown
+    const langCount: Record<string, number> = {};
+    for (const f of index.files) {
+        langCount[f.language] = (langCount[f.language] || 0) + 1;
+    }
+
+    console.log('  ' + C.green('\u2714') + ` Indexed ${index.files.length} files in ${elapsedMs}ms`);
+    console.log('  ' + C.dim('  Vocabulary: ') + C.white(Object.keys(index.idf).length + ' unique tokens'));
+    const langStr = Object.entries(langCount)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 6)
+        .map(([lang, count]) => `${lang}(${count})`)
+        .join(', ');
+    console.log('  ' + C.dim('  Languages: ') + C.white(langStr));
+    console.log('  ' + C.dim('  Index: .tentaclaw/index.json'));
+    console.log('');
+}
+
+async function cmdSearchCode(positional: string[]): Promise<void> {
+    const query = positional.join(' ').trim();
+    if (!query) {
+        console.log('');
+        console.log(C.yellow('  Usage: tentaclaw find "authentication middleware"'));
+        return;
+    }
+
+    const rootDir = process.cwd();
+    const indexPath = path.join(rootDir, '.tentaclaw', 'index.json');
+
+    let index: CodebaseIndex;
+    if (fs.existsSync(indexPath)) {
+        try {
+            index = JSON.parse(fs.readFileSync(indexPath, 'utf8')) as CodebaseIndex;
+        } catch {
+            console.log('  ' + C.dim('Index corrupted, rebuilding...'));
+            index = buildCodebaseIndex(rootDir);
+        }
+    } else {
+        console.log('  ' + C.dim('No index found, building...'));
+        index = buildCodebaseIndex(rootDir);
+    }
+
+    const results = searchIndex(index, query);
+
+    console.log('');
+    console.log('  ' + C.teal(C.bold('SEARCH')) + C.dim(` \u2014 "${query}"`));
+    console.log('');
+
+    if (results.length === 0) {
+        console.log('  ' + C.dim('No matching files found.'));
+    } else {
+        for (const r of results) {
+            const score = (r.score * 100).toFixed(0);
+            console.log('  ' + C.green(padRight(score + '%', 6)) + C.cyan(padRight(r.language, 14)) + C.white(r.path));
+        }
+    }
     console.log('');
 }
 
@@ -10042,11 +10820,13 @@ async function cmdInitProject(): Promise<void> {
     let testRunner = '';
     let buildCmd = '';
     if (fs.existsSync(path.join(cwd, 'package.json'))) {
-        const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8')) as { scripts?: Record<string, string>; devDependencies?: Record<string, string> };
-        const scripts = pkg.scripts || {};
-        testRunner = 'vitest' in (pkg.devDependencies || {}) ? 'vitest' : scripts['test'] ? 'npm test' : '';
-        buildCmd = scripts['build'] ? 'npm run build' : '';
-        stack = 'Node.js/TypeScript';
+        try {
+            const pkg = JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8')) as { scripts?: Record<string, string>; devDependencies?: Record<string, string> };
+            const scripts = pkg.scripts || {};
+            testRunner = 'vitest' in (pkg.devDependencies || {}) ? 'vitest' : scripts['test'] ? 'npm test' : '';
+            buildCmd = scripts['build'] ? 'npm run build' : '';
+            stack = 'Node.js/TypeScript';
+        } catch { stack = 'Node.js'; }
     } else if (fs.existsSync(path.join(cwd, 'requirements.txt')) || fs.existsSync(path.join(cwd, 'pyproject.toml'))) {
         stack = 'Python';
         testRunner = 'pytest';
@@ -10294,9 +11074,7 @@ async function cmdLogs(gateway: string, flags: Record<string, string>): Promise<
 // Update — self-update from git
 // =============================================================================
 
-async function cmdUpdate(): Promise<void> {
-    console.log('');
-    console.log('  ' + C.teal(C.bold('UPDATE')) + C.dim(' \u2014 updating TentaCLAW CLI'));
+async function cmdUpdate(flags: Record<string, string> = {}): Promise<void> {
     console.log('');
 
     // Find git root from script location
@@ -10312,8 +11090,39 @@ async function cmdUpdate(): Promise<void> {
         return;
     }
 
+    // Wave: --rollback flag — restore to saved version
+    if (flags['rollback'] === 'true') {
+        console.log('  ' + C.teal(C.bold('ROLLBACK')) + C.dim(' \u2014 reverting to previous version'));
+        console.log('');
+        const rollbackFile = path.join(getConfigDir(), '.update-rollback');
+        if (!fs.existsSync(rollbackFile)) {
+            console.log('  ' + C.yellow('\u26A0 No rollback point saved.'));
+            console.log('  ' + C.dim('  Rollback points are created automatically during updates.'));
+            console.log('');
+            return;
+        }
+        const commitHash = fs.readFileSync(rollbackFile, 'utf8').trim();
+        try {
+            execFileSync('git', ['checkout', commitHash], { cwd: installDir, encoding: 'utf8', stdio: 'pipe' });
+            execFileSync('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], { cwd: installDir, encoding: 'utf8', stdio: 'pipe' });
+            execFileSync('npm', ['run', 'build', '--workspace=cli'], { cwd: installDir, encoding: 'utf8', stdio: 'pipe' });
+            console.log('  ' + C.green(`\u2714 Rolled back to ${commitHash.slice(0, 8)}`));
+        } catch (e) {
+            console.log('  ' + C.red(`\u2718 Rollback failed: ${e instanceof Error ? e.message : String(e)}`));
+        }
+        console.log('');
+        return;
+    }
+
+    console.log('  ' + C.teal(C.bold('UPDATE')) + C.dim(' \u2014 updating TentaCLAW CLI'));
+    console.log('');
+
     try {
-        console.log('  ' + C.dim(`Updating ${installDir}...`));
+        // Save current commit for rollback
+        const currentCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: installDir, encoding: 'utf8', stdio: 'pipe' }).trim();
+        fs.writeFileSync(path.join(getConfigDir(), '.update-rollback'), currentCommit);
+
+        console.log('  ' + C.dim(`Updating ${installDir}... (rollback: ${currentCommit.slice(0, 8)})`));
         execFileSync('git', ['pull', '--quiet'], { cwd: installDir, encoding: 'utf8', stdio: 'pipe' });
         console.log('  ' + C.green('\u2714 Git pull complete'));
         execFileSync('npm', ['install', '--no-audit', '--no-fund', '--loglevel=error'], { cwd: installDir, encoding: 'utf8', stdio: 'pipe' });
@@ -10322,8 +11131,10 @@ async function cmdUpdate(): Promise<void> {
         console.log('  ' + C.green('\u2714 CLI rebuilt'));
         console.log('');
         console.log('  ' + C.green(C.bold('\u2714 Update complete. Restart tentaclaw to use new version.')));
+        console.log('  ' + C.dim('  If something breaks: tentaclaw update --rollback'));
     } catch (e) {
         console.log('  ' + C.red(`\u2718 Update failed: ${e instanceof Error ? e.message : String(e)}`));
+        console.log('  ' + C.dim('  Try: tentaclaw update --rollback'));
     }
     console.log('');
 }
@@ -10861,7 +11672,7 @@ Register-ArgumentCompleter -Native -CommandName tentaclaw -ScriptBlock {
         }
 
         case 'clone': {
-            // Wave 364: tentaclaw clone <url> [<dir>] — clone a git repo
+            // Wave 280/364: tentaclaw clone <url> [<dir>] — git clone + auto-init .clawcode
             const cloneUrl = parsed.positional[0] || parsed.flags['url'] || '';
             if (!cloneUrl) {
                 console.log('');
@@ -10871,17 +11682,27 @@ Register-ArgumentCompleter -Native -CommandName tentaclaw -ScriptBlock {
                 console.log('');
                 return;
             }
-            const cloneDir = parsed.positional[1] || parsed.flags['dir'] || '';
-            const cloneCmd = `git clone ${JSON.stringify(cloneUrl)}${cloneDir ? ' ' + JSON.stringify(cloneDir) : ''}`;
+            const cloneDir = parsed.positional[1] || parsed.flags['dir'] || cloneUrl.split('/').pop()?.replace(/\.git$/, '') || 'repo';
             console.log('');
-            console.log('  ' + C.teal('🐙') + ' Cloning: ' + C.white(cloneUrl) + (cloneDir ? C.dim(' → ' + cloneDir) : ''));
+            console.log('  ' + C.teal('\uD83D\uDC19') + ' Cloning: ' + C.white(cloneUrl) + C.dim(' \u2192 ' + cloneDir + '/'));
             try {
-                const cloneOut = execSync(cloneCmd + ' 2>&1', { encoding: 'utf8', stdio: 'pipe', timeout: 120_000 }).trim();
-                if (cloneOut) console.log(C.dim(cloneOut.split('\n').map((l: string) => '  ' + l).join('\n')));
-                // Determine the cloned directory name
-                const clonedName = cloneDir || cloneUrl.split('/').pop()?.replace(/\.git$/, '') || 'repo';
-                console.log('  ' + C.green(`✔ Cloned to: ${clonedName}/`));
-                console.log('  ' + C.dim(`Run: cd ${clonedName} && tentaclaw code`));
+                execSync(`git clone ${JSON.stringify(cloneUrl)} ${JSON.stringify(cloneDir)}`, { encoding: 'utf8', stdio: 'pipe', cwd: process.cwd(), timeout: 120_000 });
+                console.log('  ' + C.green('\u2714 Cloned to: ' + cloneDir + '/'));
+                // Auto-init .clawcode if missing
+                const clonedPath = path.resolve(cloneDir);
+                const clawPath = path.join(clonedPath, '.clawcode');
+                if (!fs.existsSync(clawPath)) {
+                    const hasPkg = fs.existsSync(path.join(clonedPath, 'package.json'));
+                    const hasCargo = fs.existsSync(path.join(clonedPath, 'Cargo.toml'));
+                    const hasGo = fs.existsSync(path.join(clonedPath, 'go.mod'));
+                    const hasPy = fs.existsSync(path.join(clonedPath, 'pyproject.toml')) || fs.existsSync(path.join(clonedPath, 'requirements.txt'));
+                    const pType = hasPkg ? 'node' : hasCargo ? 'rust' : hasGo ? 'go' : hasPy ? 'python' : 'unknown';
+                    const bCmd = hasPkg ? 'npm run build' : hasCargo ? 'cargo build' : hasGo ? 'go build ./...' : 'make build';
+                    const tCmd = hasPkg ? 'npm test' : hasCargo ? 'cargo test' : hasGo ? 'go test ./...' : 'make test';
+                    fs.writeFileSync(clawPath, `# ${cloneDir} \u2014 TentaCLAW Project Context\n\n## Type\n${pType}\n\n## Build & Test\n- Build: \`${bCmd}\`\n- Test: \`${tCmd}\`\n\n## Notes\n(Add architecture notes here)\n`, 'utf8');
+                    console.log('  ' + C.green('\u2714 Created .clawcode'));
+                }
+                console.log('  ' + C.dim('Next: cd ' + cloneDir + ' && tentaclaw code'));
             } catch (e) {
                 console.log('  ' + C.red('Clone failed: ' + (e instanceof Error ? e.message.split('\n')[0] : String(e))));
             }
@@ -10906,39 +11727,7 @@ Register-ArgumentCompleter -Native -CommandName tentaclaw -ScriptBlock {
             return;
         }
 
-        case 'clone': {
-            // Wave 280: tentaclaw clone <repo> [dir] — git clone then tentaclaw init
-            const cloneUrl = parsed.positional[0];
-            if (!cloneUrl) {
-                console.log(C.dim('  Usage: tentaclaw clone <repo-url> [target-dir]'));
-                return;
-            }
-            const cloneDir = parsed.positional[1] || cloneUrl.split('/').pop()?.replace(/\.git$/, '') || 'repo';
-            console.log(C.dim(`  Cloning ${cloneUrl} → ${cloneDir}/`));
-            try {
-                execSync(`git clone ${cloneUrl} ${cloneDir}`, { encoding: 'utf8', stdio: 'pipe', cwd: process.cwd(), timeout: 120_000 });
-                console.log(C.green(`  ✔ Cloned to ${cloneDir}/`));
-                // Auto-init .clawcode
-                const clonedPath = path.resolve(cloneDir);
-                const clawPath = path.join(clonedPath, '.clawcode');
-                if (!fs.existsSync(clawPath)) {
-                    const hasPkg2 = fs.existsSync(path.join(clonedPath, 'package.json'));
-                    const hasCargo2 = fs.existsSync(path.join(clonedPath, 'Cargo.toml'));
-                    const hasGo2 = fs.existsSync(path.join(clonedPath, 'go.mod'));
-                    const hasPy2 = fs.existsSync(path.join(clonedPath, 'pyproject.toml')) || fs.existsSync(path.join(clonedPath, 'requirements.txt'));
-                    const pType = hasPkg2 ? 'node' : hasCargo2 ? 'rust' : hasGo2 ? 'go' : hasPy2 ? 'python' : 'unknown';
-                    const bCmd = hasPkg2 ? 'npm run build' : hasCargo2 ? 'cargo build' : hasGo2 ? 'go build ./...' : 'make build';
-                    const tCmd = hasPkg2 ? 'npm test' : hasCargo2 ? 'cargo test' : hasGo2 ? 'go test ./...' : 'make test';
-                    fs.writeFileSync(clawPath, `# ${cloneDir} — TentaCLAW Project Context\n\n## Type\n${pType}\n\n## Build & Test\n- Build: \`${bCmd}\`\n- Test: \`${tCmd}\`\n\n## Notes\n(Add architecture notes here)\n`, 'utf8');
-                    console.log(C.green(`  ✔ Created .clawcode in ${cloneDir}/`));
-                }
-                console.log(C.dim(`  Next: cd ${cloneDir} && tentaclaw code`));
-            } catch (e) {
-                console.error(C.red('  Clone failed: ' + (e instanceof Error ? e.message.split('\n')[0] : String(e))));
-                process.exit(1);
-            }
-            return;
-        }
+        // Wave 280 clone duplicate removed — merged into Wave 364 clone above
 
         case 'snapshot': {
             // Wave 286: tentaclaw snapshot [name] — save/restore/list named stash snapshots
@@ -10964,14 +11753,14 @@ Register-ArgumentCompleter -Native -CommandName tentaclaw -ScriptBlock {
             } else if (snapSubcmd === 'save') {
                 const label = (snapName && snapName !== 'save') ? snapName : new Date().toISOString().slice(0, 16).replace('T', ' ');
                 try {
-                    execSync(`git stash push -u -m "tentaclaw: ${label}"`, { encoding: 'utf8', stdio: 'pipe', cwd: process.cwd() });
+                    execSync(`git stash push -u -m "tentaclaw: ${label.replace(/[`$"\\]/g, '')}"`, { encoding: 'utf8', stdio: 'pipe', cwd: process.cwd() });
                     console.log(C.green(`  ✔ Snapshot saved: "${label}"`));
                     console.log(C.dim('  Restore with: tentaclaw snapshot restore [stash@{N}]'));
                 } catch (e) {
                     console.log(C.red('  ' + (e instanceof Error ? e.message.split('\n')[0] : String(e))));
                 }
             } else if (snapSubcmd === 'restore') {
-                const ref = (snapName && snapName !== 'restore') ? snapName : 'stash@{0}';
+                const ref = (snapName && snapName !== 'restore') ? snapName.replace(/[`$\\;|&()]/g, '') : 'stash@{0}';
                 try {
                     execSync(`git stash pop ${ref}`, { encoding: 'utf8', stdio: 'pipe', cwd: process.cwd() });
                     console.log(C.green(`  ✔ Snapshot restored: ${ref}`));
@@ -10979,7 +11768,7 @@ Register-ArgumentCompleter -Native -CommandName tentaclaw -ScriptBlock {
                     console.log(C.red('  ' + (e instanceof Error ? e.message.split('\n')[0] : String(e))));
                 }
             } else if (snapSubcmd === 'drop') {
-                const ref2 = (snapName && snapName !== 'drop') ? snapName : 'stash@{0}';
+                const ref2 = (snapName && snapName !== 'drop') ? snapName.replace(/[`$\\;|&()]/g, '') : 'stash@{0}';
                 try {
                     execSync(`git stash drop ${ref2}`, { encoding: 'utf8', stdio: 'pipe', cwd: process.cwd() });
                     console.log(C.green(`  ✔ Snapshot dropped: ${ref2}`));
@@ -10988,7 +11777,7 @@ Register-ArgumentCompleter -Native -CommandName tentaclaw -ScriptBlock {
                 }
             } else if (snapSubcmd === 'diff') {
                 // Wave 369: show diff between current working tree and a snapshot
-                const diffRef369 = (snapName && snapName !== 'diff') ? snapName : 'stash@{0}';
+                const diffRef369 = (snapName && snapName !== 'diff') ? snapName.replace(/[`$\\;|&()]/g, '') : 'stash@{0}';
                 try {
                     const snapDiff = execSync(`git stash show -p ${diffRef369}`, { encoding: 'utf8', stdio: 'pipe' }).trim();
                     if (!snapDiff) { console.log(C.dim(`  No diff for ${diffRef369}`)); }
@@ -11126,7 +11915,7 @@ Register-ArgumentCompleter -Native -CommandName tentaclaw -ScriptBlock {
                     const popLines = popOut.split('\n').slice(0, 5);
                     for (const pl of popLines) if (pl.trim()) console.log('  ' + C.dim('  ' + pl));
                 } else if (stashSub === 'drop') {
-                    const dropIdx = parsed.flags['index'] || parsed.flags['i'] || parsed.positional[1] || '0';
+                    const dropIdx = (parsed.flags['index'] || parsed.flags['i'] || parsed.positional[1] || '0').replace(/[^0-9]/g, '') || '0';
                     execSync(`git stash drop stash@{${dropIdx}} 2>&1`, { encoding: 'utf8', stdio: 'pipe' });
                     console.log('  ' + C.yellow(`✔ Dropped stash[${dropIdx}]`));
                 } else if (stashSub === 'clear') {
@@ -11190,9 +11979,11 @@ Register-ArgumentCompleter -Native -CommandName tentaclaw -ScriptBlock {
             let buildCmd2 = '';
             let buildLabel2 = '';
             if (fs.existsSync('package.json')) {
-                const pkgB = JSON.parse(fs.readFileSync('package.json', 'utf8') || '{}') as { scripts?: Record<string, string> };
-                if (pkgB.scripts?.['build']) { buildCmd2 = `npm run build${buildArgs2 ? ' -- ' + buildArgs2 : ''}`; buildLabel2 = 'npm run build'; }
-                else if (pkgB.scripts?.['compile']) { buildCmd2 = `npm run compile${buildArgs2 ? ' -- ' + buildArgs2 : ''}`; buildLabel2 = 'npm run compile'; }
+                try {
+                    const pkgB = JSON.parse(fs.readFileSync('package.json', 'utf8') || '{}') as { scripts?: Record<string, string> };
+                    if (pkgB.scripts?.['build']) { buildCmd2 = `npm run build${buildArgs2 ? ' -- ' + buildArgs2 : ''}`; buildLabel2 = 'npm run build'; }
+                    else if (pkgB.scripts?.['compile']) { buildCmd2 = `npm run compile${buildArgs2 ? ' -- ' + buildArgs2 : ''}`; buildLabel2 = 'npm run compile'; }
+                } catch { /* corrupted package.json */ }
             } else if (fs.existsSync('Cargo.toml')) {
                 buildCmd2 = `cargo build ${buildArgs2}`; buildLabel2 = 'cargo build';
             } else if (fs.existsSync('go.mod')) {
@@ -11274,18 +12065,20 @@ Register-ArgumentCompleter -Native -CommandName tentaclaw -ScriptBlock {
             let testCmd2 = '';
             let testLabel = '';
             if (fs.existsSync('package.json')) {
-                const pkgT = JSON.parse(fs.readFileSync('package.json', 'utf8') || '{}') as { scripts?: Record<string, string> };
-                const testScript = pkgT.scripts?.['test'];
-                if (testScript && !testWatchMode) { testCmd2 = `npm test${testArgs ? ' -- ' + testArgs : ''}`; testLabel = 'npm test'; }
-                else if (fs.existsSync('node_modules/.bin/vitest')) {
-                    testCmd2 = testWatchMode ? `npx vitest ${testArgs}` : `npx vitest run ${testArgs}`;
-                    testLabel = 'vitest';
-                }
-                else if (fs.existsSync('node_modules/.bin/jest')) {
-                    testCmd2 = testWatchMode ? `npx jest --watch ${testArgs}` : `npx jest ${testArgs}`;
-                    testLabel = 'jest';
-                }
-                else if (testScript) { testCmd2 = `npm test${testArgs ? ' -- ' + testArgs : ''}`; testLabel = 'npm test'; }
+                try {
+                    const pkgT = JSON.parse(fs.readFileSync('package.json', 'utf8') || '{}') as { scripts?: Record<string, string> };
+                    const testScript = pkgT.scripts?.['test'];
+                    if (testScript && !testWatchMode) { testCmd2 = `npm test${testArgs ? ' -- ' + testArgs : ''}`; testLabel = 'npm test'; }
+                    else if (fs.existsSync('node_modules/.bin/vitest')) {
+                        testCmd2 = testWatchMode ? `npx vitest ${testArgs}` : `npx vitest run ${testArgs}`;
+                        testLabel = 'vitest';
+                    }
+                    else if (fs.existsSync('node_modules/.bin/jest')) {
+                        testCmd2 = testWatchMode ? `npx jest --watch ${testArgs}` : `npx jest ${testArgs}`;
+                        testLabel = 'jest';
+                    }
+                    else if (testScript) { testCmd2 = `npm test${testArgs ? ' -- ' + testArgs : ''}`; testLabel = 'npm test'; }
+                } catch { /* corrupted package.json */ }
             } else if (fs.existsSync('Cargo.toml')) {
                 testCmd2 = `cargo test ${testArgs}`; testLabel = 'cargo test';
             } else if (fs.existsSync('go.mod')) {
@@ -11380,10 +12173,12 @@ Register-ArgumentCompleter -Native -CommandName tentaclaw -ScriptBlock {
             const lintTarget = parsed.positional[0] || '.';
             let lintCmd = '';
             if (fs.existsSync('package.json')) {
-                const pkg2 = JSON.parse(fs.readFileSync('package.json', 'utf8') || '{}') as { scripts?: Record<string, string>; devDependencies?: Record<string, string> };
-                if (pkg2.scripts?.['lint']) { lintCmd = 'npm run lint'; }
-                else if (pkg2.devDependencies?.['eslint']) { lintCmd = `npx eslint "${lintTarget}"`; }
-                else if (pkg2.devDependencies?.['biome']) { lintCmd = `npx biome lint "${lintTarget}"`; }
+                try {
+                    const pkg2 = JSON.parse(fs.readFileSync('package.json', 'utf8') || '{}') as { scripts?: Record<string, string>; devDependencies?: Record<string, string> };
+                    if (pkg2.scripts?.['lint']) { lintCmd = 'npm run lint'; }
+                    else if (pkg2.devDependencies?.['eslint']) { lintCmd = `npx eslint "${lintTarget}"`; }
+                    else if (pkg2.devDependencies?.['biome']) { lintCmd = `npx biome lint "${lintTarget}"`; }
+                } catch { /* corrupted package.json */ }
             } else if (fs.existsSync('Cargo.toml')) {
                 lintCmd = 'cargo clippy';
             } else if (fs.existsSync('go.mod')) {
@@ -11425,12 +12220,14 @@ Register-ArgumentCompleter -Native -CommandName tentaclaw -ScriptBlock {
             let fmtCmd = '';
             // Auto-detect formatter
             if (fs.existsSync('package.json')) {
-                const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8') || '{}') as { scripts?: Record<string, string>; devDependencies?: Record<string, string> };
-                if (pkg.scripts?.['format:check'] && fmtCheck) { fmtCmd = 'npm run format:check'; }
-                else if (pkg.scripts?.['format']) { fmtCmd = fmtCheck ? 'npm run format -- --check' : 'npm run format'; }
-                else if (pkg.scripts?.['fmt']) { fmtCmd = fmtCheck ? 'npm run fmt -- --check' : 'npm run fmt'; }
-                else if (pkg.devDependencies?.['prettier']) { fmtCmd = fmtCheck ? `npx prettier --check "${fmtTarget}"` : `npx prettier --write "${fmtTarget}"`; }
-                else if (pkg.devDependencies?.['eslint']) { fmtCmd = fmtCheck ? `npx eslint "${fmtTarget}"` : `npx eslint --fix "${fmtTarget}"`; }
+                try {
+                    const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8') || '{}') as { scripts?: Record<string, string>; devDependencies?: Record<string, string> };
+                    if (pkg.scripts?.['format:check'] && fmtCheck) { fmtCmd = 'npm run format:check'; }
+                    else if (pkg.scripts?.['format']) { fmtCmd = fmtCheck ? 'npm run format -- --check' : 'npm run format'; }
+                    else if (pkg.scripts?.['fmt']) { fmtCmd = fmtCheck ? 'npm run fmt -- --check' : 'npm run fmt'; }
+                    else if (pkg.devDependencies?.['prettier']) { fmtCmd = fmtCheck ? `npx prettier --check "${fmtTarget}"` : `npx prettier --write "${fmtTarget}"`; }
+                    else if (pkg.devDependencies?.['eslint']) { fmtCmd = fmtCheck ? `npx eslint "${fmtTarget}"` : `npx eslint --fix "${fmtTarget}"`; }
+                } catch { /* corrupted package.json */ }
             } else if (fs.existsSync('Cargo.toml')) {
                 fmtCmd = fmtCheck ? 'cargo fmt -- --check' : 'cargo fmt';
             } else if (fs.existsSync('go.mod')) {
@@ -11804,7 +12601,7 @@ ${projectType}
                     const lastMsg = execSync('git log -1 --format=%s', { encoding: 'utf8', stdio: 'pipe' }).trim();
                     const amendMsg400 = commitMsgArg || lastMsg;
                     if (!amendMsg400) { console.log(C.yellow('  No commit to amend.')); return; }
-                    execSync(`git add -A && git commit --amend -m "${amendMsg400.replace(/"/g, "'")}" 2>&1`, { encoding: 'utf8', stdio: 'pipe' });
+                    execSync(`git add -A && git commit --amend -m "${amendMsg400.replace(/[`$"\\]/g, '')}" 2>&1`, { encoding: 'utf8', stdio: 'pipe' });
                     console.log(C.green(`  ✔ Amended: "${amendMsg400}"`));
                     if (commitPush) {
                         try { console.log(C.dim('  Pushing (force)…')); execSync('git push --force-with-lease 2>&1', { encoding: 'utf8', stdio: 'pipe' }); console.log(C.green('  ✔ Pushed.')); }
@@ -11871,7 +12668,7 @@ ${projectType}
                 }
                 // Wave 419: --no-stage skips git add -A (commits only already-staged files)
                 const gitAddCmd419 = commitNoStage419 ? '' : 'git add -A && ';
-                execSync(`${gitAddCmd419}git commit -m "${commitMsg.replace(/"/g, "'")}"`, { encoding: 'utf8', stdio: 'pipe' });
+                execSync(`${gitAddCmd419}git commit -m "${commitMsg.replace(/[`$"\\]/g, '')}"`, { encoding: 'utf8', stdio: 'pipe' });
                 console.log(C.green(`  ✔ Committed ${changedFiles.length} file${changedFiles.length !== 1 ? 's' : ''}: "${commitMsg}"`));
                 if (commitPush) {
                     try {
@@ -11898,8 +12695,8 @@ ${projectType}
             const diffTarget325 = parsed.positional[0] || '';
             // positional could be a ref (HEAD, sha) or a file path
             const isRef325 = diffTarget325 && /^[a-f0-9]{7,40}$|^HEAD/.test(diffTarget325);
-            const diffFileArg = (!isRef325 && diffTarget325) ? `-- "${diffTarget325}"` : '';
-            const diffRefArg = isRef325 ? diffTarget325 : '';
+            const diffFileArg = (!isRef325 && diffTarget325) ? `-- ${JSON.stringify(diffTarget325)}` : '';
+            const diffRefArg = isRef325 ? diffTarget325.replace(/[`$\\;|&()]/g, '') : '';
             let diffOut = '';
             let diffMode = '';
             try {
@@ -12058,7 +12855,7 @@ ${projectType}
 
         case 'update':
         case 'upgrade':
-            await cmdUpdate();
+            await cmdUpdate(parsed.flags);
             return;
 
         case 'status':
@@ -12121,7 +12918,7 @@ ${projectType}
             // Try standalone (config-based) first; fall back to gateway cluster listing
             const modelsConfig = loadConfig();
             if (modelsConfig) {
-                await cmdModelsStandalone(parsed.flags['filter'] || parsed.flags['f'] || parsed.positional[0] || '');
+                await cmdModelsStandalone(parsed.flags['filter'] || parsed.flags['f'] || parsed.positional[0] || '', parsed.flags['status'] === 'true' || parsed.flags['s'] === 'true');
             } else {
                 await cmdModels(gateway);
             }
@@ -12308,9 +13105,15 @@ ${projectType}
             await cmdAlerts(gateway, parsed.flags);
             break;
 
+        case 'bench':
         case 'benchmark':
         case 'benchmarks':
-            await cmdBenchmarks(gateway);
+            // Wave 460: --local flag runs local model benchmark (no gateway needed)
+            if (parsed.flags['local'] === 'true' || parsed.flags['l'] === 'true') {
+                await cmdBenchLocal();
+            } else {
+                await cmdBenchmarks(gateway);
+            }
             break;
 
         case 'chat':
@@ -12442,6 +13245,22 @@ ${projectType}
 
         case 'review': // Wave 539
             await cmdReview(gateway, parsed.flags);
+            break;
+
+        case 'changelog': // Wave 548: AI-summarized git log
+            await cmdChangelog(parsed.flags);
+            break;
+
+        case 'tournament': // Wave 563: model tournament
+            await cmdTournament(parsed.flags, parsed.positional);
+            break;
+
+        case 'index': // Wave 533: codebase indexing
+            await cmdIndex();
+            break;
+
+        case 'find': // Wave 534/565: semantic search over codebase index
+            await cmdSearchCode(parsed.positional);
             break;
 
         case 'pipeline': // Wave 561: draft+review pipeline
@@ -12691,15 +13510,16 @@ ${projectType}
 
         case 'doctor': {
             // Use standalone doctor if config exists and no gateway flag
+            const localFlag457 = parsed.flags['local'] === 'true' || parsed.flags['l'] === 'true';
             const hasConfig = loadConfig() !== null;
-            const gwReachable = await apiProbe(gateway, '/api/v1/nodes');
+            const gwReachable = !localFlag457 && await apiProbe(gateway, '/api/v1/nodes');
             if (gwReachable) {
                 await cmdDoctor(gateway, parsed.flags);
             } else if (hasConfig) {
-                await cmdDoctorStandalone();
+                await cmdDoctorStandalone(localFlag457);
                 return;
             } else {
-                await cmdDoctorStandalone();
+                await cmdDoctorStandalone(localFlag457);
                 return;
             }
             break;
@@ -12919,7 +13739,7 @@ ${projectType}
         case 'recommend': {
             // Wave 441: --local flag (or no gateway) shows RAM-based local recommendations
             const isLocalRec441 = parsed.flags['local'] === 'true' || parsed.flags['local'] === '';
-            const vram = parsed.flags['vram'] ? parseInt(parsed.flags['vram']) : undefined;
+            const vram = parsed.flags['vram'] ? (parseInt(parsed.flags['vram'], 10) || undefined) : undefined;
             if (isLocalRec441 || !gateway || gateway === 'http://localhost:8080') {
                 // Standalone local recommendation based on system RAM
                 const ramGb441 = Math.round(require('os').totalmem() / 1024 / 1024 / 1024);
@@ -13435,11 +14255,12 @@ ${projectType}
             console.log('  ' + C.purple(C.bold('QUANTIZE')) + C.dim(` — ${qModel} to Q${qBits}`));
             console.log('  ' + C.dim('This creates a quantized copy via Ollama modelfile.'));
             console.log('');
-            const qName = `${qModel.split(':')[0]}:q${qBits}`;
-            const modelfile = `FROM ${qModel}\nPARAMETER num_ctx 32768`;
-            console.log('  ' + C.dim(`Creating ${qName} from ${qModel}...`));
+            const safeQModel = qModel.replace(/[`$"\\;|&()]/g, '');
+            const qName = `${safeQModel.split(':')[0]}:q${qBits}`;
+            const modelfile = `FROM ${safeQModel}\nPARAMETER num_ctx 32768`;
+            console.log('  ' + C.dim(`Creating ${qName} from ${safeQModel}...`));
             try {
-                execSync(`ollama create ${qName} -f - <<< "${modelfile}"`, { encoding: 'utf8', stdio: 'pipe', timeout: 300_000 });
+                execSync(`ollama create ${JSON.stringify(qName)} -f - <<< "${modelfile}"`, { encoding: 'utf8', stdio: 'pipe', timeout: 300_000 });
                 console.log('  ' + C.green(`\u2714 Created ${qName}`));
             } catch (e) {
                 console.log('  ' + C.yellow(`\u26A0 Ollama create not available. For GGUF quantization, use llama.cpp:`));
@@ -13450,13 +14271,66 @@ ${projectType}
         }
 
         case 'drain': {
+            // Wave 489: graceful drain — waits for in-flight requests to finish
             const nodeId = parsed.positional[0];
             if (!nodeId) { console.error(C.red('  Usage: tentaclaw drain <nodeId>')); process.exit(1); }
             console.log('');
-            console.log('  ' + C.yellow('\u26A0') + ' Draining node ' + C.white(nodeId) + '...');
-            await apiPost(gateway, `/api/v1/nodes/${encodeURIComponent(nodeId)}/maintenance`, { enabled: true });
-            console.log('  ' + C.green('\u2714') + ' Node ' + C.white(nodeId) + ' is now in maintenance mode');
+            console.log('  ' + C.yellow('\u26A0') + ' Draining node ' + C.white(nodeId) + ' (waiting for in-flight requests)...');
+            try {
+                const drainResult = await apiPost(gateway, `/api/v1/nodes/${encodeURIComponent(nodeId)}/drain`, {}) as { drained: boolean; elapsed_ms: number; message: string };
+                if (drainResult.drained) {
+                    console.log('  ' + C.green('\u2714') + ' Node ' + C.white(nodeId) + ' drained in ' + C.cyan((drainResult.elapsed_ms / 1000).toFixed(1) + 's'));
+                } else {
+                    console.log('  ' + C.yellow('\u26A0') + ' ' + drainResult.message);
+                }
+            } catch {
+                // Fallback to simple maintenance mode if drain endpoint not available
+                await apiPost(gateway, `/api/v1/nodes/${encodeURIComponent(nodeId)}/maintenance`, { enabled: true });
+                console.log('  ' + C.green('\u2714') + ' Node ' + C.white(nodeId) + ' is now in maintenance mode');
+            }
             console.log('  ' + C.dim('No new requests will be routed to this node.'));
+            console.log('');
+            break;
+        }
+
+        case 'queue': {
+            // Wave 485: queue depth visibility — show pending/active inference requests
+            console.log('');
+            console.log('  ' + C.teal(C.bold('INFERENCE QUEUE')));
+            console.log('');
+            try {
+                const active = await apiGet(gateway, '/api/v1/inference/active') as { requests: Array<{ id: string; model: string; hostname: string; elapsed_ms: number }>; count: number };
+                if (active.count === 0) {
+                    console.log('  ' + C.dim('No active inference requests.'));
+                } else {
+                    console.log('  ' + C.bold(padRight('ID', 20)) + padRight('Model', 25) + padRight('Node', 20) + 'Elapsed');
+                    for (const r of active.requests) {
+                        const elapsed = r.elapsed_ms < 1000 ? r.elapsed_ms + 'ms' : (r.elapsed_ms / 1000).toFixed(1) + 's';
+                        console.log('  ' + C.dim(padRight(r.id.slice(0, 18), 20)) + C.white(padRight(r.model, 25)) + C.cyan(padRight(r.hostname, 20)) + elapsed);
+                    }
+                    console.log('');
+                    console.log('  ' + C.dim(`${active.count} active request${active.count > 1 ? 's' : ''}`));
+                }
+            } catch {
+                console.log(C.yellow('  Could not fetch queue status.'));
+            }
+
+            // Also show batch jobs if any
+            try {
+                const nodes = await apiGet(gateway, '/api/v1/nodes') as { nodes: Array<{ latest_stats?: { inference?: { in_flight_requests: number } }; hostname: string }> };
+                let totalInFlight = 0;
+                for (const n of nodes.nodes) {
+                    const inFlight = n.latest_stats?.inference?.in_flight_requests ?? 0;
+                    if (inFlight > 0) {
+                        console.log('  ' + C.dim(padRight(n.hostname, 20)) + C.yellow(`${inFlight} in-flight`));
+                    }
+                    totalInFlight += inFlight;
+                }
+                if (totalInFlight > 0) {
+                    console.log('');
+                    console.log('  ' + C.dim(`Total cluster in-flight: ${totalInFlight}`));
+                }
+            } catch { /* ok */ }
             console.log('');
             break;
         }
@@ -13573,7 +14447,31 @@ ${projectType}
                         process.exit(1);
                     }
                     const typeFilter = parsed.flags['type'] ? `&type=${encodeURIComponent(parsed.flags['type'])}` : '';
-                    const results = await apiGet(registryUrl, `/v1/search?q=${encodeURIComponent(query)}${typeFilter}`) as { packages: Array<{ name: string; namespace: string; description: string; version: string; type: string; stars: number; downloads: number }> };
+                    let results: { packages: Array<{ name: string; namespace: string; description: string; version: string; type: string; stars: number; downloads: number }> };
+                    try {
+                        results = await apiGet(registryUrl, `/v1/search?q=${encodeURIComponent(query)}${typeFilter}`) as typeof results;
+                    } catch {
+                        // Offline fallback: search local clawhub directory
+                        console.log('');
+                        console.log('  ' + C.yellow('\u26A0 CLAWHub registry not reachable — searching local packages'));
+                        const localPkgs: typeof results['packages'] = [];
+                        const localHubDir = path.join(path.resolve(__dirname, '..', '..', '..'), 'clawhub');
+                        if (fs.existsSync(localHubDir)) {
+                            for (const cat of fs.readdirSync(localHubDir)) {
+                                const catDir = path.join(localHubDir, cat);
+                                if (!fs.statSync(catDir).isDirectory()) continue;
+                                for (const file of fs.readdirSync(catDir).filter(f => f.endsWith('.json'))) {
+                                    try {
+                                        const pkg = JSON.parse(fs.readFileSync(path.join(catDir, file), 'utf8'));
+                                        if (pkg.name?.toLowerCase().includes(query.toLowerCase()) || pkg.description?.toLowerCase().includes(query.toLowerCase())) {
+                                            localPkgs.push({ name: pkg.name || file.replace('.json', ''), namespace: 'tentaclaw', description: pkg.description || '', version: pkg.version || '0.1.0', type: cat, stars: 0, downloads: 0 });
+                                        }
+                                    } catch {}
+                                }
+                            }
+                        }
+                        results = { packages: localPkgs };
+                    }
                     console.log('');
                     console.log('  ' + C.teal(C.bold('CLAWHUB SEARCH')) + C.dim(` — "${query}"`));
                     console.log('');
@@ -13970,7 +14868,7 @@ ${projectType}
         case 'fetch': {
             // Wave 403: tentaclaw fetch — git fetch with branch staleness display
             try {
-                const fetchRemote403 = parsed.positional[0] || '';
+                const fetchRemote403 = (parsed.positional[0] || '').replace(/[`$\\;|&()]/g, '');
                 console.log(C.dim('  Fetching…'));
                 execSync(`git fetch ${fetchRemote403} --prune 2>&1`, { encoding: 'utf8', stdio: 'pipe' });
                 // Show staleness: local branches vs their upstream
@@ -14006,7 +14904,7 @@ ${projectType}
 
         case 'branch': {
             // Wave 404: tentaclaw branch [name] [--delete|-d] [--list] — top-level branch management
-            const branchName404 = parsed.positional[0] || '';
+            const branchName404 = (parsed.positional[0] || '').replace(/[`$\\;|&()]/g, '');
             const branchDelete404 = parsed.flags['delete'] === 'true' || parsed.flags['d'] === 'true' || parsed.flags['delete'] === '' || parsed.flags['d'] === '';
             const branchNew404 = parsed.flags['b'] === 'true' || parsed.flags['b'] === '' || parsed.flags['new'] === 'true' || parsed.flags['new'] === '';
             try {
@@ -14046,7 +14944,7 @@ ${projectType}
 
         case 'revert': {
             // Wave 405: tentaclaw revert [<commit>] [--no-edit] — git revert wrapper
-            const revertTarget405 = parsed.positional[0] || 'HEAD';
+            const revertTarget405 = (parsed.positional[0] || 'HEAD').replace(/[`$\\;|&()]/g, '');
             const noEdit405 = parsed.flags['no-edit'] === 'true' || parsed.flags['no-edit'] === '';
             try {
                 // Show what commit we're reverting

@@ -457,9 +457,24 @@ export function findBestNode(model: string, opts?: { taskType?: string; priority
             priorityModifier = throughput > 0 ? -(throughput * 0.3) : 0;
         }
 
+        // Wave 469: GPU-level routing — on multi-GPU nodes, score the best individual GPU
+        // This prefers nodes where at least one GPU has significant free VRAM and low utilization
+        let gpuLevelBonus = 0;
+        if (node.latest_stats.gpus.length > 1) {
+            const bestGpu = node.latest_stats.gpus.reduce((best: any, g: any) => {
+                const free = g.vramTotalMb - g.vramUsedMb;
+                const bestFree = best.vramTotalMb - best.vramUsedMb;
+                return free > bestFree ? g : best;
+            }, node.latest_stats.gpus[0]);
+            const bestGpuFree = bestGpu.vramTotalMb - bestGpu.vramUsedMb;
+            // Bonus if best GPU alone can fit the model (single-GPU placement preferred)
+            if (bestGpuFree >= requiredVramMb) gpuLevelBonus = -20;
+        }
+
         const score = vramFitPenalty +
                       vramPressure +
                       healthPenalty +
+                      gpuLevelBonus +
                       (node.latest_stats.inference.in_flight_requests * 40) +
                       (avgUtil * 0.3) +
                       (latencyP50 * 0.01) -

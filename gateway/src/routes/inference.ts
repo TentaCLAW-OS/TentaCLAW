@@ -92,7 +92,15 @@ routes.post('/v1/chat/completions', async (c) => {
         }, 429);
     }
 
-    const body = await c.req.json();
+    let body: Record<string, any>;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json({ error: { message: 'Invalid JSON in request body', type: 'invalid_request_error' } }, 400);
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return c.json({ error: { message: 'Request body must be a JSON object', type: 'invalid_request_error' } }, 400);
+    }
     const model = body.model;
 
     if (!model) {
@@ -329,7 +337,8 @@ routes.post('/v1/chat/completions', async (c) => {
 // =============================================================================
 
 routes.post('/v1/completions', async (c) => {
-    const body = await c.req.json();
+    let body: Record<string, any>;
+    try { body = await c.req.json(); } catch { return c.json({ error: { message: 'Invalid JSON' } }, 400); }
     const model = body.model;
     if (!model) return c.json({ error: { message: 'model is required' } }, 400);
 
@@ -526,7 +535,8 @@ function convertToAnthropicResponse(
 }
 
 routes.post('/v1/messages', async (c) => {
-    const body = await c.req.json();
+    let body: Record<string, any>;
+    try { body = await c.req.json(); } catch { return anthropicError('invalid_request_error', 'Invalid JSON in request body', 400); }
 
     if (!body.model) {
         return anthropicError('invalid_request_error', 'model is required', 400);
@@ -771,7 +781,8 @@ routes.post('/v1/messages', async (c) => {
 // =============================================================================
 
 routes.post('/v1/embeddings', async (c) => {
-    const body = await c.req.json();
+    let body: Record<string, any>;
+    try { body = await c.req.json(); } catch { return c.json({ error: { message: 'Invalid JSON', type: 'invalid_request_error' } }, 400); }
     const model = body.model || 'nomic-embed-text';
     const input = body.input;
 

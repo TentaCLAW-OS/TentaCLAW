@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useClusterStore } from '@/stores/cluster';
 import { useThemeStore } from '@/stores/theme';
 import { THEMES } from '@/lib/themes';
@@ -200,6 +200,30 @@ export function SettingsTab() {
   const [budgetLimit, setBudgetLimit] = useState('');
   const [budgetThreshold, setBudgetThreshold] = useState('80');
 
+  /* Notification channels state */
+  const [channels, setChannels] = useState<NotificationChannel[]>(MOCK_CHANNELS);
+  const [addingChannel, setAddingChannel] = useState(false);
+  const [newChName, setNewChName] = useState('');
+  const [newChType, setNewChType] = useState<'discord' | 'telegram' | 'email'>('discord');
+  const [newChTarget, setNewChTarget] = useState('');
+
+  const handleAddChannel = useCallback(() => {
+    if (!addingChannel) { setAddingChannel(true); return; }
+    if (!newChName.trim() || !newChTarget.trim()) return;
+    setChannels(prev => [...prev, { name: newChName, type: newChType, target: newChTarget, active: true }]);
+    setAddingChannel(false);
+    setNewChName('');
+    setNewChTarget('');
+  }, [addingChannel, newChName, newChType, newChTarget]);
+
+  const handleToggleChannel = useCallback((idx: number) => {
+    setChannels(prev => prev.map((ch, i) => i === idx ? { ...ch, active: !ch.active } : ch));
+  }, []);
+
+  const handleDeleteChannel = useCallback((idx: number) => {
+    setChannels(prev => prev.filter((_, i) => i !== idx));
+  }, []);
+
   /* Derive some display values */
   const onlineCount = summary?.online_nodes ?? nodes.filter((n) => n.status === 'online').length;
   const totalNodes = summary?.total_nodes ?? nodes.length;
@@ -272,7 +296,7 @@ export function SettingsTab() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_CHANNELS.map((ch, i) => (
+              {channels.map((ch, i) => (
                 <tr
                   key={i}
                   className="hover:bg-[rgba(0,255,255,0.02)] transition-colors"
@@ -287,11 +311,25 @@ export function SettingsTab() {
                     {ch.target}
                   </td>
                   <td style={tableCellStyle}>
-                    {ch.active ? (
-                      <span style={{ color: 'var(--green)' }}>Active &#10003;</span>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)' }}>Disabled</span>
-                    )}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleToggleChannel(i)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleToggleChannel(i)}
+                      style={{ cursor: 'pointer', color: ch.active ? 'var(--green)' : 'var(--text-muted)' }}
+                    >
+                      {ch.active ? 'Active \u2713' : 'Disabled'}
+                    </span>
+                    {' '}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleDeleteChannel(i)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleDeleteChannel(i)}
+                      style={{ cursor: 'pointer', color: 'var(--red)', fontSize: 10, marginLeft: 8 }}
+                    >
+                      \u2716
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -299,8 +337,20 @@ export function SettingsTab() {
           </table>
         </div>
 
+        {addingChannel && (
+          <div className="flex items-center gap-2 mt-2" style={{ padding: '8px', borderRadius: '6px', background: 'var(--bg-card)' }}>
+            <input value={newChName} onChange={(e) => setNewChName(e.target.value)} placeholder="Name" style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-primary)', fontSize: '12px' }} />
+            <select title="Channel type" value={newChType} onChange={(e) => setNewChType(e.target.value as 'discord' | 'telegram' | 'email')} style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-primary)', fontSize: '12px' }}>
+              <option value="discord">Discord</option>
+              <option value="telegram">Telegram</option>
+              <option value="email">Email</option>
+            </select>
+            <input value={newChTarget} onChange={(e) => setNewChTarget(e.target.value)} placeholder="Target (#channel, @bot, email)" style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-primary)', fontSize: '12px' }} />
+          </div>
+        )}
         <div style={{ marginTop: 12 }}>
-          <OutlineButton>+ Add Channel</OutlineButton>
+          <OutlineButton onClick={handleAddChannel}>{addingChannel ? 'Save Channel' : '+ Add Channel'}</OutlineButton>
+          {addingChannel && <OutlineButton onClick={() => setAddingChannel(false)}>Cancel</OutlineButton>}
         </div>
       </div>
 

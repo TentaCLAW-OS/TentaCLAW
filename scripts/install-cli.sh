@@ -96,18 +96,18 @@ check_node() {
 install_node() {
     if command -v apt-get &>/dev/null; then
         # Debian/Ubuntu
-        step "Installing Node.js 22 via NodeSource..."
-        curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - || fail "NodeSource setup failed"
+        step "Installing Node.js 20 via NodeSource..."
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - || fail "NodeSource setup failed"
         sudo apt-get install -y nodejs || fail "Node.js install failed"
     elif command -v dnf &>/dev/null; then
         # RHEL/Fedora
-        step "Installing Node.js 22 via NodeSource..."
-        curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash - || fail "NodeSource setup failed"
+        step "Installing Node.js 20 via NodeSource..."
+        curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash - || fail "NodeSource setup failed"
         sudo dnf install -y nodejs || fail "Node.js install failed"
     elif command -v yum &>/dev/null; then
         # Older RHEL/CentOS
-        step "Installing Node.js 22 via NodeSource..."
-        curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash - || fail "NodeSource setup failed"
+        step "Installing Node.js 20 via NodeSource..."
+        curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash - || fail "NodeSource setup failed"
         sudo yum install -y nodejs || fail "Node.js install failed"
     elif command -v brew &>/dev/null; then
         # macOS

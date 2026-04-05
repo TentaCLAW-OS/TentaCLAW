@@ -18,7 +18,7 @@ Monorepo (npm workspaces): `gateway/`, `agent/`, `cli/`, `dashboard/`, `shared/`
 - Kill port 8080 on Windows: `powershell -Command "Get-NetTCPConnection -LocalPort 8080 | ForEach { Stop-Process -Id $_.OwningProcess -Force }"`
 
 ## Tests
-- Run: `npm test --workspace=gateway` — 1015 tests, ~18s, vitest + in-memory SQLite
+- Run: `npm test --workspace=gateway` — 1056 tests, ~19s, vitest + in-memory SQLite
 - Tests use `TENTACLAW_DB_PATH=':memory:'` — fully isolated, fresh DB per file
 - Tests pass even when `tsc` fails — vitest uses `tsx`, not tsc output
 - Cluster secret set to `'test-secret'` in test env
@@ -58,6 +58,10 @@ Monorepo (npm workspaces): `gateway/`, `agent/`, `cli/`, `dashboard/`, `shared/`
 - `TENTACLAW_DB_PATH`, `TENTACLAW_API_KEY`, `TENTACLAW_CLUSTER_SECRET`
 - `TENTACLAW_NO_AUTH=true` — disable all auth
 - `TENTACLAW_RATE_LIMIT`, `TENTACLAW_CHAT_RATE_LIMIT` (default: 60 rpm)
+- `NODE_STALE_TIMEOUT_SECS` (90) — seconds before marking node offline
+- `FLEET_DRAIN_TIMEOUT_MS` (120000) — max wait for graceful drain
+- `AUTH_BLOCK_DURATION_MS` (900000) — IP block duration after 5 auth failures
+- `GPU_TEMP_CRITICAL_C` (90), `GPU_TEMP_HOT_C` (85), `GPU_TEMP_WARM_C` (75) — thermal thresholds
 
 ## Agent Environment Variables
 - `TENTACLAW_GATEWAY_URL`, `TENTACLAW_NODE_ID`, `TENTACLAW_FARM_HASH`

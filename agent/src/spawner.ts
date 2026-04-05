@@ -20,7 +20,7 @@ const args = process.argv.slice(2);
 
 const NODE_COUNT = (() => {
     const idx = args.indexOf('--nodes');
-    return idx !== -1 && args[idx + 1] ? parseInt(args[idx + 1]) : 4;
+    return idx !== -1 && args[idx + 1] ? (parseInt(args[idx + 1], 10) || 4) : 4;
 })();
 
 const GATEWAY = (() => {

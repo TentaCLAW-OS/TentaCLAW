@@ -36,7 +36,7 @@ const args = process.argv.slice(2);
 const MOCK_MODE = args.includes('--mock');
 const MOCK_GPU_COUNT = (() => {
     const idx = args.indexOf('--gpus');
-    return idx !== -1 && args[idx + 1] ? parseInt(args[idx + 1]) : 2;
+    return idx !== -1 && args[idx + 1] ? (parseInt(args[idx + 1], 10) || 2) : 2;
 })();
 const GATEWAY_OVERRIDE = (() => {
     const idx = args.indexOf('--gateway');
@@ -44,7 +44,7 @@ const GATEWAY_OVERRIDE = (() => {
 })();
 const INTERVAL_OVERRIDE = (() => {
     const idx = args.indexOf('--interval');
-    return idx !== -1 && args[idx + 1] ? parseInt(args[idx + 1]) : 0;
+    return idx !== -1 && args[idx + 1] ? (parseInt(args[idx + 1], 10) || 0) : 0;
 })();
 const NODE_NAME_OVERRIDE = (() => {
     const idx = args.indexOf('--name');
@@ -668,8 +668,10 @@ function getAmdGpuStats(): GpuStats[] {
             // VRAM from hwmon or mem_info
             let vramTotal = 0, vramUsed = 0;
             try {
-                vramTotal = Math.round(parseInt(readSysfs('mem_info_vram_total')) / 1048576);
-                vramUsed = Math.round(parseInt(readSysfs('mem_info_vram_used')) / 1048576);
+                const vt = parseInt(readSysfs('mem_info_vram_total'), 10);
+                const vu = parseInt(readSysfs('mem_info_vram_used'), 10);
+                vramTotal = isNaN(vt) ? 0 : Math.round(vt / 1048576);
+                vramUsed = isNaN(vu) ? 0 : Math.round(vu / 1048576);
             } catch {}
 
             // Temperature from hwmon
@@ -677,21 +679,22 @@ function getAmdGpuStats(): GpuStats[] {
             try {
                 const hwmonDir = fs.readdirSync(`${base}/hwmon`)[0];
                 if (hwmonDir) {
-                    const tempStr = fs.readFileSync(`${base}/hwmon/${hwmonDir}/temp1_input`, 'utf-8').trim();
-                    temp = Math.round(parseInt(tempStr) / 1000);
+                    const tempRaw = parseInt(fs.readFileSync(`${base}/hwmon/${hwmonDir}/temp1_input`, 'utf-8').trim(), 10);
+                    temp = isNaN(tempRaw) ? 0 : Math.round(tempRaw / 1000);
                 }
             } catch {}
 
             // Utilization
-            const util = parseInt(readSysfs('gpu_busy_percent')) || 0;
+            const utilRaw = parseInt(readSysfs('gpu_busy_percent'), 10);
+            const util = isNaN(utilRaw) ? 0 : utilRaw;
 
             // Power
             let power = 0;
             try {
                 const hwmonDir = fs.readdirSync(`${base}/hwmon`)[0];
                 if (hwmonDir) {
-                    const powerStr = fs.readFileSync(`${base}/hwmon/${hwmonDir}/power1_average`, 'utf-8').trim();
-                    power = Math.round(parseInt(powerStr) / 1000000); // microwatts to watts
+                    const powerRaw = parseInt(fs.readFileSync(`${base}/hwmon/${hwmonDir}/power1_average`, 'utf-8').trim(), 10);
+                    power = isNaN(powerRaw) ? 0 : Math.round(powerRaw / 1000000);
                 }
             } catch {}
 
@@ -700,8 +703,8 @@ function getAmdGpuStats(): GpuStats[] {
             try {
                 const hwmonDir = fs.readdirSync(`${base}/hwmon`)[0];
                 if (hwmonDir) {
-                    const pwm = parseInt(fs.readFileSync(`${base}/hwmon/${hwmonDir}/pwm1`, 'utf-8').trim());
-                    fan = Math.round((pwm / 255) * 100);
+                    const pwm = parseInt(fs.readFileSync(`${base}/hwmon/${hwmonDir}/pwm1`, 'utf-8').trim(), 10);
+                    fan = isNaN(pwm) ? 0 : Math.round((pwm / 255) * 100);
                 }
             } catch {}
 
@@ -740,27 +743,100 @@ function getAmdGpuStats(): GpuStats[] {
 }
 
 function getIntelGpuStats(): GpuStats[] {
-    // Basic Intel iGPU detection via sysfs
+    const gpus: GpuStats[] = [];
     try {
         const cards = fs.readdirSync('/sys/class/drm').filter(d => /^card\d+$/.test(d));
         for (const card of cards) {
             const base = `/sys/class/drm/${card}/device`;
             try {
                 const vendor = fs.readFileSync(`${base}/vendor`, 'utf-8').trim();
-                if (vendor === '0x8086') {
-                    return [{
-                        busId: card,
-                        name: 'Intel Integrated GPU',
-                        vramTotalMb: 0, vramUsedMb: 0,
-                        temperatureC: 0, utilizationPct: 0,
-                        powerDrawW: 0, fanSpeedPct: 0,
-                        clockSmMhz: 0, clockMemMhz: 0,
-                    }];
+                if (vendor !== '0x8086') continue;
+
+                const deviceId = fs.readFileSync(`${base}/device`, 'utf-8').trim();
+
+                // Detect Intel Arc discrete GPUs (0x56xx series = Alchemist/Battlemage)
+                const isArc = deviceId.startsWith('0x56') || deviceId.startsWith('0x57');
+                let name = isArc ? 'Intel Arc GPU' : 'Intel Integrated GPU';
+
+                // Try to get a better name from i915/xe driver
+                try {
+                    const drmInfo = execSync(`cat /sys/class/drm/${card}/device/label 2>/dev/null || echo ""`, { encoding: 'utf-8' }).trim();
+                    if (drmInfo) name = drmInfo;
+                } catch {}
+
+                // Read VRAM for discrete Intel GPUs (i915/xe driver exposes this)
+                let vramTotalMb = 0;
+                let vramUsedMb = 0;
+                try {
+                    // xe driver path (newer kernels)
+                    const memTotal = fs.readFileSync(`/sys/class/drm/${card}/device/tile0/gt0/mem/total_bytes`, 'utf-8').trim();
+                    const memUsed = fs.readFileSync(`/sys/class/drm/${card}/device/tile0/gt0/mem/used_bytes`, 'utf-8').trim();
+                    vramTotalMb = parseInt(memTotal, 10) / 1048576 || 0;
+                    vramUsedMb = parseInt(memUsed, 10) / 1048576 || 0;
+                } catch {
+                    try {
+                        // i915 driver path (lmem)
+                        const lmem = fs.readFileSync(`/sys/class/drm/${card}/lmem_total_bytes`, 'utf-8').trim();
+                        vramTotalMb = parseInt(lmem, 10) / 1048576 || 0;
+                    } catch {}
                 }
+
+                // Read GPU utilization via i915 engine busyness or xe
+                let utilizationPct = 0;
+                try {
+                    const busy = execSync(`cat /sys/class/drm/${card}/device/tile0/gt0/engines/rcs0/busy_ms 2>/dev/null || echo "0"`, { encoding: 'utf-8' }).trim();
+                    utilizationPct = Math.min(100, parseInt(busy, 10) || 0);
+                } catch {}
+
+                // Read temperature from hwmon
+                let temperatureC = 0;
+                try {
+                    const hwmonDirs = fs.readdirSync(`${base}/hwmon`).filter(d => d.startsWith('hwmon'));
+                    for (const hw of hwmonDirs) {
+                        try {
+                            const temp = fs.readFileSync(`${base}/hwmon/${hw}/temp1_input`, 'utf-8').trim();
+                            const t = parseInt(temp, 10);
+                            if (!isNaN(t) && t > 0) { temperatureC = Math.round(t / 1000); break; }
+                        } catch {}
+                    }
+                } catch {}
+
+                // Read power from hwmon
+                let powerDrawW = 0;
+                try {
+                    const hwmonDirs = fs.readdirSync(`${base}/hwmon`).filter(d => d.startsWith('hwmon'));
+                    for (const hw of hwmonDirs) {
+                        try {
+                            const power = fs.readFileSync(`${base}/hwmon/${hw}/power1_average`, 'utf-8').trim();
+                            const p = parseInt(power, 10);
+                            if (!isNaN(p) && p > 0) { powerDrawW = Math.round(p / 1000000); break; }
+                        } catch {}
+                    }
+                } catch {}
+
+                // Read clock speed
+                let clockSmMhz = 0;
+                try {
+                    const freq = fs.readFileSync(`/sys/class/drm/${card}/gt_cur_freq_mhz`, 'utf-8').trim();
+                    clockSmMhz = parseInt(freq, 10) || 0;
+                } catch {}
+
+                gpus.push({
+                    busId: card,
+                    name,
+                    vramTotalMb: Math.round(vramTotalMb),
+                    vramUsedMb: Math.round(vramUsedMb),
+                    temperatureC,
+                    utilizationPct,
+                    powerDrawW,
+                    fanSpeedPct: 0,
+                    clockSmMhz,
+                    clockMemMhz: 0,
+                });
             } catch {}
         }
     } catch {}
-    return [];
+    return gpus;
 }
 
 function getMockSystemStats() {
@@ -777,14 +853,15 @@ function getMockSystemStats() {
 function getLinuxSystemStats() {
     try {
         // These are static shell pipelines with no user input
-        const cpuIdle = parseFloat(execSync("grep 'cpu ' /proc/stat | awk '{print ($5/($2+$3+$4+$5+$6+$7+$8))*100}'", { encoding: 'utf-8' }));
+        const cpuIdleRaw = parseFloat(execSync("grep 'cpu ' /proc/stat | awk '{print ($5/($2+$3+$4+$5+$6+$7+$8))*100}'", { encoding: 'utf-8' }));
+        const cpuIdle = isNaN(cpuIdleRaw) ? 50 : cpuIdleRaw;
         const memInfo = fs.readFileSync('/proc/meminfo', 'utf-8');
-        const memTotal = parseInt(memInfo.match(/MemTotal:\s+(\d+)/)?.[1] || '0');
-        const memAvailable = parseInt(memInfo.match(/MemAvailable:\s+(\d+)/)?.[1] || '0');
+        const memTotal = parseInt(memInfo.match(/MemTotal:\s+(\d+)/)?.[1] || '0', 10) || 0;
+        const memAvailable = parseInt(memInfo.match(/MemAvailable:\s+(\d+)/)?.[1] || '0', 10) || 0;
         const diskOutput = execSync("df -k / | tail -1 | awk '{print $2,$3}'", { encoding: 'utf-8' });
-        const [diskTotal, diskUsed] = diskOutput.trim().split(' ').map(s => Math.round(parseInt(s) / 1024 / 1024));
+        const [diskTotal, diskUsed] = diskOutput.trim().split(' ').map(s => { const v = parseInt(s, 10); return isNaN(v) ? 0 : Math.round(v / 1024 / 1024); });
         const networkOutput = execSync("cat /sys/class/net/eth0/statistics/rx_bytes /sys/class/net/eth0/statistics/tx_bytes 2>/dev/null || echo '0\n0'", { encoding: 'utf-8' });
-        const [bytesIn, bytesOut] = networkOutput.trim().split('\n').map(s => parseInt(s) || 0);
+        const [bytesIn, bytesOut] = networkOutput.trim().split('\n').map(s => parseInt(s, 10) || 0);
 
         return {
             cpu: { usage_pct: Math.round(100 - cpuIdle), temp_c: 0 },
@@ -2074,7 +2151,7 @@ function checkDiskSpace(): void {
 
     try {
         const dfOutput = execSync("df -k / | tail -1 | awk '{print $4}'", { encoding: 'utf-8', timeout: 5000 });
-        const freeKb = parseInt(dfOutput.trim());
+        const freeKb = parseInt(dfOutput.trim(), 10) || 0;
         const freeGb = freeKb / 1048576;
 
         if (freeGb < 2) {
@@ -2127,7 +2204,7 @@ async function runSelfHeal(config: AgentConfig): Promise<SelfHealResult[]> {
         try {
             const dfOut = execSync('df -h / | tail -1', { encoding: 'utf-8', timeout: 5000 });
             const parts = dfOut.trim().split(/\s+/);
-            const usePct = parseInt(parts[4]);
+            const usePct = parseInt(parts[4], 10) || 0;
             if (usePct > 95) {
                 // Auto-fix: clear old logs and temp files
                 try {

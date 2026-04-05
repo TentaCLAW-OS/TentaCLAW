@@ -456,7 +456,8 @@ export function recordAuthFailure(ipAddress: string): boolean {
 
         const newCount = row.failure_count + 1;
         if (newCount >= 5) {
-            const blockedUntil = new Date(Date.now() + 15 * 60_000).toISOString();
+            const authBlockMs = parseInt(process.env.AUTH_BLOCK_DURATION_MS || '900000', 10) || 900_000;
+            const blockedUntil = new Date(Date.now() + authBlockMs).toISOString();
             d.prepare(
                 'UPDATE auth_failures SET failure_count = ?, blocked_until = ? WHERE ip_address = ?',
             ).run(newCount, blockedUntil, ipAddress);

@@ -109,6 +109,16 @@ export interface GatewayResponse {
     config_hash?: string;
 }
 
+/** Agent reports command execution results back to gateway */
+export interface CommandResponse {
+    command_id: string;
+    status: 'success' | 'failed' | 'skipped';
+    result?: unknown;
+    error?: string;
+    executed_at: string;
+    duration_ms?: number;
+}
+
 // =============================================================================
 // Node Registration
 // =============================================================================

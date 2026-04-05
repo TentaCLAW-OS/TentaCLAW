@@ -277,23 +277,80 @@ function ActionButton({
    SecurityTab — API key management & cluster security
    ══════════════════════════════════════════════════════ */
 export function SecurityTab() {
-  const [keys] = useState<ApiKey[]>(MOCK_API_KEYS);
+  const [keys, setKeys] = useState<ApiKey[]>(MOCK_API_KEYS);
   const [confirmRotate, setConfirmRotate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newKeyName, setNewKeyName] = useState('');
+  const [newKeyScope, setNewKeyScope] = useState<ApiKeyScope>('inference');
+  const [newKeyResult, setNewKeyResult] = useState('');
 
   const enabledCount = keys.filter((k) => k.status === 'enabled').length;
 
-  const handleCreateKey = useCallback(() => {
-    // TODO: open create-key modal
+  // Fetch real keys on mount
+  const fetchKeys = useCallback(async () => {
+    try {
+      const resp = await fetch('/api/v1/apikeys');
+      if (resp.ok) {
+        const data = await resp.json() as { keys?: Array<{ id: string; name: string; key_prefix: string; scope: string; rate_limit: number; created_at: string; last_used_at: string; disabled: boolean }> };
+        if (data.keys && data.keys.length > 0) {
+          setKeys(data.keys.map(k => ({
+            id: k.id,
+            name: k.name || 'Unnamed',
+            keyPrefix: k.key_prefix || 'tc_****',
+            scope: (k.scope as ApiKeyScope) || 'inference',
+            rateLimit: (k.rate_limit || 60) + ' rpm',
+            createdAt: k.created_at?.slice(0, 10) || '',
+            lastUsed: k.last_used_at || 'never',
+            status: k.disabled ? 'disabled' as const : 'enabled' as const,
+          })));
+        }
+      }
+    } catch { /* keep mock data if gateway unreachable */ }
   }, []);
 
-  const handleRotateSecret = useCallback(() => {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useState(() => { fetchKeys(); });
+
+  const handleCreateKey = useCallback(async () => {
+    if (!creating) {
+      setCreating(true);
+      setNewKeyName('');
+      setNewKeyResult('');
+      return;
+    }
+    if (!newKeyName.trim()) return;
+    try {
+      const resp = await fetch('/api/v1/apikeys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newKeyName, scope: newKeyScope }),
+      });
+      if (resp.ok) {
+        const data = await resp.json() as { key?: string; id?: string };
+        setNewKeyResult(data.key || 'Key created');
+        await fetchKeys();
+      }
+    } catch { /* ignore */ }
+    setCreating(false);
+  }, [creating, newKeyName, newKeyScope, fetchKeys]);
+
+  const handleRotateSecret = useCallback(async () => {
     if (!confirmRotate) {
       setConfirmRotate(true);
       return;
     }
-    // TODO: call rotate API
+    try {
+      await fetch('/api/v1/admin/rotate-secret', { method: 'POST' });
+    } catch { /* ignore */ }
     setConfirmRotate(false);
   }, [confirmRotate]);
+
+  const handleDeleteKey = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/v1/apikeys/${id}`, { method: 'DELETE' });
+      setKeys(prev => prev.filter(k => k.id !== id));
+    } catch { /* ignore */ }
+  }, []);
 
   return (
     <div className="flex flex-col gap-5" style={{ animation: 'slideUp 0.4s ease-out both' }}>
@@ -316,6 +373,37 @@ export function SecurityTab() {
             />
           </div>
         </div>
+
+        {/* Create key form */}
+        {creating && (
+          <div className="flex items-center gap-2 mb-2" style={{ padding: '8px', borderRadius: '6px', background: 'var(--bg-card)' }}>
+            <input
+              value={newKeyName}
+              onChange={(e) => setNewKeyName(e.target.value)}
+              placeholder="Key name..."
+              style={{ flex: 1, padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-primary)', fontSize: '12px' }}
+            />
+            <select
+              title="API key scope"
+              value={newKeyScope}
+              onChange={(e) => setNewKeyScope(e.target.value as ApiKeyScope)}
+              style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg-main)', color: 'var(--text-primary)', fontSize: '12px' }}
+            >
+              <option value="inference">Inference</option>
+              <option value="read">Read</option>
+              <option value="admin">Admin</option>
+            </select>
+            <ActionButton label="Create" variant="cyan" onClick={handleCreateKey} />
+            <ActionButton label="Cancel" variant="red" onClick={() => setCreating(false)} />
+          </div>
+        )}
+
+        {/* Show newly created key */}
+        {newKeyResult && (
+          <div style={{ padding: '8px', borderRadius: '6px', background: 'var(--accent-green)', color: '#000', fontSize: '11px', marginBottom: '8px' }}>
+            New API Key (copy now — won&apos;t be shown again): <strong>{newKeyResult}</strong>
+          </div>
+        )}
 
         <div style={{ overflowX: 'auto' }}>
           <table

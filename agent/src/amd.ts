@@ -345,8 +345,8 @@ export function getAmdGpuStats(busId?: string): GpuStats[] {
             try {
                 const hwmonDir = resolveHwmonDir(base);
                 if (hwmonDir) {
-                    const pwm = parseInt(fs.readFileSync(`${hwmonDir}/pwm1`, 'utf-8').trim());
-                    fan = Math.round((pwm / 255) * 100);
+                    const pwm = parseInt(fs.readFileSync(`${hwmonDir}/pwm1`, 'utf-8').trim(), 10);
+                    fan = isNaN(pwm) ? 0 : Math.round((pwm / 255) * 100);
                 }
             } catch { /* fan info not available */ }
 

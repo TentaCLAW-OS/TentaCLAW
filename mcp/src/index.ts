@@ -446,6 +446,101 @@ const tools: ToolDefinition[] = [
             return lines.join('\n');
         },
     },
+
+    // -------------------------------------------------------------------------
+    // get_alerts — current cluster alerts
+    // -------------------------------------------------------------------------
+    {
+        name: 'get_alerts',
+        description: 'Returns current alerts for the TentaCLAW cluster: GPU overheating, nodes offline, VRAM full, etc.',
+        parameters: {
+            severity: { type: 'string', description: 'Filter by severity: critical, warning, info', required: false },
+        },
+        handler: async (params) => {
+            const severity = params.severity ? `?severity=${params.severity}` : '';
+            const res = await gatewayFetch(`/api/v1/alerts${severity}`);
+            if (!res.ok) return `Error fetching alerts: ${JSON.stringify(res.data)}`;
+            const alerts = (res.data as { alerts?: Array<{ id: string; type: string; severity: string; message: string; node_id: string; created_at: string }> }).alerts || [];
+            if (alerts.length === 0) return 'No active alerts. Cluster is healthy.';
+            return alerts.map(a => `[${a.severity.toUpperCase()}] ${a.type} on ${a.node_id}: ${a.message} (${a.created_at})`).join('\n');
+        },
+    },
+
+    // -------------------------------------------------------------------------
+    // cancel_inference — abort a running inference request
+    // -------------------------------------------------------------------------
+    {
+        name: 'cancel_inference',
+        description: 'Cancel an active inference request by ID. Use list_active_requests first to see running requests.',
+        parameters: {
+            request_id: { type: 'string', description: 'The request ID to cancel', required: true },
+        },
+        handler: async (params) => {
+            const res = await gatewayFetch(`/api/v1/inference/cancel/${params.request_id}`, { method: 'POST' });
+            if (!res.ok) return `Error cancelling request: ${JSON.stringify(res.data)}`;
+            return `Request ${params.request_id} cancelled.`;
+        },
+    },
+
+    // -------------------------------------------------------------------------
+    // list_active_requests — show in-flight inference requests
+    // -------------------------------------------------------------------------
+    {
+        name: 'list_active_requests',
+        description: 'Lists all currently active (in-flight) inference requests across the cluster.',
+        parameters: {},
+        handler: async () => {
+            const res = await gatewayFetch('/api/v1/inference/active');
+            if (!res.ok) return `Error: ${JSON.stringify(res.data)}`;
+            const data = res.data as { requests?: Array<{ id: string; model: string; hostname: string; elapsed_ms: number }>; count?: number };
+            if (!data.requests?.length) return 'No active inference requests.';
+            const lines = [`${data.count} active request(s):`, ''];
+            for (const r of data.requests) {
+                lines.push(`  ${r.id} — ${r.model} on ${r.hostname} (${r.elapsed_ms}ms)`);
+            }
+            return lines.join('\n');
+        },
+    },
+
+    // -------------------------------------------------------------------------
+    // drain_node — gracefully drain a node for maintenance
+    // -------------------------------------------------------------------------
+    {
+        name: 'drain_node',
+        description: 'Gracefully drain a node: waits for in-flight requests to finish, then sets it to maintenance mode.',
+        parameters: {
+            node_id: { type: 'string', description: 'The node ID to drain', required: true },
+        },
+        handler: async (params) => {
+            const res = await gatewayFetch(`/api/v1/nodes/${params.node_id}/drain`, { method: 'POST', body: {} });
+            if (!res.ok) return `Error draining node: ${JSON.stringify(res.data)}`;
+            const data = res.data as { drained?: boolean; elapsed_ms?: number; message?: string };
+            return data.drained
+                ? `Node ${params.node_id} drained in ${data.elapsed_ms}ms. Ready for maintenance.`
+                : `Drain timed out: ${data.message}`;
+        },
+    },
+
+    // -------------------------------------------------------------------------
+    // fleet_deploy — deploy a model to all nodes
+    // -------------------------------------------------------------------------
+    {
+        name: 'fleet_deploy',
+        description: 'Deploy (install) a model across all online nodes in the cluster, or to specific nodes.',
+        parameters: {
+            model: { type: 'string', description: 'Model name to deploy (e.g. llama3.1:8b)', required: true },
+            nodes: { type: 'string', description: 'Comma-separated node IDs (empty = all)', required: false },
+        },
+        handler: async (params) => {
+            const body: Record<string, unknown> = { model: params.model };
+            if (params.nodes) body.nodes = (params.nodes as string).split(',').map(s => s.trim());
+            const res = await gatewayFetch('/api/v1/fleet/deploy', { method: 'POST', body });
+            if (!res.ok) return `Error deploying: ${JSON.stringify(res.data)}`;
+            const data = res.data as { count?: number; failed?: number; deployed_to?: Array<{ hostname: string; status: string }> };
+            const summary = (data.deployed_to || []).map(d => `  ${d.hostname}: ${d.status}`).join('\n');
+            return `Deployed ${params.model} to ${data.count} node(s) (${data.failed || 0} failed):\n${summary}`;
+        },
+    },
 ];
 
 // =============================================================================

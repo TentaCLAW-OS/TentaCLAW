@@ -537,7 +537,7 @@ routes.get('/api/v1/profiler/endpoint/:path{.+}', (c) => {
 
 routes.get('/api/v1/profiler/recent', (c) => {
     const limitParam = c.req.query('limit');
-    const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+    const limit = limitParam ? (parseInt(limitParam, 10) || 50) : undefined;
     return c.json(getProfiles(limit));
 });
 

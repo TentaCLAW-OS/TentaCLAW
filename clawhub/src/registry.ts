@@ -268,8 +268,8 @@ export function createRegistry(): Hono {
         const typeFilter = c.req.query('type');
         const query = (c.req.query('q') || '').toLowerCase();
         const sort = c.req.query('sort') || 'updated';
-        const page = Math.max(1, parseInt(c.req.query('page') || '1', 10));
-        const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10)));
+        const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10) || 20));
 
         let results = [...packages.values()];
 
@@ -431,8 +431,8 @@ export function createRegistry(): Hono {
         const categoryFilter = c.req.query('category');
         const tagFilter = c.req.query('tag');
         const sort = c.req.query('sort') || 'relevance';
-        const page = Math.max(1, parseInt(c.req.query('page') || '1', 10));
-        const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10)));
+        const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10) || 20));
 
         let results = [...packages.values()];
 
@@ -503,8 +503,8 @@ export function createRegistry(): Hono {
     app.get('/v1/categories/:type', (c) => {
         const type = c.req.param('type')!;
         const category = c.req.query('category');
-        const page = Math.max(1, parseInt(c.req.query('page') || '1', 10));
-        const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10)));
+        const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10) || 20));
 
         let results = [...packages.values()].filter((p) => p.type === type);
 
@@ -520,7 +520,7 @@ export function createRegistry(): Hono {
 
     // ── GET /v1/trending — trending by recent downloads ────────────────
     app.get('/v1/trending', (c) => {
-        const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10)));
+        const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10) || 20));
         const type = c.req.query('type');
 
         let results = [...packages.values()];
@@ -546,7 +546,7 @@ export function createRegistry(): Hono {
 
     // ── GET /v1/featured — editor's picks ──────────────────────────────
     app.get('/v1/featured', (c) => {
-        const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10)));
+        const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10) || 20));
         const type = c.req.query('type');
 
         let results = [...packages.values()].filter((p) => p.featured);
@@ -615,8 +615,8 @@ export function createRegistry(): Hono {
     // ── GET /v1/publishers/:username/packages — all packages by user ───
     app.get('/v1/publishers/:username/packages', (c) => {
         const username = c.req.param('username')!;
-        const page = Math.max(1, parseInt(c.req.query('page') || '1', 10));
-        const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10)));
+        const page = Math.max(1, parseInt(c.req.query('page') || '1', 10) || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(c.req.query('limit') || '20', 10) || 20));
 
         const userPkgs = [...packages.values()]
             .filter((p) => p.publisher === username)

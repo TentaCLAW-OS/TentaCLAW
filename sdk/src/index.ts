@@ -125,6 +125,60 @@ class HttpClient {
     post<T>(path: string, body?: unknown): Promise<T> { return this.request<T>('POST', path, body); }
     put<T>(path: string, body?: unknown): Promise<T> { return this.request<T>('PUT', path, body); }
     del<T>(path: string): Promise<T> { return this.request<T>('DELETE', path); }
+
+    /** Stream SSE responses — yields text chunks */
+    async *stream(path: string, body: unknown): AsyncGenerator<string, void, unknown> {
+        const url = this.baseUrl + path;
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'TentaCLAW-SDK/0.1.0',
+        };
+        if (this.options.apiKey) {
+            headers['Authorization'] = 'Bearer ' + this.options.apiKey;
+        }
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+            const errBody = await res.text();
+            throw new TentaCLAWError(res.status, errBody, path);
+        }
+
+        if (!res.body) return;
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ') || line.includes('[DONE]')) continue;
+                try {
+                    const ev = JSON.parse(line.slice(6)) as { choices?: Array<{ delta?: { content?: string } }> };
+                    const content = ev.choices?.[0]?.delta?.content;
+                    if (content) yield content;
+                } catch { /* skip malformed SSE */ }
+            }
+        }
+    }
+}
+
+/** Pagination options for list endpoints */
+export interface ListOptions {
+    offset?: number;
+    limit?: number;
+    filter?: string;
 }
 
 // =============================================================================
@@ -149,8 +203,13 @@ export class TentaCLAWError extends Error {
 class NodesClient {
     constructor(private http: HttpClient) {}
 
-    list(): Promise<Node[]> {
-        return this.http.get('/api/v1/nodes');
+    list(opts?: ListOptions): Promise<Node[]> {
+        const params = new URLSearchParams();
+        if (opts?.offset) params.set('offset', String(opts.offset));
+        if (opts?.limit) params.set('limit', String(opts.limit));
+        if (opts?.filter) params.set('filter', opts.filter);
+        const qs = params.toString();
+        return this.http.get('/api/v1/nodes' + (qs ? '?' + qs : ''));
     }
 
     get(id: string): Promise<Node> {
@@ -218,6 +277,21 @@ class InferenceClient {
         });
     }
 
+    /** Streaming chat — yields text chunks as they arrive */
+    chatStream(model: string, message: string, options?: { system_prompt?: string; temperature?: number; max_tokens?: number }): AsyncGenerator<string, void, unknown> {
+        const messages: Array<{ role: string; content: string }> = [];
+        if (options?.system_prompt) messages.push({ role: 'system', content: options.system_prompt });
+        messages.push({ role: 'user', content: message });
+
+        return this.http.stream('/v1/chat/completions', {
+            model,
+            messages,
+            temperature: options?.temperature,
+            max_tokens: options?.max_tokens,
+            stream: true,
+        });
+    }
+
     complete(model: string, prompt: string): Promise<Record<string, unknown>> {
         return this.http.post('/v1/completions', { model, prompt });
     }
@@ -266,8 +340,13 @@ class ClusterClient {
 class AlertsClient {
     constructor(private http: HttpClient) {}
 
-    list(): Promise<Alert[]> {
-        return this.http.get('/api/v1/alerts');
+    list(opts?: ListOptions): Promise<Alert[]> {
+        const params = new URLSearchParams();
+        if (opts?.offset) params.set('offset', String(opts.offset));
+        if (opts?.limit) params.set('limit', String(opts.limit));
+        if (opts?.filter) params.set('severity', opts.filter);
+        const qs = params.toString();
+        return this.http.get('/api/v1/alerts' + (qs ? '?' + qs : ''));
     }
 
     rules(): Promise<unknown[]> {

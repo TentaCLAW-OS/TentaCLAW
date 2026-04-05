@@ -1,0 +1,158 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "Prometheus data source pointing at TentaCLAW /metrics",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "title": "Cluster Overview",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "tentaclaw_nodes_online", "legendFormat": "Nodes Online", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": { "thresholds": { "steps": [{ "color": "red", "value": 0 }, { "color": "green", "value": 1 }] } }
+      }
+    },
+    {
+      "title": "Total GPUs",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        { "expr": "tentaclaw_gpus_total", "legendFormat": "GPUs", "refId": "A" }
+      ]
+    },
+    {
+      "title": "Cluster tok/s",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "tentaclaw_cluster_toks_per_sec", "legendFormat": "tok/s", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "steps": [{ "color": "yellow", "value": 0 }, { "color": "green", "value": 50 }] } }
+      }
+    },
+    {
+      "title": "Health Score",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        { "expr": "tentaclaw_cluster_health_score", "legendFormat": "Health", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 100,
+          "thresholds": { "steps": [{ "color": "red", "value": 0 }, { "color": "orange", "value": 60 }, { "color": "yellow", "value": 80 }, { "color": "green", "value": 90 }] }
+        }
+      }
+    },
+    {
+      "title": "VRAM Usage (per node)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        { "expr": "tentaclaw_node_vram_used_mb", "legendFormat": "{{hostname}} used", "refId": "A" },
+        { "expr": "tentaclaw_node_vram_total_mb", "legendFormat": "{{hostname}} total", "refId": "B" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "decmbytes" } }
+    },
+    {
+      "title": "GPU Temperature (per node)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        { "expr": "tentaclaw_node_gpu_temp_c", "legendFormat": "{{hostname}}", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "thresholds": { "steps": [{ "color": "green", "value": 0 }, { "color": "yellow", "value": 75 }, { "color": "red", "value": 85 }] },
+          "custom": { "thresholdsStyle": { "mode": "area" } }
+        }
+      }
+    },
+    {
+      "title": "Inference Throughput (tok/s per node)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        { "expr": "tentaclaw_node_toks_per_sec", "legendFormat": "{{hostname}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "title": "GPU Utilization %",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        { "expr": "tentaclaw_node_gpu_util_pct", "legendFormat": "{{hostname}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
+    },
+    {
+      "title": "In-Flight Requests",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        { "expr": "tentaclaw_node_in_flight", "legendFormat": "{{hostname}}", "refId": "A" }
+      ]
+    },
+    {
+      "title": "Power Draw (Watts)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        { "expr": "tentaclaw_node_power_watts", "legendFormat": "{{hostname}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "watt" } }
+    },
+    {
+      "title": "Loaded Models",
+      "type": "table",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 28 },
+      "targets": [
+        { "expr": "tentaclaw_model_node_count", "legendFormat": "{{model}}", "refId": "A", "format": "table", "instant": true }
+      ]
+    },
+    {
+      "title": "Inference Latency p50 (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+      "targets": [
+        { "expr": "tentaclaw_inference_latency_p50_ms", "legendFormat": "{{model}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "title": "CPU Usage %",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+      "targets": [
+        { "expr": "tentaclaw_node_cpu_usage_pct", "legendFormat": "{{hostname}}", "refId": "A" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100 } }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["tentaclaw", "ai", "gpu", "inference"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "TentaCLAW Cluster",
+  "uid": "tentaclaw-cluster",
+  "version": 1
+}

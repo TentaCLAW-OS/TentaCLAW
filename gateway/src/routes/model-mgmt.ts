@@ -303,4 +303,313 @@ function inferTags(name: string): string[] {
     return tags;
 }
 
+// =============================================================================
+// Wave 601: Model Quantization — POST /api/v1/models/:model/quantize
+// Queues a quantization job on a target node via agent command
+// =============================================================================
+
+modelMgmt.post('/api/v1/models/:model/quantize', async (c) => {
+    const model = c.req.param('model');
+    const body = await c.req.json() as { node_id: string; bits?: number; method?: string };
+    if (!body.node_id) return c.json({ error: 'node_id required' }, 400);
+
+    const bits = body.bits || 4;
+    const method = body.method || 'Q4_K_M';
+
+    queueCommand(body.node_id, 'quantize_model', { model, bits, method });
+
+    return c.json({
+        message: `Quantization queued: ${model} → ${method} (${bits}-bit)`,
+        model,
+        target_quantization: method,
+        bits,
+        node_id: body.node_id,
+        status: 'queued',
+    }, 202);
+});
+
+// =============================================================================
+// Wave 603: GGUF Conversion — POST /api/v1/models/convert
+// Queue GGUF conversion from HuggingFace safetensors
+// =============================================================================
+
+modelMgmt.post('/api/v1/models/convert', async (c) => {
+    const body = await c.req.json() as { source: string; node_id: string; format?: string; output_name?: string };
+    if (!body.source || !body.node_id) return c.json({ error: 'source and node_id required' }, 400);
+
+    const format = body.format || 'gguf';
+    queueCommand(body.node_id, 'quantize_model', {
+        model: body.source,
+        convert: true,
+        format,
+        output_name: body.output_name,
+    });
+
+    return c.json({
+        message: `Conversion queued: ${body.source} → ${format}`,
+        source: body.source,
+        format,
+        node_id: body.node_id,
+        status: 'queued',
+    }, 202);
+});
+
+// =============================================================================
+// Wave 604: Model Merging — POST /api/v1/models/merge
+// Queue model merge (frankenmerge) on a target node
+// =============================================================================
+
+modelMgmt.post('/api/v1/models/merge', async (c) => {
+    const body = await c.req.json() as { model_a: string; model_b: string; node_id: string; method?: string; output_name?: string };
+    if (!body.model_a || !body.model_b || !body.node_id) {
+        return c.json({ error: 'model_a, model_b, and node_id required' }, 400);
+    }
+
+    const method = body.method || 'slerp';
+    queueCommand(body.node_id, 'quantize_model', {
+        model: body.model_a,
+        merge_with: body.model_b,
+        merge_method: method,
+        output_name: body.output_name || `${body.model_a.split(':')[0]}-${body.model_b.split(':')[0]}-merge`,
+    });
+
+    return c.json({
+        message: `Merge queued: ${body.model_a} + ${body.model_b} (${method})`,
+        model_a: body.model_a,
+        model_b: body.model_b,
+        method,
+        node_id: body.node_id,
+        status: 'queued',
+    }, 202);
+});
+
+// =============================================================================
+// Wave 605: LORA Training — POST /api/v1/models/:model/lora
+// Queue LORA fine-tuning on a target node
+// =============================================================================
+
+modelMgmt.post('/api/v1/models/:model/lora', async (c) => {
+    const model = c.req.param('model');
+    const body = await c.req.json() as { node_id: string; data_path: string; epochs?: number; lr?: number; output_name?: string };
+    if (!body.node_id || !body.data_path) return c.json({ error: 'node_id and data_path required' }, 400);
+
+    queueCommand(body.node_id, 'quantize_model', {
+        model,
+        lora_train: true,
+        data_path: body.data_path,
+        epochs: body.epochs || 3,
+        lr: body.lr || 2e-4,
+        output_name: body.output_name || `${model.split(':')[0]}-lora`,
+    });
+
+    return c.json({
+        message: `LORA training queued: ${model} on ${body.data_path}`,
+        model,
+        data_path: body.data_path,
+        epochs: body.epochs || 3,
+        node_id: body.node_id,
+        status: 'queued',
+    }, 202);
+});
+
+// =============================================================================
+// Wave 606: LORA Library — GET/POST /api/v1/lora
+// Manage LORA adapters
+// =============================================================================
+
+interface LoraAdapter {
+    id: string;
+    name: string;
+    base_model: string;
+    task: string;
+    node_id: string;
+    created_at: string;
+}
+
+const loraAdapters: LoraAdapter[] = [];
+
+modelMgmt.get('/api/v1/lora', (c) => {
+    return c.json({ adapters: loraAdapters, count: loraAdapters.length });
+});
+
+modelMgmt.post('/api/v1/lora', async (c) => {
+    const body = await c.req.json() as { name: string; base_model: string; task: string; node_id: string };
+    if (!body.name || !body.base_model) return c.json({ error: 'name and base_model required' }, 400);
+
+    const adapter: LoraAdapter = {
+        id: 'lora-' + Date.now().toString(36),
+        name: body.name,
+        base_model: body.base_model,
+        task: body.task || 'general',
+        node_id: body.node_id || '',
+        created_at: new Date().toISOString(),
+    };
+    if (loraAdapters.length >= 100) {
+        return c.json({ error: 'Maximum 100 LORA adapters. Delete old ones first.' }, 400);
+    }
+    loraAdapters.push(adapter);
+    return c.json({ adapter }, 201);
+});
+
+modelMgmt.delete('/api/v1/lora/:id', (c) => {
+    const id = c.req.param('id');
+    const idx = loraAdapters.findIndex(a => a.id === id);
+    if (idx === -1) return c.json({ error: 'Adapter not found' }, 404);
+    loraAdapters.splice(idx, 1);
+    return c.json({ message: 'Adapter removed' });
+});
+
+// =============================================================================
+// Wave 613: Model Compare — POST /api/v1/models/compare
+// Side-by-side benchmark of two models
+// =============================================================================
+
+modelMgmt.post('/api/v1/models/compare', async (c) => {
+    const body = await c.req.json() as { model_a: string; model_b: string; prompt?: string };
+    if (!body.model_a || !body.model_b) return c.json({ error: 'model_a and model_b required' }, 400);
+
+    // Get benchmark data for both models
+    const allBenchmarks = getAllBenchmarks();
+    const benchA = allBenchmarks.filter((b: any) => b.model === body.model_a);
+    const benchB = allBenchmarks.filter((b: any) => b.model === body.model_b);
+
+    const avgTps = (benches: any[]) => benches.length > 0
+        ? benches.reduce((s: number, b: any) => s + (b.tokens_per_second || 0), 0) / benches.length
+        : 0;
+
+    return c.json({
+        model_a: {
+            name: body.model_a,
+            avg_tps: Math.round(avgTps(benchA) * 10) / 10,
+            benchmark_count: benchA.length,
+        },
+        model_b: {
+            name: body.model_b,
+            avg_tps: Math.round(avgTps(benchB) * 10) / 10,
+            benchmark_count: benchB.length,
+        },
+        winner: avgTps(benchA) > avgTps(benchB) ? body.model_a : avgTps(benchB) > avgTps(benchA) ? body.model_b : 'tie',
+    });
+});
+
+// =============================================================================
+// Wave 617: Model Benchmark Leaderboard — GET /api/v1/leaderboard/benchmarks
+// Separate from the live leaderboard in misc.ts — this one uses stored benchmarks
+// =============================================================================
+
+modelMgmt.get('/api/v1/leaderboard/benchmarks', (c) => {
+    const allBenchmarks = getAllBenchmarks();
+
+    // Aggregate by model
+    const modelStats: Record<string, { tps_sum: number; count: number; best_tps: number }> = {};
+    for (const b of allBenchmarks as any[]) {
+        const model = b.model || 'unknown';
+        if (!modelStats[model]) modelStats[model] = { tps_sum: 0, count: 0, best_tps: 0 };
+        const tps = b.tokens_per_second || 0;
+        modelStats[model].tps_sum += tps;
+        modelStats[model].count++;
+        if (tps > modelStats[model].best_tps) modelStats[model].best_tps = tps;
+    }
+
+    const leaderboard = Object.entries(modelStats)
+        .map(([model, stats]) => ({
+            model,
+            avg_tps: Math.round((stats.tps_sum / stats.count) * 10) / 10,
+            best_tps: Math.round(stats.best_tps * 10) / 10,
+            benchmark_count: stats.count,
+        }))
+        .sort((a, b) => b.avg_tps - a.avg_tps);
+
+    return c.json({ leaderboard, count: leaderboard.length });
+});
+
+// =============================================================================
+// Wave 605b: Fine-Tuning Jobs API
+// POST /api/v1/finetune/jobs — create a fine-tune job
+// GET  /api/v1/finetune/jobs — list fine-tune jobs
+// GET  /api/v1/finetune/jobs/:id — get job status
+// DELETE /api/v1/finetune/jobs/:id — cancel job
+// =============================================================================
+
+interface FinetuneJob {
+    id: string;
+    model: string;
+    node_id: string;
+    data_path: string;
+    method: 'lora' | 'full' | 'qlora';
+    epochs: number;
+    lr: number;
+    status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+    output_model?: string;
+    error?: string;
+    created_at: string;
+    started_at?: string;
+    completed_at?: string;
+}
+
+const finetuneJobs = new Map<string, FinetuneJob>();
+
+modelMgmt.get('/api/v1/finetune/jobs', (c) => {
+    const jobs = Array.from(finetuneJobs.values());
+    return c.json({ jobs, count: jobs.length });
+});
+
+modelMgmt.get('/api/v1/finetune/jobs/:id', (c) => {
+    const job = finetuneJobs.get(c.req.param('id'));
+    if (!job) return c.json({ error: 'Job not found' }, 404);
+    return c.json({ job });
+});
+
+modelMgmt.post('/api/v1/finetune/jobs', async (c) => {
+    const body = await c.req.json() as { model: string; node_id: string; data_path: string; method?: string; epochs?: number; lr?: number };
+    if (!body.model || !body.node_id || !body.data_path) {
+        return c.json({ error: 'model, node_id, and data_path required' }, 400);
+    }
+
+    const job: FinetuneJob = {
+        id: 'ft-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6),
+        model: body.model,
+        node_id: body.node_id,
+        data_path: body.data_path,
+        method: (body.method as FinetuneJob['method']) || 'lora',
+        epochs: body.epochs || 3,
+        lr: body.lr || 2e-4,
+        status: 'queued',
+        created_at: new Date().toISOString(),
+    };
+    finetuneJobs.set(job.id, job);
+
+    // Prevent memory leak: cap at 100 jobs, evict oldest completed
+    if (finetuneJobs.size > 100) {
+        for (const [id, j] of finetuneJobs) {
+            if (j.status === 'completed' || j.status === 'failed' || j.status === 'cancelled') {
+                finetuneJobs.delete(id);
+                if (finetuneJobs.size <= 80) break;
+            }
+        }
+    }
+
+    // Queue the actual command to the agent
+    queueCommand(body.node_id, 'quantize_model', {
+        model: body.model,
+        lora_train: true,
+        data_path: body.data_path,
+        epochs: job.epochs,
+        lr: job.lr,
+    });
+
+    return c.json({ job }, 201);
+});
+
+modelMgmt.delete('/api/v1/finetune/jobs/:id', (c) => {
+    const id = c.req.param('id');
+    const job = finetuneJobs.get(id);
+    if (!job) return c.json({ error: 'Job not found' }, 404);
+    if (job.status === 'completed' || job.status === 'failed') {
+        return c.json({ error: 'Job already finished' }, 400);
+    }
+    job.status = 'cancelled';
+    return c.json({ message: 'Job cancelled', job });
+});
+
 export default modelMgmt;

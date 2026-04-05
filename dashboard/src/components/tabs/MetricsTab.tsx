@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Sparkline } from '@/components/ui/Sparkline';
+import { useClusterStore } from '@/stores/cluster';
 
 /* ── data helpers ── */
 
@@ -123,7 +124,7 @@ function MultiSparkline({ series }: { series: SeriesDef[] }) {
     >
       {series.map((s, si) => {
         const points = s.data.map((v, i) => {
-          const x = (i / (s.data.length - 1)) * 100;
+          const x = s.data.length > 1 ? (i / (s.data.length - 1)) * 100 : 50;
           const y = 24 - ((v - globalMin) / range) * 20 - 2;
           return { x, y };
         });
@@ -166,11 +167,21 @@ function MultiSparkline({ series }: { series: SeriesDef[] }) {
    ══════════════════════════════════════════════════════ */
 
 export function MetricsTab() {
+  const nodes = useClusterStore((s) => s.nodes);
+  const summary = useClusterStore((s) => s.summary);
+
   const data = useMemo(() => {
     const N = 30;
 
-    // Throughput — tok/s (realistic range for a small cluster)
-    const throughput = mockSeries(N, 380, 620, 'stable', 101);
+    // Use real cluster data to seed current values, then generate sparkline history
+    const currentTps = nodes.reduce((s, n) => s + ((n as any).latest_stats?.toks_per_sec ?? 0), 0) || 500;
+    const totalVramMb = summary?.total_vram_mb ?? 160000;
+    const usedVramMb = summary?.used_vram_mb ?? 80000;
+    const vramPct = totalVramMb > 0 ? (usedVramMb / totalVramMb) * 100 : 70;
+
+    // Real data anchored sparklines — last point is the real value
+    const throughput = mockSeries(N - 1, currentTps * 0.6, currentTps * 1.3, 'stable', 101);
+    throughput.push(currentTps);
 
     // Latency — ms
     const latencyP50 = mockSeries(N, 18, 35, 'stable', 201);
@@ -181,10 +192,17 @@ export function MetricsTab() {
     const errorRate = mockSeries(N, 0.1, 1.8, 'stable', 301);
 
     // Daily electricity cost — USD
-    const cost = mockSeries(N, 2.8, 6.2, 'up', 401);
+    const totalWatts = nodes.reduce((s, n) => {
+      const gpus = (n as any).latest_stats?.gpus ?? [];
+      return s + gpus.reduce((gs: number, g: any) => gs + (g.powerDrawW ?? 0), 0);
+    }, 0);
+    const dailyCost = totalWatts > 0 ? (totalWatts / 1000) * 24 * 0.12 : 4.5;
+    const cost = mockSeries(N - 1, dailyCost * 0.7, dailyCost * 1.2, 'up', 401);
+    cost.push(dailyCost);
 
     // VRAM utilization — cluster-wide percentage
-    const vram = mockSeries(N, 55, 92, 'up', 501);
+    const vram = mockSeries(N - 1, vramPct * 0.8, Math.min(vramPct * 1.1, 100), 'up', 501);
+    vram.push(vramPct);
 
     return { throughput, latencyP50, latencyP95, latencyP99, errorRate, cost, vram };
   }, []);

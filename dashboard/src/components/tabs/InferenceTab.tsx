@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { useClusterStore } from '@/stores/cluster';
 import { Sparkline } from '@/components/ui/Sparkline';
 import { TentaCLAWTips } from '@/components/ui/TentaCLAWTips';
@@ -46,6 +46,15 @@ function errorRateColor(pct: number): string {
 
 export function InferenceTab() {
   const { nodes, summary } = useClusterStore();
+
+  // Live throughput history — append current tok/s every render, keep last 50 points
+  const throughputHistory = useRef<number[]>([...MOCK_THROUGHPUT_HISTORY]);
+  const currentTps = nodes.filter(n => n.status === 'online').reduce((s, n) => s + (n.latest_stats?.toks_per_sec ?? 0), 0);
+  useEffect(() => {
+    const arr = throughputHistory.current;
+    arr.push(Math.round(currentTps));
+    if (arr.length > 50) arr.shift();
+  }, [currentTps]);
 
   /* Compute live stats from cluster data */
   const stats = useMemo(() => {
@@ -127,7 +136,7 @@ export function InferenceTab() {
         </h3>
         <div style={{ height: 80 }}>
           <Sparkline
-            data={MOCK_THROUGHPUT_HISTORY}
+            data={throughputHistory.current}
             color="var(--cyan)"
             fillOpacity={0.2}
           />

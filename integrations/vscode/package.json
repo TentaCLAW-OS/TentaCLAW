@@ -1,0 +1,70 @@
+{
+  "name": "tentaclaw",
+  "displayName": "TentaCLAW",
+  "description": "Local AI compute cluster integration — route inference to your own GPUs",
+  "version": "0.1.0",
+  "publisher": "tentaclaw-os",
+  "repository": "https://github.com/TentaCLAW-OS/tentaclaw-os",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Machine Learning", "Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "tentaclaw.status", "title": "TentaCLAW: Cluster Status" },
+      { "command": "tentaclaw.chat", "title": "TentaCLAW: Chat with Local Model" },
+      { "command": "tentaclaw.explain", "title": "TentaCLAW: Explain Selection" },
+      { "command": "tentaclaw.review", "title": "TentaCLAW: Review Git Diff" },
+      { "command": "tentaclaw.complete", "title": "TentaCLAW: Complete Code" }
+    ],
+    "configuration": {
+      "title": "TentaCLAW",
+      "properties": {
+        "tentaclaw.gatewayUrl": {
+          "type": "string",
+          "default": "http://localhost:8080",
+          "description": "TentaCLAW gateway URL"
+        },
+        "tentaclaw.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for authenticated requests"
+        },
+        "tentaclaw.model": {
+          "type": "string",
+          "default": "",
+          "description": "Preferred model (empty = cluster default)"
+        },
+        "tentaclaw.autoComplete": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable inline code completion"
+        }
+      }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "tentaclaw",
+          "title": "TentaCLAW",
+          "icon": "media/tentaclaw-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "tentaclaw": [
+        { "id": "tentaclaw.cluster", "name": "Cluster" },
+        { "id": "tentaclaw.chat", "name": "Chat" }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  }
+}

@@ -17,8 +17,16 @@
         "dashboard"
     ],
     "scripts": {
+        "build": "npm run build --workspace=gateway && npm run build --workspace=agent && npm run build --workspace=cli && npm run build --workspace=dashboard",
+        "build:gateway": "npm run build --workspace=gateway",
+        "build:cli": "npm run build --workspace=cli",
+        "build:agent": "npm run build --workspace=agent",
+        "build:dashboard": "npm run build --workspace=dashboard",
+        "test": "npm test --workspace=gateway",
+        "test:all": "npm test --workspace=gateway",
         "lint": "eslint .",
-        "format": "prettier --write \"**/*.ts\""
+        "format": "prettier --write \"**/*.ts\"",
+        "typecheck": "npm run build --workspace=gateway && npm run build --workspace=cli && npm run build --workspace=agent"
     },
     "author": "TentaCLAW Project",
     "license": "MIT",
@@ -27,5 +35,8 @@
         "@typescript-eslint/parser": "^8.57.2",
         "eslint": "^10.1.0",
         "prettier": "^3.8.1"
+    },
+    "dependencies": {
+        "my-package": "^0.0.0"
     }
 }

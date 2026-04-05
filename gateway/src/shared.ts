@@ -222,7 +222,7 @@ setInterval(() => {
     for (const [key, bucket] of chatRateBuckets) {
         if (now > bucket.resetAt + 60_000) chatRateBuckets.delete(key);
     }
-}, 300_000);
+}, 300_000).unref();
 
 // Login rate limiting
 const loginRateBuckets = new Map<string, { count: number; resetAt: number }>();
@@ -252,7 +252,7 @@ setInterval(() => {
     for (const [ip, bucket] of loginRateBuckets) {
         if (now > bucket.resetAt + 60_000) loginRateBuckets.delete(ip);
     }
-}, 300_000);
+}, 300_000).unref();
 
 // Per-key rate limiting
 const keyRateBuckets = new Map<string, { count: number; window_start: number }>();
@@ -282,7 +282,7 @@ setInterval(() => {
     for (const [key, bucket] of keyRateBuckets) {
         if (now - bucket.window_start > 120_000) keyRateBuckets.delete(key);
     }
-}, 300_000);
+}, 300_000).unref();
 
 // =============================================================================
 // Request Queue

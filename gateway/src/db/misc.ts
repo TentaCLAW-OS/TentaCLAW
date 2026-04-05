@@ -358,6 +358,16 @@ export function getAllWatchdogEvents(limit: number = 100): Array<{ id: number; n
 // =============================================================================
 
 export function createNotificationChannel(type: string, name: string, config: Record<string, unknown>): any {
+    // Validate webhook URLs to prevent SSRF
+    if (type === 'discord' && config.webhook_url) {
+        const wh = String(config.webhook_url);
+        if (!wh.startsWith('https://discord.com/') && !wh.startsWith('https://discordapp.com/')) {
+            throw new Error('Discord webhook URL must start with https://discord.com/ or https://discordapp.com/');
+        }
+    }
+    if (type === 'webhook' && config.url) {
+        try { new URL(String(config.url)); } catch { throw new Error('Invalid webhook URL'); }
+    }
     const d = getDb();
     const id = generateId();
     d.prepare('INSERT INTO notification_channels (id, type, name, config) VALUES (?, ?, ?, ?)').run(id, type, name, JSON.stringify(config));
@@ -385,7 +395,8 @@ export async function sendNotification(channelId: string, message: string): Prom
     try {
         switch (channel.type) {
             case 'telegram': {
-                const url = `https://api.telegram.org/bot${config.bot_token}/sendMessage`;
+                const safeBotToken = String(config.bot_token || '').replace(/[^a-zA-Z0-9:_-]/g, '');
+                const url = `https://api.telegram.org/bot${safeBotToken}/sendMessage`;
                 const resp = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -395,7 +406,9 @@ export async function sendNotification(channelId: string, message: string): Prom
                 return resp.ok;
             }
             case 'discord': {
-                const resp = await fetch(config.webhook_url, {
+                const webhookUrl = String(config.webhook_url || '');
+                if (!webhookUrl.startsWith('https://')) return false;
+                const resp = await fetch(webhookUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ content: message }),
@@ -404,7 +417,9 @@ export async function sendNotification(channelId: string, message: string): Prom
                 return resp.ok;
             }
             case 'webhook': {
-                const resp = await fetch(config.url, {
+                const whUrl = String(config.url || '');
+                if (!whUrl.startsWith('http://') && !whUrl.startsWith('https://')) return false;
+                const resp = await fetch(whUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message, timestamp: new Date().toISOString() }),

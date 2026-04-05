@@ -284,12 +284,13 @@ if (RATE_LIMIT > 0) {
         await next();
     });
 
-    setInterval(() => {
+    const _rateBucketCleanup = setInterval(() => {
         const now = Date.now();
         for (const [ip, bucket] of rateBuckets) {
             if (now > bucket.resetAt + 60000) rateBuckets.delete(ip);
         }
     }, 300_000);
+    _rateBucketCleanup.unref(); // don't prevent process exit
 }
 
 // =============================================================================
@@ -341,34 +342,37 @@ ensureDefaultNamespace();
 // Background Tasks
 // =============================================================================
 
+// Track all intervals for clean shutdown
+const _intervals: NodeJS.Timeout[] = [];
+
 // Mark stale nodes as offline every 30 seconds
-setInterval(() => {
+_intervals.push(setInterval(() => {
     const staleIds = markStaleNodes(60);
     for (const id of staleIds) {
         broadcastSSE('node_offline', { node_id: id, timestamp: new Date().toISOString() });
         console.log(`[tentaclaw] Node went offline: ${id}`);
     }
-}, 30_000);
+}, 30_000));
 
 // Prune old stats daily (keep 7 days)
-setInterval(() => {
+_intervals.push(setInterval(() => {
     const pruned = pruneStats(7);
     if (pruned > 0) {
         console.log(`[tentaclaw] Pruned ${pruned} old stats records`);
     }
-}, 86_400_000);
+}, 86_400_000));
 
 // Wave 494: GPU hang detection — check every 60s, alert if in-flight > 0 and tok/s = 0 for >60s
-setInterval(() => {
+_intervals.push(setInterval(() => {
     const hangs = checkGpuHangs();
     for (const hang of hangs) {
         console.warn(`[tentaclaw] GPU hang detected: ${hang.hostname} (${hang.node_id}) — ${hang.duration_s}s stalled`);
         broadcastSSE('gpu_hang', { node_id: hang.node_id, hostname: hang.hostname, duration_s: hang.duration_s });
     }
-}, 60_000);
+}, 60_000));
 
 // Run scheduled tasks every 60 seconds
-setInterval(() => {
+_intervals.push(setInterval(() => {
     const due = getDueSchedules();
     for (const schedule of due) {
         console.log('[tentaclaw] Running schedule: ' + schedule.name + ' (' + schedule.type + ')');
@@ -413,7 +417,7 @@ setInterval(() => {
             console.error('[tentaclaw] Schedule error: ' + err);
         }
     }
-}, 60_000);
+}, 60_000));
 
 // Auto-doctor every 5 minutes
 let autoDocInterval: NodeJS.Timeout | null = null;
@@ -435,9 +439,16 @@ function startAutoDoctor() {
 
 setTimeout(startAutoDoctor, 10000);
 
-// Graceful shutdown
+// Graceful shutdown — clear all intervals to prevent leaks
+function cleanupIntervals() {
+    for (const iv of _intervals) clearInterval(iv);
+    _intervals.length = 0;
+    if (autoDocInterval) { clearInterval(autoDocInterval); autoDocInterval = null; }
+}
+
 process.on('SIGTERM', () => {
     console.log('[tentaclaw] SIGTERM received — graceful shutdown starting');
+    cleanupIntervals();
     console.log('[tentaclaw] Waiting for in-flight requests to complete...');
     setTimeout(() => {
         console.log('[tentaclaw] Shutdown complete');
@@ -447,6 +458,7 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
     console.log('[tentaclaw] SIGINT received — shutting down');
+    cleanupIntervals();
     process.exit(0);
 });
 
@@ -572,7 +584,7 @@ function startDiscoveryService(gatewayPort: number): void {
                 broadcaster.send(buf, 0, buf.length, DISCOVERY_PORT + 1, '255.255.255.255', () => {});
             };
             announce();
-            setInterval(announce, 30000);
+            _intervals.push(setInterval(announce, 30000));
             console.log(`[tentaclaw] Broadcasting gateway presence every 30s`);
         });
     } catch {

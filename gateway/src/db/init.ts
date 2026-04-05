@@ -629,6 +629,49 @@ const MIGRATIONS: Migration[] = [
             `);
         },
     },
+    {
+        version: 14,
+        name: 'add_finetune_burst_maintenance',
+        up: (db: Database.Database) => {
+            db.exec(`
+                CREATE TABLE IF NOT EXISTS finetune_jobs (
+                    id TEXT PRIMARY KEY,
+                    model TEXT NOT NULL,
+                    node_id TEXT NOT NULL,
+                    data_path TEXT NOT NULL,
+                    method TEXT NOT NULL DEFAULT 'lora',
+                    epochs INTEGER DEFAULT 3,
+                    lr REAL DEFAULT 0.0002,
+                    status TEXT NOT NULL DEFAULT 'queued',
+                    output_model TEXT,
+                    error TEXT,
+                    created_at TEXT DEFAULT (datetime('now')),
+                    started_at TEXT,
+                    completed_at TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_finetune_status ON finetune_jobs(status);
+
+                CREATE TABLE IF NOT EXISTS burst_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    enabled INTEGER NOT NULL DEFAULT 0,
+                    cloud_provider TEXT,
+                    cloud_endpoint TEXT,
+                    cloud_api_key TEXT,
+                    max_burst_rpm INTEGER DEFAULT 100,
+                    cost_threshold_usd REAL DEFAULT 10.0,
+                    updated_at TEXT DEFAULT (datetime('now'))
+                );
+
+                CREATE TABLE IF NOT EXISTS maintenance_mode (
+                    node_id TEXT PRIMARY KEY,
+                    enabled INTEGER NOT NULL DEFAULT 0,
+                    reason TEXT,
+                    entered_at TEXT DEFAULT (datetime('now')),
+                    FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
+                );
+            `);
+        },
+    },
 ];
 
 /**

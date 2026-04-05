@@ -368,7 +368,8 @@ routes.get('/api/v1/models/recommend', (c) => {
     const vramParam = c.req.query('vram_mb');
     let availableVram: number;
     if (vramParam) {
-        availableVram = parseInt(vramParam);
+        availableVram = parseInt(vramParam, 10);
+        if (isNaN(availableVram) || availableVram < 0) availableVram = 0;
     } else {
         const nodes = getAllNodes().filter(n => n.status === 'online' && n.latest_stats);
         if (nodes.length === 0) return c.json({ recommendations: [], available_vram_mb: 0, message: 'No nodes online' });

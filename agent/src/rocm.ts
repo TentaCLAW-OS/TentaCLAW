@@ -97,7 +97,7 @@ export function detectAmdGpus(): AmdGpuInfo[] {
 
         for (const [key, info] of Object.entries(data as Record<string, any>)) {
             if (!key.startsWith('card')) continue;
-            const idx = parseInt(key.replace('card', ''));
+            const idx = parseInt(key.replace('card', ''), 10) || 0;
             const name = info['Card Series'] || info['Card series'] || 'Unknown AMD GPU';
             const family = classifyGpuFamily(name);
 
@@ -248,8 +248,8 @@ export function getAmdRecommendations(gpus: AmdGpuInfo[]): string[] {
 
     const rocmVersion = gpus[0].rocmVersion;
     if (rocmVersion) {
-        const major = parseInt(rocmVersion.split('.')[0]);
-        if (major < 6) {
+        const major = parseInt(rocmVersion.split('.')[0], 10) || 0;
+        if (major > 0 && major < 6) {
             recommendations.push(`ROCm ${rocmVersion} is outdated. Upgrade to ROCm 7+ for best inference performance.`);
         }
     }
@@ -284,8 +284,8 @@ export function getRocmConfig(): RocmConfig {
 
     const version = getRocmVersion();
     if (version) {
-        const major = parseInt(version.split('.')[0]);
-        if (major < 6) warnings.push(`ROCm ${version} is outdated. Recommend ROCm 7+.`);
+        const major = parseInt(version.split('.')[0], 10) || 0;
+        if (major > 0 && major < 6) warnings.push(`ROCm ${version} is outdated. Recommend ROCm 7+.`);
     }
 
     return {
