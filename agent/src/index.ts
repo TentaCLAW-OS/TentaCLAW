@@ -1239,9 +1239,11 @@ async function pushStats(config: AgentConfig, stats: StatsPayload): Promise<Gate
             headers: {
                 'Content-Type': 'application/json',
                 'User-Agent': `TentaCLAW-Agent/${AGENT_VERSION}`,
+                'Connection': 'close',
                 ...(config.clusterSecret ? { 'X-Cluster-Secret': config.clusterSecret } : {}),
             },
             timeout: 10000,
+            agent: false,  // Don't pool sockets — prevents memory leak in long-running agent
         };
 
         const req = (url.protocol === 'https:' ? https : http).request(options, (res) => {
@@ -1542,9 +1544,18 @@ function startShellTunnel(config: AgentConfig): void {
     const wsUrl = config.gatewayUrl.replace('http://', 'ws://').replace('https://', 'wss://') +
         '/ws/agent-shell/' + encodeURIComponent(config.nodeId);
 
+    let currentWs: InstanceType<typeof WebSocket> | null = null;
+
     function connect() {
+        // Clean up previous connection to prevent memory leak
+        if (currentWs) {
+            try { currentWs.removeAllListeners(); currentWs.terminate(); } catch {}
+            currentWs = null;
+        }
+
         try {
             const ws = new WebSocket(wsUrl);
+            currentWs = ws;
 
             ws.on('open', () => {
                 console.log('[shell] Connected to gateway shell tunnel');
@@ -2132,7 +2143,7 @@ function checkMemoryLeak(): void {
         const last10 = recovery.rssHistory.slice(-10).reduce((a, b) => a + b, 0) / 10;
         const growthPct = ((last10 - first10) / first10) * 100;
 
-        if (growthPct > 200) {
+        if (growthPct > 100) {
             console.log(`[recovery] Memory leak suspected: RSS grew ${growthPct.toFixed(0)}% over 10 min (${Math.round(first10 / 1048576)}MB → ${Math.round(last10 / 1048576)}MB)`);
             // Force GC if available
             if (global.gc) {
