@@ -595,8 +595,6 @@ routes.get('/dashboard', (c) => c.redirect('/dashboard/'));
 routes.use('/screenshots/*', serveStatic({ root: '../website' }));
 routes.use('/og-image.svg', serveStatic({ root: '../website', path: 'og-image.svg' }));
 routes.get('/docs.html', serveStatic({ root: '../website', path: 'docs.html' }));
-routes.get('/docs', serveStatic({ root: '../website', path: 'docs.html' }));
 routes.get('/integrations.html', serveStatic({ root: '../website', path: 'integrations.html' }));
-routes.get('/integrations', serveStatic({ root: '../website', path: 'integrations.html' }));
 
 export default routes;

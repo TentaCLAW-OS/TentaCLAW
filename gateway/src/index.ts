@@ -65,6 +65,7 @@ import fleetRoutes, { checkGpuHangs } from './routes/fleet'; // Wave 480-498
 import observabilityRoutes from './routes/observability'; // Wave 491-500
 import modelMgmtRoutes from './routes/model-mgmt'; // Wave 607-628 Phase 4
 import platformRoutes from './routes/platform'; // Wave 686-730 Phase 5-7
+import compatRoutes from './routes/compat'; // Gemini, Ollama native, KoboldAI, OpenRouter
 
 // Re-export for tests
 export { app, initClusterSecret, isAuthDisabled, log, paginate };
@@ -330,6 +331,7 @@ app.route('/', fleetRoutes);           // Wave 480-498
 app.route('/', observabilityRoutes);   // Wave 491-500
 app.route('/', modelMgmtRoutes);       // Wave 607-628 Phase 4
 app.route('/', platformRoutes);        // Wave 686-730 Phase 5-7
+app.route('/', compatRoutes);          // Gemini, Ollama native, KoboldAI, OpenRouter
 app.route('/', miscRoutes);
 
 // Root: serve website for tentaclaw.io, redirect to dashboard for local access
