@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
 import { StatCard, Badge } from '../components/ui';
+import { acknowledgeAlert as apiAckAlert } from '../api';
 import {
   AlertTriangle, AlertCircle, Info, CheckCircle2, Bell,
   Filter, Search, X, Clock,
@@ -29,7 +30,11 @@ function timeAgo(ts: number) {
 }
 
 export function AlertsPage() {
-  const { alerts, acknowledgeAlert, nodes } = useStore();
+  const { alerts, acknowledgeAlert: storeAck, nodes } = useStore();
+  const handleAck = async (id: string) => {
+    storeAck(id); // optimistic UI update
+    await apiAckAlert(id); // fire real API call
+  };
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [showAcknowledged, setShowAcknowledged] = useState(false);
@@ -129,7 +134,7 @@ export function AlertsPage() {
                   </div>
                   {!alert.acknowledged && (
                     <button
-                      onClick={() => acknowledgeAlert(alert.id)}
+                      onClick={() => handleAck(alert.id)}
                       className="px-2.5 py-1 bg-bg-card-hover border border-border rounded-lg text-[11px] text-text-secondary hover:text-text-primary hover:border-border-focus transition-colors shrink-0"
                     >
                       Acknowledge

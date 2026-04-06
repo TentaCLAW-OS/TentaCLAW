@@ -12,6 +12,20 @@ import {
 } from 'lucide-react';
 import type { ModelInfo } from '../types';
 
+async function apiDeploy(model: string): Promise<boolean> {
+  try {
+    const r = await fetch('/api/v1/deploy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }) });
+    return r.ok;
+  } catch { return false; }
+}
+
+async function apiUnload(nodeId: string, model: string): Promise<boolean> {
+  try {
+    const r = await fetch(`/api/v1/nodes/${nodeId}/models/${model}`, { method: 'DELETE' });
+    return r.ok;
+  } catch { return false; }
+}
+
 export function ModelsPage() {
   const { models, nodes } = useStore();
   const [search, setSearch] = useState('');
@@ -138,20 +152,20 @@ export function ModelsPage() {
             <div className="px-4 py-2 border-t border-border/50 flex items-center gap-2">
               {model.status === 'available' && (
                 <>
-                  <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 transition-colors">
+                  <button onClick={() => apiDeploy(model.id)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 transition-colors">
                     <Play size={12} /> Deploy
                   </button>
-                  <button className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-bg-secondary text-text-muted text-xs hover:text-text-primary transition-colors">
+                  <button onClick={() => apiDeploy(model.id)} className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-bg-secondary text-text-muted text-xs hover:text-text-primary transition-colors">
                     <Download size={12} /> Pull
                   </button>
                 </>
               )}
               {model.status === 'loaded' && (
                 <>
-                  <button className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-danger/10 text-danger text-xs font-medium hover:bg-danger/20 transition-colors">
+                  <button onClick={() => model.loadedOn[0] && apiUnload(model.loadedOn[0], model.id)} className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-danger/10 text-danger text-xs font-medium hover:bg-danger/20 transition-colors">
                     <Square size={12} /> Unload
                   </button>
-                  <button className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-bg-secondary text-text-muted text-xs hover:text-text-primary transition-colors">
+                  <button title="Delete model" className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-bg-secondary text-text-muted text-xs hover:text-text-primary transition-colors">
                     <Trash2 size={12} />
                   </button>
                 </>
