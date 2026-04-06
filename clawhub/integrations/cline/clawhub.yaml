@@ -1,0 +1,29 @@
+name: "@tentaclaw/cline"
+version: "1.0.0"
+type: integration
+title: "Cline Coding Agent"
+description: "Connect Cline autonomous coding agent to your TentaCLAW cluster for local-model-powered development."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - ide
+tags:
+  - cline
+  - coding-agent
+  - autonomous
+  - vscode
+integration:
+  protocol: rest
+  service: cline
+  entry: ./src/cline.ts
+  transport: http
+  tools:
+    - name: chat
+      description: "Serve chat completions to Cline from cluster models"
+    - name: autonomous-code
+      description: "Handle autonomous code generation and editing requests from Cline"
+  auth:
+    type: api-key
+    config_key: TENTACLAW_API_KEY

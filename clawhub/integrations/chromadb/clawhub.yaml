@@ -1,0 +1,31 @@
+name: "@tentaclaw/chromadb"
+version: "1.0.0"
+type: integration
+title: "ChromaDB Vector Store"
+description: "Store and query embeddings with ChromaDB. Semantic search over your cluster's document collections."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - vector-store
+tags:
+  - chromadb
+  - vector
+  - embeddings
+  - semantic-search
+integration:
+  protocol: rest
+  service: chromadb
+  entry: ./src/chromadb.ts
+  transport: http
+  tools:
+    - name: index
+      description: "Index documents and embeddings into a ChromaDB collection"
+    - name: query
+      description: "Query a ChromaDB collection with semantic similarity search"
+    - name: collections
+      description: "List, create, and manage ChromaDB collections"
+  auth:
+    type: bearer-token
+    config_key: CHROMADB_API_TOKEN

@@ -215,7 +215,7 @@ There are model runners. There are GPU servers. There are cluster schedulers. No
 | **CLAWHub** | `clawhub/` | Package marketplace -- registry, schema validation, 96 packages across 8 categories. |
 | **Builder** | `builder/` | ISO/PXE build system -- Ubuntu 24.04 base, custom initrd, GRUB BIOS+UEFI. |
 | **Deploy** | `deploy/` | Helm chart, Terraform modules, Ansible playbooks, Kubernetes manifests, Docker production compose. |
-| **Integrations** | `integrations/` | First-party integrations -- Dify, n8n, Home Assistant, Continue.dev, LangChain, and more. |
+| **Integrations** | `integrations/` | 37 integrations -- ChromaDB, Qdrant, Langfuse, Cursor, Cline, Flowise, WhatsApp, LlamaIndex, and more. |
 | **Website** | `website/` | tentaclaw.io -- landing page, docs, install scripts, GitHub Pages. |
 
 ---
@@ -422,7 +422,7 @@ Proxmox nodes are called **Octopods** -- Octopod-1, Octopod-2, and so on. Becaus
 
 - [Website](https://tentaclaw.io) -- Landing page, pricing, and downloads
 - [Documentation](https://tentaclaw.io/docs.html) -- Setup guides, API reference, configuration
-- [Integrations](https://tentaclaw.io/integrations.html) -- 28+ supported tools and platforms
+- [Integrations](https://tentaclaw.io/integrations.html) -- 37+ supported tools and platforms
 - [Discord](https://discord.gg/tentaclaw) -- Community support and discussion (The Tank)
 - [GitHub Issues](https://github.com/TentaCLAW-OS/TentaCLAW/issues) -- Bug reports and feature requests
 

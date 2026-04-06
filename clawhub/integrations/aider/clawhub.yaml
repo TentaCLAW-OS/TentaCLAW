@@ -1,0 +1,29 @@
+name: "@tentaclaw/aider"
+version: "1.0.0"
+type: integration
+title: "Aider Pair Programmer"
+description: "Use Aider AI pair programming with TentaCLAW cluster models. Edit code in your repo with local inference."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - developer-tools
+tags:
+  - aider
+  - pair-programming
+  - code-editing
+  - cli
+integration:
+  protocol: rest
+  service: aider
+  entry: ./src/aider.ts
+  transport: http
+  tools:
+    - name: chat
+      description: "Serve chat completions to Aider from cluster models"
+    - name: edit
+      description: "Handle code editing requests from Aider with diff-based output"
+  auth:
+    type: api-key
+    config_key: TENTACLAW_API_KEY

@@ -1,0 +1,31 @@
+name: "@tentaclaw/milvus"
+version: "1.0.0"
+type: integration
+title: "Milvus Vector Database"
+description: "Cloud-native vector database for scalable similarity search. Index and query embeddings with Milvus."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - vector-store
+tags:
+  - milvus
+  - vector
+  - embeddings
+  - similarity-search
+integration:
+  protocol: rest
+  service: milvus
+  entry: ./src/milvus.ts
+  transport: http
+  tools:
+    - name: index
+      description: "Insert vectors and metadata into a Milvus collection"
+    - name: search
+      description: "Search a Milvus collection with vector similarity and filters"
+    - name: collections
+      description: "List, create, and manage Milvus collections and indexes"
+  auth:
+    type: api-key
+    config_key: MILVUS_API_KEY

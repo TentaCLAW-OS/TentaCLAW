@@ -1,0 +1,31 @@
+name: "@tentaclaw/langfuse"
+version: "1.0.0"
+type: integration
+title: "Langfuse LLM Observability"
+description: "Trace, evaluate, and monitor LLM inference across your cluster with Langfuse observability."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - observability
+tags:
+  - langfuse
+  - observability
+  - tracing
+  - llm-monitoring
+integration:
+  protocol: rest
+  service: langfuse
+  entry: ./src/langfuse.ts
+  transport: http
+  tools:
+    - name: trace
+      description: "Send inference traces and spans to Langfuse"
+    - name: score
+      description: "Score and evaluate LLM outputs in Langfuse"
+    - name: dashboard
+      description: "Retrieve observability metrics and dashboards from Langfuse"
+  auth:
+    type: api-key
+    config_key: LANGFUSE_SECRET_KEY

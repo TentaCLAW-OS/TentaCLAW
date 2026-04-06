@@ -1,0 +1,29 @@
+name: "@tentaclaw/flowise"
+version: "1.0.0"
+type: integration
+title: "Flowise Workflow Builder"
+description: "Drag-and-drop LLM workflows with Flowise, powered by TentaCLAW cluster inference and embeddings."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - workflow
+tags:
+  - flowise
+  - workflow
+  - no-code
+  - langchain
+integration:
+  protocol: rest
+  service: flowise
+  entry: ./src/flowise.ts
+  transport: http
+  tools:
+    - name: ChatTentaCLAW
+      description: "Flowise chat model node backed by TentaCLAW cluster inference"
+    - name: TentaCLAWEmbeddings
+      description: "Flowise embeddings node backed by TentaCLAW cluster models"
+  auth:
+    type: api-key
+    config_key: FLOWISE_API_KEY

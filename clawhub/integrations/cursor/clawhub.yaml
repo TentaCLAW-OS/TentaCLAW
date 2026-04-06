@@ -1,0 +1,29 @@
+name: "@tentaclaw/cursor"
+version: "1.0.0"
+type: integration
+title: "Cursor IDE Integration"
+description: "Use TentaCLAW cluster models as a backend for Cursor IDE. Chat and fill-in-middle completions powered by your GPUs."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - ide
+tags:
+  - cursor
+  - ide
+  - code-completion
+  - fill-in-middle
+integration:
+  protocol: rest
+  service: cursor
+  entry: ./src/cursor.ts
+  transport: http
+  tools:
+    - name: chat
+      description: "Serve chat completions to Cursor IDE from cluster models"
+    - name: fim
+      description: "Serve fill-in-middle code completions to Cursor IDE"
+  auth:
+    type: api-key
+    config_key: TENTACLAW_API_KEY

@@ -1,0 +1,31 @@
+name: "@tentaclaw/qdrant"
+version: "1.0.0"
+type: integration
+title: "Qdrant Vector Database"
+description: "High-performance vector similarity search with Qdrant. Store, filter, and retrieve embeddings at scale."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - vector-store
+tags:
+  - qdrant
+  - vector
+  - embeddings
+  - similarity-search
+integration:
+  protocol: rest
+  service: qdrant
+  entry: ./src/qdrant.ts
+  transport: http
+  tools:
+    - name: index
+      description: "Index vectors and payloads into a Qdrant collection"
+    - name: search
+      description: "Search a Qdrant collection with vector similarity and filters"
+    - name: collections
+      description: "List, create, and manage Qdrant collections"
+  auth:
+    type: api-key
+    config_key: QDRANT_API_KEY

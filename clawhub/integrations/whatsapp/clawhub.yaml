@@ -1,0 +1,31 @@
+name: "@tentaclaw/whatsapp-bot"
+version: "1.0.0"
+type: integration
+title: "WhatsApp Bot Integration"
+description: "Chat with your TentaCLAW cluster models over WhatsApp. Receive messages, respond with AI, and handle media."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - communication
+tags:
+  - whatsapp
+  - bot
+  - chat
+  - messaging
+integration:
+  protocol: rest
+  service: whatsapp
+  entry: ./src/whatsapp.ts
+  transport: http
+  tools:
+    - name: receive
+      description: "Receive incoming WhatsApp messages via webhook"
+    - name: respond
+      description: "Send AI-generated responses back to WhatsApp conversations"
+    - name: media
+      description: "Handle image, audio, and document media in WhatsApp messages"
+  auth:
+    type: bearer-token
+    config_key: WHATSAPP_API_TOKEN

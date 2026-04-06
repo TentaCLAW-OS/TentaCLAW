@@ -1,0 +1,29 @@
+name: "@tentaclaw/opentelemetry"
+version: "1.0.0"
+type: integration
+title: "OpenTelemetry GenAI Observability"
+description: "Export traces and metrics from TentaCLAW inference to any OpenTelemetry-compatible backend."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - observability
+tags:
+  - opentelemetry
+  - otel
+  - tracing
+  - metrics
+integration:
+  protocol: rest
+  service: opentelemetry
+  entry: ./src/opentelemetry.ts
+  transport: http
+  tools:
+    - name: trace
+      description: "Export distributed traces and spans for inference requests via OTLP"
+    - name: metrics
+      description: "Export inference latency, throughput, and GPU metrics via OTLP"
+  auth:
+    type: api-key
+    config_key: OTEL_EXPORTER_API_KEY

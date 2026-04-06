@@ -1,0 +1,29 @@
+name: "@tentaclaw/llamaindex"
+version: "1.0.0"
+type: integration
+title: "LlamaIndex RAG Framework"
+description: "Build retrieval-augmented generation pipelines with LlamaIndex, powered by TentaCLAW cluster LLMs and embeddings."
+license: MIT
+author:
+  name: TentaCLAW Team
+publisher: tentaclaw
+categories:
+  - framework
+tags:
+  - llamaindex
+  - rag
+  - retrieval
+  - embeddings
+integration:
+  protocol: rest
+  service: llamaindex
+  entry: ./src/llamaindex.ts
+  transport: http
+  tools:
+    - name: TentaCLAWLLM
+      description: "LlamaIndex LLM provider backed by TentaCLAW cluster inference"
+    - name: TentaCLAWEmbedding
+      description: "LlamaIndex embedding provider backed by TentaCLAW cluster models"
+  auth:
+    type: api-key
+    config_key: TENTACLAW_API_KEY
