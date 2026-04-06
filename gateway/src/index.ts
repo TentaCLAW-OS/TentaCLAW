@@ -332,8 +332,21 @@ app.route('/', modelMgmtRoutes);       // Wave 607-628 Phase 4
 app.route('/', platformRoutes);        // Wave 686-730 Phase 5-7
 app.route('/', miscRoutes);
 
-// Root redirect to dashboard (must be after route mounting since misc has '/')
-app.get('/', (c) => c.redirect('/dashboard/'));
+// Root: serve website for tentaclaw.io, redirect to dashboard for local access
+app.get('/', (c) => {
+    const host = c.req.header('host') || '';
+    if (host.includes('tentaclaw.io')) {
+        // Serve website index.html for the public domain
+        const fs = require('fs');
+        const path = require('path');
+        const htmlPath = path.join(__dirname, '..', '..', '..', 'website', 'index.html');
+        try {
+            const html = fs.readFileSync(htmlPath, 'utf-8');
+            return c.html(html);
+        } catch { return c.redirect('/dashboard/'); }
+    }
+    return c.redirect('/dashboard/');
+});
 
 // Initialize default namespace
 ensureDefaultNamespace();
