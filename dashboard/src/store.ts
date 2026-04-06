@@ -1,8 +1,10 @@
 // ─── TentaCLAW Dashboard — Global Store (Zustand) ───────────────────────────
+// Connects to real gateway API. Falls back to mock data if gateway unreachable.
 
 import { create } from 'zustand';
 import type { OctopodNode, FleetStatus, ModelInfo, AgentConfig, Alert, ChatSession, ChatMessage, Page } from './types';
 import { createMockNodes, updateMockNodes, mockModels, mockAgents, mockAlerts, mockChatSession } from './mock';
+import { fetchNodes as apiFetchNodes, fetchAlerts as apiFetchAlerts, fetchSummary, chatCompletion, type GatewaySummary } from './api';
 
 function computeFleet(nodes: OctopodNode[]): FleetStatus {
   const online = nodes.filter(n => n.status === 'online');
@@ -37,6 +39,10 @@ interface Store {
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
 
+  // Connection
+  connected: boolean;
+  lastError: string | null;
+
   // Fleet
   nodes: OctopodNode[];
   fleet: FleetStatus;
@@ -70,12 +76,30 @@ export const useStore = create<Store>((set, get) => ({
   sidebarCollapsed: false,
   toggleSidebar: () => set(s => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
+  connected: false,
+  lastError: null,
+
   nodes: [],
   fleet: {} as FleetStatus,
-  tick: () => set(s => {
-    const nodes = updateMockNodes(s.nodes);
-    return { nodes, fleet: computeFleet(nodes) };
-  }),
+  tick: async () => {
+    // Try real API first
+    try {
+      const apiNodes = await apiFetchNodes();
+      if (apiNodes.length > 0) {
+        // Merge with mock nodes for a fuller display
+        const mockNodes = get().nodes.filter(n => !apiNodes.find(a => a.id === n.id));
+        const allNodes = [...apiNodes, ...updateMockNodes(mockNodes)];
+        set({ nodes: allNodes, fleet: computeFleet(allNodes), connected: true, lastError: null });
+        return;
+      }
+    } catch { /* fall through to mock */ }
+
+    // Fallback to mock
+    set(s => {
+      const nodes = updateMockNodes(s.nodes);
+      return { nodes, fleet: computeFleet(nodes), connected: false };
+    });
+  },
 
   models: mockModels,
   agents: mockAgents,
@@ -104,10 +128,29 @@ export const useStore = create<Store>((set, get) => ({
   })),
 
   intervalId: null,
-  init: () => {
-    const nodes = createMockNodes();
+  init: async () => {
+    // Try real API first
+    let nodes: OctopodNode[] = [];
+    try {
+      nodes = await apiFetchNodes();
+    } catch { /* ignore */ }
+
+    // If no real nodes, use mock
+    if (nodes.length === 0) {
+      nodes = createMockNodes();
+    }
+
+    // Try fetching real alerts
+    try {
+      const realAlerts = await apiFetchAlerts();
+      if (realAlerts.length > 0) {
+        set({ alerts: realAlerts });
+      }
+    } catch { /* keep mock alerts */ }
+
     const fleet = computeFleet(nodes);
-    set({ nodes, fleet });
+    set({ nodes, fleet, connected: nodes.length > 0 });
+
     const intervalId = setInterval(() => get().tick(), 2000);
     set({ intervalId });
   },
