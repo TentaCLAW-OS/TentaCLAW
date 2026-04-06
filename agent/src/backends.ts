@@ -79,7 +79,7 @@ export interface InferenceBackend {
     getCapabilities(): BackendCapabilities;
 }
 
-export type BackendType = 'ollama' | 'vllm' | 'sglang' | 'llamacpp' | 'bitnet' | 'mlx';
+export type BackendType = 'ollama' | 'vllm' | 'sglang' | 'llamacpp' | 'bitnet' | 'mlx' | 'aphrodite' | 'koboldcpp' | 'exllamav2' | 'tensorrt' | 'lmstudio' | 'tabbyapi';
 
 export interface BackendStatus {
     type: BackendType;
