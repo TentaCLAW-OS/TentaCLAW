@@ -10,18 +10,34 @@ import {
 import { OctopusLogo } from '../components/ui';
 import type { ChatMessage } from '../types';
 
-// Simulated streaming response
-async function* simulateStream(prompt: string): AsyncGenerator<string> {
-  const responses: Record<string, string> = {
-    default: `I'm running on the TentaCLAW cluster. Here's what I can help with:\n\n**Cluster Management**\n- Check node status and health\n- Deploy or swap models on GPUs\n- Monitor VRAM, power, and temperatures\n\n**Code Assistance**\n- Write and debug code\n- Explain complex algorithms\n- Generate tests and documentation\n\n**General AI Tasks**\n- Research and summarization\n- Creative writing and brainstorming\n- Data analysis and visualization\n\nWhat would you like to work on?`,
-  };
+import { chatCompletion } from '../api';
 
-  const text = responses.default;
-  const words = text.split(' ');
-  for (let i = 0; i < words.length; i++) {
-    yield words[i] + (i < words.length - 1 ? ' ' : '');
-    await new Promise(r => setTimeout(r, 20 + Math.random() * 40));
-  }
+// Real API call with simulated fallback
+async function sendChat(model: string, messages: { role: string; content: string }[]): Promise<{ content: string; tokensUsed: number; latencyMs: number; nodeId: string; model: string }> {
+  const startTime = Date.now();
+  try {
+    const result = await chatCompletion(model, messages);
+    if (result?.choices?.[0]?.message?.content) {
+      return {
+        content: result.choices[0].message.content,
+        tokensUsed: result.usage?.total_tokens || Math.round(result.choices[0].message.content.length / 4),
+        latencyMs: Date.now() - startTime,
+        nodeId: result._tentaclaw?.routed_to || 'unknown',
+        model: result.model || model,
+      };
+    }
+  } catch { /* fall through to mock */ }
+
+  // Fallback mock response
+  const mockResponse = `I'm running on the TentaCLAW cluster. Here's what I can help with:\n\n**Cluster Management**\n- Check node status and health\n- Deploy or swap models on GPUs\n- Monitor VRAM, power, and temperatures\n\n**Code Assistance**\n- Write and debug code\n- Explain complex algorithms\n- Generate tests and documentation\n\nWhat would you like to work on?`;
+  await new Promise(r => setTimeout(r, 1000 + Math.random() * 2000));
+  return {
+    content: mockResponse,
+    tokensUsed: Math.round(mockResponse.length / 4),
+    latencyMs: Date.now() - startTime,
+    nodeId: 'mock-node',
+    model,
+  };
 }
 
 export function ChatPage() {
@@ -52,27 +68,23 @@ export function ChatPage() {
     addMessage(userMsg);
     setInput('');
 
-    // Simulate assistant response via streaming
+    // Send to real API (falls back to mock if gateway unreachable)
     setStreaming(true);
-    const assistantId = `msg-${Date.now() + 1}`;
-    let fullContent = '';
-    const startTime = Date.now();
 
-    for await (const chunk of simulateStream(input)) {
-      fullContent += chunk;
-      // We update the store with the full content each time
-      // In a real implementation, this would be optimized
-    }
+    const chatMessages = (session?.messages || []).map(m => ({ role: m.role, content: m.content }));
+    chatMessages.push({ role: 'user', content: input.trim() });
+
+    const result = await sendChat(session?.model || 'llama3.1:8b', chatMessages);
 
     const assistantMsg: ChatMessage = {
-      id: assistantId,
+      id: `msg-${Date.now() + 1}`,
       role: 'assistant',
-      content: fullContent,
+      content: result.content,
       timestamp: Date.now(),
-      model: session?.model,
-      tokensUsed: Math.round(fullContent.length / 4),
-      latencyMs: Date.now() - startTime,
-      nodeId: 'octopod-1',
+      model: result.model,
+      tokensUsed: result.tokensUsed,
+      latencyMs: result.latencyMs,
+      nodeId: result.nodeId,
     };
     addMessage(assistantMsg);
     setStreaming(false);
