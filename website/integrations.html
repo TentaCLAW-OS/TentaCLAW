@@ -1,0 +1,1662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Integrations &amp; Ecosystem — TentaCLAW OS</title>
+  <meta name="description" content="28+ integrations, every major inference backend, drop-in OpenAI API compatibility. TentaCLAW connects to the tools you already use.">
+  <meta name="theme-color" content="#060910">
+  <meta property="og:title" content="Integrations &amp; Ecosystem — TentaCLAW OS">
+  <meta property="og:description" content="One cluster. Every integration. Ollama, vLLM, SGLang, llama.cpp, LangChain, and 28+ more.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.tentaclaw.io/integrations">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       TentaCLAW OS — Integrations Page Styles
+       ============================================================ */
+
+    :root {
+      --bg:        #060910;
+      --bg-raised: #0a0f18;
+      --surface:   #0e1520;
+      --panel:     #121a28;
+      --border:    rgba(0,255,255,0.10);
+      --border-dim:rgba(255,255,255,0.06);
+      --border-hover:rgba(0,255,255,0.25);
+      --cyan:      #00ffff;
+      --cyan-glow: rgba(0,255,255,0.25);
+      --cyan-dim:  rgba(0,255,255,0.06);
+      --purple:    #8c00c8;
+      --purple-light:#a855f7;
+      --purple-glow:rgba(140,0,200,0.20);
+      --purple-dim:rgba(140,0,200,0.08);
+      --teal:      #008c8c;
+      --teal-bright:#00d4aa;
+      --green:     #00ff88;
+      --amber:     #f59e0b;
+      --red:       #ef4444;
+      --text:      #e8edf5;
+      --text-secondary:#94a3b8;
+      --dim:       #5a6a82;
+      --muted:     #3a4a5f;
+    }
+
+    /* --- Reset & Base --- */
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior:smooth; font-size:16px; }
+    body {
+      font-family:'Inter',system-ui,-apple-system,sans-serif;
+      background:var(--bg); color:var(--text);
+      overflow-x:hidden; -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      line-height:1.6;
+    }
+    h1,h2,h3,h4,h5,h6 { font-family:'Space Grotesk',sans-serif; line-height:1.2; }
+    ::selection { background:var(--purple); color:#fff; }
+    a { color:var(--cyan); text-decoration:none; transition:color 0.2s ease; }
+    a:hover { color:#fff; }
+    img { max-width:100%; display:block; }
+
+    /* --- Utility --- */
+    .container { max-width:1200px; margin:0 auto; padding:0 24px; }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+
+    /* --- Grid Overlay --- */
+    .grid-overlay {
+      position:fixed; inset:0; z-index:0; pointer-events:none;
+      background-image:
+        linear-gradient(rgba(0,255,255,0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,255,0.018) 1px, transparent 1px);
+      background-size:64px 64px;
+      mask-image:radial-gradient(ellipse 80% 60% at 50% 20%, black 0%, transparent 70%);
+      -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 20%, black 0%, transparent 70%);
+    }
+
+    /* --- Ambient Glow Orbs --- */
+    .glow-orb {
+      position:fixed; border-radius:50%; pointer-events:none; z-index:0;
+      filter:blur(120px); opacity:0.35;
+    }
+    .glow-orb.cyan  { width:600px; height:600px; background:var(--cyan); top:-200px; right:-100px; opacity:0.08; }
+    .glow-orb.purple { width:500px; height:500px; background:var(--purple); bottom:10%; left:-150px; opacity:0.07; }
+    .glow-orb.teal  { width:400px; height:400px; background:var(--teal); top:50%; right:-100px; opacity:0.05; }
+
+    /* ============================================================
+       NAVIGATION
+       ============================================================ */
+    nav {
+      position:fixed; top:0; left:0; right:0; z-index:1000;
+      padding:16px 0;
+      background:rgba(6,9,16,0.75);
+      backdrop-filter:blur(20px) saturate(1.4);
+      -webkit-backdrop-filter:blur(20px) saturate(1.4);
+      border-bottom:1px solid var(--border-dim);
+      transition:background 0.3s, padding 0.3s;
+    }
+    nav.scrolled { padding:10px 0; background:rgba(6,9,16,0.92); }
+    .nav-inner {
+      max-width:1200px; margin:0 auto; padding:0 24px;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .nav-logo {
+      display:flex; align-items:center; gap:10px;
+      font-family:'Space Grotesk',sans-serif; font-size:20px;
+      font-weight:700; color:var(--text); text-decoration:none;
+    }
+    .nav-logo .logo-icon {
+      width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+    }
+    .nav-logo .logo-icon svg { width:32px; height:32px; }
+    .nav-logo .accent { color:var(--cyan); }
+    .nav-links { display:flex; align-items:center; gap:32px; list-style:none; }
+    .nav-links a {
+      color:var(--dim); font-size:14px; font-weight:500;
+      transition:color 0.2s; letter-spacing:0.01em;
+    }
+    .nav-links a:hover { color:var(--text); }
+    .nav-links a.active { color:var(--cyan); }
+    .nav-cta {
+      padding:8px 20px; border-radius:8px; font-size:13px; font-weight:600;
+      background:rgba(0,255,255,0.08); border:1px solid rgba(0,255,255,0.2);
+      color:var(--cyan); transition:all 0.25s;
+    }
+    .nav-cta:hover {
+      background:rgba(0,255,255,0.15); border-color:var(--cyan);
+      color:var(--cyan); box-shadow:0 0 20px rgba(0,255,255,0.1);
+    }
+    .nav-hamburger {
+      display:none; background:none; border:none; cursor:pointer;
+      padding:4px; color:var(--dim);
+    }
+    .nav-hamburger svg { width:24px; height:24px; }
+
+    /* ============================================================
+       HERO
+       ============================================================ */
+    .hero {
+      position:relative; z-index:1;
+      padding:160px 24px 100px; text-align:center;
+      overflow:hidden;
+    }
+    .hero::before {
+      content:''; position:absolute; inset:0; z-index:-1;
+      background:
+        radial-gradient(ellipse 60% 50% at 50% 0%, rgba(0,255,255,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 30% at 30% 10%, rgba(140,0,200,0.05) 0%, transparent 60%);
+    }
+    .hero-badge {
+      display:inline-flex; align-items:center; gap:8px;
+      padding:6px 16px; border-radius:100px;
+      background:rgba(0,255,255,0.06);
+      border:1px solid rgba(0,255,255,0.12);
+      font-size:13px; font-weight:500; color:var(--cyan);
+      margin-bottom:32px;
+      animation: fadeInDown 0.6s ease-out;
+    }
+    .hero-badge .dot {
+      width:6px; height:6px; border-radius:50%;
+      background:var(--green);
+      box-shadow:0 0 8px rgba(0,255,136,0.5);
+      animation:pulse 2s ease-in-out infinite;
+    }
+    .hero h1 {
+      font-size:clamp(2.5rem, 6vw, 4.5rem);
+      font-weight:800; letter-spacing:-2px;
+      line-height:1.05; margin-bottom:24px;
+      animation: fadeInUp 0.7s ease-out;
+    }
+    .gradient-text {
+      background:linear-gradient(135deg, var(--cyan), var(--teal-bright), var(--purple-light));
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      background-clip:text;
+    }
+    .hero-sub {
+      font-size:clamp(1rem, 2vw, 1.25rem);
+      color:var(--text-secondary); max-width:720px;
+      margin:0 auto 40px; line-height:1.7;
+      animation: fadeInUp 0.8s ease-out 0.1s both;
+    }
+    .hero-stats {
+      display:flex; align-items:center; justify-content:center; gap:48px;
+      animation: fadeInUp 0.9s ease-out 0.2s both;
+    }
+    .hero-stat {
+      text-align:center;
+    }
+    .hero-stat-number {
+      font-family:'Space Grotesk',sans-serif;
+      font-size:2.5rem; font-weight:800;
+      background:linear-gradient(135deg, var(--cyan), var(--teal-bright));
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      background-clip:text;
+    }
+    .hero-stat-label {
+      font-size:13px; color:var(--dim); margin-top:4px;
+      font-family:'JetBrains Mono',monospace; text-transform:uppercase;
+      letter-spacing:1px;
+    }
+
+    /* ============================================================
+       SECTIONS (shared)
+       ============================================================ */
+    .section {
+      position:relative; z-index:1;
+      padding:100px 24px;
+    }
+    .section-header {
+      text-align:center; margin-bottom:64px;
+    }
+    .section-label {
+      display:inline-block;
+      font-family:'JetBrains Mono',monospace; font-size:12px;
+      color:var(--cyan); text-transform:uppercase; letter-spacing:2px;
+      margin-bottom:16px; font-weight:500;
+    }
+    .section-title {
+      font-size:clamp(2rem, 4vw, 3rem);
+      font-weight:800; letter-spacing:-1px;
+      margin-bottom:16px;
+    }
+    .section-desc {
+      font-size:1.1rem; color:var(--text-secondary);
+      max-width:640px; margin:0 auto; line-height:1.7;
+    }
+
+    /* ============================================================
+       BACKEND CARDS (Inference Backends)
+       ============================================================ */
+    .backends-grid {
+      display:grid; grid-template-columns:repeat(4, 1fr);
+      gap:20px; max-width:1200px; margin:0 auto;
+    }
+    .backend-card {
+      position:relative;
+      background:rgba(14,21,32,0.6);
+      border:1px solid var(--border-dim);
+      border-radius:16px; padding:28px 24px;
+      transition:all 0.35s ease;
+      overflow:hidden;
+    }
+    .backend-card::before {
+      content:''; position:absolute; inset:0; z-index:0;
+      border-radius:16px; opacity:0;
+      background:linear-gradient(135deg, rgba(0,255,255,0.04) 0%, rgba(140,0,200,0.03) 100%);
+      transition:opacity 0.35s;
+    }
+    .backend-card:hover {
+      border-color:var(--border-hover);
+      transform:translateY(-4px);
+      box-shadow:0 12px 40px rgba(0,0,0,0.3), 0 0 30px rgba(0,255,255,0.04);
+    }
+    .backend-card:hover::before { opacity:1; }
+    .backend-card > * { position:relative; z-index:1; }
+    .backend-icon {
+      width:48px; height:48px; border-radius:12px;
+      display:flex; align-items:center; justify-content:center;
+      margin-bottom:16px; font-size:24px;
+      background:rgba(0,255,255,0.06); border:1px solid rgba(0,255,255,0.1);
+    }
+    .backend-icon.purple-icon {
+      background:rgba(140,0,200,0.08); border-color:rgba(140,0,200,0.15);
+    }
+    .backend-icon.green-icon {
+      background:rgba(0,255,136,0.06); border-color:rgba(0,255,136,0.12);
+    }
+    .backend-icon.amber-icon {
+      background:rgba(245,158,11,0.06); border-color:rgba(245,158,11,0.12);
+    }
+    .backend-icon svg { width:24px; height:24px; }
+    .backend-name {
+      font-family:'Space Grotesk',sans-serif;
+      font-size:1.15rem; font-weight:700;
+      margin-bottom:8px;
+    }
+    .backend-desc {
+      font-size:13px; color:var(--dim); line-height:1.65;
+      margin-bottom:16px;
+    }
+    .backend-tags {
+      display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px;
+    }
+    .backend-tag {
+      padding:3px 10px; border-radius:100px;
+      font-size:11px; font-weight:500;
+      background:rgba(0,255,255,0.06); color:var(--cyan);
+      border:1px solid rgba(0,255,255,0.1);
+      font-family:'JetBrains Mono',monospace;
+    }
+    .backend-tag.purple-tag {
+      background:rgba(140,0,200,0.06); color:var(--purple-light);
+      border-color:rgba(140,0,200,0.12);
+    }
+    .backend-tag.green-tag {
+      background:rgba(0,255,136,0.06); color:var(--green);
+      border-color:rgba(0,255,136,0.12);
+    }
+    .backend-link {
+      display:inline-flex; align-items:center; gap:6px;
+      font-size:13px; font-weight:600; color:var(--cyan);
+      transition:all 0.2s;
+    }
+    .backend-link:hover { color:#fff; gap:10px; }
+    .backend-link svg { width:14px; height:14px; transition:transform 0.2s; }
+    .backend-link:hover svg { transform:translateX(2px); }
+
+    /* ============================================================
+       API COMPATIBILITY SECTION
+       ============================================================ */
+    .api-grid {
+      display:grid; grid-template-columns:repeat(2, 1fr);
+      gap:20px; max-width:1200px; margin:0 auto 48px;
+    }
+    .api-card {
+      background:rgba(14,21,32,0.6);
+      border:1px solid var(--border-dim);
+      border-radius:16px; padding:28px 24px;
+      transition:all 0.35s ease;
+    }
+    .api-card:hover {
+      border-color:var(--border-hover);
+      transform:translateY(-2px);
+    }
+    .api-card-title {
+      font-family:'Space Grotesk',sans-serif;
+      font-size:1.1rem; font-weight:700;
+      margin-bottom:8px;
+      display:flex; align-items:center; gap:10px;
+    }
+    .api-card-title .api-badge {
+      padding:2px 8px; border-radius:6px; font-size:11px;
+      font-family:'JetBrains Mono',monospace; font-weight:600;
+    }
+    .api-badge.compat { background:rgba(0,255,136,0.1); color:var(--green); }
+    .api-badge.beta { background:rgba(245,158,11,0.1); color:var(--amber); }
+    .api-card-desc {
+      font-size:13px; color:var(--dim); line-height:1.6;
+    }
+    .api-card-endpoints {
+      margin-top:12px; display:flex; flex-wrap:wrap; gap:6px;
+    }
+    .endpoint-tag {
+      padding:4px 10px; border-radius:6px;
+      font-size:12px; font-family:'JetBrains Mono',monospace;
+      background:rgba(0,255,255,0.04); color:var(--text-secondary);
+      border:1px solid var(--border-dim);
+    }
+
+    /* Code block */
+    .code-showcase {
+      max-width:800px; margin:0 auto;
+      background:rgba(10,15,24,0.8);
+      border:1px solid var(--border-dim);
+      border-radius:16px; overflow:hidden;
+    }
+    .code-header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 20px;
+      background:rgba(14,21,32,0.6);
+      border-bottom:1px solid var(--border-dim);
+    }
+    .code-header-dots {
+      display:flex; gap:6px;
+    }
+    .code-header-dots span {
+      width:10px; height:10px; border-radius:50%;
+    }
+    .code-header-dots span:nth-child(1) { background:#ef4444; }
+    .code-header-dots span:nth-child(2) { background:#f59e0b; }
+    .code-header-dots span:nth-child(3) { background:#22c55e; }
+    .code-header-lang {
+      font-family:'JetBrains Mono',monospace;
+      font-size:12px; color:var(--dim);
+    }
+    .code-body {
+      padding:20px 24px; overflow-x:auto;
+    }
+    .code-body pre {
+      font-family:'JetBrains Mono',monospace;
+      font-size:13px; line-height:1.7;
+      color:var(--text-secondary);
+      white-space:pre; margin:0;
+    }
+    .code-body .c-comment { color:var(--dim); font-style:italic; }
+    .code-body .c-keyword { color:var(--purple-light); }
+    .code-body .c-string { color:var(--green); }
+    .code-body .c-func { color:var(--cyan); }
+    .code-body .c-var { color:var(--text); }
+    .code-body .c-param { color:var(--amber); }
+
+    /* ============================================================
+       MODEL MARKETPLACE
+       ============================================================ */
+    .marketplace-grid {
+      display:grid; grid-template-columns:repeat(3, 1fr);
+      gap:20px; max-width:1200px; margin:0 auto;
+    }
+    .marketplace-card {
+      background:rgba(14,21,32,0.6);
+      border:1px solid var(--border-dim);
+      border-radius:16px; padding:32px 28px;
+      transition:all 0.35s ease;
+      text-align:center;
+    }
+    .marketplace-card:hover {
+      border-color:var(--border-hover);
+      transform:translateY(-4px);
+      box-shadow:0 12px 40px rgba(0,0,0,0.3);
+    }
+    .marketplace-icon {
+      width:64px; height:64px; border-radius:16px;
+      display:flex; align-items:center; justify-content:center;
+      margin:0 auto 20px; font-size:28px;
+      background:rgba(0,255,255,0.06); border:1px solid rgba(0,255,255,0.1);
+    }
+    .marketplace-card h3 {
+      font-size:1.25rem; font-weight:700; margin-bottom:8px;
+    }
+    .marketplace-card p {
+      font-size:14px; color:var(--dim); line-height:1.6;
+      margin-bottom:16px;
+    }
+    .marketplace-stat {
+      font-family:'JetBrains Mono',monospace; font-size:12px;
+      color:var(--cyan); margin-bottom:16px;
+    }
+
+    /* ============================================================
+       PLATFORM INTEGRATIONS
+       ============================================================ */
+    .platform-category {
+      margin-bottom:48px;
+    }
+    .platform-category:last-child { margin-bottom:0; }
+    .category-title {
+      font-family:'JetBrains Mono',monospace;
+      font-size:12px; color:var(--cyan); text-transform:uppercase;
+      letter-spacing:2px; margin-bottom:20px; font-weight:500;
+      display:flex; align-items:center; gap:12px;
+    }
+    .category-title::after {
+      content:''; flex:1; height:1px;
+      background:linear-gradient(90deg, rgba(0,255,255,0.15) 0%, transparent 80%);
+    }
+    .platform-grid {
+      display:grid; grid-template-columns:repeat(4, 1fr);
+      gap:14px;
+    }
+    .platform-card {
+      background:rgba(14,21,32,0.4);
+      border:1px solid var(--border-dim);
+      border-radius:12px; padding:18px 16px;
+      display:flex; align-items:center; gap:12px;
+      transition:all 0.3s ease;
+      cursor:default;
+    }
+    .platform-card:hover {
+      border-color:rgba(0,255,255,0.2);
+      background:rgba(14,21,32,0.7);
+      transform:translateY(-2px);
+    }
+    .platform-card-icon {
+      width:36px; height:36px; border-radius:8px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:18px; flex-shrink:0;
+      background:rgba(0,255,255,0.04);
+    }
+    .platform-card-info { min-width:0; }
+    .platform-card-name {
+      font-size:13px; font-weight:600; color:var(--text);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .platform-card-desc {
+      font-size:11px; color:var(--muted); line-height:1.4;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+
+    /* ============================================================
+       CLI AGENT SECTION
+       ============================================================ */
+    .agent-section {
+      background:linear-gradient(180deg, rgba(140,0,200,0.04) 0%, transparent 100%);
+      border-top:1px solid rgba(140,0,200,0.08);
+      border-bottom:1px solid rgba(140,0,200,0.08);
+    }
+    .agent-grid {
+      display:grid; grid-template-columns:1fr 1fr;
+      gap:48px; max-width:1200px; margin:0 auto;
+      align-items:center;
+    }
+    .agent-features {
+      list-style:none; display:flex; flex-direction:column; gap:16px;
+    }
+    .agent-features li {
+      display:flex; align-items:flex-start; gap:12px;
+      font-size:15px; color:var(--text-secondary);
+    }
+    .agent-features li .feat-icon {
+      width:28px; height:28px; border-radius:8px;
+      display:flex; align-items:center; justify-content:center;
+      flex-shrink:0; font-size:14px;
+      background:rgba(140,0,200,0.08); border:1px solid rgba(140,0,200,0.12);
+      color:var(--purple-light);
+    }
+    .agent-features li strong { color:var(--text); }
+    .agent-terminal {
+      background:rgba(10,15,24,0.8);
+      border:1px solid var(--border-dim);
+      border-radius:16px; overflow:hidden;
+    }
+    .agent-terminal-header {
+      display:flex; align-items:center; gap:8px;
+      padding:12px 16px;
+      background:rgba(14,21,32,0.6);
+      border-bottom:1px solid var(--border-dim);
+    }
+    .agent-terminal-header .dots { display:flex; gap:6px; }
+    .agent-terminal-header .dots span {
+      width:10px; height:10px; border-radius:50%;
+    }
+    .agent-terminal-header .dots span:nth-child(1) { background:#ef4444; }
+    .agent-terminal-header .dots span:nth-child(2) { background:#f59e0b; }
+    .agent-terminal-header .dots span:nth-child(3) { background:#22c55e; }
+    .agent-terminal-header .title {
+      font-family:'JetBrains Mono',monospace;
+      font-size:12px; color:var(--dim); margin-left:8px;
+    }
+    .agent-terminal-body {
+      padding:20px; font-family:'JetBrains Mono',monospace;
+      font-size:12.5px; line-height:1.8; color:var(--text-secondary);
+    }
+    .agent-terminal-body .t-prompt { color:var(--purple-light); }
+    .agent-terminal-body .t-cmd { color:var(--text); }
+    .agent-terminal-body .t-output { color:var(--dim); }
+    .agent-terminal-body .t-success { color:var(--green); }
+    .agent-terminal-body .t-cyan { color:var(--cyan); }
+
+    /* ============================================================
+       CTA BANNER
+       ============================================================ */
+    .cta-banner {
+      position:relative; z-index:1;
+      padding:80px 24px;
+      text-align:center;
+    }
+    .cta-banner h2 {
+      font-size:clamp(2rem, 4vw, 3rem);
+      font-weight:800; letter-spacing:-1px;
+      margin-bottom:16px;
+    }
+    .cta-banner p {
+      color:var(--text-secondary); font-size:1.1rem;
+      max-width:560px; margin:0 auto 32px;
+    }
+    .cta-buttons {
+      display:flex; align-items:center; justify-content:center; gap:16px;
+      flex-wrap:wrap;
+    }
+    .btn {
+      display:inline-flex; align-items:center; gap:8px;
+      padding:14px 28px; border-radius:12px;
+      font-size:15px; font-weight:600;
+      transition:all 0.3s; cursor:pointer;
+      text-decoration:none; border:none;
+    }
+    .btn-primary {
+      background:linear-gradient(135deg, var(--cyan), var(--teal-bright));
+      color:#000;
+    }
+    .btn-primary:hover {
+      transform:translateY(-2px); color:#000;
+      box-shadow:0 8px 30px rgba(0,255,255,0.25);
+    }
+    .btn-outline {
+      background:transparent; color:var(--text);
+      border:1px solid var(--border);
+    }
+    .btn-outline:hover {
+      border-color:var(--cyan); color:var(--cyan);
+      transform:translateY(-2px);
+    }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    footer {
+      position:relative; z-index:1;
+      border-top:1px solid var(--border-dim);
+      padding:64px 24px 40px;
+    }
+    .footer-inner {
+      max-width:1200px; margin:0 auto;
+      display:flex; align-items:flex-start; justify-content:space-between;
+      flex-wrap:wrap; gap:40px;
+    }
+    .footer-brand { max-width:300px; }
+    .footer-logo {
+      display:flex; align-items:center; gap:10px;
+      font-family:'Space Grotesk',sans-serif; font-size:18px;
+      font-weight:700; color:var(--text); margin-bottom:12px;
+    }
+    .footer-logo .accent { color:var(--cyan); }
+    .footer-tagline {
+      color:var(--muted); font-size:14px; line-height:1.7;
+      margin-bottom:16px;
+    }
+    .footer-links-group { }
+    .footer-links-title {
+      font-family:'JetBrains Mono',monospace; font-size:11px;
+      color:var(--muted); text-transform:uppercase; letter-spacing:2px;
+      margin-bottom:16px;
+    }
+    .footer-links { list-style:none; display:flex; flex-direction:column; gap:10px; }
+    .footer-links a { color:var(--dim); font-size:14px; }
+    .footer-links a:hover { color:var(--cyan); }
+    .footer-bottom {
+      max-width:1200px; margin:40px auto 0; padding-top:24px;
+      border-top:1px solid var(--border-dim);
+      display:flex; align-items:center; justify-content:space-between;
+      flex-wrap:wrap; gap:16px;
+    }
+    .footer-bottom-text { font-size:13px; color:var(--muted); }
+    .footer-bottom-text .motto { font-style:italic; color:var(--dim); }
+    .footer-bottom-text .founder { display:block; margin-top:8px; color:var(--dim); font-size:13px; }
+    .footer-social { display:flex; gap:16px; }
+    .footer-social a {
+      color:var(--muted); transition:color 0.2s;
+      display:flex; align-items:center;
+    }
+    .footer-social a:hover { color:var(--cyan); }
+    .footer-social svg { width:20px; height:20px; }
+
+    /* ============================================================
+       ANIMATIONS
+       ============================================================ */
+    @keyframes fadeInUp {
+      from { opacity:0; transform:translateY(24px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    @keyframes fadeInDown {
+      from { opacity:0; transform:translateY(-16px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity:1; }
+      50% { opacity:0.5; }
+    }
+    .reveal {
+      opacity:0; transform:translateY(24px);
+      transition:opacity 0.6s ease, transform 0.6s ease;
+    }
+    .reveal.visible {
+      opacity:1; transform:translateY(0);
+    }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width:1024px) {
+      .backends-grid { grid-template-columns:repeat(2, 1fr); }
+      .platform-grid { grid-template-columns:repeat(3, 1fr); }
+      .agent-grid { grid-template-columns:1fr; }
+    }
+    @media (max-width:768px) {
+      .nav-links { display:none; }
+      .nav-hamburger { display:block; }
+      .nav-links.open {
+        display:flex; flex-direction:column;
+        position:absolute; top:100%; left:0; right:0;
+        background:rgba(6,9,16,0.95); backdrop-filter:blur(20px);
+        padding:20px 24px; gap:16px;
+        border-bottom:1px solid var(--border-dim);
+      }
+      .backends-grid { grid-template-columns:1fr; }
+      .api-grid { grid-template-columns:1fr; }
+      .marketplace-grid { grid-template-columns:1fr; }
+      .platform-grid { grid-template-columns:repeat(2, 1fr); }
+      .hero-stats { gap:24px; flex-wrap:wrap; }
+      .footer-inner { flex-direction:column; }
+      .footer-bottom { flex-direction:column; text-align:center; }
+    }
+    @media (max-width:480px) {
+      .platform-grid { grid-template-columns:1fr; }
+      .cta-buttons { flex-direction:column; align-items:stretch; }
+      .btn { justify-content:center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient effects -->
+  <div class="grid-overlay" aria-hidden="true"></div>
+  <div class="glow-orb cyan" aria-hidden="true"></div>
+  <div class="glow-orb purple" aria-hidden="true"></div>
+  <div class="glow-orb teal" aria-hidden="true"></div>
+
+  <!-- ============================================================
+       NAVIGATION
+       ============================================================ -->
+  <nav>
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">
+        <span class="logo-icon">
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00d4aa"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient>
+              <linearGradient id="logo-grad2" x1="100%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#00d4aa"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient>
+              <radialGradient id="logo-body" cx="50%" cy="40%" r="55%"><stop offset="0%" stop-color="#00d4aa" stop-opacity="0.9"/><stop offset="100%" stop-color="#0a2a22"/></radialGradient>
+            </defs>
+            <ellipse cx="32" cy="22" rx="16" ry="14" fill="url(#logo-body)"/>
+            <ellipse cx="32" cy="22" rx="16" ry="14" stroke="url(#logo-grad)" stroke-width="1.2" fill="none"/>
+            <ellipse cx="26" cy="19" rx="4" ry="4.5" fill="#0d1117" stroke="url(#logo-grad)" stroke-width="0.8"/>
+            <ellipse cx="38" cy="19" rx="4" ry="4.5" fill="#0d1117" stroke="url(#logo-grad)" stroke-width="0.8"/>
+            <ellipse cx="26" cy="19.5" rx="2" ry="2.5" fill="url(#logo-grad)"/>
+            <ellipse cx="38" cy="19.5" rx="2" ry="2.5" fill="url(#logo-grad)"/>
+            <circle cx="25" cy="18" r="0.9" fill="white" opacity="0.85"/>
+            <circle cx="37" cy="18" r="0.9" fill="white" opacity="0.85"/>
+            <path d="M27 25 Q32 29 37 25" stroke="url(#logo-grad)" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+            <path d="M18 32 C12 36 8 42 10 50 C11 54 14 55 13 58" stroke="url(#logo-grad)" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+            <path d="M22 35 C18 40 16 47 18 53 C19 57 22 57 21 60" stroke="url(#logo-grad2)" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <path d="M26 36 C24 42 23 49 25 54 C26 58 28 58 28 62" stroke="url(#logo-grad)" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+            <path d="M30 36 C29 43 29 50 30 55 C31 59 32 60 32 63" stroke="url(#logo-grad2)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+            <path d="M34 36 C35 43 35 50 34 55 C33 59 32 60 32 63" stroke="url(#logo-grad)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+            <path d="M38 36 C40 42 41 49 39 54 C38 58 36 58 36 62" stroke="url(#logo-grad2)" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+            <path d="M42 35 C46 40 48 47 46 53 C45 57 42 57 43 60" stroke="url(#logo-grad)" stroke-width="2" stroke-linecap="round" fill="none"/>
+            <path d="M46 32 C52 36 56 42 54 50 C53 54 50 55 51 58" stroke="url(#logo-grad2)" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          </svg>
+        </span>
+        Tenta<span class="accent">CLAW</span>
+      </a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html#features">Features</a></li>
+        <li><a href="index.html#dashboard">Dashboard</a></li>
+        <li><a href="index.html#download">Download</a></li>
+        <li><a href="docs.html">Docs</a></li>
+        <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="index.html#install" class="nav-cta">Get Started</a></li>
+      </ul>
+      <button class="nav-hamburger" id="navHamburger" aria-label="Toggle navigation">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============================================================
+       HERO
+       ============================================================ -->
+  <section class="hero">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      28+ Integrations
+    </div>
+
+    <h1>
+      One Cluster.<br>
+      <span class="gradient-text">Every Integration.</span>
+    </h1>
+
+    <p class="hero-sub">
+      TentaCLAW connects to the tools you already use. Drop-in API compatibility,
+      28+ integrations, and support for every major inference backend.
+    </p>
+
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-number">8</div>
+        <div class="hero-stat-label">Inference Backends</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-number">4</div>
+        <div class="hero-stat-label">Compatible APIs</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-number">28+</div>
+        <div class="hero-stat-label">Platform Integrations</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-number">135K+</div>
+        <div class="hero-stat-label">Models Available</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SECTION 1: INFERENCE BACKENDS
+       ============================================================ -->
+  <section class="section" id="backends">
+    <div class="section-header reveal">
+      <div class="section-label">Inference Backends</div>
+      <h2 class="section-title">Every Engine. One Gateway.</h2>
+      <p class="section-desc">
+        TentaCLAW auto-detects and routes to any backend in your cluster.
+        Mix and match engines across nodes for maximum throughput.
+      </p>
+    </div>
+
+    <div class="backends-grid">
+      <!-- Ollama -->
+      <div class="backend-card reveal">
+        <div class="backend-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="5"/><path d="M12 13v6"/><path d="M8 21h8"/></svg>
+        </div>
+        <div class="backend-name">Ollama</div>
+        <div class="backend-desc">
+          Native integration with auto-detection on port 11434.
+          Context management (num_ctx: 32768), tool embedding support, /api/tags model discovery.
+        </div>
+        <div class="backend-tags">
+          <span class="backend-tag">auto-detect</span>
+          <span class="backend-tag green-tag">native</span>
+          <span class="backend-tag">:11434</span>
+        </div>
+        <a href="https://ollama.com" target="_blank" rel="noopener" class="backend-link">
+          ollama.com
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <!-- vLLM -->
+      <div class="backend-card reveal">
+        <div class="backend-icon purple-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--purple-light)" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        </div>
+        <div class="backend-name">vLLM</div>
+        <div class="backend-desc">
+          Production-grade. PagedAttention, tensor parallelism, speculative decoding
+          (EAGLE-3: 3-6.5x speedup), FP8 quantization, prefix caching. LMCache: 3-15x throughput.
+        </div>
+        <div class="backend-tags">
+          <span class="backend-tag purple-tag">production</span>
+          <span class="backend-tag purple-tag">PagedAttention</span>
+          <span class="backend-tag purple-tag">FP8</span>
+        </div>
+        <a href="https://docs.vllm.ai" target="_blank" rel="noopener" class="backend-link">
+          docs.vllm.ai
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <!-- SGLang -->
+      <div class="backend-card reveal">
+        <div class="backend-icon green-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/></svg>
+        </div>
+        <div class="backend-name">SGLang</div>
+        <div class="backend-desc">
+          RadixAttention (6.4x faster on RAG), prefix-aware batching, tree cache optimization.
+          29% faster than vLLM on H100 benchmarks.
+        </div>
+        <div class="backend-tags">
+          <span class="backend-tag green-tag">RadixAttention</span>
+          <span class="backend-tag green-tag">6.4x RAG</span>
+          <span class="backend-tag green-tag">H100</span>
+        </div>
+        <a href="https://github.com/sgl-project/sglang" target="_blank" rel="noopener" class="backend-link">
+          sgl-project/sglang
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <!-- llama.cpp -->
+      <div class="backend-card reveal">
+        <div class="backend-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/></svg>
+        </div>
+        <div class="backend-name">llama.cpp / llamafile</div>
+        <div class="backend-desc">
+          GGUF format, CPU+GPU hybrid inference, auto-detection on port 8080.
+          Run models on any hardware. Single-binary deployment with llamafile.
+        </div>
+        <div class="backend-tags">
+          <span class="backend-tag">GGUF</span>
+          <span class="backend-tag">CPU+GPU</span>
+          <span class="backend-tag">:8080</span>
+        </div>
+        <a href="https://github.com/ggerganov/llama.cpp" target="_blank" rel="noopener" class="backend-link">
+          ggerganov/llama.cpp
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <!-- LM Studio -->
+      <div class="backend-card reveal">
+        <div class="backend-icon amber-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        </div>
+        <div class="backend-name">LM Studio</div>
+        <div class="backend-desc">
+          Desktop GUI for local models. Auto-detection on port 1234,
+          OpenAI-compatible API out of the box. Perfect for development.
+        </div>
+        <div class="backend-tags">
+          <span class="backend-tag" style="background:rgba(245,158,11,0.06);color:var(--amber);border-color:rgba(245,158,11,0.12);">desktop</span>
+          <span class="backend-tag" style="background:rgba(245,158,11,0.06);color:var(--amber);border-color:rgba(245,158,11,0.12);">:1234</span>
+          <span class="backend-tag" style="background:rgba(245,158,11,0.06);color:var(--amber);border-color:rgba(245,158,11,0.12);">OpenAI compat</span>
+        </div>
+        <a href="https://lmstudio.ai" target="_blank" rel="noopener" class="backend-link">
+          lmstudio.ai
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <!-- BitNet -->
+      <div class="backend-card reveal">
+        <div class="backend-icon purple-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--purple-light)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/><circle cx="12" cy="12" r="9"/></svg>
+        </div>
+        <div class="backend-name">BitNet</div>
+        <div class="backend-desc">
+          1-bit LLMs running at near-zero cost. Per-GPU layer distribution,
+          thread pool optimization. The future of efficient inference.
+        </div>
+        <div class="backend-tags">
+          <span class="backend-tag purple-tag">1-bit</span>
+          <span class="backend-tag purple-tag">layer distrib</span>
+          <span class="backend-tag purple-tag">low cost</span>
+        </div>
+        <a href="https://github.com/microsoft/BitNet" target="_blank" rel="noopener" class="backend-link">
+          microsoft/BitNet
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <!-- TabbyAPI -->
+      <div class="backend-card reveal">
+        <div class="backend-icon green-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M4 6l8-4 8 4M4 6v6l8 4 8-4V6M4 12v6l8 4 8-4v-6"/></svg>
+        </div>
+        <div class="backend-name">TabbyAPI</div>
+        <div class="backend-desc">
+          ExLlamaV2 backend with unique token encoding endpoint.
+          Optimized quantization for maximum quality at minimum VRAM.
+        </div>
+        <div class="backend-tags">
+          <span class="backend-tag green-tag">ExLlamaV2</span>
+          <span class="backend-tag green-tag">token encode</span>
+          <span class="backend-tag green-tag">EXL2</span>
+        </div>
+        <a href="https://github.com/theroyallab/tabbyAPI" target="_blank" rel="noopener" class="backend-link">
+          theroyallab/tabbyAPI
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <!-- TensorRT-LLM -->
+      <div class="backend-card reveal">
+        <div class="backend-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <div class="backend-name">TensorRT-LLM</div>
+        <div class="backend-desc">
+          NVIDIA-optimized inference engine. Advanced tensor parallelism,
+          INT4/INT8/FP8 quantization, in-flight batching for maximum GPU utilization.
+        </div>
+        <div class="backend-tags">
+          <span class="backend-tag">NVIDIA</span>
+          <span class="backend-tag">tensor parallel</span>
+          <span class="backend-tag">in-flight batch</span>
+        </div>
+        <a href="https://github.com/NVIDIA/TensorRT-LLM" target="_blank" rel="noopener" class="backend-link">
+          NVIDIA/TensorRT-LLM
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SECTION 2: API COMPATIBILITY
+       ============================================================ -->
+  <section class="section" id="api" style="background:linear-gradient(180deg, rgba(0,255,255,0.02) 0%, transparent 100%);">
+    <div class="section-header reveal">
+      <div class="section-label">API Compatibility</div>
+      <h2 class="section-title">Drop-In. Zero Rewrites.</h2>
+      <p class="section-desc">
+        Point your existing code at TentaCLAW. It speaks every API you already use.
+      </p>
+    </div>
+
+    <div class="api-grid">
+      <!-- OpenAI -->
+      <div class="api-card reveal">
+        <div class="api-card-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--cyan)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
+          OpenAI API
+          <span class="api-badge compat">Full Compat</span>
+        </div>
+        <div class="api-card-desc">
+          Complete compatibility with the OpenAI SDK. Streaming, function calling,
+          JSON mode, vision, embeddings -- everything works out of the box.
+        </div>
+        <div class="api-card-endpoints">
+          <span class="endpoint-tag">/v1/chat/completions</span>
+          <span class="endpoint-tag">/v1/completions</span>
+          <span class="endpoint-tag">/v1/models</span>
+          <span class="endpoint-tag">/v1/embeddings</span>
+        </div>
+      </div>
+
+      <!-- Anthropic -->
+      <div class="api-card reveal">
+        <div class="api-card-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--purple-light)" stroke-width="2"><path d="M12 2L2 19h20L12 2z"/></svg>
+          Anthropic Messages API
+          <span class="api-badge compat">Full Compat</span>
+        </div>
+        <div class="api-card-desc">
+          Native Anthropic Messages format with system params, tool_choice,
+          and streaming support. Route Claude-style requests to local models.
+        </div>
+        <div class="api-card-endpoints">
+          <span class="endpoint-tag">/v1/messages</span>
+          <span class="endpoint-tag">system params</span>
+          <span class="endpoint-tag">tool_choice</span>
+          <span class="endpoint-tag">streaming</span>
+        </div>
+      </div>
+
+      <!-- Audio -->
+      <div class="api-card reveal">
+        <div class="api-card-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M12 1v22M8 4v16M4 8v8M16 4v16M20 8v8"/></svg>
+          Audio APIs
+          <span class="api-badge beta">Beta</span>
+        </div>
+        <div class="api-card-desc">
+          Speech-to-text with Whisper, text-to-speech with Bark, Piper, and XTTS.
+          Same OpenAI audio endpoint format.
+        </div>
+        <div class="api-card-endpoints">
+          <span class="endpoint-tag">/v1/audio/transcriptions</span>
+          <span class="endpoint-tag">/v1/audio/speech</span>
+          <span class="endpoint-tag">Whisper</span>
+          <span class="endpoint-tag">Bark / Piper / XTTS</span>
+        </div>
+      </div>
+
+      <!-- Image -->
+      <div class="api-card reveal">
+        <div class="api-card-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+          Image Generation
+          <span class="api-badge beta">Beta</span>
+        </div>
+        <div class="api-card-desc">
+          Generate images through the standard OpenAI images endpoint.
+          Route to SDXL, Flux, or any Stable Diffusion backend.
+        </div>
+        <div class="api-card-endpoints">
+          <span class="endpoint-tag">/v1/images/generations</span>
+          <span class="endpoint-tag">SDXL</span>
+          <span class="endpoint-tag">Flux</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Code Example -->
+    <div class="code-showcase reveal">
+      <div class="code-header">
+        <div class="code-header-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="code-header-lang">python</div>
+      </div>
+      <div class="code-body">
+<pre><span class="c-comment"># Drop-in replacement -- just change the base URL</span>
+<span class="c-keyword">from</span> <span class="c-var">openai</span> <span class="c-keyword">import</span> <span class="c-func">OpenAI</span>
+
+<span class="c-var">client</span> = <span class="c-func">OpenAI</span>(
+    <span class="c-param">base_url</span>=<span class="c-string">"http://your-cluster:8080/v1"</span>,
+    <span class="c-param">api_key</span>=<span class="c-string">"your-key"</span>
+)
+
+<span class="c-var">response</span> = <span class="c-var">client</span>.<span class="c-var">chat</span>.<span class="c-var">completions</span>.<span class="c-func">create</span>(
+    <span class="c-param">model</span>=<span class="c-string">"llama3.1:70b"</span>,
+    <span class="c-param">messages</span>=[{<span class="c-string">"role"</span>: <span class="c-string">"user"</span>, <span class="c-string">"content"</span>: <span class="c-string">"Hello!"</span>}]
+)
+
+<span class="c-func">print</span>(<span class="c-var">response</span>.<span class="c-var">choices</span>[<span class="c-param">0</span>].<span class="c-var">message</span>.<span class="c-var">content</span>)</pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SECTION 3: MODEL MARKETPLACE
+       ============================================================ -->
+  <section class="section" id="models">
+    <div class="section-header reveal">
+      <div class="section-label">Model Marketplace</div>
+      <h2 class="section-title">135,000+ Models. One Command.</h2>
+      <p class="section-desc">
+        Browse, pull, and deploy models from every major registry.
+        Automatic VRAM estimation and quantization recommendations.
+      </p>
+    </div>
+
+    <div class="marketplace-grid">
+      <!-- HuggingFace -->
+      <div class="marketplace-card reveal">
+        <div class="marketplace-icon" style="font-size:28px;">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--amber)" stroke-width="1.5" stroke-linecap="round">
+            <circle cx="12" cy="10" r="7"/>
+            <path d="M8.5 8.5c0-.5.5-1 1.5-1s1.5.5 1.5 1M12.5 8.5c0-.5.5-1 1.5-1s1.5.5 1.5 1"/>
+            <path d="M9 12c0 1.5 1.3 3 3 3s3-1.5 3-3"/>
+            <path d="M7 17c-2 1-3 3-3 5M17 17c2 1 3 3 3 5"/>
+          </svg>
+        </div>
+        <h3>HuggingFace</h3>
+        <div class="marketplace-stat">135,000+ MODELS</div>
+        <p>
+          Browse the world's largest model hub. GGUF format detection,
+          automatic VRAM estimation, quantization recommendations for your hardware.
+        </p>
+        <a href="https://huggingface.co" target="_blank" rel="noopener" class="backend-link" style="justify-content:center;">
+          huggingface.co
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <!-- Ollama Registry -->
+      <div class="marketplace-card reveal">
+        <div class="marketplace-icon">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--cyan)" stroke-width="1.5" stroke-linecap="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <path d="M7 10l5 5 5-5"/>
+            <path d="M12 15V3"/>
+          </svg>
+        </div>
+        <h3>Ollama Registry</h3>
+        <div class="marketplace-stat">PULL &amp; RUN</div>
+        <p>
+          One command to pull and serve any model.
+          <code style="background:rgba(0,255,255,0.06);padding:2px 8px;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cyan);">ollama pull llama3.1:70b</code>
+        </p>
+        <a href="https://ollama.com/library" target="_blank" rel="noopener" class="backend-link" style="justify-content:center;">
+          ollama.com/library
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <!-- CLAWHub -->
+      <div class="marketplace-card reveal">
+        <div class="marketplace-icon" style="background:rgba(140,0,200,0.08);border-color:rgba(140,0,200,0.15);">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--purple-light)" stroke-width="1.5" stroke-linecap="round">
+            <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7l3-7z"/>
+          </svg>
+        </div>
+        <h3>CLAWHub</h3>
+        <div class="marketplace-stat" style="color:var(--purple-light);">COMING SOON</div>
+        <p>
+          TentaCLAW's own package registry. Publish and share agents,
+          integrations, tools, and flight sheets with the community.
+        </p>
+        <span class="backend-link" style="justify-content:center;color:var(--purple-light);cursor:default;">
+          clawhub.tentaclaw.io
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SECTION 4: PLATFORM INTEGRATIONS
+       ============================================================ -->
+  <section class="section" id="platform" style="background:linear-gradient(180deg, rgba(0,255,255,0.015) 0%, transparent 50%, rgba(140,0,200,0.015) 100%);">
+    <div class="section-header reveal">
+      <div class="section-label">Platform Integrations</div>
+      <h2 class="section-title">Connects to Everything.</h2>
+      <p class="section-desc">
+        From chat platforms to CI/CD pipelines, TentaCLAW plugs into your existing stack.
+      </p>
+    </div>
+
+    <div class="container">
+
+      <!-- AI Frameworks -->
+      <div class="platform-category reveal">
+        <div class="category-title">AI Frameworks</div>
+        <div class="platform-grid">
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">LangChain</div>
+              <div class="platform-card-desc">ChatTentaCLAW, embeddings, RAG callbacks</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--purple-light)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">CrewAI</div>
+              <div class="platform-card-desc">Multi-agent orchestration</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--teal-bright)" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Dify</div>
+              <div class="platform-card-desc">Custom model provider + workflow tools</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 7h4v4H7zM13 7h4v4h-4z"/><path d="M7 13h10v4H7z"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Jupyter</div>
+              <div class="platform-card-desc">Notebook kernel integration</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat & Messaging -->
+      <div class="platform-category reveal">
+        <div class="category-title">Chat &amp; Messaging</div>
+        <div class="platform-grid">
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="var(--purple-light)"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Discord</div>
+              <div class="platform-card-desc">Deploy models in Discord servers</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2z"/><path d="M14 2v6h6"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Slack</div>
+              <div class="platform-card-desc">AI assistant in Slack channels</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Telegram</div>
+              <div class="platform-card-desc">Bot framework for Telegram</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="20" height="20" rx="4"/><path d="M7 7h10v10H7z"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Matrix</div>
+              <div class="platform-card-desc">Decentralized chat integration</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Workflow Automation -->
+      <div class="platform-category reveal">
+        <div class="category-title">Workflow Automation</div>
+        <div class="platform-grid">
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">n8n</div>
+              <div class="platform-card-desc">Full node: 10 operations (chat, deploy, monitor)</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--purple-light)" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Make (Integromat)</div>
+              <div class="platform-card-desc">Visual workflow automation</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Zapier</div>
+              <div class="platform-card-desc">Trigger-based workflow automation</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Developer Tools -->
+      <div class="platform-category reveal">
+        <div class="category-title">Developer Tools</div>
+        <div class="platform-grid">
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">VS Code Extension</div>
+              <div class="platform-card-desc">Inline AI, cluster status, code explain</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Continue.dev</div>
+              <div class="platform-card-desc">IDE autocomplete with local models</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path d="M9 22V12h6v10"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Home Assistant</div>
+              <div class="platform-card-desc">Smart home AI integration</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Observability -->
+      <div class="platform-category reveal">
+        <div class="category-title">Observability &amp; Monitoring</div>
+        <div class="platform-grid">
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Grafana</div>
+              <div class="platform-card-desc">Cluster metrics dashboards</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--purple-light)" stroke-width="2" stroke-linecap="round"><path d="M12 20V10M18 20V4M6 20v-4"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Datadog</div>
+              <div class="platform-card-desc">Cluster metrics &amp; APM</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Sentry</div>
+              <div class="platform-card-desc">Error tracking &amp; performance</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--green)" stroke-width="2" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Uptime Kuma</div>
+              <div class="platform-card-desc">Self-hosted uptime monitoring</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">PagerDuty</div>
+              <div class="platform-card-desc">Incident alerting &amp; on-call</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/><path d="M2 8l2-2M22 8l-2-2"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">NTFY</div>
+              <div class="platform-card-desc">Push notifications to any device</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DevOps & Project Management -->
+      <div class="platform-category reveal">
+        <div class="category-title">DevOps &amp; Project Management</div>
+        <div class="platform-grid">
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 006 0v-1a10 10 0 10-3.92 7.94"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Jenkins</div>
+              <div class="platform-card-desc">CI/CD pipeline integration</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">GitLab CI</div>
+              <div class="platform-card-desc">Pipeline triggers &amp; deployments</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Jira</div>
+              <div class="platform-card-desc">Issue tracking integration</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--purple-light)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 12l2 2 4-4"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Linear</div>
+              <div class="platform-card-desc">Project management sync</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round"><path d="M4 4h16v16H4z"/><path d="M9 4v16M15 4v16M4 9h16M4 15h16"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Notion</div>
+              <div class="platform-card-desc">Knowledge base &amp; docs sync</div>
+            </div>
+          </div>
+          <div class="platform-card">
+            <div class="platform-card-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--purple-light)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/></svg>
+            </div>
+            <div class="platform-card-info">
+              <div class="platform-card-name">Obsidian</div>
+              <div class="platform-card-desc">Knowledge base AI sync</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       SECTION 5: CLI CODING AGENT
+       ============================================================ -->
+  <section class="section agent-section" id="agent">
+    <div class="section-header reveal">
+      <div class="section-label" style="color:var(--purple-light);">Built-In Coding Agent</div>
+      <h2 class="section-title">Your Cluster Has a Brain.</h2>
+      <p class="section-desc">
+        A full AI coding agent built into the CLI. No dependencies. Persistent memory.
+        Works everywhere your cluster runs.
+      </p>
+    </div>
+
+    <div class="agent-grid">
+      <ul class="agent-features reveal">
+        <li>
+          <span class="feat-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </span>
+          <div><strong>Zero dependencies</strong> -- pure Node.js, no Python, no pip, no conda</div>
+        </li>
+        <li>
+          <span class="feat-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></svg>
+          </span>
+          <div><strong>12 built-in tools</strong> -- read_file, write_file, list_dir, run_shell, search_files, edit_file, and more</div>
+        </li>
+        <li>
+          <span class="feat-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+          </span>
+          <div><strong>Persistent sessions</strong> -- JSONL event logs, resumable via <code style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--purple-light);">--resume &lt;id&gt;</code></div>
+        </li>
+        <li>
+          <span class="feat-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a10 10 0 110 20 10 10 0 010-20z"/><path d="M12 6v6l4 2"/></svg>
+          </span>
+          <div><strong>Workspace memory</strong> -- SOUL.md, USER.md, MEMORY.md, IDENTITY.md for persistent context</div>
+        </li>
+        <li>
+          <span class="feat-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
+          </span>
+          <div><strong>20+ slash commands</strong> -- /quit /new /status /sessions /save /export /clear /compact /model /think /workspace</div>
+        </li>
+        <li>
+          <span class="feat-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          </span>
+          <div><strong>Cross-platform</strong> -- Linux, macOS, Windows, Proxmox. Shell shortcut: <code style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--purple-light);">! git status</code></div>
+        </li>
+      </ul>
+
+      <div class="agent-terminal reveal">
+        <div class="agent-terminal-header">
+          <div class="dots"><span></span><span></span><span></span></div>
+          <div class="title">tentaclaw code</div>
+        </div>
+        <div class="agent-terminal-body">
+          <span class="t-prompt">$</span> <span class="t-cmd">tentaclaw code</span><br>
+          <br>
+          <span class="t-cyan">TentaCLAW</span> <span class="t-output">Code Agent v0.1.0</span><br>
+          <span class="t-output">Session: </span><span class="t-success">a7f3b2c1</span><br>
+          <span class="t-output">Model: </span><span class="t-cyan">llama3.1:70b</span><br>
+          <span class="t-output">Workspace: ~/.tentaclaw/workspace/</span><br>
+          <br>
+          <span class="t-prompt">&gt;</span> <span class="t-cmd">refactor the auth middleware to use JWT</span><br>
+          <br>
+          <span class="t-success">Reading</span> <span class="t-output">src/middleware/auth.ts</span><br>
+          <span class="t-success">Reading</span> <span class="t-output">src/lib/tokens.ts</span><br>
+          <span class="t-success">Editing</span> <span class="t-output">src/middleware/auth.ts (3 changes)</span><br>
+          <span class="t-success">Writing</span> <span class="t-output">src/lib/jwt.ts (new file)</span><br>
+          <span class="t-success">Running</span> <span class="t-output">npm test -- --run</span><br>
+          <br>
+          <span class="t-success">Done.</span> <span class="t-output">4 files changed, all tests passing.</span><br>
+          <br>
+          <span class="t-prompt">&gt;</span> <span class="t-cmd" style="opacity:0.5;">_</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       CTA BANNER
+       ============================================================ -->
+  <section class="cta-banner reveal">
+    <h2>Ready to <span class="gradient-text">Connect Everything?</span></h2>
+    <p>Install TentaCLAW and start routing inference across your GPU cluster in under 5 minutes.</p>
+    <div class="cta-buttons">
+      <a href="index.html#install" class="btn btn-primary">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Get Started
+      </a>
+      <a href="https://github.com/TentaCLAW-OS/TentaCLAW" target="_blank" rel="noopener" class="btn btn-outline">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        View on GitHub
+      </a>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       FOOTER
+       ============================================================ -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <svg viewBox="0 0 32 32" fill="none" width="24" height="24">
+            <circle cx="16" cy="16" r="6" fill="url(#fg)"/>
+            <path d="M16 2L16 10M16 22L16 30M2 16L10 16M22 16L30 16M5.8 5.8L11.4 11.4M20.6 20.6L26.2 26.2M5.8 26.2L11.4 20.6M20.6 11.4L26.2 5.8" stroke="url(#fg)" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+            <defs><linearGradient id="fg" x1="0" y1="0" x2="32" y2="32"><stop offset="0%" stop-color="#00ffff"/><stop offset="100%" stop-color="#8c00c8"/></linearGradient></defs>
+          </svg>
+          Tenta<span class="accent">CLAW</span>
+        </div>
+        <p class="footer-tagline">
+          The open-source operating system for AI inference.
+          Turn any GPU into a production inference node.
+        </p>
+      </div>
+
+      <div class="footer-links-group">
+        <div class="footer-links-title">Product</div>
+        <ul class="footer-links">
+          <li><a href="index.html#features">Features</a></li>
+          <li><a href="index.html#dashboard">Dashboard</a></li>
+          <li><a href="index.html#download">Download ISO</a></li>
+          <li><a href="index.html#install">Install</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-links-group">
+        <div class="footer-links-title">Resources</div>
+        <ul class="footer-links">
+          <li><a href="docs.html">Documentation</a></li>
+          <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW" target="_blank" rel="noopener">GitHub</a></li>
+          <li><a href="https://discord.gg/tentaclaw" target="_blank" rel="noopener">Discord</a></li>
+          <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW/issues" target="_blank" rel="noopener">Report Issue</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-links-group">
+        <div class="footer-links-title">Community</div>
+        <ul class="footer-links">
+          <li><a href="https://twitter.com/tentaclaw_os" target="_blank" rel="noopener">Twitter / X</a></li>
+          <li><a href="https://discord.gg/tentaclaw" target="_blank" rel="noopener">Discord</a></li>
+          <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW/blob/master/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <div class="footer-bottom-text">
+        <span class="motto">"Eight arms. One mind. Zero compromises."</span>
+        <span class="founder">Founded by Alexander Ivy</span>
+      </div>
+      <div class="footer-social">
+        <!-- GitHub -->
+        <a href="https://github.com/TentaCLAW-OS/TentaCLAW" target="_blank" rel="noopener" aria-label="GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        </a>
+        <!-- Twitter -->
+        <a href="https://twitter.com/tentaclaw_os" target="_blank" rel="noopener" aria-label="Twitter">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        </a>
+        <!-- Discord -->
+        <a href="https://discord.gg/tentaclaw" target="_blank" rel="noopener" aria-label="Discord">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================
+       JAVASCRIPT
+       ============================================================ -->
+  <script>
+    // --- Nav scroll effect ---
+    const nav = document.querySelector('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 40);
+    }, { passive: true });
+
+    // --- Mobile nav toggle ---
+    const hamburger = document.getElementById('navHamburger');
+    const navLinks = document.getElementById('navLinks');
+    hamburger.addEventListener('click', () => {
+      navLinks.classList.toggle('open');
+    });
+    navLinks.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => navLinks.classList.remove('open'));
+    });
+
+    // --- Scroll reveal (Intersection Observer) ---
+    const revealEls = document.querySelectorAll('.reveal');
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    revealEls.forEach(el => revealObserver.observe(el));
+  </script>
+
+</body>
+</html>

@@ -25,17 +25,20 @@
 TentaCLAW OS turns scattered GPUs into one self-healing AI inference cluster. It auto-detects hardware, routes requests to the best available model, and gives you a live dashboard + OpenAI-compatible API — all for the cost of your power bill.
 
 - **Zero Config** — Auto-detect GPUs, auto-register nodes, auto-route inference
-- **OpenAI Compatible** — Drop-in replacement API at `POST /v1/chat/completions`
-- **Live Dashboard** — Real-time monitoring of GPUs, models, agents, and alerts
-- **Multi-Node Clustering** — Scale across distributed GPU machines
-- **AI Coding Agent** — Built-in CLI agent that runs on your own hardware
+- **8 Inference Backends** — Ollama, vLLM, SGLang, llama.cpp, LM Studio, BitNet, TabbyAPI, TensorRT-LLM
+- **OpenAI + Anthropic Compatible** — Drop-in replacement APIs: `/v1/chat/completions`, `/v1/messages`, `/v1/embeddings`, audio, images
+- **Live Dashboard** — Real-time GPU monitoring with 7 pages: Fleet Overview, Cluster Control, Models, Agents, Chat, Alerts, Settings
+- **28+ Integrations** — LangChain, n8n, Discord, Slack, VS Code, Grafana, Jupyter, HuggingFace, and more
+- **AI Coding Agent** — Built-in CLI agent with 12 tools, persistent sessions, workspace memory
+- **Model Marketplace** — Browse 135,000+ models from HuggingFace, pull from Ollama, publish to CLAWHub
+- **Multi-Node Clustering** — Scale across distributed GPU machines with smart routing
 - **Open Source** — MIT licensed, community-driven
 
 ## Screenshots
 
 <p align="center">
-  <img src="assets/screenshots/dashboard-new-home.png" width="800" alt="TentaCLAW Dashboard">
-  <br><em>Dashboard — Fleet Overview with real-time GPU monitoring</em>
+  <img src="assets/screenshots/dashboard-live-octopod.png" width="800" alt="TentaCLAW Dashboard — Live">
+  <br><em>Dashboard — Live fleet overview with real-time GPU stats from Octopod nodes</em>
 </p>
 
 <p align="center">
@@ -143,7 +146,35 @@ curl http://localhost:8080/v1/chat/completions \
   }'
 ```
 
+TentaCLAW also supports the Anthropic Messages API (`POST /v1/messages`), audio transcription (Whisper), text-to-speech (Bark, Piper, XTTS), and image generation (SDXL, Flux).
+
 See the [full API docs](https://tentaclaw.io/docs.html#gateway-api) for all endpoints.
+
+## Supported Backends
+
+| Backend | Auto-Detect | Key Features |
+|---------|-------------|--------------|
+| [Ollama](https://ollama.com) | Port 11434 | Native integration, context management, tool embedding |
+| [vLLM](https://docs.vllm.ai) | `/v1/models` | PagedAttention, tensor parallelism, speculative decoding, FP8 |
+| [SGLang](https://github.com/sgl-project/sglang) | `/v1/models` | RadixAttention (6.4x faster on RAG), prefix caching |
+| [llama.cpp](https://github.com/ggerganov/llama.cpp) | Port 8080 | GGUF format, CPU+GPU, llamafile support |
+| [LM Studio](https://lmstudio.ai) | Port 1234 | Desktop GUI, OpenAI-compatible |
+| [BitNet](https://github.com/microsoft/BitNet) | — | 1-bit LLMs, per-GPU layer distribution |
+| [TabbyAPI](https://github.com/theroyallab/tabbyAPI) | Token encode | ExLlamaV2 backend |
+| [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) | — | NVIDIA optimized, advanced parallelism |
+
+## Integrations
+
+TentaCLAW integrates with 28+ platforms:
+
+**AI Frameworks:** LangChain, CrewAI, Dify, Jupyter
+**Chat:** Discord, Slack, Telegram, Matrix
+**Automation:** n8n, Make, Zapier
+**Dev Tools:** VS Code, Continue.dev, Home Assistant
+**Monitoring:** Grafana, Datadog, Sentry, PagerDuty, Uptime Kuma
+**DevOps:** Jenkins, GitLab CI, Jira, Linear, Notion
+
+See the [full integrations page](https://tentaclaw.io/integrations.html) for details.
 
 ## CLI
 

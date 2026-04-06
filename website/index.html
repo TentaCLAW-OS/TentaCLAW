@@ -544,6 +544,49 @@
     /* ============================================================
        CLI SECTION
        ============================================================ */
+    /* ============================================================
+       INTEGRATIONS SECTION
+       ============================================================ */
+    .integrations-grid {
+      display:flex; flex-direction:column; gap:28px;
+      max-width:900px; margin:0 auto 40px;
+    }
+    .integrations-category {
+      text-align:center;
+    }
+    .integrations-category-label {
+      font-family:'JetBrains Mono',monospace;
+      font-size:11px; color:var(--cyan); text-transform:uppercase;
+      letter-spacing:2px; margin-bottom:12px; font-weight:500;
+    }
+    .integrations-pills {
+      display:flex; flex-wrap:wrap; gap:10px; justify-content:center;
+    }
+    .integration-pill {
+      display:inline-flex; align-items:center; gap:6px;
+      padding:8px 18px; border-radius:100px;
+      background:rgba(14,21,32,0.6);
+      border:1px solid var(--border-dim);
+      font-size:13px; font-weight:500; color:var(--text);
+      transition:all 0.25s; cursor:default;
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+    }
+    .integration-pill:hover {
+      border-color:var(--border-hover);
+      transform:translateY(-2px);
+      box-shadow:0 8px 24px rgba(0,0,0,0.2), 0 0 20px rgba(0,255,255,0.03);
+    }
+    .integrations-cta {
+      text-align:center; margin-top:8px;
+    }
+    .integrations-cta a {
+      color:var(--cyan); font-size:14px; font-weight:500;
+      border-bottom:1px solid rgba(0,255,255,0.3);
+      padding-bottom:2px; transition:border-color 0.2s;
+    }
+    .integrations-cta a:hover { border-color:var(--cyan); }
+
     .cli-feature-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -898,6 +941,7 @@
         <li><a href="#dashboard">Dashboard</a></li>
         <li><a href="#download">Download</a></li>
         <li><a href="docs.html">Docs</a></li>
+        <li><a href="integrations.html">Integrations</a></li>
         <li><a href="https://github.com/TentaCLAW-OS/TentaCLAW" target="_blank" rel="noopener">GitHub</a></li>
         <li><a href="#install" class="nav-cta">Get Started</a></li>
       </ul>
@@ -1018,7 +1062,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/><circle cx="15" cy="15" r="2"/></svg>
           </div>
           <h3>Live Dashboard</h3>
-          <p>Proxmox-style command center. Every GPU, every model, every request visible in real-time with sparklines and status pills.</p>
+          <p>Real-time GPU monitoring with VRAM bars, temperature graphs, sparkline throughput charts, and alert severity filtering. 7 pages: Fleet Overview, Cluster Control, Models, Agents, Chat, Alerts, Settings.</p>
         </div>
         <!-- Feature 4 -->
         <div class="feature-card">
@@ -1026,7 +1070,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           </div>
           <h3>AI Chat Built-in</h3>
-          <p>Chat with any model in your cluster directly from the dashboard. OpenAI-compatible API included for drop-in integration.</p>
+          <p>Chat with any model running on your cluster. OpenAI + Anthropic API compatible. Supports Whisper transcription, Bark/Piper TTS, and SDXL/Flux image generation. Drop-in replacement for any OpenAI client.</p>
         </div>
         <!-- Feature 5 -->
         <div class="feature-card">
@@ -1034,7 +1078,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
           </div>
           <h3>Smart Scheduling</h3>
-          <p>Automatic model placement, VRAM optimization, and cold-start minimization. The right model on the right GPU, always.</p>
+          <p>Automatic model placement with VRAM-aware routing. Supports 8 backends: Ollama, vLLM, SGLang, llama.cpp, LM Studio, BitNet, TabbyAPI, TensorRT-LLM. RadixAttention caching, speculative decoding, FP8 quantization.</p>
         </div>
         <!-- Feature 6 -->
         <div class="feature-card">
@@ -1059,6 +1103,7 @@
       <h2 class="section-title">A command center<br>for your GPU cluster</h2>
       <p class="section-sub">
         Monitor nodes, manage models, track requests, and chat with AI.
+        Deploy from HuggingFace or Ollama. Route to 8 different inference backends.
         All from a single pane of glass.
       </p>
 
@@ -1272,6 +1317,10 @@
         </div>
       </div>
 
+      <p style="text-align:center; color:var(--dim); font-size:0.95rem; max-width:700px; margin:0 auto 32px; line-height:1.7;">
+        Plus: CLAWHub package registry, HuggingFace model browser (135,000+ models), 20+ slash commands, and persistent session memory.
+      </p>
+
       <div class="cli-install-wrap">
         <div class="install-code-wrap">
           <div class="install-code-bar">
@@ -1297,6 +1346,72 @@
         <a href="docs.html#cli-reference" class="cli-cta-btn">
           CLI Docs →
         </a>
+      </div>
+    </div>
+  </section>
+
+  <div class="glow-line"></div>
+
+  <!-- ============================================================
+       INTEGRATIONS
+       ============================================================ -->
+  <section class="section" id="integrations">
+    <div class="section-inner reveal">
+      <div class="section-label">Integrations</div>
+      <h2 class="section-title">Works with everything<br>you already use</h2>
+      <p class="section-sub">
+        28+ integrations. 8 inference backends. Drop-in API compatibility.
+      </p>
+
+      <div class="integrations-grid">
+        <div class="integrations-category">
+          <div class="integrations-category-label">Backends</div>
+          <div class="integrations-pills">
+            <span class="integration-pill">Ollama</span>
+            <span class="integration-pill">vLLM</span>
+            <span class="integration-pill">SGLang</span>
+            <span class="integration-pill">llama.cpp</span>
+            <span class="integration-pill">LM Studio</span>
+            <span class="integration-pill">BitNet</span>
+            <span class="integration-pill">TabbyAPI</span>
+            <span class="integration-pill">TensorRT-LLM</span>
+          </div>
+        </div>
+        <div class="integrations-category">
+          <div class="integrations-category-label">APIs</div>
+          <div class="integrations-pills">
+            <span class="integration-pill">OpenAI</span>
+            <span class="integration-pill">Anthropic</span>
+            <span class="integration-pill">HuggingFace</span>
+          </div>
+        </div>
+        <div class="integrations-category">
+          <div class="integrations-category-label">Platforms</div>
+          <div class="integrations-pills">
+            <span class="integration-pill">LangChain</span>
+            <span class="integration-pill">CrewAI</span>
+            <span class="integration-pill">Dify</span>
+            <span class="integration-pill">n8n</span>
+            <span class="integration-pill">Zapier</span>
+            <span class="integration-pill">Discord</span>
+            <span class="integration-pill">Slack</span>
+            <span class="integration-pill">Telegram</span>
+          </div>
+        </div>
+        <div class="integrations-category">
+          <div class="integrations-category-label">Tools</div>
+          <div class="integrations-pills">
+            <span class="integration-pill">VS Code</span>
+            <span class="integration-pill">Continue.dev</span>
+            <span class="integration-pill">Grafana</span>
+            <span class="integration-pill">Jupyter</span>
+            <span class="integration-pill">Home Assistant</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="integrations-cta">
+        <a href="integrations.html">View all integrations &rarr;</a>
       </div>
     </div>
   </section>
@@ -1389,10 +1504,10 @@
 
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px,1fr)); gap:16px; max-width:1100px; margin:0 auto;">
         <div style="background:rgba(14,21,32,0.6); border:1px solid rgba(255,255,255,0.06); border-radius:12px; overflow:hidden; transition:all 0.3s;">
-          <img src="../assets/screenshots/dashboard-new-home.png" alt="TentaCLAW Dashboard — Fleet Overview" loading="lazy" style="width:100%; height:auto; display:block;">
+          <img src="../assets/screenshots/dashboard-live-octopod.png" alt="TentaCLAW Dashboard — Live Fleet" loading="lazy" style="width:100%; height:auto; display:block;">
           <div style="padding:12px 16px;">
-            <div style="font-size:13px; font-weight:600; color:#e8edf5;">Dashboard — Fleet Overview</div>
-            <div style="font-size:11px; color:#5a6a82;">Real-time GPU monitoring across all Octopods</div>
+            <div style="font-size:13px; font-weight:600; color:#00ffff;">Dashboard — Live Fleet</div>
+            <div style="font-size:11px; color:#5a6a82;">Real-time GPU stats from a live Octopod cluster</div>
           </div>
         </div>
         <div style="background:rgba(14,21,32,0.6); border:1px solid rgba(255,255,255,0.06); border-radius:12px; overflow:hidden; transition:all 0.3s;">
