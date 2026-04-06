@@ -1,2 +1,19 @@
-* text eol=
-* text ivb2=,
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Binary files - never convert line endings
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.iso binary
+*.img binary
