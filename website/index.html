@@ -1256,61 +1256,69 @@
        ============================================================ -->
   <section class="section" id="integrations">
     <div class="section-inner reveal">
-      <div class="section-label">Integrations</div>
-      <h2 class="section-title">Works with everything<br>you already use</h2>
+      <div class="section-label">Ecosystem</div>
+      <h2 class="section-title">Every backend.<br>Every tool. One API.</h2>
       <p class="section-sub">
-        28+ integrations. 8 inference backends. Drop-in API compatibility.
+        TentaCLAW auto-detects and routes to any inference engine. Drop-in OpenAI and Anthropic compatibility.
+        28+ platform integrations. 135,000+ models from HuggingFace.
       </p>
 
-      <div class="integrations-grid">
-        <div class="integrations-category">
-          <div class="integrations-category-label">Backends</div>
-          <div class="integrations-pills">
-            <span class="integration-pill">Ollama</span>
-            <span class="integration-pill">vLLM</span>
-            <span class="integration-pill">SGLang</span>
-            <span class="integration-pill">llama.cpp</span>
-            <span class="integration-pill">LM Studio</span>
-            <span class="integration-pill">BitNet</span>
-            <span class="integration-pill">TabbyAPI</span>
-            <span class="integration-pill">TensorRT-LLM</span>
-          </div>
+      <!-- Top row: 4 backend cards -->
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; max-width:960px; margin:0 auto 20px;">
+        <a href="https://ollama.com" target="_blank" rel="noopener" style="background:rgba(14,21,32,0.6); border:1px solid rgba(0,255,255,0.12); border-radius:12px; padding:20px 16px; text-align:center; text-decoration:none; transition:all 0.25s;">
+          <div style="font-size:24px; margin-bottom:8px;">🦙</div>
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:700; color:#e8edf5;">Ollama</div>
+          <div style="font-size:11px; color:#5a6a82; margin-top:4px;">Native integration<br>Auto-detect on :11434</div>
+        </a>
+        <a href="https://docs.vllm.ai" target="_blank" rel="noopener" style="background:rgba(14,21,32,0.6); border:1px solid rgba(140,0,200,0.12); border-radius:12px; padding:20px 16px; text-align:center; text-decoration:none; transition:all 0.25s;">
+          <div style="font-size:24px; margin-bottom:8px;">⚡</div>
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:700; color:#e8edf5;">vLLM</div>
+          <div style="font-size:11px; color:#5a6a82; margin-top:4px;">PagedAttention<br>Tensor parallelism</div>
+        </a>
+        <a href="https://github.com/sgl-project/sglang" target="_blank" rel="noopener" style="background:rgba(14,21,32,0.6); border:1px solid rgba(0,212,170,0.12); border-radius:12px; padding:20px 16px; text-align:center; text-decoration:none; transition:all 0.25s;">
+          <div style="font-size:24px; margin-bottom:8px;">🔷</div>
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:700; color:#e8edf5;">SGLang</div>
+          <div style="font-size:11px; color:#5a6a82; margin-top:4px;">RadixAttention<br>6.4x faster on RAG</div>
+        </a>
+        <a href="https://github.com/ggerganov/llama.cpp" target="_blank" rel="noopener" style="background:rgba(14,21,32,0.6); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:20px 16px; text-align:center; text-decoration:none; transition:all 0.25s;">
+          <div style="font-size:24px; margin-bottom:8px;">🔧</div>
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:700; color:#e8edf5;">llama.cpp</div>
+          <div style="font-size:11px; color:#5a6a82; margin-top:4px;">GGUF format<br>CPU + GPU hybrid</div>
+        </a>
+      </div>
+
+      <!-- Bottom row: APIs + more -->
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; max-width:960px; margin:0 auto 24px;">
+        <div style="background:rgba(14,21,32,0.4); border:1px solid rgba(255,255,255,0.04); border-radius:12px; padding:16px; text-align:center;">
+          <div style="font-size:13px; font-weight:600; color:#00ffff;">OpenAI API</div>
+          <div style="font-size:10px; color:#5a6a82; margin-top:2px;">Drop-in compatible</div>
         </div>
-        <div class="integrations-category">
-          <div class="integrations-category-label">APIs</div>
-          <div class="integrations-pills">
-            <span class="integration-pill">OpenAI</span>
-            <span class="integration-pill">Anthropic</span>
-            <span class="integration-pill">HuggingFace</span>
-          </div>
+        <div style="background:rgba(14,21,32,0.4); border:1px solid rgba(255,255,255,0.04); border-radius:12px; padding:16px; text-align:center;">
+          <div style="font-size:13px; font-weight:600; color:#a855f7;">Anthropic API</div>
+          <div style="font-size:10px; color:#5a6a82; margin-top:2px;">/v1/messages support</div>
         </div>
-        <div class="integrations-category">
-          <div class="integrations-category-label">Platforms</div>
-          <div class="integrations-pills">
-            <span class="integration-pill">LangChain</span>
-            <span class="integration-pill">CrewAI</span>
-            <span class="integration-pill">Dify</span>
-            <span class="integration-pill">n8n</span>
-            <span class="integration-pill">Zapier</span>
-            <span class="integration-pill">Discord</span>
-            <span class="integration-pill">Slack</span>
-            <span class="integration-pill">Telegram</span>
-          </div>
+        <div style="background:rgba(14,21,32,0.4); border:1px solid rgba(255,255,255,0.04); border-radius:12px; padding:16px; text-align:center;">
+          <div style="font-size:13px; font-weight:600; color:#00d4aa;">HuggingFace</div>
+          <div style="font-size:10px; color:#5a6a82; margin-top:2px;">135K+ models</div>
         </div>
-        <div class="integrations-category">
-          <div class="integrations-category-label">Tools</div>
-          <div class="integrations-pills">
-            <span class="integration-pill">VS Code</span>
-            <span class="integration-pill">Continue.dev</span>
-            <span class="integration-pill">Grafana</span>
-            <span class="integration-pill">Jupyter</span>
-            <span class="integration-pill">Home Assistant</span>
-          </div>
+        <div style="background:rgba(14,21,32,0.4); border:1px solid rgba(255,255,255,0.04); border-radius:12px; padding:16px; text-align:center;">
+          <div style="font-size:13px; font-weight:600; color:#94a3b8;">+4 more backends</div>
+          <div style="font-size:10px; color:#5a6a82; margin-top:2px;">LM Studio, BitNet, TabbyAPI, TensorRT</div>
         </div>
       </div>
 
-      <div class="integrations-cta">
-        <a href="integrations.html">View all integrations &rarr;</a>
+      <!-- Platform integrations in a compact line -->
+      <div style="text-align:center; max-width:800px; margin:0 auto 24px;">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#5a6a82; text-transform:uppercase; letter-spacing:2px; margin-bottom:10px;">Also integrates with</div>
+        <div style="font-size:13px; color:#94a3b8; line-height:2;">
+          LangChain · CrewAI · Dify · n8n · Zapier · Discord · Slack · Telegram · VS Code · Continue.dev · Grafana · Datadog · Jupyter · Home Assistant · Jenkins · GitLab · Jira · Linear · Notion
+        </div>
+      </div>
+
+      <div style="text-align:center;">
+        <a href="integrations.html" style="display:inline-flex; align-items:center; gap:8px; padding:10px 24px; border-radius:10px; background:rgba(0,255,255,0.06); border:1px solid rgba(0,255,255,0.15); color:#00ffff; font-size:14px; font-weight:500; text-decoration:none; transition:all 0.25s;">
+          View all 28+ integrations &rarr;
+        </a>
       </div>
     </div>
   </section>
