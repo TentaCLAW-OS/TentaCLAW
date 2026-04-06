@@ -1625,12 +1625,24 @@ export class BackendRegistry {
 export function createBackendRegistry(): BackendRegistry {
     const registry = new BackendRegistry();
 
+    // Core backends
     registry.register(new OllamaBackend());
     registry.register(new VllmBackend());
     registry.register(new SglangBackend());
     registry.register(new LlamaCppBackend());
     registry.register(new BitNetBackend());
     registry.register(new MlxBackend());
+
+    // Extended backends (loaded dynamically to keep core lean)
+    try {
+        const ext = require('./backends-extended');
+        if (ext.AphroditeBackend) registry.register(new ext.AphroditeBackend());
+        if (ext.KoboldCppBackend) registry.register(new ext.KoboldCppBackend());
+        if (ext.ExLlamaV2Backend) registry.register(new ext.ExLlamaV2Backend());
+        if (ext.LmStudioBackend) registry.register(new ext.LmStudioBackend());
+        if (ext.TabbyApiBackend) registry.register(new ext.TabbyApiBackend());
+        if (ext.TensorRtBackend) registry.register(new ext.TensorRtBackend());
+    } catch { /* extended backends not available */ }
 
     return registry;
 }
