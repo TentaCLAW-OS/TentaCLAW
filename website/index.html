@@ -1232,63 +1232,6 @@
         </div>
       </div>
 
-      <!-- CLI Terminal Demo — faithful recreation of actual CLI output -->
-      <div class="hero-terminal" style="max-width:720px; margin:32px auto 0;">
-        <div class="terminal-bar">
-          <span class="terminal-dot red"></span>
-          <span class="terminal-dot yellow"></span>
-          <span class="terminal-dot green"></span>
-          <span class="terminal-title">tentaclaw — bash</span>
-        </div>
-        <div class="terminal-body" style="min-height:auto; font-size:12px; line-height:1.5; padding:20px 24px;">
-<span class="value" style="white-space:pre;">                          ___
-                       .-'   `'.
-                      /         \
-                      |         ;
-                      |         |           ___.--,
-             _.._     |0) ~ (0) |    _.---'`__.-( (_.
-      __.--'`_.. '.__\.    '--. \_.-' ,.--'`     `""`
-     ( ,.--'`   ',__/|)  `-. '.  `.   /   _
-     _`) )  .---.__.' /   `. `. \_  `-'  /`.)
-    `)_')  /        /     `.  `\  \ `'  /
-     `'''  |  _    |       `. `. `.  /`
-            ;  \   '.        `. `. `./
-             \  '.   \         `. `.  `-._     _
-              '.  `'. `.         `-. `.    `.__/
-                `'.  `\ `.         `.  `-.
-                   `'  \ `;          `-._`.
-                        ` \               `'</span>
-
-  <span class="box">╭───────────────────────────────────────╮</span>
-  <span class="box">│</span>  🐙 <span class="value" style="font-weight:700;">TentaCLAW</span> <span class="comment">v2.38.0</span>                 <span class="box">│</span>
-  <span class="box">│</span>  <span class="purple-t" style="font-style:italic;">Eight arms. One mind.</span>               <span class="box">│</span>
-  <span class="box">╰───────────────────────────────────────╯</span>
-
-<span class="prompt">$</span> <span class="cmd">tentaclaw status</span>
-
-<span class="box">╭───────────────────────────────────────────────────────────╮</span>
-<span class="box">│</span> <span class="value" style="font-weight:700;">TENTACLAW CLUSTER</span>                           <span class="comment">v2.38.0</span> <span class="box">│</span>
-<span class="box">├───────────────────────────────────────────────────────────┤</span>
-<span class="box">│</span> <span class="comment">Status    </span><span class="success">● HEALTHY</span>                                    <span class="box">│</span>
-<span class="box">│</span> <span class="comment">Nodes     </span><span class="cmd">4 online</span>  <span class="comment">/  4 total</span>                       <span class="box">│</span>
-<span class="box">│</span> <span class="comment">GPUs      </span><span class="value">12 active</span>                                    <span class="box">│</span>
-<span class="box">│</span> <span class="comment">VRAM      </span><span class="value">412 GB free</span>  <span class="comment">/  736 GB total</span>              <span class="box">│</span>
-<span class="box">│</span> <span class="comment">Models    </span><span class="cmd">llama3.1:70b, codestral:22b</span>  <span class="comment">+4 more</span>     <span class="box">│</span>
-<span class="box">│</span> <span class="comment">Tok/s     </span><span class="success" style="font-weight:700;">45,280</span>                                      <span class="box">│</span>
-<span class="box">│</span> <span class="comment">Uptime    </span><span class="cmd">14d 7h 23m</span>                                  <span class="box">│</span>
-<span class="box">│</span>                                                           <span class="box">│</span>
-<span class="box">│</span> <span class="purple-t" style="font-style:italic;">"eight arms, zero problems"</span>  <span class="comment">— 🐙</span>                    <span class="box">│</span>
-<span class="box">╰───────────────────────────────────────────────────────────╯</span>
-
-<span class="prompt">$</span> <span class="cmd">tentaclaw code</span>
-<span class="comment">  Model: llama3.1:70b on octopod-1</span>
-<span class="comment">  Tools: read_file, write_file, edit_file, run_shell, search_files</span>
-<span class="success">  Ready.</span>
-
-<span class="value">❯</span> <span class="cmd">Fix the auth middleware in gateway/src/routes/admin.ts</span><span class="cursor-blink"></span>
-        </div>
-      </div>
-
       <div class="cli-cta-wrap">
         <a href="docs.html#cli-reference" class="cli-cta-btn">
           CLI Docs →
