@@ -616,6 +616,133 @@
       font-size: 0.95rem;
     }
 
+    /* --- CLI Three-Column Layout --- */
+    .cli-columns {
+      display:grid; grid-template-columns:1fr 1.4fr 1fr;
+      gap:24px; margin:48px 0 40px;
+    }
+    .cli-column {
+      background:rgba(14,21,32,0.6);
+      border:1px solid var(--border-dim);
+      border-radius:16px; padding:28px 24px;
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      transition:all 0.35s ease;
+    }
+    .cli-column:hover {
+      border-color:var(--border-hover);
+      transform:translateY(-4px);
+      box-shadow:0 20px 60px rgba(0,0,0,0.3), 0 0 40px rgba(0,255,255,0.03);
+    }
+    .cli-column.center-col {
+      border-color:rgba(0,255,255,0.2);
+      box-shadow:0 0 40px rgba(0,255,255,0.04);
+      position:relative; overflow:hidden;
+    }
+    .cli-column.center-col::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg, var(--cyan), var(--purple-light));
+    }
+    .cli-col-title {
+      font-family:'Space Grotesk',sans-serif;
+      font-size:1.1rem; font-weight:700; margin-bottom:16px;
+      color:var(--text);
+    }
+    .cli-col-title .accent { color:var(--cyan); }
+    .cli-cmd-list { list-style:none; }
+    .cli-cmd-list li {
+      display:flex; align-items:baseline; gap:10px;
+      padding:7px 0; border-bottom:1px solid var(--border-dim);
+      font-size:13px;
+    }
+    .cli-cmd-list li:last-child { border-bottom:none; }
+    .cli-cmd-list .cmd-name {
+      font-family:'JetBrains Mono',monospace;
+      color:var(--cyan); font-weight:500;
+      white-space:nowrap; flex-shrink:0;
+    }
+    .cli-cmd-list .cmd-desc {
+      color:var(--muted); font-size:12px;
+    }
+    .cli-center-desc {
+      color:var(--dim); font-size:0.92rem; line-height:1.7;
+      margin-bottom:20px;
+    }
+    .cli-tools-grid {
+      display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px;
+    }
+    .cli-tool-pill {
+      font-family:'JetBrains Mono',monospace;
+      font-size:11px; padding:4px 10px;
+      background:rgba(0,255,255,0.06);
+      border:1px solid rgba(0,255,255,0.12);
+      border-radius:6px; color:var(--cyan);
+    }
+    .cli-meta-item {
+      font-size:12px; color:var(--dim); padding:5px 0;
+      line-height:1.6;
+    }
+    .cli-meta-item strong { color:var(--text-secondary); font-weight:600; }
+    .cli-pkg-types {
+      display:flex; flex-wrap:wrap; gap:6px; margin-top:12px;
+    }
+    .cli-pkg-pill {
+      font-size:11px; padding:4px 10px;
+      background:rgba(140,0,200,0.08);
+      border:1px solid rgba(140,0,200,0.15);
+      border-radius:6px; color:var(--purple-light);
+    }
+    @media (max-width:1024px) {
+      .cli-columns { grid-template-columns:1fr; }
+      .cli-column.center-col { order:-1; }
+    }
+
+    /* --- Agent Section --- */
+    .agent-grid {
+      display:grid; grid-template-columns:repeat(4, 1fr);
+      gap:20px;
+    }
+    .agent-card {
+      background:rgba(14,21,32,0.6);
+      border:1px solid var(--border-dim);
+      border-radius:16px; padding:28px 24px;
+      transition:all 0.35s ease; position:relative;
+      overflow:hidden;
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+    }
+    .agent-card::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg, var(--cyan), var(--purple-light));
+      opacity:0; transition:opacity 0.35s;
+    }
+    .agent-card:hover {
+      border-color:var(--border-hover);
+      transform:translateY(-6px);
+      box-shadow:0 20px 60px rgba(0,0,0,0.3), 0 0 40px rgba(0,255,255,0.03);
+    }
+    .agent-card:hover::before { opacity:1; }
+    .agent-card-icon {
+      width:48px; height:48px; border-radius:12px;
+      display:flex; align-items:center; justify-content:center;
+      margin-bottom:20px;
+      background:linear-gradient(135deg, var(--cyan-dim), var(--purple-dim));
+      border:1px solid var(--border);
+    }
+    .agent-card-icon svg { width:24px; height:24px; color:var(--cyan); }
+    .agent-card h3 {
+      font-size:1.05rem; font-weight:700; margin-bottom:8px;
+    }
+    .agent-card p {
+      color:var(--dim); font-size:0.88rem; line-height:1.7;
+    }
+    @media (max-width:1024px) {
+      .agent-grid { grid-template-columns:repeat(2, 1fr); }
+    }
+    @media (max-width:768px) {
+      .agent-grid { grid-template-columns:1fr; }
+    }
+
     /* ============================================================
        INSTALL SECTION
        ============================================================ */
@@ -1187,44 +1314,134 @@
   <div class="glow-line"></div>
 
   <!-- ============================================================
+       AGENT & INFRASTRUCTURE
+       ============================================================ -->
+  <section class="section" id="agent">
+    <div class="section-inner reveal">
+      <div class="section-label">Agent</div>
+      <h2 class="section-title">Self-healing infrastructure</h2>
+      <p class="section-sub">
+        Every node runs an intelligent agent that monitors, heals, and optimizes.
+      </p>
+
+      <div class="agent-grid">
+        <!-- Watchdog -->
+        <div class="agent-card">
+          <div class="agent-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3>Watchdog</h3>
+          <p>4-level escalation: log, restart service, kill processes, reset GPU, reboot. Max 3 escalations per hour.</p>
+        </div>
+        <!-- GPU Detection -->
+        <div class="agent-card">
+          <div class="agent-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+          </div>
+          <h3>GPU Detection</h3>
+          <p>Auto-detect NVIDIA, AMD, Intel GPUs. Overclock profiles: stock, gaming, mining, inference.</p>
+        </div>
+        <!-- Backend Auto-Discovery -->
+        <div class="agent-card">
+          <div class="agent-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+          </div>
+          <h3>Backend Auto-Discovery</h3>
+          <p>Finds Ollama, vLLM, SGLang, llama.cpp, LM Studio, BitNet, TabbyAPI automatically.</p>
+        </div>
+        <!-- MCP Server -->
+        <div class="agent-card">
+          <div class="agent-card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </div>
+          <h3>MCP Server</h3>
+          <p>16 tools for Claude, Cursor, and AI IDE integration. Manage your cluster from any AI assistant.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="glow-line"></div>
+
+  <!-- ============================================================
        CLI SECTION
        ============================================================ -->
   <section class="section" id="cli">
     <div class="section-inner reveal">
-      <div class="section-label">AI Coding Agent</div>
-      <h2 class="section-title">TentaCLAW CLI</h2>
+      <div class="section-label">CLI</div>
+      <h2 class="section-title">The TentaCLAW CLI</h2>
       <p class="section-sub">
-        A coding agent that runs on your own cluster. No cloud. No subscriptions.<br>
-        Reads files, writes files, runs commands, and iterates until the task is done.
+        87 commands. 12 code tools. A full AI coding agent. All from your terminal.
       </p>
 
-      <div class="cli-feature-grid">
-        <div class="cli-feature-card">
-          <div class="cli-feature-icon">🐙</div>
-          <div class="cli-feature-title">Agentic code loop</div>
-          <div class="cli-feature-desc">Reads, writes, edits files. Runs shell commands. Searches codebases. Iterates until done.</div>
+      <div class="cli-columns">
+        <!-- A. Cluster Management -->
+        <div class="cli-column">
+          <div class="cli-col-title">Cluster Management</div>
+          <ul class="cli-cmd-list">
+            <li><span class="cmd-name">tentaclaw status</span> <span class="cmd-desc">Fleet health at a glance</span></li>
+            <li><span class="cmd-name">tentaclaw nodes</span> <span class="cmd-desc">List all Octopod nodes</span></li>
+            <li><span class="cmd-name">tentaclaw models</span> <span class="cmd-desc">Model registry &amp; deployment</span></li>
+            <li><span class="cmd-name">tentaclaw deploy</span> <span class="cmd-desc">Deploy models to cluster</span></li>
+            <li><span class="cmd-name">tentaclaw health</span> <span class="cmd-desc">Health score with A-F grade</span></li>
+            <li><span class="cmd-name">tentaclaw alerts</span> <span class="cmd-desc">Monitor fleet warnings</span></li>
+            <li><span class="cmd-name">tentaclaw benchmark</span> <span class="cmd-desc">GPU performance testing</span></li>
+            <li><span class="cmd-name">tentaclaw thermal</span> <span class="cmd-desc">Temperature monitoring</span></li>
+          </ul>
         </div>
-        <div class="cli-feature-card">
-          <div class="cli-feature-icon">💾</div>
-          <div class="cli-feature-title">Persistent memory</div>
-          <div class="cli-feature-desc">Workspace files, session history, JSONL event logs. Resume any session where you left off.</div>
+
+        <!-- B. AI Coding Agent (center, prominent) -->
+        <div class="cli-column center-col">
+          <div class="cli-col-title"><span class="accent">tentaclaw code</span></div>
+          <p class="cli-center-desc">
+            A full AI coding agent that runs on YOUR hardware. No cloud. No subscriptions. No API bills.
+          </p>
+          <div class="cli-tools-grid">
+            <span class="cli-tool-pill">read_file</span>
+            <span class="cli-tool-pill">write_file</span>
+            <span class="cli-tool-pill">edit_file</span>
+            <span class="cli-tool-pill">patch_file</span>
+            <span class="cli-tool-pill">search_files</span>
+            <span class="cli-tool-pill">glob_files</span>
+            <span class="cli-tool-pill">list_dir</span>
+            <span class="cli-tool-pill">run_shell</span>
+            <span class="cli-tool-pill">create_directory</span>
+            <span class="cli-tool-pill">delete_file</span>
+            <span class="cli-tool-pill">http_get</span>
+            <span class="cli-tool-pill">write_note</span>
+          </div>
+          <div class="cli-meta-item"><strong>30+ slash commands</strong> &mdash; /quit, /new, /status, /sessions, /save, /export, /compact, /model, /auto, /think, and more</div>
+          <div class="cli-meta-item"><strong>Persistent sessions</strong> &mdash; JSONL event logs, resume any session with <code style="color:var(--cyan); font-family:'JetBrains Mono',monospace;">--resume</code></div>
+          <div class="cli-meta-item"><strong>Workspace memory</strong> &mdash; SOUL.md, USER.md, MEMORY.md keep context across sessions</div>
+          <div class="cli-meta-item" style="margin-top:12px; color:var(--text-secondary);"><strong>Works on:</strong> Linux, macOS, Windows, Proxmox</div>
         </div>
-        <div class="cli-feature-card">
-          <div class="cli-feature-icon">⚡</div>
-          <div class="cli-feature-title">Zero dependencies</div>
-          <div class="cli-feature-desc">Pure Node.js. No npm packages beyond TypeScript types. Works on Linux, macOS, Windows, Proxmox.</div>
+
+        <!-- C. CLAWHub Marketplace -->
+        <div class="cli-column">
+          <div class="cli-col-title">CLAWHub Marketplace</div>
+          <ul class="cli-cmd-list">
+            <li><span class="cmd-name">tentaclaw hub search</span> <span class="cmd-desc">Search packages</span></li>
+            <li><span class="cmd-name">tentaclaw hub install</span> <span class="cmd-desc">Install @ns/pkg</span></li>
+            <li><span class="cmd-name">tentaclaw hub publish</span> <span class="cmd-desc">Publish your own</span></li>
+            <li><span class="cmd-name">tentaclaw hub trending</span> <span class="cmd-desc">Discover popular packages</span></li>
+          </ul>
+          <div style="font-size:12px; color:var(--dim); margin-top:16px; margin-bottom:8px; font-weight:600;">Package types:</div>
+          <div class="cli-pkg-types">
+            <span class="cli-pkg-pill">agents</span>
+            <span class="cli-pkg-pill">skills</span>
+            <span class="cli-pkg-pill">model configs</span>
+            <span class="cli-pkg-pill">integrations</span>
+            <span class="cli-pkg-pill">themes</span>
+          </div>
         </div>
       </div>
 
-      <p style="text-align:center; color:var(--dim); font-size:0.95rem; max-width:700px; margin:0 auto 32px; line-height:1.7;">
-        Plus: CLAWHub package registry, HuggingFace model browser (135,000+ models), 20+ slash commands, and persistent session memory.
-      </p>
-
+      <!-- Install commands -->
       <div class="cli-install-wrap">
         <div class="install-code-wrap">
           <div class="install-code-bar">
             <span>bash</span>
-            <button type="button" class="copy-btn" onclick="navigator.clipboard.writeText('curl -fsSL tentaclaw.io/install-cli | bash')">Copy</button>
+            <button type="button" class="copy-btn" onclick="navigator.clipboard.writeText('curl -fsSL tentaclaw.io/install-cli | bash').then(()=>{this.textContent='Copied!';this.style.color='#00ff88';setTimeout(()=>{this.textContent='Copy';this.style.color=''},2000)})">Copy</button>
           </div>
           <div class="install-code">
             <span class="dollar">$</span>curl -fsSL tentaclaw.io/install-cli | bash
@@ -1233,7 +1450,7 @@
         <div class="install-code-wrap cli-install-spacer">
           <div class="install-code-bar">
             <span>powershell</span>
-            <button type="button" class="copy-btn" onclick="navigator.clipboard.writeText('irm tentaclaw.io/install.ps1 | iex')">Copy</button>
+            <button type="button" class="copy-btn" onclick="navigator.clipboard.writeText('irm tentaclaw.io/install.ps1 | iex').then(()=>{this.textContent='Copied!';this.style.color='#00ff88';setTimeout(()=>{this.textContent='Copy';this.style.color=''},2000)})">Copy</button>
           </div>
           <div class="install-code">
             <span class="dollar">PS&gt;</span>irm tentaclaw.io/install.ps1 | iex
@@ -1243,7 +1460,7 @@
 
       <div class="cli-cta-wrap">
         <a href="docs.html#cli-reference" class="cli-cta-btn">
-          CLI Docs →
+          CLI Docs &rarr;
         </a>
       </div>
     </div>
@@ -1257,7 +1474,7 @@
   <section class="section" id="integrations">
     <div class="section-inner reveal">
       <div class="section-label">Ecosystem</div>
-      <h2 class="section-title">Every backend.<br>Every tool. One API.</h2>
+      <h2 class="section-title">Plug into everything</h2>
       <p class="section-sub">
         TentaCLAW auto-detects and routes to any inference engine. Drop-in OpenAI and Anthropic compatibility.
         28+ platform integrations. 135,000+ models from HuggingFace.
