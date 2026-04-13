@@ -23,7 +23,7 @@
   "license": "MIT",
   "dependencies": {},
   "devDependencies": {
-    "@types/node": "^22.12.0",
+    "@types/node": "^25.6.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }
