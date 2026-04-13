@@ -58,7 +58,7 @@ jobs:
 
       # -- Gateway --
       - name: Cache gateway node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: gateway/node_modules
           key: gateway-deps-${{ hashFiles('gateway/package-lock.json') }}
@@ -72,7 +72,7 @@ jobs:
 
       # -- Agent --
       - name: Cache agent node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: agent/node_modules
           key: agent-deps-${{ hashFiles('agent/package-lock.json') }}
@@ -86,7 +86,7 @@ jobs:
 
       # -- CLI --
       - name: Cache cli node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: cli/node_modules
           key: cli-deps-${{ hashFiles('cli/package-lock.json') }}
@@ -118,7 +118,7 @@ jobs:
 
       # -- CLAWHub --
       - name: Cache clawhub node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: clawhub/node_modules
           key: clawhub-deps-${{ hashFiles('clawhub/package-lock.json') }}
@@ -169,7 +169,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Cache ${{ matrix.component }} node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ matrix.component }}/node_modules
           key: ${{ matrix.component }}-deps-${{ hashFiles(format('{0}/package-lock.json', matrix.component)) }}
@@ -214,7 +214,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Cache ${{ matrix.component }} node_modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ matrix.component }}/node_modules
           key: ${{ matrix.component }}-deps-${{ hashFiles(format('{0}/package-lock.json', matrix.component)) }}
