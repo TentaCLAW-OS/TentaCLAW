@@ -23,7 +23,7 @@
   "author": "TentaCLAW Project",
   "license": "MIT",
   "dependencies": {
-    "ws": "^8.20.0"
+    "ws": "^8.20.1"
   },
   "devDependencies": {
     "@types/node": "^22.12.0",
